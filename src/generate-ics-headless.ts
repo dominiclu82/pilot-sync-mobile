@@ -88,20 +88,6 @@ export async function generateICSHeadless(
       const direction = diff < 0 ? -1 : 1;
       log(`🗓️ 切換月份：${curYear}/${curMonth} → ${targetYear}/${targetMonth}`);
 
-      // 列出頁面 header 區所有元素供偵錯
-      const headerInfo = await page.evaluate(() => {
-        return Array.from(document.querySelectorAll('*'))
-          .filter(el => {
-            const r = el.getBoundingClientRect();
-            return r.y > 50 && r.y < 250 && r.width > 5 && r.width < 400 && r.height > 5 && r.height < 80;
-          })
-          .map(el => {
-            const r = el.getBoundingClientRect();
-            return `[${el.tagName} cls="${(el.className+'').substring(0,25)}" x=${Math.round(r.x)} y=${Math.round(r.y)} w=${Math.round(r.width)} txt="${(el.textContent??'').trim().substring(0,15)}"]`;
-          }).slice(0, 20).join(' ');
-      });
-      log(`🔍 Header元素: ${headerInfo}`);
-
       for (let i = 0; i < Math.abs(diff); i++) {
         let clicked = false;
 
