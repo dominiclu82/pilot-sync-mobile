@@ -105,26 +105,50 @@ export async function generateICSHeadless(
       for (let i = 0; i < Math.abs(diff); i++) {
         let clicked = false;
 
-        // 方法0: 嘗試 Open Menu 按鈕（可能是月份選擇器入口）
-        try {
-          const openMenuBtn = page.getByRole('button', { name: 'Open Menu' });
-          if (await openMenuBtn.count() > 0) {
-            await openMenuBtn.click();
-            await page.waitForTimeout(800);
-            // 找月份選擇器或 PREVIOUS/NEXT
-            const prevEl = page.locator(`text="${direction < 0 ? 'PREVIOUS' : 'NEXT'}"`).first();
-            if (await prevEl.count() > 0) {
-              await prevEl.click({ timeout: 3000 });
-              clicked = true;
+        // 方法1: 用 rosterCalendarNav class 定位容器，點第一或最後一個子元素
+        if (!clicked) {
+          try {
+            const navContainer = page.locator('[class*="rosterCalendarNav"]');
+            if (await navContainer.count() > 0) {
+              // 先試 button，再試任何子元素
+              const btns = navContainer.locator('button');
+              const btnCount = await btns.count();
+              if (btnCount >= 2) {
+                await (direction < 0 ? btns.first() : btns.last()).click();
+                clicked = true;
+              } else {
+                // 沒有 button，試所有直接子元素
+                const children = navContainer.locator('> *');
+                const childCount = await children.count();
+                if (childCount >= 2) {
+                  await (direction < 0 ? children.first() : children.last()).click();
+                  clicked = true;
+                }
+              }
             }
-            if (!clicked) {
-              // 關閉選單再試其他方法
-              try { await page.getByRole('button', { name: /close menu/i }).click(); } catch {}
-            }
-          }
-        } catch {}
+          } catch {}
+        }
 
-        // 方法1: 找任何含 PREVIOUS/NEXT 文字的元素
+        // 方法2: 用 rosterCalendarNav 內所有可點擊的直接子節點（含 div）
+        if (!clicked) {
+          try {
+            const handle = await page.evaluateHandle((dir: number) => {
+              const nav = document.querySelector('[class*="rosterCalendarNav"]');
+              if (!nav) return null;
+              const children = Array.from(nav.querySelectorAll('button, [role="button"], div, span'))
+                .filter(el => {
+                  const r = el.getBoundingClientRect();
+                  return r.width > 0 && r.height > 0 && r.width < 200;
+                });
+              children.sort((a, b) => a.getBoundingClientRect().x - b.getBoundingClientRect().x);
+              return dir < 0 ? children[0] ?? null : children[children.length - 1] ?? null;
+            }, direction);
+            const el = handle.asElement();
+            if (el) { await el.click(); clicked = true; }
+          } catch {}
+        }
+
+        // 方法3: 找任何含 PREVIOUS/NEXT 文字的元素
         if (!clicked) {
           try {
             const el = page.locator(`text="${direction < 0 ? 'PREVIOUS' : 'NEXT'}"`).first();
@@ -132,42 +156,7 @@ export async function generateICSHeadless(
           } catch {}
         }
 
-        // 方法2: 鍵盤導覽 ArrowLeft/Right
         if (!clicked) {
-          for (const key of (direction < 0 ? ['ArrowLeft', 'PageUp'] : ['ArrowRight', 'PageDown'])) {
-            try {
-              await page.keyboard.press(key);
-              await page.waitForTimeout(600);
-              const newLbl = ((await monthLocator.textContent()) ?? '').trim();
-              if (newLbl !== toolbarLabel) { clicked = true; break; }
-            } catch {}
-          }
-        }
-
-        // 方法3: 掃描 header 區域的可點擊元素
-        if (!clicked) {
-          try {
-            const box = await monthLocator.boundingBox();
-            if (box) {
-              const handle = await page.evaluateHandle(({ dir, cy }: { dir: number; cy: number }) => {
-                const candidates = Array.from(document.querySelectorAll('*')).filter(el => {
-                  const r = el.getBoundingClientRect();
-                  if (r.width <= 0 || r.height <= 0 || r.width > 400 || r.height > 100) return false;
-                  if (Math.abs((r.top + r.height / 2) - cy) > 60) return false;
-                  const s = window.getComputedStyle(el);
-                  return s.cursor === 'pointer' || el.tagName === 'BUTTON' || el.getAttribute('role') === 'button';
-                });
-                candidates.sort((a, b) => a.getBoundingClientRect().x - b.getBoundingClientRect().x);
-                return dir < 0 ? candidates[0] ?? null : candidates[candidates.length - 1] ?? null;
-              }, { dir: direction, cy: box.y + box.height / 2 });
-              const el = handle.asElement();
-              if (el) { await el.click(); clicked = true; }
-            }
-          } catch {}
-        }
-
-        if (!clicked) {
-          // 最後截圖
           try { await page.screenshot({ path: debugScreenshotPath, fullPage: false }); } catch {}
           throw new Error('找不到月份切換方式，請查看 /debug/screenshot');
         }
