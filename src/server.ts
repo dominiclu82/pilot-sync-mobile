@@ -55,6 +55,30 @@ app.get('/', (_req, res) => {
   res.send(getSPAHtml());
 });
 
+app.get('/icon.svg', (_req, res) => {
+  res.setHeader('Content-Type', 'image/svg+xml');
+  res.send(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192">
+  <rect width="192" height="192" rx="38" fill="#1e2740"/>
+  <text x="96" y="145" text-anchor="middle" font-size="115"
+    font-family="Apple Color Emoji,Segoe UI Emoji,Noto Color Emoji,sans-serif">✈️</text>
+</svg>`);
+});
+
+app.get('/manifest.json', (_req, res) => {
+  res.json({
+    name: 'CrewSync',
+    short_name: 'CrewSync',
+    description: 'Crew Roster → Google Calendar',
+    start_url: '/',
+    display: 'standalone',
+    background_color: '#0a0e1a',
+    theme_color: '#1e2740',
+    icons: [
+      { src: '/icon.svg', sizes: 'any', type: 'image/svg+xml', purpose: 'any maskable' },
+    ],
+  });
+});
+
 app.get('/oauth/url', (_req, res) => {
   try {
     const creds = loadCredentials();
@@ -162,6 +186,9 @@ function getSPAHtml(): string {
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="CrewSync">
 <meta name="theme-color" content="#0a0e1a">
+<link rel="manifest" href="/manifest.json">
+<link rel="icon" href="/icon.svg">
+<link rel="apple-touch-icon" href="/icon.svg">
 <title>CrewSync</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
