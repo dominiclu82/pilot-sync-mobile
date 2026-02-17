@@ -263,6 +263,7 @@ input:focus,select:focus{border-color:var(--accent)}
 .google-badge .dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
 .dot-ok{background:var(--success)}
 .dot-no{background:#f59e0b}
+.auth-group{border:1px solid var(--dim);border-radius:10px;padding:10px;display:flex;flex-direction:column;gap:8px}
 details.how-to{background:var(--card);border-radius:var(--radius);overflow:hidden}
 details.how-to summary{padding:12px 16px;cursor:pointer;font-size:.84em;color:var(--muted);
   display:flex;align-items:center;gap:6px;list-style:none;user-select:none}
@@ -285,24 +286,26 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
   </div>
 
   <div class="card">
-    <!-- Google auth status -->
-    <div id="google-badge" class="google-badge">
-      <div class="dot dot-no" id="google-dot"></div>
-      <div id="google-badge-text" style="flex:1;color:var(--muted)">尚未授權 Google 日曆（第一次需要）</div>
-      <button class="btn btn-secondary btn-sm" id="google-auth-btn"
-        onclick="doGoogleAuth()" style="width:auto;padding:6px 12px;font-size:.82em">授權</button>
-    </div>
-    <details class="how-to" style="background:var(--surface);border-radius:10px">
-      <summary>🔐 首次授權出現警告？</summary>
-      <div class="how-to-body">
-        <div class="how-to-os">
-          Google 會顯示「這個應用程式未經驗證」的警告畫面，這是正常的：<br><br>
-          1. 點左下角「<b>進階</b>」<br>
-          2. 點「<b>前往 crew-sync.onrender.com（不安全）</b>」<br>
-          3. 點「<b>繼續</b>」完成授權
-        </div>
+    <!-- Google auth group -->
+    <div class="auth-group">
+      <div id="google-badge" class="google-badge" style="padding:0">
+        <div class="dot dot-no" id="google-dot"></div>
+        <div id="google-badge-text" style="flex:1;color:var(--muted)">尚未授權 Google 日曆（第一次需要）</div>
+        <button class="btn btn-secondary btn-sm" id="google-auth-btn"
+          onclick="doGoogleAuth()" style="width:auto;padding:6px 12px;font-size:.82em">授權</button>
       </div>
-    </details>
+      <details class="how-to" style="background:var(--surface);border-radius:8px">
+        <summary>🔐 首次授權出現警告？</summary>
+        <div class="how-to-body">
+          <div class="how-to-os">
+            Google 會顯示「這個應用程式未經驗證」的警告畫面，這是正常的：<br><br>
+            1. 點左下角「<b>進階</b>」<br>
+            2. 點「<b>前往 crew-sync.onrender.com（不安全）</b>」<br>
+            3. 點「<b>繼續</b>」完成授權
+          </div>
+        </div>
+      </details>
+    </div>
     <div id="cred-error" class="alert alert-error" style="display:none"></div>
 
     <form id="cred-form" autocomplete="on" onsubmit="submitCredentials(event)">
