@@ -323,6 +323,18 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
   </div>
 
   <details class="how-to">
+    <summary>🔐 首次授權 Google 出現警告？</summary>
+    <div class="how-to-body">
+      <div class="how-to-os">
+        Google 會顯示「這個應用程式未經驗證」的警告畫面，這是正常的。請依以下步驟繼續：<br><br>
+        1. 點左下角「<b>進階</b>」<br>
+        2. 點「<b>前往 crew-sync.onrender.com（不安全）</b>」<br>
+        3. 點「<b>繼續</b>」完成授權
+      </div>
+    </div>
+  </details>
+
+  <details class="how-to">
     <summary>📲 如何加入主畫面？</summary>
     <div class="how-to-body">
       <div class="how-to-os">
