@@ -264,11 +264,6 @@ input:focus,select:focus{border-color:var(--accent)}
         <input type="password" id="jx-pass" name="password"
           autocomplete="current-password" placeholder="班表登入密碼">
       </div>
-      <div class="field" style="margin-top:10px">
-        <label>Google 日曆 ID</label>
-        <input type="email" id="cal-id" name="email"
-          autocomplete="email" placeholder="your@gmail.com" required>
-      </div>
       <hr class="sep" style="margin:4px 0">
       <div style="font-weight:600;font-size:.9em">同步月份</div>
       <div class="month-row">
@@ -368,7 +363,6 @@ function showMain() {
   });
   // Pre-fill saved values
   document.getElementById('jx-user').value = localStorage.getItem('crewsync_user') || '';
-  document.getElementById('cal-id').value  = localStorage.getItem('crewsync_cal')  || '';
   document.getElementById('cred-error').style.display = 'none';
   updateGoogleBadge();
   showScreen('screen-main');
@@ -462,7 +456,6 @@ function clearSavedData() {
   if (!confirm('確定要清除所有儲存的資料嗎？')) return;
   localStorage.removeItem('crewsync_rt');
   localStorage.removeItem('crewsync_user');
-  localStorage.removeItem('crewsync_cal');
   refreshToken = '';
   const el = document.getElementById('settings-msg');
   el.className = 'alert alert-success'; el.style.display = ''; el.textContent = '✅ 資料已清除';
@@ -476,12 +469,6 @@ function submitCredentials(e) {
 
   const jxUser = document.getElementById('jx-user').value.trim();
   const jxPass = document.getElementById('jx-pass').value;
-  const calId  = document.getElementById('cal-id').value.trim();
-  if (!calId) {
-    document.getElementById('cred-error').textContent = '請填入 Google 日曆 ID（你的 Gmail 地址）';
-    document.getElementById('cred-error').style.display = '';
-    return;
-  }
 
   if (!jxUser || !jxPass) {
     document.getElementById('cred-error').textContent = '請填入員工編號和密碼';
@@ -491,11 +478,10 @@ function submitCredentials(e) {
 
   // 儲存帳號供下次預填（密碼由瀏覽器密碼管理器處理）
   localStorage.setItem('crewsync_user', jxUser);
-  localStorage.setItem('crewsync_cal',  calId);
 
   const year  = parseInt(document.getElementById('sync-year').value);
   const month = parseInt(document.getElementById('sync-month').value);
-  const params = { year, month, jxUsername: jxUser, jxPassword: jxPass, calendarId: calId };
+  const params = { year, month, jxUsername: jxUser, jxPassword: jxPass, calendarId: 'primary' };
 
   if (!refreshToken) {
     // Need Google auth first
