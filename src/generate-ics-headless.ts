@@ -81,11 +81,21 @@ export async function generateICSHeadless(
     const diff = (targetYear * 12 + targetMonth) - (curYear * 12 + curMonth);
 
     if (diff !== 0) {
-      const btnText = diff < 0 ? 'PREVIOUS' : 'NEXT';
+      const btnPattern = diff < 0 ? /prev/i : /next/i;
       log(`🗓️ 切換月份：${curYear}/${curMonth} → ${targetYear}/${targetMonth}`);
       for (let i = 0; i < Math.abs(diff); i++) {
-        await page.locator(`button:has-text("${btnText}")`).click();
-        await page.waitForTimeout(800);
+        // 嘗試多種選取方式：role、text pattern、aria-label
+        const navBtn = page.getByRole('button', { name: btnPattern });
+        try {
+          await navBtn.first().waitFor({ state: 'visible', timeout: 8000 });
+          await navBtn.first().click();
+        } catch {
+          // fallback: locator by text
+          const fallback = page.locator(`button`).filter({ hasText: btnPattern });
+          await fallback.first().waitFor({ state: 'visible', timeout: 5000 });
+          await fallback.first().click();
+        }
+        await page.waitForTimeout(1000);
       }
       await monthLocator.waitFor({ state: 'visible', timeout: 5000 });
       const newLabel = ((await monthLocator.textContent()) ?? '').trim();
