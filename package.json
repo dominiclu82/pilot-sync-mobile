@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "start": "tsx src/server.ts",
-    "build": "npx playwright install chromium --with-deps",
+    "build": "npx playwright install chromium",
     "auth": "tsx src/auth.ts",
     "dev": "tsx watch src/server.ts"
   },
