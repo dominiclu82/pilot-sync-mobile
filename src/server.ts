@@ -4,7 +4,7 @@ import fs from 'fs';
 import path from 'path';
 import { randomUUID } from 'crypto';
 import { config } from 'dotenv';
-import { CREDENTIALS_PATH, OUTPUT_DIR, ROOT } from './config.js';
+import { OUTPUT_DIR, ROOT, loadCredentials } from './config.js';
 import { generateICSHeadless } from './generate-ics-headless.js';
 import { syncICS, SyncResult } from './upload-ics.js';
 
@@ -12,14 +12,6 @@ config({ path: path.join(ROOT, '.env') });
 
 const PORT = process.env.PORT || 3000;
 const BASE_URL = process.env.BASE_URL || `http://localhost:${PORT}`;
-
-// Load Google credentials from env var (Render) or file (local)
-function loadCredentials(): any {
-  if (process.env.GOOGLE_CREDENTIALS_JSON) {
-    return JSON.parse(process.env.GOOGLE_CREDENTIALS_JSON);
-  }
-  return JSON.parse(fs.readFileSync(CREDENTIALS_PATH, 'utf8'));
-}
 
 // Determine redirect URI: env var > BASE_URL-derived > credentials.json
 const _creds = loadCredentials();

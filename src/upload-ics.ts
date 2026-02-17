@@ -1,7 +1,7 @@
 import fs from 'fs';
 import { google } from 'googleapis';
 import ical from 'ical';
-import { CREDENTIALS_PATH } from './config.js';
+import { loadCredentials } from './config.js';
 
 export interface SyncResult {
   addedCount: number;
@@ -21,7 +21,7 @@ export async function syncICS(params: {
 
   log('📋 開始上傳到 Google 日曆...');
 
-  const credentials = JSON.parse(fs.readFileSync(CREDENTIALS_PATH, 'utf8'));
+  const credentials = loadCredentials();
   const oauth2Client = new google.auth.OAuth2(
     credentials.web.client_id,
     credentials.web.client_secret,
