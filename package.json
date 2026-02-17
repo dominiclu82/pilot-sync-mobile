@@ -1,0 +1,28 @@
+{
+  "name": "pilot-sync-mobile",
+  "version": "1.0.0",
+  "description": "Mobile web interface for pilot roster sync to Google Calendar",
+  "type": "module",
+  "scripts": {
+    "start": "tsx src/server.ts",
+    "build": "npx playwright install chromium --with-deps",
+    "auth": "tsx src/auth.ts",
+    "dev": "tsx watch src/server.ts"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^16.5.0",
+    "express": "^5.1.0",
+    "googleapis": "^150.0.1",
+    "ical": "^0.8.0",
+    "playwright": "^1.53.1"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.17",
+    "@types/express": "^5.0.0",
+    "@types/ical": "^0.8.1",
+    "@types/node": "^22.0.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.7.0"
+  }
+}
