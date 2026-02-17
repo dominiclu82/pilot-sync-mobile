@@ -94,43 +94,50 @@ export async function generateICSHeadless(
           if (await el.count() > 0) { await el.click({ timeout: 3000 }); clicked = true; }
         } catch {}
 
-        // 方法2: evaluateHandle 找月份標籤附近帶有 prev/next class 的可點擊元素
-        if (!clicked) {
-          try {
-            const handle = await page.evaluateHandle((dir: number) => {
-              const label = Array.from(document.querySelectorAll('*')).find(el =>
-                /^\d{4}\.(JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC)$/i.test((el.textContent ?? '').trim())
-                && el.children.length === 0
-              );
-              if (!label) return null;
-              let container: Element | null = label.parentElement;
-              for (let up = 0; up < 8; up++) {
-                if (!container) break;
-                const clickables = Array.from(container.querySelectorAll(
-                  'button, [role="button"], [class*="prev"], [class*="next"], [class*="Prev"], [class*="Next"], [class*="nav"]'
-                ));
-                if (clickables.length >= 2) {
-                  return dir < 0 ? clickables[0] : clickables[clickables.length - 1];
-                }
-                container = container.parentElement;
-              }
-              return null;
-            }, direction);
-            const el = handle.asElement();
-            if (el) { await el.click(); clicked = true; }
-          } catch {}
-        }
-
-        // 方法3: 依月份標籤位置，點擊其左方或右方 60px 處
+        // 方法2: 在月份標籤同排找 cursor:pointer 元素（最左=PREVIOUS, 最右=NEXT）
         if (!clicked) {
           try {
             const box = await monthLocator.boundingBox();
             if (box) {
-              const x = direction < 0 ? box.x - 60 : box.x + box.width + 60;
-              const y = box.y + box.height / 2;
-              await page.mouse.click(x, y);
-              clicked = true;
-              log(`🖱️ 座標點擊導覽 (${Math.round(x)}, ${Math.round(y)})`);
+              const labelCenterY = box.y + box.height / 2;
+              const handle = await page.evaluateHandle(({ dir, cy }: { dir: number; cy: number }) => {
+                const candidates = Array.from(document.querySelectorAll('*')).filter(el => {
+                  const rect = el.getBoundingClientRect();
+                  if (rect.width <= 0 || rect.height <= 0) return false;
+                  if (rect.width > 300 || rect.height > 100) return false; // 排除容器
+                  const elCy = rect.top + rect.height / 2;
+                  if (Math.abs(elCy - cy) > 40) return false; // 同一橫排
+                  const style = window.getComputedStyle(el);
+                  return style.cursor === 'pointer' || el.tagName === 'BUTTON';
+                });
+                if (!candidates.length) return null;
+                candidates.sort((a, b) => a.getBoundingClientRect().x - b.getBoundingClientRect().x);
+                return dir < 0 ? candidates[0] : candidates[candidates.length - 1];
+              }, { dir: direction, cy: labelCenterY });
+              const el = handle.asElement();
+              if (el) {
+                const elBox = await (el as any).boundingBox?.();
+                log(`🖱️ cursor:pointer 元素點擊 x=${elBox?.x?.toFixed(0)} y=${elBox?.y?.toFixed(0)}`);
+                await el.click();
+                clicked = true;
+              }
+            }
+          } catch {}
+        }
+
+        // 方法3: 月份標籤右側找導覽（若標籤在最左，PREVIOUS可能在右側）
+        if (!clicked) {
+          try {
+            const box = await monthLocator.boundingBox();
+            if (box) {
+              // 嘗試右側 100px 和 200px
+              const offsets = direction < 0 ? [100, 200, 300] : [box.width + 100, box.width + 200];
+              for (const offset of offsets) {
+                await page.mouse.click(box.x + offset, box.y + box.height / 2);
+                await page.waitForTimeout(600);
+                const newLbl = ((await monthLocator.textContent()) ?? '').trim();
+                if (newLbl !== toolbarLabel) { clicked = true; break; }
+              }
             }
           } catch {}
         }
@@ -159,7 +166,7 @@ export async function generateICSHeadless(
     const dutyDetails: DutyDetail[] = [];
     const processedDuties = new Set<string>();
     let i = 0;
-    const SKIP = new Set(['DO', 'HDO', 'ANL', 'PSL']);
+    const SKIP = new Set(['DO', 'HDO', 'BDO', 'ANL', 'PSL']);
 
     while (true) {
       await page.waitForSelector('.rbc-event-content', { timeout: 2000 });
