@@ -65,7 +65,7 @@ app.get('/', (_req, res) => {
 
 app.get('/oauth/url', (_req, res) => {
   try {
-    const creds = JSON.parse(fs.readFileSync(CREDENTIALS_PATH, 'utf8'));
+    const creds = loadCredentials();
     const client = new google.auth.OAuth2(creds.web.client_id, creds.web.client_secret, REDIRECT_URI);
     const url = client.generateAuthUrl({
       access_type: 'offline',
@@ -86,7 +86,7 @@ async function oauthCallback(req: express.Request, res: express.Response) {
   const { code } = req.query;
   if (!code) { res.status(400).send('Missing code'); return; }
   try {
-    const creds = JSON.parse(fs.readFileSync(CREDENTIALS_PATH, 'utf8'));
+    const creds = loadCredentials();
     const client = new google.auth.OAuth2(creds.web.client_id, creds.web.client_secret, REDIRECT_URI);
     const { tokens } = await client.getToken(code as string);
     const rt = tokens.refresh_token ?? '';
