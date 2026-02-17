@@ -81,22 +81,59 @@ export async function generateICSHeadless(
     const diff = (targetYear * 12 + targetMonth) - (curYear * 12 + curMonth);
 
     if (diff !== 0) {
-      const btnPattern = diff < 0 ? /prev/i : /next/i;
+      const direction = diff < 0 ? -1 : 1;
       log(`🗓️ 切換月份：${curYear}/${curMonth} → ${targetYear}/${targetMonth}`);
+
+      // 診斷：列出頁面所有按鈕
+      const allBtns = await page.$$('button');
+      const btnInfo = await Promise.all(allBtns.slice(0, 15).map(async b => {
+        const text = ((await b.textContent()) ?? '').trim().replace(/\s+/g, ' ').substring(0, 20);
+        const aria = await b.getAttribute('aria-label') ?? '';
+        const title = await b.getAttribute('title') ?? '';
+        return `"${text || aria || title || '?'}"`;
+      }));
+      log(`🔍 頁面按鈕(${allBtns.length}): ${btnInfo.join(' ')}`);
+
       for (let i = 0; i < Math.abs(diff); i++) {
-        // 嘗試多種選取方式：role、text pattern、aria-label
-        const navBtn = page.getByRole('button', { name: btnPattern });
-        try {
-          await navBtn.first().waitFor({ state: 'visible', timeout: 8000 });
-          await navBtn.first().click();
-        } catch {
-          // fallback: locator by text
-          const fallback = page.locator(`button`).filter({ hasText: btnPattern });
-          await fallback.first().waitFor({ state: 'visible', timeout: 5000 });
-          await fallback.first().click();
+        // 方法1: getByRole 多種關鍵字
+        const keywords = direction < 0 ? [/prev/i, /back/i, /上一/, /</, /‹/] : [/next/i, /forward/i, /下一/, />/, /›/];
+        let clicked = false;
+        for (const kw of keywords) {
+          try {
+            const btn = page.getByRole('button', { name: kw });
+            if (await btn.count() > 0) { await btn.first().click(); clicked = true; break; }
+          } catch {}
         }
-        await page.waitForTimeout(1000);
+
+        // 方法2: 找月份標籤同層容器中的第一/最後一個按鈕
+        if (!clicked) {
+          try {
+            const handle = await page.evaluateHandle((dir: number) => {
+              const labels = Array.from(document.querySelectorAll('*')).filter(el =>
+                /^\d{4}\.(JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC)$/i.test((el.textContent ?? '').trim())
+                && el.children.length === 0
+              );
+              if (!labels.length) return null;
+              let container: Element | null = labels[0];
+              for (let up = 0; up < 5; up++) {
+                container = container?.parentElement ?? null;
+                if (!container) break;
+                const btns = Array.from(container.querySelectorAll('button'));
+                if (btns.length >= 2) {
+                  return dir < 0 ? btns[0] : btns[btns.length - 1];
+                }
+              }
+              return null;
+            }, direction);
+            const el = handle.asElement();
+            if (el) { await el.click(); clicked = true; }
+          } catch {}
+        }
+
+        if (!clicked) throw new Error('找不到月份切換按鈕，請查看上方按鈕診斷資訊');
+        await page.waitForTimeout(1200);
       }
+
       await monthLocator.waitFor({ state: 'visible', timeout: 5000 });
       const newLabel = ((await monthLocator.textContent()) ?? '').trim();
       const { year: vy, month: vm } = parseToolbarLabel(newLabel);
