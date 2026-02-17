@@ -84,44 +84,35 @@ export async function generateICSHeadless(
       const direction = diff < 0 ? -1 : 1;
       log(`🗓️ 切換月份：${curYear}/${curMonth} → ${targetYear}/${targetMonth}`);
 
-      // 診斷：列出頁面所有按鈕
-      const allBtns = await page.$$('button');
-      const btnInfo = await Promise.all(allBtns.slice(0, 15).map(async b => {
-        const text = ((await b.textContent()) ?? '').trim().replace(/\s+/g, ' ').substring(0, 20);
-        const aria = await b.getAttribute('aria-label') ?? '';
-        const title = await b.getAttribute('title') ?? '';
-        return `"${text || aria || title || '?'}"`;
-      }));
-      log(`🔍 頁面按鈕(${allBtns.length}): ${btnInfo.join(' ')}`);
-
       for (let i = 0; i < Math.abs(diff); i++) {
-        // 方法1: getByRole 多種關鍵字
-        const keywords = direction < 0 ? [/prev/i, /back/i, /上一/, /</, /‹/] : [/next/i, /forward/i, /下一/, />/, /›/];
         let clicked = false;
-        for (const kw of keywords) {
-          try {
-            const btn = page.getByRole('button', { name: kw });
-            if (await btn.count() > 0) { await btn.first().click(); clicked = true; break; }
-          } catch {}
-        }
 
-        // 方法2: 找月份標籤同層容器中的第一/最後一個按鈕
+        // 方法1: 找任何含 PREVIOUS/NEXT 文字的可點元素（不限 button）
+        const textTarget = direction < 0 ? 'PREVIOUS' : 'NEXT';
+        try {
+          const el = page.locator(`text="${textTarget}"`).first();
+          if (await el.count() > 0) { await el.click({ timeout: 3000 }); clicked = true; }
+        } catch {}
+
+        // 方法2: evaluateHandle 找月份標籤附近帶有 prev/next class 的可點擊元素
         if (!clicked) {
           try {
             const handle = await page.evaluateHandle((dir: number) => {
-              const labels = Array.from(document.querySelectorAll('*')).filter(el =>
+              const label = Array.from(document.querySelectorAll('*')).find(el =>
                 /^\d{4}\.(JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC)$/i.test((el.textContent ?? '').trim())
                 && el.children.length === 0
               );
-              if (!labels.length) return null;
-              let container: Element | null = labels[0];
-              for (let up = 0; up < 5; up++) {
-                container = container?.parentElement ?? null;
+              if (!label) return null;
+              let container: Element | null = label.parentElement;
+              for (let up = 0; up < 8; up++) {
                 if (!container) break;
-                const btns = Array.from(container.querySelectorAll('button'));
-                if (btns.length >= 2) {
-                  return dir < 0 ? btns[0] : btns[btns.length - 1];
+                const clickables = Array.from(container.querySelectorAll(
+                  'button, [role="button"], [class*="prev"], [class*="next"], [class*="Prev"], [class*="Next"], [class*="nav"]'
+                ));
+                if (clickables.length >= 2) {
+                  return dir < 0 ? clickables[0] : clickables[clickables.length - 1];
                 }
+                container = container.parentElement;
               }
               return null;
             }, direction);
@@ -130,7 +121,21 @@ export async function generateICSHeadless(
           } catch {}
         }
 
-        if (!clicked) throw new Error('找不到月份切換按鈕，請查看上方按鈕診斷資訊');
+        // 方法3: 依月份標籤位置，點擊其左方或右方 60px 處
+        if (!clicked) {
+          try {
+            const box = await monthLocator.boundingBox();
+            if (box) {
+              const x = direction < 0 ? box.x - 60 : box.x + box.width + 60;
+              const y = box.y + box.height / 2;
+              await page.mouse.click(x, y);
+              clicked = true;
+              log(`🖱️ 座標點擊導覽 (${Math.round(x)}, ${Math.round(y)})`);
+            }
+          } catch {}
+        }
+
+        if (!clicked) throw new Error('找不到月份切換方式，頁面結構可能已更新');
         await page.waitForTimeout(1200);
       }
 

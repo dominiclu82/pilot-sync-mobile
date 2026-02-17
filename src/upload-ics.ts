@@ -19,6 +19,13 @@ export async function syncICS(params: {
   const { refreshToken, calendarId, icsPath, onLog } = params;
   const log = (msg: string) => { console.log(msg); onLog?.(msg); };
 
+  // ical 將浮動時間（無時區）以 UTC 解析，但實際上是台北時間，
+  // 需用 UTC 數值直接組成 +08:00 字串，避免二次轉換
+  const toTaipei = (d: Date) => {
+    const p = (n: number) => String(n).padStart(2, '0');
+    return `${d.getUTCFullYear()}-${p(d.getUTCMonth()+1)}-${p(d.getUTCDate())}T${p(d.getUTCHours())}:${p(d.getUTCMinutes())}:00+08:00`;
+  };
+
   log('📋 開始上傳到 Google 日曆...');
 
   const credentials = loadCredentials();
@@ -139,8 +146,8 @@ export async function syncICS(params: {
     const isFlightDuty = /^JX\d{3}/.test(event.summary);
     const requestBody = {
       summary: event.summary,
-      start: { dateTime: event.start, timeZone: 'Asia/Taipei' },
-      end: { dateTime: event.end, timeZone: 'Asia/Taipei' },
+      start: { dateTime: toTaipei(event.startDate), timeZone: 'Asia/Taipei' },
+      end: { dateTime: toTaipei(event.endDate), timeZone: 'Asia/Taipei' },
       description: 'Imported from CrewSync',
       reminders: isFlightDuty ? {
         useDefault: false,
