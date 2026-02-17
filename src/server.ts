@@ -121,6 +121,19 @@ async function oauthCallback(req: express.Request, res: express.Response) {
   }
 }
 
+app.get('/debug/screenshot', (_req, res) => {
+  // 找最新的 debug 截圖
+  try {
+    if (!fs.existsSync(OUTPUT_DIR)) { res.status(404).send('No screenshot'); return; }
+    const files = fs.readdirSync(OUTPUT_DIR)
+      .filter(f => f.endsWith('-debug.png'))
+      .map(f => ({ f, t: fs.statSync(path.join(OUTPUT_DIR, f)).mtimeMs }))
+      .sort((a, b) => b.t - a.t);
+    if (!files.length) { res.status(404).send('No screenshot yet. Run a sync first.'); return; }
+    res.sendFile(path.join(OUTPUT_DIR, files[0].f));
+  } catch (err: any) { res.status(500).send(err.message); }
+});
+
 app.post('/sync', async (req, res) => {
   const { year, month, jxUsername, jxPassword, refreshToken, calendarId } = req.body;
   if (!year || !month || !jxUsername || !jxPassword || !refreshToken || !calendarId) {

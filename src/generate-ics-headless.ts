@@ -80,69 +80,97 @@ export async function generateICSHeadless(
     const { year: curYear, month: curMonth } = parseToolbarLabel(toolbarLabel);
     const diff = (targetYear * 12 + targetMonth) - (curYear * 12 + curMonth);
 
+    // 截圖供偵錯
+    const debugScreenshotPath = icsPath.replace('.ics', '-debug.png');
+    try { await page.screenshot({ path: debugScreenshotPath, fullPage: false }); } catch {}
+
     if (diff !== 0) {
       const direction = diff < 0 ? -1 : 1;
       log(`🗓️ 切換月份：${curYear}/${curMonth} → ${targetYear}/${targetMonth}`);
 
+      // 列出頁面 header 區所有元素供偵錯
+      const headerInfo = await page.evaluate(() => {
+        return Array.from(document.querySelectorAll('*'))
+          .filter(el => {
+            const r = el.getBoundingClientRect();
+            return r.y > 50 && r.y < 250 && r.width > 5 && r.width < 400 && r.height > 5 && r.height < 80;
+          })
+          .map(el => {
+            const r = el.getBoundingClientRect();
+            return `[${el.tagName} cls="${(el.className+'').substring(0,25)}" x=${Math.round(r.x)} y=${Math.round(r.y)} w=${Math.round(r.width)} txt="${(el.textContent??'').trim().substring(0,15)}"]`;
+          }).slice(0, 20).join(' ');
+      });
+      log(`🔍 Header元素: ${headerInfo}`);
+
       for (let i = 0; i < Math.abs(diff); i++) {
         let clicked = false;
 
-        // 方法1: 找任何含 PREVIOUS/NEXT 文字的可點元素（不限 button）
-        const textTarget = direction < 0 ? 'PREVIOUS' : 'NEXT';
+        // 方法0: 嘗試 Open Menu 按鈕（可能是月份選擇器入口）
         try {
-          const el = page.locator(`text="${textTarget}"`).first();
-          if (await el.count() > 0) { await el.click({ timeout: 3000 }); clicked = true; }
+          const openMenuBtn = page.getByRole('button', { name: 'Open Menu' });
+          if (await openMenuBtn.count() > 0) {
+            await openMenuBtn.click();
+            await page.waitForTimeout(800);
+            // 找月份選擇器或 PREVIOUS/NEXT
+            const prevEl = page.locator(`text="${direction < 0 ? 'PREVIOUS' : 'NEXT'}"`).first();
+            if (await prevEl.count() > 0) {
+              await prevEl.click({ timeout: 3000 });
+              clicked = true;
+            }
+            if (!clicked) {
+              // 關閉選單再試其他方法
+              try { await page.getByRole('button', { name: /close menu/i }).click(); } catch {}
+            }
+          }
         } catch {}
 
-        // 方法2: 在月份標籤同排找 cursor:pointer 元素（最左=PREVIOUS, 最右=NEXT）
+        // 方法1: 找任何含 PREVIOUS/NEXT 文字的元素
+        if (!clicked) {
+          try {
+            const el = page.locator(`text="${direction < 0 ? 'PREVIOUS' : 'NEXT'}"`).first();
+            if (await el.count() > 0) { await el.click({ timeout: 3000 }); clicked = true; }
+          } catch {}
+        }
+
+        // 方法2: 鍵盤導覽 ArrowLeft/Right
+        if (!clicked) {
+          for (const key of (direction < 0 ? ['ArrowLeft', 'PageUp'] : ['ArrowRight', 'PageDown'])) {
+            try {
+              await page.keyboard.press(key);
+              await page.waitForTimeout(600);
+              const newLbl = ((await monthLocator.textContent()) ?? '').trim();
+              if (newLbl !== toolbarLabel) { clicked = true; break; }
+            } catch {}
+          }
+        }
+
+        // 方法3: 掃描 header 區域的可點擊元素
         if (!clicked) {
           try {
             const box = await monthLocator.boundingBox();
             if (box) {
-              const labelCenterY = box.y + box.height / 2;
               const handle = await page.evaluateHandle(({ dir, cy }: { dir: number; cy: number }) => {
                 const candidates = Array.from(document.querySelectorAll('*')).filter(el => {
-                  const rect = el.getBoundingClientRect();
-                  if (rect.width <= 0 || rect.height <= 0) return false;
-                  if (rect.width > 300 || rect.height > 100) return false; // 排除容器
-                  const elCy = rect.top + rect.height / 2;
-                  if (Math.abs(elCy - cy) > 40) return false; // 同一橫排
-                  const style = window.getComputedStyle(el);
-                  return style.cursor === 'pointer' || el.tagName === 'BUTTON';
+                  const r = el.getBoundingClientRect();
+                  if (r.width <= 0 || r.height <= 0 || r.width > 400 || r.height > 100) return false;
+                  if (Math.abs((r.top + r.height / 2) - cy) > 60) return false;
+                  const s = window.getComputedStyle(el);
+                  return s.cursor === 'pointer' || el.tagName === 'BUTTON' || el.getAttribute('role') === 'button';
                 });
-                if (!candidates.length) return null;
                 candidates.sort((a, b) => a.getBoundingClientRect().x - b.getBoundingClientRect().x);
-                return dir < 0 ? candidates[0] : candidates[candidates.length - 1];
-              }, { dir: direction, cy: labelCenterY });
+                return dir < 0 ? candidates[0] ?? null : candidates[candidates.length - 1] ?? null;
+              }, { dir: direction, cy: box.y + box.height / 2 });
               const el = handle.asElement();
-              if (el) {
-                const elBox = await (el as any).boundingBox?.();
-                log(`🖱️ cursor:pointer 元素點擊 x=${elBox?.x?.toFixed(0)} y=${elBox?.y?.toFixed(0)}`);
-                await el.click();
-                clicked = true;
-              }
+              if (el) { await el.click(); clicked = true; }
             }
           } catch {}
         }
 
-        // 方法3: 月份標籤右側找導覽（若標籤在最左，PREVIOUS可能在右側）
         if (!clicked) {
-          try {
-            const box = await monthLocator.boundingBox();
-            if (box) {
-              // 嘗試右側 100px 和 200px
-              const offsets = direction < 0 ? [100, 200, 300] : [box.width + 100, box.width + 200];
-              for (const offset of offsets) {
-                await page.mouse.click(box.x + offset, box.y + box.height / 2);
-                await page.waitForTimeout(600);
-                const newLbl = ((await monthLocator.textContent()) ?? '').trim();
-                if (newLbl !== toolbarLabel) { clicked = true; break; }
-              }
-            }
-          } catch {}
+          // 最後截圖
+          try { await page.screenshot({ path: debugScreenshotPath, fullPage: false }); } catch {}
+          throw new Error('找不到月份切換方式，請查看 /debug/screenshot');
         }
-
-        if (!clicked) throw new Error('找不到月份切換方式，頁面結構可能已更新');
         await page.waitForTimeout(1200);
       }
 
