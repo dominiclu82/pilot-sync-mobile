@@ -263,6 +263,15 @@ input:focus,select:focus{border-color:var(--accent)}
 .google-badge .dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
 .dot-ok{background:var(--success)}
 .dot-no{background:#f59e0b}
+details.how-to{background:var(--card);border-radius:var(--radius);overflow:hidden}
+details.how-to summary{padding:12px 16px;cursor:pointer;font-size:.84em;color:var(--muted);
+  display:flex;align-items:center;gap:6px;list-style:none;user-select:none}
+details.how-to summary::-webkit-details-marker{display:none}
+details.how-to summary::after{content:'›';margin-left:auto;font-size:1.1em;transition:transform .2s}
+details.how-to[open] summary::after{transform:rotate(90deg)}
+.how-to-body{padding:0 16px 14px;display:flex;flex-direction:column;gap:12px}
+.how-to-os{font-size:.82em;line-height:1.7}
+.how-to-os strong{color:var(--text);display:block;margin-bottom:2px}
 </style>
 </head>
 <body>
@@ -312,6 +321,24 @@ input:focus,select:focus{border-color:var(--accent)}
       <button type="submit" class="btn btn-primary">🚀 開始同步</button>
     </form>
   </div>
+
+  <details class="how-to">
+    <summary>📲 如何加入主畫面？</summary>
+    <div class="how-to-body">
+      <div class="how-to-os">
+        <strong>🍎 iPhone / iPad（Safari）</strong>
+        1. 點底部 <b>分享</b> 按鈕（方框加箭頭）<br>
+        2. 向下滑，點「<b>加入主畫面</b>」<br>
+        3. 右上角點「<b>新增</b>」
+      </div>
+      <div class="how-to-os">
+        <strong>🤖 Android（Chrome）</strong>
+        1. 點右上角 <b>⋮</b> 選單<br>
+        2. 點「<b>新增至主畫面</b>」或「<b>安裝應用程式</b>」<br>
+        3. 點「<b>新增</b>」
+      </div>
+    </div>
+  </details>
 
   <div style="text-align:center">
     <button class="link-btn" onclick="showSettings()">⚙️ 設定</button>
