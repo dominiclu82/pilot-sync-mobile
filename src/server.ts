@@ -848,6 +848,7 @@ function switchTab(tab, btn) {
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('tab-active'));
   document.getElementById('tab-' + tab).classList.add('tab-active');
   btn.classList.add('tab-active');
+  window.scrollTo(0, 0);
 }
 
 // ── D-ATIS ────────────────────────────────────────────────────────────────────
