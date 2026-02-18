@@ -213,8 +213,46 @@ function getSPAHtml(): string {
   --radius:14px;--safe-bottom:env(safe-area-inset-bottom,0px)
 }
 body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
-  min-height:100dvh;display:flex;flex-direction:column;align-items:center;justify-content:center;
-  padding:20px 16px calc(20px + var(--safe-bottom));overflow-x:hidden}
+  min-height:100dvh;overflow-x:hidden;padding-bottom:56px}
+#tab-sync{display:none;flex-direction:column;align-items:center;justify-content:center;
+  min-height:calc(100dvh - 56px);padding:20px 16px calc(20px + var(--safe-bottom))}
+#tab-sync.tab-active{display:flex}
+#tab-briefing{display:none;min-height:calc(100dvh - 56px);padding:16px 16px calc(20px + var(--safe-bottom))}
+#tab-briefing.tab-active{display:block}
+.tab-bar{position:fixed;bottom:0;left:0;right:0;height:56px;background:var(--card);
+  border-top:1px solid var(--dim);display:flex;z-index:200;
+  padding-bottom:env(safe-area-inset-bottom,0px)}
+.tab-btn{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:2px;border:none;background:none;color:var(--muted);font-size:.7em;font-weight:600;
+  cursor:pointer;transition:color .15s;-webkit-appearance:none}
+.tab-btn.tab-active{color:var(--accent)}
+.tab-btn-icon{font-size:1.5em;line-height:1}
+.briefing-section{background:var(--card);border-radius:var(--radius);padding:16px;margin-bottom:16px}
+.briefing-section h2{font-size:1em;font-weight:700;margin:0 0 12px;color:var(--text);display:flex;align-items:center;gap:6px}
+.datis-tabs{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px}
+.datis-tab{padding:4px 12px;font-size:.78em;background:none;border:1.5px solid var(--dim);
+  border-radius:16px;color:var(--muted);font-weight:500;cursor:pointer;transition:all .2s;margin:0}
+.datis-tab:hover{border-color:var(--accent);color:var(--accent)}
+.datis-tab.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+.datis-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(80px,1fr));gap:8px}
+.datis-btn{display:flex;flex-direction:column;align-items:center;justify-content:center;
+  padding:8px 4px;border-radius:10px;border:2px solid var(--accent);background:none;
+  color:var(--text);font-size:.82em;font-weight:700;cursor:pointer;transition:all .2s;
+  margin:0;line-height:1.3}
+.datis-btn span{font-size:.8em;font-weight:400;color:var(--muted);margin-top:2px}
+.datis-btn:hover,.datis-btn.selected{background:var(--accent);color:#fff}
+.datis-btn:hover span,.datis-btn.selected span{color:rgba(255,255,255,.85)}
+.datis-btn.a{border-style:dashed;opacity:.75}
+.datis-btn.a:hover,.datis-btn.a.selected{opacity:1}
+.datis-btn.s{border:2px solid #b45309}
+.datis-btn.a.s{border:2px dashed #b45309}
+.datis-btn.s:hover,.datis-btn.s.selected{background:#b45309}
+.datis-btn.s:hover span,.datis-btn.s.selected span{color:rgba(255,255,255,.85)}
+.datis-btn.hidden{display:none}
+.atis-card{background:var(--surface);border:1px solid var(--dim);border-radius:10px;padding:.8em 1em;margin-bottom:.8em}
+.atis-card-title{font-weight:700;font-size:.9em;color:var(--accent-light);margin-bottom:.4em}
+.atis-card pre{margin:0;white-space:pre-wrap;word-break:break-word;font-family:'Courier New',monospace;font-size:.85em;line-height:1.5;color:var(--text)}
+.atis-loading{text-align:center;padding:2em;color:var(--muted)}
 .screen{display:none;width:100%;max-width:420px;animation:fadeIn .2s ease}
 .screen.active{display:flex;flex-direction:column;gap:20px}
 @keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
@@ -273,9 +311,31 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
 .how-to-body{padding:0 16px 14px;display:flex;flex-direction:column;gap:12px}
 .how-to-os{font-size:.82em;line-height:1.7}
 .how-to-os strong{color:var(--text);display:block;margin-bottom:2px}
+[data-theme="light"]{
+  --bg:#f1f5f9;--surface:#ffffff;--card:#dbeafe;
+  --accent:#2563eb;--accent-light:#3b82f6;
+  --text:#1e293b;--muted:#64748b;--dim:#cbd5e1;
+  --success:#15803d;--error:#dc2626
+}
+.briefing-subtabs{display:flex;border-bottom:1.5px solid var(--dim);margin-bottom:16px}
+.briefing-subtab{flex:1;padding:10px 4px;font-size:.84em;font-weight:700;background:none;
+  border:none;border-bottom:2.5px solid transparent;color:var(--muted);cursor:pointer;
+  transition:color .2s,border-color .2s;margin-bottom:-1.5px;-webkit-appearance:none}
+.briefing-subtab.active{color:var(--accent);border-bottom-color:var(--accent)}
+.briefing-panel{display:none}
+.briefing-panel.active{display:block}
+.tool-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px;margin-top:4px}
+.tool-link-btn{display:flex;align-items:center;justify-content:center;
+  padding:10px 8px;background:var(--accent);color:#fff;border-radius:10px;
+  text-decoration:none;font-weight:600;font-size:.82em;text-align:center;
+  transition:opacity .15s;line-height:1.3}
+.tool-link-btn:active{opacity:.7}
 </style>
 </head>
 <body>
+
+<!-- ══ Tab: 同步 ═════════════════════════════════════════════════════ -->
+<div id="tab-sync" class="tab-active">
 
 <!-- ══ Main（含帳號 + 月份，一個畫面搞定）══════════════════════════════ -->
 <div id="screen-main" class="screen active">
@@ -406,6 +466,157 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
     <button class="btn btn-danger btn-sm" onclick="clearSavedData()">🗑️ 清除已儲存的資料</button>
     <button class="btn btn-secondary" onclick="showMain()">← 返回</button>
   </div>
+</div>
+
+</div><!-- end tab-sync -->
+
+<!-- ══ Tab: A350簡報箱 ══════════════════════════════════════════════ -->
+<div id="tab-briefing">
+
+  <!-- 子 Tab Bar -->
+  <div class="briefing-subtabs">
+    <button class="briefing-subtab active" id="subtabBtn-tools" onclick="switchBriefingTab('tools',this)">🗺️ 工具連結</button>
+    <button class="briefing-subtab" id="subtabBtn-datis" onclick="switchBriefingTab('datis',this)">📡 D-ATIS</button>
+  </div>
+
+  <!-- ── 工具連結 panel ── -->
+  <div id="briefing-tools" class="briefing-panel active">
+    <div class="briefing-section">
+      <div class="tool-grid">
+        <a class="tool-link-btn" href="https://flight-plan-editor.weathernews.com/flight_plan_editor/#login" target="_blank">☁️ Weathernews Flight Plan</a>
+        <a class="tool-link-btn" href="https://pilotstarspace.starlux-airlines.com/#/" target="_blank">🌟 SJX Pilot Space</a>
+        <a class="tool-link-btn" href="https://elb.starlux-airlines.com/elb/#/dashboard/fleet" target="_blank">🧰 STARLUX ELB Fleet</a>
+        <a class="tool-link-btn" href="https://tono2.net" target="_blank">🇯🇵 Tono2 航空氣象</a>
+        <a class="tool-link-btn" href="https://sjx.lido.aero/lido/las/login.jsp?DESMON_RESULT_PAGE=https://sjx.lido.aero/briefing&DESMON_CODE=LAS_001&DESMON_LANG=null" target="_blank">📋 LIDO Briefing</a>
+        <a class="tool-link-btn" href="https://www.skyinfo.jp" target="_blank">🇯🇵 日本NOTAM地圖</a>
+        <a class="tool-link-btn" href="https://app.cwa.gov.tw/web/obsmap/typhoon.html" target="_blank">🌀 颱風路徑圖</a>
+        <a class="tool-link-btn" href="https://zihchi.github.io/flight-time/" target="_blank">💻 飛時計算工具</a>
+        <a class="tool-link-btn" href="https://gpsjam.org/" target="_blank">🛰️ GPS干擾區域</a>
+        <a class="tool-link-btn" href="https://zihchi.github.io/NOTAM/" target="_blank">📡 NOTAM座標</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── D-ATIS panel ── -->
+  <div id="briefing-datis" class="briefing-panel">
+    <div class="briefing-section">
+      <h2>📡 D-ATIS</h2>
+      <div class="datis-tabs">
+        <button class="datis-tab active" onclick="switchDatisRegion('taiwan',this)">台灣</button>
+        <button class="datis-tab" onclick="switchDatisRegion('hkmacao',this)">港澳</button>
+        <button class="datis-tab" onclick="switchDatisRegion('japan',this)">日本</button>
+        <button class="datis-tab" onclick="switchDatisRegion('korea',this)">韓國</button>
+        <button class="datis-tab" onclick="switchDatisRegion('philippines',this)">菲律賓</button>
+        <button class="datis-tab" onclick="switchDatisRegion('thailand',this)">泰國</button>
+        <button class="datis-tab" onclick="switchDatisRegion('vietnam',this)">越南柬埔寨</button>
+        <button class="datis-tab" onclick="switchDatisRegion('seasia',this)">星馬印</button>
+        <button class="datis-tab" onclick="switchDatisRegion('usa',this)">美國</button>
+        <button class="datis-tab" onclick="switchDatisRegion('pacific',this)">阿拉斯加太平洋</button>
+        <button class="datis-tab" onclick="switchDatisRegion('canada',this)">加拿大</button>
+        <button class="datis-tab" onclick="switchDatisRegion('europe',this)">歐洲</button>
+        <button class="datis-tab" onclick="switchDatisRegion('all',this)">全部</button>
+      </div>
+      <div class="datis-grid" id="datisGrid">
+        <!-- 台灣 -->
+        <button class="datis-btn r" data-region="taiwan" onclick="openDatisLink('https://atis.guru/atis/RCTP',this)">RCTP<span>桃園</span></button>
+        <button class="datis-btn a s" data-region="taiwan" onclick="openDatisLink('https://atis.guru/atis/RCKH',this)">RCKH<span>高雄</span></button>
+        <button class="datis-btn a s" data-region="taiwan" onclick="openDatisLink('https://atis.guru/atis/RCSS',this)">RCSS<span>松山</span></button>
+        <!-- 港澳 -->
+        <button class="datis-btn r s hidden" data-region="hkmacao" onclick="openDatisLink('https://atis.guru/atis/VHHH',this)">VHHH<span>香港</span></button>
+        <button class="datis-btn r hidden" data-region="hkmacao" onclick="openDatisLink('https://atis.guru/atis/VMMC',this)">VMMC<span>澳門</span></button>
+        <!-- 日本 -->
+        <button class="datis-btn r hidden" data-region="japan" onclick="openDatisLink('https://atis.guru/atis/RJAA',this)">RJAA<span>成田</span></button>
+        <button class="datis-btn r hidden" data-region="japan" onclick="openDatisLink('https://atis.guru/atis/RJBB',this)">RJBB<span>關西</span></button>
+        <button class="datis-btn r hidden" data-region="japan" onclick="openDatisLink('https://atis.guru/atis/RJCC',this)">RJCC<span>新千歲</span></button>
+        <button class="datis-btn r s hidden" data-region="japan" onclick="openDatisLink('https://atis.guru/atis/RJFF',this)">RJFF<span>福岡</span></button>
+        <button class="datis-btn r hidden" data-region="japan" onclick="openDatisLink('https://atis.guru/atis/RJSS',this)">RJSS<span>仙台</span></button>
+        <button class="datis-btn r hidden" data-region="japan" onclick="openDatisLink('https://atis.guru/atis/ROAH',this)">ROAH<span>那霸</span></button>
+        <button class="datis-btn a hidden" data-region="japan" onclick="openDatisLink('https://atis.guru/atis/RJTT',this)">RJTT<span>羽田</span></button>
+        <!-- 韓國 -->
+        <button class="datis-btn a hidden" data-region="korea" onclick="openDatisLink('https://atis.guru/atis/RKPC',this)">RKPC<span>濟州</span></button>
+        <button class="datis-btn a s hidden" data-region="korea" onclick="openDatisLink('https://atis.guru/atis/RKPK',this)">RKPK<span>釜山</span></button>
+        <button class="datis-btn a hidden" data-region="korea" onclick="openDatisLink('https://atis.guru/atis/RKSI',this)">RKSI<span>仁川</span></button>
+        <!-- 菲律賓 -->
+        <button class="datis-btn r hidden" data-region="philippines" onclick="openDatisLink('https://atis.guru/atis/RPLC',this)">RPLC<span>克拉克</span></button>
+        <button class="datis-btn r hidden" data-region="philippines" onclick="openDatisLink('https://atis.guru/atis/RPLL',this)">RPLL<span>馬尼拉</span></button>
+        <button class="datis-btn r hidden" data-region="philippines" onclick="openDatisLink('https://atis.guru/atis/RPVM',this)">RPVM<span>宿霧</span></button>
+        <!-- 泰國 -->
+        <button class="datis-btn r hidden" data-region="thailand" onclick="openDatisLink('https://atis.guru/atis/VTBS',this)">VTBS<span>素萬那普</span></button>
+        <button class="datis-btn a hidden" data-region="thailand" onclick="openDatisLink('https://atis.guru/atis/VTBD',this)">VTBD<span>廊曼</span></button>
+        <button class="datis-btn a hidden" data-region="thailand" onclick="openDatisLink('https://atis.guru/atis/VTBU',this)">VTBU<span>芭達雅</span></button>
+        <button class="datis-btn a hidden" data-region="thailand" onclick="openDatisLink('https://atis.guru/atis/VTCC',this)">VTCC<span>清邁</span></button>
+        <!-- 越南柬埔寨 -->
+        <button class="datis-btn r hidden" data-region="vietnam" onclick="openDatisLink('https://atis.guru/atis/VVNB',this)">VVNB<span>河內</span></button>
+        <button class="datis-btn r hidden" data-region="vietnam" onclick="openDatisLink('https://atis.guru/atis/VVPQ',this)">VVPQ<span>富國</span></button>
+        <button class="datis-btn r hidden" data-region="vietnam" onclick="openDatisLink('https://atis.guru/atis/VVTS',this)">VVTS<span>胡志明</span></button>
+        <button class="datis-btn a hidden" data-region="vietnam" onclick="openDatisLink('https://atis.guru/atis/VDPP',this)">VDPP<span>金邊</span></button>
+        <button class="datis-btn a hidden" data-region="vietnam" onclick="openDatisLink('https://atis.guru/atis/VVCR',this)">VVCR<span>芽莊</span></button>
+        <button class="datis-btn a hidden" data-region="vietnam" onclick="openDatisLink('https://atis.guru/atis/VVDN',this)">VVDN<span>峴港</span></button>
+        <!-- 星馬印 -->
+        <button class="datis-btn r hidden" data-region="seasia" onclick="openDatisLink('https://atis.guru/atis/WIII',this)">WIII<span>雅加達</span></button>
+        <button class="datis-btn r hidden" data-region="seasia" onclick="openDatisLink('https://atis.guru/atis/WSSS',this)">WSSS<span>新加坡</span></button>
+        <button class="datis-btn a hidden" data-region="seasia" onclick="openDatisLink('https://atis.guru/atis/WADD',this)">WADD<span>峇里島</span></button>
+        <button class="datis-btn a hidden" data-region="seasia" onclick="openDatisLink('https://atis.guru/atis/WARR',this)">WARR<span>泗水</span></button>
+        <button class="datis-btn a hidden" data-region="seasia" onclick="openDatisLink('https://atis.guru/atis/WBGG',this)">WBGG<span>古晉</span></button>
+        <button class="datis-btn a hidden" data-region="seasia" onclick="openDatisLink('https://atis.guru/atis/WMKK',this)">WMKK<span>吉隆坡</span></button>
+        <button class="datis-btn a hidden" data-region="seasia" onclick="openDatisLink('https://atis.guru/atis/WMKP',this)">WMKP<span>檳城</span></button>
+        <!-- 美國 -->
+        <button class="datis-btn r hidden" data-region="usa" onclick="openDatisLink('https://atis.guru/atis/KLAX',this)">KLAX<span>洛杉磯</span></button>
+        <button class="datis-btn r s hidden" data-region="usa" onclick="openDatisLink('https://atis.guru/atis/KONT',this)">KONT<span>安大略</span></button>
+        <button class="datis-btn r hidden" data-region="usa" onclick="openDatisLink('https://atis.guru/atis/KPHX',this)">KPHX<span>鳳凰城</span></button>
+        <button class="datis-btn r hidden" data-region="usa" onclick="openDatisLink('https://atis.guru/atis/KSEA',this)">KSEA<span>西雅圖</span></button>
+        <button class="datis-btn r s hidden" data-region="usa" onclick="openDatisLink('https://atis.guru/atis/KSFO',this)">KSFO<span>舊金山</span></button>
+        <button class="datis-btn a hidden" data-region="usa" onclick="openDatisLink('https://atis.guru/atis/KLAS',this)">KLAS<span>拉斯維加斯</span></button>
+        <button class="datis-btn a hidden" data-region="usa" onclick="openDatisLink('https://atis.guru/atis/KOAK',this)">KOAK<span>奧克蘭</span></button>
+        <button class="datis-btn a hidden" data-region="usa" onclick="openDatisLink('https://atis.guru/atis/KPDX',this)">KPDX<span>波特蘭</span></button>
+        <button class="datis-btn a hidden" data-region="usa" onclick="openDatisLink('https://atis.guru/atis/KSMF',this)">KSMF<span>沙加緬度</span></button>
+        <button class="datis-btn a hidden" data-region="usa" onclick="openDatisLink('https://atis.guru/atis/KTUS',this)">KTUS<span>土森</span></button>
+        <!-- 阿拉斯加太平洋 -->
+        <button class="datis-btn a hidden" data-region="pacific" onclick="openDatisLink('https://atis.guru/atis/PACD',this)">PACD<span>Cold Bay</span></button>
+        <button class="datis-btn a hidden" data-region="pacific" onclick="openDatisLink('https://atis.guru/atis/PAFA',this)">PAFA<span>費爾班克斯</span></button>
+        <button class="datis-btn a hidden" data-region="pacific" onclick="openDatisLink('https://atis.guru/atis/PAKN',this)">PAKN<span>King Salmon</span></button>
+        <button class="datis-btn a hidden" data-region="pacific" onclick="openDatisLink('https://atis.guru/atis/PANC',this)">PANC<span>安克拉治</span></button>
+        <button class="datis-btn a hidden" data-region="pacific" onclick="openDatisLink('https://atis.guru/atis/PASY',this)">PASY<span>Shemya</span></button>
+        <button class="datis-btn a hidden" data-region="pacific" onclick="openDatisLink('https://atis.guru/atis/PGSN',this)">PGSN<span>塞班</span></button>
+        <button class="datis-btn a hidden" data-region="pacific" onclick="openDatisLink('https://atis.guru/atis/PGUM',this)">PGUM<span>關島</span></button>
+        <button class="datis-btn a hidden" data-region="pacific" onclick="openDatisLink('https://atis.guru/atis/PHNL',this)">PHNL<span>檀香山</span></button>
+        <button class="datis-btn a hidden" data-region="pacific" onclick="openDatisLink('https://atis.guru/atis/PMDY',this)">PMDY<span>中途島</span></button>
+        <button class="datis-btn a hidden" data-region="pacific" onclick="openDatisLink('https://atis.guru/atis/PWAK',this)">PWAK<span>威克島</span></button>
+        <!-- 加拿大 -->
+        <button class="datis-btn a hidden" data-region="canada" onclick="openDatisLink('https://atis.guru/atis/CYVR',this)">CYVR<span>溫哥華</span></button>
+        <!-- 歐洲 -->
+        <button class="datis-btn r hidden" data-region="europe" onclick="openDatisLink('https://atis.guru/atis/LKPR',this)">LKPR<span>布拉格</span></button>
+        <button class="datis-btn a hidden" data-region="europe" onclick="openDatisLink('https://atis.guru/atis/EDDB',this)">EDDB<span>柏林</span></button>
+        <button class="datis-btn a hidden" data-region="europe" onclick="openDatisLink('https://atis.guru/atis/EDDM',this)">EDDM<span>慕尼黑</span></button>
+        <button class="datis-btn a hidden" data-region="europe" onclick="openDatisLink('https://atis.guru/atis/EPWA',this)">EPWA<span>華沙</span></button>
+        <button class="datis-btn a hidden" data-region="europe" onclick="openDatisLink('https://atis.guru/atis/LOWL',this)">LOWL<span>林茲</span></button>
+        <button class="datis-btn a hidden" data-region="europe" onclick="openDatisLink('https://atis.guru/atis/LOWW',this)">LOWW<span>維也納</span></button>
+      </div>
+      <div style="margin-top:8px;font-size:.75em;color:var(--muted)">實線 = Regular　虛線 = Alternate　<span style="color:#b45309;font-weight:700">▪ Special</span></div>
+      <div id="datisDisplay" style="display:none;margin-top:1em">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.5em">
+          <div id="datisLabel" style="font-weight:700;font-size:1em"></div>
+          <button class="btn btn-secondary btn-sm" onclick="reloadCurrentAtis()" style="width:auto;padding:6px 12px;font-size:.8em">↺ 重新整理</button>
+        </div>
+        <div id="datisContent"></div>
+      </div>
+    </div>
+  </div>
+
+</div><!-- end tab-briefing -->
+
+<!-- ══ Tab Bar ═══════════════════════════════════════════════════════ -->
+<div class="tab-bar">
+  <button class="tab-btn tab-active" id="tabBtn-sync" onclick="switchTab('sync',this)">
+    <span class="tab-btn-icon">✈️</span>班表同步
+  </button>
+  <button class="tab-btn" id="tabBtn-briefing" onclick="switchTab('briefing',this)">
+    <span class="tab-btn-icon">📦</span>A350簡報箱
+  </button>
+  <button class="tab-btn" id="tabBtn-theme" onclick="toggleTheme()">
+    <span class="tab-btn-icon" id="theme-icon">☀️</span><span id="theme-label">日間</span>
+  </button>
+  <div style="position:absolute;right:4px;bottom:calc(env(safe-area-inset-bottom,0px) + 2px);font-size:.55em;color:var(--dim);pointer-events:none">v2.0</div>
 </div>
 
 <script>
@@ -628,6 +839,149 @@ function showDone(success, logs, result, error) {
 
 function mkStat(n, label) {
   return '<div class="stat-item"><div class="stat-num">' + n + '</div><div class="stat-lbl">' + label + '</div></div>';
+}
+
+// ── Tab switching ─────────────────────────────────────────────────────────────
+function switchTab(tab, btn) {
+  document.getElementById('tab-sync').classList.remove('tab-active');
+  document.getElementById('tab-briefing').classList.remove('tab-active');
+  document.getElementById('tab-sync').style.display = '';
+  document.getElementById('tab-briefing').style.display = '';
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('tab-active'));
+  document.getElementById('tab-' + tab).classList.add('tab-active');
+  btn.classList.add('tab-active');
+}
+
+// ── D-ATIS ────────────────────────────────────────────────────────────────────
+var currentAtisUrl = '';
+var currentAtisIcao = '';
+
+function switchDatisRegion(region, tab) {
+  document.querySelectorAll('.datis-tab').forEach(t => t.classList.remove('active'));
+  tab.classList.add('active');
+  document.querySelectorAll('.datis-btn').forEach(btn => {
+    if (region === 'all' || btn.dataset.region === region) {
+      btn.classList.remove('hidden');
+    } else {
+      btn.classList.add('hidden');
+    }
+  });
+}
+
+function openDatisLink(url, btn) {
+  document.querySelectorAll('.datis-btn').forEach(b => b.classList.remove('selected'));
+  btn.classList.add('selected');
+  const icao = btn.textContent.trim().substring(0, 4);
+  currentAtisUrl = url;
+  currentAtisIcao = icao;
+  const display = document.getElementById('datisDisplay');
+  const label = document.getElementById('datisLabel');
+  const content = document.getElementById('datisContent');
+  label.textContent = btn.querySelector('span') ? icao + ' ' + btn.querySelector('span').textContent : icao;
+  content.innerHTML = '<div class="atis-loading">載入中...</div>';
+  display.style.display = 'block';
+  fetchAtisData(url, icao, content);
+  display.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+function reloadCurrentAtis() {
+  if (currentAtisUrl) {
+    const content = document.getElementById('datisContent');
+    content.innerHTML = '<div class="atis-loading">重新載入中...</div>';
+    fetchAtisData(currentAtisUrl, currentAtisIcao, content);
+  }
+}
+
+function fetchAtisData(url, icao, container) {
+  const corsProxy = 'https://api.codetabs.com/v1/proxy/?quest=';
+  const metarUrl = 'https://aviationweather.gov/api/data/metar?ids=' + icao + '&format=raw&hours=12';
+  const tafUrl = 'https://aviationweather.gov/api/data/taf?ids=' + icao + '&format=raw';
+  const atisPromise = fetch(corsProxy + encodeURIComponent(url))
+    .then(r => { if (!r.ok) throw new Error(); return r.text(); })
+    .then(html => parseAtisHtml(html))
+    .catch(() => []);
+  const metarPromise = fetch(corsProxy + encodeURIComponent(metarUrl))
+    .then(r => { if (!r.ok) throw new Error(); return r.text(); })
+    .then(t => t.trim()).catch(() => '');
+  const tafPromise = fetch(corsProxy + encodeURIComponent(tafUrl))
+    .then(r => { if (!r.ok) throw new Error(); return r.text(); })
+    .then(t => t.trim()).catch(() => '');
+  Promise.all([atisPromise, metarPromise, tafPromise]).then(([atisSections, metarText, tafText]) => {
+    const atisOnly = atisSections.filter(s => {
+      const t = s.title.toLowerCase();
+      return !t.includes('metar') && !t.includes('taf');
+    });
+    const noData = '<span style="color:var(--muted);font-style:italic">無資料</span>';
+    let cards = '';
+    if (atisOnly.length > 0) {
+      cards += atisOnly.map(s =>
+        '<div class="atis-card"><div class="atis-card-title">' + s.title + '</div><pre>' + s.text + '</pre></div>'
+      ).join('');
+    } else {
+      cards += '<div class="atis-card"><div class="atis-card-title">📻 ATIS</div><pre>' + noData + '</pre></div>';
+    }
+    const latestMetar = metarText ? metarText.split('\\n')[0] : '';
+    cards += '<div class="atis-card"><div class="atis-card-title">🌤️ METAR</div><pre>' + (latestMetar || noData) + '</pre></div>';
+    cards += '<div class="atis-card"><div class="atis-card-title">📅 TAF</div><pre>' + (tafText || noData) + '</pre></div>';
+    container.innerHTML = cards;
+  });
+}
+
+function parseAtisHtml(html) {
+  const results = [];
+  const titlePattern = /<h5[^>]*class="card-title"[^>]*>([\\s\\S]*?)<\\/h5>/gi;
+  const atisPattern = /<div[^>]*class="atis"[^>]*>([\\s\\S]*?)<\\/div>/gi;
+  const titles = [];
+  const atisTexts = [];
+  let m;
+  while ((m = titlePattern.exec(html)) !== null) titles.push(m[1].trim().replace(/<[^>]*>/g, ''));
+  while ((m = atisPattern.exec(html)) !== null) {
+    let text = m[1].replace(/&#xA;/g,'\\n').replace(/&#xD;/g,'').replace(/&#x9;/g,'  ')
+      .replace(/&amp;/g,'&').replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/<[^>]*>/g,'').trim();
+    atisTexts.push(text);
+  }
+  for (let i = 0; i < atisTexts.length; i++) {
+    const title = titles[i] || (i === 0 ? 'ATIS' : 'Info ' + (i + 1));
+    const icon = title.toLowerCase().includes('arrival') ? '🛬' :
+                 title.toLowerCase().includes('departure') ? '🛫' :
+                 title.toLowerCase().includes('atis') ? '📻' : 'ℹ️';
+    results.push({ title: icon + ' ' + title, text: atisTexts[i] });
+  }
+  return results;
+}
+
+// ── Theme ─────────────────────────────────────────────────────────────────────
+function toggleTheme() {
+  const html = document.documentElement;
+  const icon = document.getElementById('theme-icon');
+  const label = document.getElementById('theme-label');
+  if (html.dataset.theme === 'light') {
+    // 目前日間 → 切換回夜間
+    delete html.dataset.theme;
+    icon.textContent = '☀️'; label.textContent = '日間';  // 夜間模式下顯示「切到日間」
+    localStorage.setItem('crewsync_theme', 'dark');
+  } else {
+    // 目前夜間 → 切換到日間
+    html.dataset.theme = 'light';
+    icon.textContent = '🌙'; label.textContent = '夜間';  // 日間模式下顯示「切到夜間」
+    localStorage.setItem('crewsync_theme', 'light');
+  }
+}
+(function() {
+  if (localStorage.getItem('crewsync_theme') === 'light') {
+    document.documentElement.dataset.theme = 'light';
+    document.getElementById('theme-icon').textContent = '🌙';
+    document.getElementById('theme-label').textContent = '夜間';
+  }
+  // 預設夜間模式 → 初始 HTML 已顯示 ☀️ 日間，不需額外處理
+})();
+
+// ── Briefing sub-tab ──────────────────────────────────────────────────────────
+function switchBriefingTab(panel, btn) {
+  document.querySelectorAll('.briefing-subtab').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.briefing-panel').forEach(p => p.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('briefing-' + panel).classList.add('active');
 }
 
 // ── Boot ─────────────────────────────────────────────────────────────────────
