@@ -217,7 +217,7 @@ body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSy
 #tab-sync{display:none;flex-direction:column;align-items:center;justify-content:center;
   min-height:calc(100dvh - 56px);padding:20px 16px calc(20px + var(--safe-bottom))}
 #tab-sync.tab-active{display:flex}
-#tab-briefing{display:none;min-height:calc(100dvh - 56px);padding:16px 16px calc(20px + var(--safe-bottom))}
+#tab-briefing{display:none;min-height:calc(100dvh - 56px);padding:0 0 calc(20px + var(--safe-bottom))}
 #tab-briefing.tab-active{display:block}
 .tab-bar{position:fixed;bottom:0;left:0;right:0;height:56px;background:var(--card);
   border-top:1px solid var(--dim);display:flex;z-index:200;
@@ -317,13 +317,13 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
   --text:#1e293b;--muted:#64748b;--dim:#cbd5e1;
   --success:#15803d;--error:#dc2626
 }
-.briefing-subtabs{display:flex;border-bottom:1.5px solid var(--dim);margin-bottom:16px}
+.briefing-subtabs{position:sticky;top:env(safe-area-inset-top,0px);z-index:100;background:var(--bg);display:flex;border-bottom:1.5px solid var(--dim);padding:0 16px;margin-bottom:0}
 .briefing-subtab{flex:1;padding:10px 4px;font-size:.84em;font-weight:700;background:none;
   border:none;border-bottom:2.5px solid transparent;color:var(--muted);cursor:pointer;
   transition:color .2s,border-color .2s;margin-bottom:-1.5px;-webkit-appearance:none}
 .briefing-subtab.active{color:var(--accent);border-bottom-color:var(--accent)}
 .briefing-panel{display:none}
-.briefing-panel.active{display:block}
+.briefing-panel.active{display:block;padding:16px 16px 0}
 .tool-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px;margin-top:4px}
 .tool-link-btn{display:flex;align-items:center;justify-content:center;
   padding:10px 8px;background:var(--accent);color:#fff;border-radius:10px;
