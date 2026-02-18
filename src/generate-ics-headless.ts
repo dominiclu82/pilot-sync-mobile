@@ -169,7 +169,13 @@ export async function generateICSHeadless(
     const dutyDetails: DutyDetail[] = [];
     const processedDuties = new Set<string>();
     let i = 0;
-    const SKIP = new Set(['DO', 'HDO', 'BDO', 'ANL', 'PSL']);
+    const SKIP = new Set([
+      'DO',  'HDO', 'BDO', 'MDO',
+      'ANL', 'AWL', 'B1L', 'B2L', 'B3L', 'BNL', 'DSL', 'DPL', 'FCL', 'HAL',
+      'HPL', 'M1L', 'M2L', 'M3L', 'M4L', 'M5L', 'M6L', 'M7L', 'M8L', 'MRL',
+      'MTL', 'OKL', 'PNL', 'POL', 'PSL', 'PTL', 'PVL', 'RAL', 'SKL', 'SUP',
+      'TFL', 'UBL', 'UKL', 'UQL',
+    ]);
 
     while (true) {
       await page.waitForSelector('.rbc-event-content', { timeout: 2000 });
