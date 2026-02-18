@@ -335,7 +335,7 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
 <body>
 
 <!-- ══ Tab: 同步 ═════════════════════════════════════════════════════ -->
-<div id="tab-sync" class="tab-active">
+<div id="tab-sync">
 
 <!-- ══ Main（含帳號 + 月份，一個畫面搞定）══════════════════════════════ -->
 <div id="screen-main" class="screen active">
@@ -471,16 +471,16 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
 </div><!-- end tab-sync -->
 
 <!-- ══ Tab: A350簡報箱 ══════════════════════════════════════════════ -->
-<div id="tab-briefing">
+<div id="tab-briefing" class="tab-active">
 
   <!-- 子 Tab Bar -->
   <div class="briefing-subtabs">
-    <button class="briefing-subtab active" id="subtabBtn-tools" onclick="switchBriefingTab('tools',this)">🗺️ 工具連結</button>
-    <button class="briefing-subtab" id="subtabBtn-datis" onclick="switchBriefingTab('datis',this)">📡 D-ATIS</button>
+    <button class="briefing-subtab" id="subtabBtn-tools" onclick="switchBriefingTab('tools',this)">🗺️ 工具連結</button>
+    <button class="briefing-subtab active" id="subtabBtn-datis" onclick="switchBriefingTab('datis',this)">📡 D-ATIS</button>
   </div>
 
   <!-- ── 工具連結 panel ── -->
-  <div id="briefing-tools" class="briefing-panel active">
+  <div id="briefing-tools" class="briefing-panel">
     <div class="briefing-section">
       <div class="tool-grid">
         <a class="tool-link-btn" href="https://flight-plan-editor.weathernews.com/flight_plan_editor/#login" target="_blank">☁️ Weathernews Flight Plan</a>
@@ -496,7 +496,7 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
   </div>
 
   <!-- ── D-ATIS panel ── -->
-  <div id="briefing-datis" class="briefing-panel">
+  <div id="briefing-datis" class="briefing-panel active">
     <div class="briefing-section">
       <h2>📡 D-ATIS</h2>
       <div class="datis-tabs">
@@ -605,10 +605,10 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
 
 <!-- ══ Tab Bar ═══════════════════════════════════════════════════════ -->
 <div class="tab-bar">
-  <button class="tab-btn tab-active" id="tabBtn-sync" onclick="switchTab('sync',this)">
+  <button class="tab-btn" id="tabBtn-sync" onclick="switchTab('sync',this)">
     <span class="tab-btn-icon">✈️</span>班表同步
   </button>
-  <button class="tab-btn" id="tabBtn-briefing" onclick="switchTab('briefing',this)">
+  <button class="tab-btn tab-active" id="tabBtn-briefing" onclick="switchTab('briefing',this)">
     <span class="tab-btn-icon">📦</span>A350簡報箱
   </button>
   <button class="tab-btn" id="tabBtn-theme" onclick="toggleTheme()">
