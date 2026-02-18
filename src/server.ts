@@ -490,9 +490,7 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
         <a class="tool-link-btn" href="https://sjx.lido.aero/lido/las/login.jsp?DESMON_RESULT_PAGE=https://sjx.lido.aero/briefing&DESMON_CODE=LAS_001&DESMON_LANG=null" target="_blank">📋 LIDO Briefing</a>
         <a class="tool-link-btn" href="https://www.skyinfo.jp" target="_blank">🇯🇵 日本NOTAM地圖</a>
         <a class="tool-link-btn" href="https://app.cwa.gov.tw/web/obsmap/typhoon.html" target="_blank">🌀 颱風路徑圖</a>
-        <a class="tool-link-btn" href="https://zihchi.github.io/flight-time/" target="_blank">💻 飛時計算工具</a>
         <a class="tool-link-btn" href="https://gpsjam.org/" target="_blank">🛰️ GPS干擾區域</a>
-        <a class="tool-link-btn" href="https://zihchi.github.io/NOTAM/" target="_blank">📡 NOTAM座標</a>
       </div>
     </div>
   </div>
