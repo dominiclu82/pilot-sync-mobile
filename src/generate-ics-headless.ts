@@ -174,7 +174,7 @@ export async function generateICSHeadless(
       'ANL', 'AWL', 'B1L', 'B2L', 'B3L', 'BNL', 'DSL', 'DPL', 'FCL', 'HAL',
       'HPL', 'M1L', 'M2L', 'M3L', 'M4L', 'M5L', 'M6L', 'M7L', 'M8L', 'MRL',
       'MTL', 'OKL', 'PNL', 'POL', 'PSL', 'PTL', 'PVL', 'RAL', 'SKL', 'SUP',
-      'TFL', 'UBL', 'UKL', 'UQL',
+      'TFL', 'UBL', 'UKL', 'UQL', 'PPSL',
     ]);
 
     while (true) {
