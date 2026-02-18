@@ -142,9 +142,18 @@ export async function syncICS(params: {
   let addedCount = 0;
   let updatedCount = 0;
 
+  const getColorId = (summary: string): string | undefined => {
+    if (/^JX\d{3}/.test(summary)) return '10';           // Tomato  — 航班
+    if (/^A35\b|^CRM|^SIM/.test(summary))  return '8';  // Blueberry — 訓練
+    if (/^SBY|^S5|^GND/.test(summary))     return '2';  // Sage      — 待命
+    if (/^PPSL|^ANL/.test(summary))         return '5';  // Banana    — 假期
+    return undefined;
+  };
+
   for (const event of eventsToUpload) {
     const isFlightDuty = /^JX\d{3}/.test(event.summary);
-    const requestBody = {
+    const colorId = getColorId(event.summary);
+    const requestBody: Record<string, any> = {
       summary: event.summary,
       start: { dateTime: toTaipei(event.startDate), timeZone: 'Asia/Taipei' },
       end: { dateTime: toTaipei(event.endDate), timeZone: 'Asia/Taipei' },
@@ -156,6 +165,7 @@ export async function syncICS(params: {
           { method: 'popup', minutes: 24 * 60 },
         ],
       } : { useDefault: true },
+      ...(colorId ? { colorId } : {}),
     };
 
     try {
