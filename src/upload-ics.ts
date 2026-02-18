@@ -57,7 +57,7 @@ export async function syncICS(params: {
     .filter((e) => e.type === 'VEVENT')
     .map((e) => ({
       uid: e.uid ? String(e.uid).trim().toLowerCase() : '',
-      summary: e.summary,
+      summary: String(e.summary ?? ''),
       start: e.start.toISOString(),
       end: e.end.toISOString(),
       startDate: e.start,
@@ -143,10 +143,9 @@ export async function syncICS(params: {
   let updatedCount = 0;
 
   const getColorId = (summary: string): string | undefined => {
-    if (/^JX\d{3}/.test(summary)) return '10';           // Tomato  — 航班
-    if (/^A35\b|^CRM|^SIM/.test(summary))  return '8';  // Blueberry — 訓練
-    if (/^SBY|^S5|^GND/.test(summary))     return '2';  // Sage      — 待命
-    if (/^PPSL|^ANL/.test(summary))         return '5';  // Banana    — 假期
+    if (/^JX\d{3}/i.test(summary))          return '11'; // Tomato    — 航班
+    if (/^A35\b|^CRM|^SIM/i.test(summary))  return '9';  // Blueberry — 訓練
+    if (/^SBY|^S5|^GND/i.test(summary))     return '2';  // Sage      — 待命
     return undefined;
   };
 
