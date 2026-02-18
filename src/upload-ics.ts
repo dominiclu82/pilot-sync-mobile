@@ -144,7 +144,7 @@ export async function syncICS(params: {
 
   const getColorId = (summary: string): string | undefined => {
     if (/^JX\d{3}/i.test(summary))          return '11'; // Tomato    — 航班
-    if (/^A35\b|^CRM|^SIM/i.test(summary))  return '9';  // Blueberry — 訓練
+    if (/^A35\b|^CRM|^SIM/i.test(summary))  return '7';  // Peacock   — 訓練
     if (/^SBY|^S5|^GND/i.test(summary))     return '2';  // Sage      — 待命
     return undefined;
   };
