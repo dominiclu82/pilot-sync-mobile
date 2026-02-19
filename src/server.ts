@@ -602,6 +602,9 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
       <button class="wx-route-btn" onclick="selectWxRegion('canada',this)">加拿大</button>
       <button class="wx-route-btn" onclick="selectWxRegion('europe',this)">歐洲</button>
     </div>
+    <div style="background:rgba(245,158,11,.08);border-bottom:1px solid rgba(245,158,11,.25);padding:5px 14px;font-size:.72em;color:#f59e0b;display:flex;align-items:center;gap:6px;flex-shrink:0">
+      <span>⚠</span><span>Non-operational use only. Data may not reflect current conditions.</span>
+    </div>
     <div class="wx-split">
       <div class="wx-list-pane" id="wx-list-pane">
         <div class="wx-loading-msg">載入氣象資料中...</div>
