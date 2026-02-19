@@ -243,7 +243,8 @@ function getSPAHtml(): string {
   --radius:14px;--safe-bottom:env(safe-area-inset-bottom,0px)
 }
 body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
-  min-height:100dvh;overflow-x:hidden;padding-bottom:56px;padding-top:env(safe-area-inset-top,0px)}
+  min-height:100dvh;overflow-x:hidden;padding-bottom:56px;padding-top:env(safe-area-inset-top,0px);
+  overscroll-behavior:none}
 #tab-sync{display:none;flex-direction:column;align-items:center;justify-content:center;
   min-height:calc(100dvh - 56px);padding:20px 16px calc(20px + var(--safe-bottom))}
 #tab-sync.tab-active{display:flex}
