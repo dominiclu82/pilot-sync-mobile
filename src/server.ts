@@ -98,6 +98,20 @@ app.get(REDIRECT_PATH, oauthCallback);
 app.get('/api/oauth2callback', oauthCallback); // 雲端路徑
 app.get('/oauth/callback', oauthCallback);     // 本機 fallback
 
+// ── METAR proxy ────────────────────────────────────────────────────────────────
+app.get('/api/metar', async (req, res) => {
+  try {
+    const { ids, hours } = req.query;
+    const url = `https://aviationweather.gov/api/data/metar?ids=${ids}&format=raw&hours=${hours || 1}`;
+    const r = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0' } });
+    const text = await r.text();
+    res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+    res.send(text);
+  } catch (e: any) {
+    res.status(502).send('');
+  }
+});
+
 // ── Pacific HF proxy ──────────────────────────────────────────────────────────
 app.get('/api/pacific-hf', async (_req, res) => {
   try {
@@ -355,26 +369,19 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
 .wx-split{display:flex;flex-direction:column;flex:1}
 .wx-list-pane{border-bottom:1px solid var(--dim)}
 .wx-detail-pane{padding:16px}
-.wx-row-r {border-left:3px solid var(--accent)}
-.wx-row-a {border-left:3px solid var(--dim);opacity:.88}
-.wx-row-rs{border-left:3px solid #b45309}
-.wx-row-as{border-left:3px solid #b45309;opacity:.88}
-.wx-row-r:active,.wx-row-r.selected,
-.wx-row-a:active,.wx-row-a.selected,
-.wx-row-rs:active,.wx-row-rs.selected,
-.wx-row-as:active,.wx-row-as.selected{opacity:1}
-.wx-legend{display:flex;gap:14px;flex-wrap:wrap;padding:7px 14px;font-size:.71em;color:var(--muted);border-top:1px solid var(--dim);background:var(--surface)}
-.wx-leg-r{color:var(--accent);font-weight:700;margin-right:2px}
-.wx-leg-a{color:var(--dim);font-weight:700;margin-right:2px}
-.wx-leg-s{color:#b45309;font-weight:700;margin-right:2px}
+.wx-card{margin:5px 10px 0;border-radius:10px;cursor:pointer;overflow:hidden;-webkit-tap-highlight-color:transparent}
+.wx-card-r {border:2px solid var(--accent)}
+.wx-card-a {border:2px dashed var(--accent);opacity:.8}
+.wx-card-rs{border:2px solid #b45309}
+.wx-card-as{border:2px dashed #b45309;opacity:.8}
+.wx-card:active,.wx-card.selected{opacity:1;background:rgba(255,255,255,.06)}
+.wx-legend{display:flex;gap:10px;flex-wrap:wrap;padding:8px 10px 10px;font-size:.71em;color:var(--muted);margin-top:2px}
 @media(min-width:640px){
   #briefing-datis.active{height:calc(100dvh - 150px - env(safe-area-inset-top,0px));overflow:hidden}
   .wx-split{flex-direction:row;overflow:hidden;flex:1}
-  .wx-list-pane{width:270px;flex-shrink:0;overflow-y:auto;border-right:1px solid var(--dim);border-bottom:none}
+  .wx-list-pane{width:280px;flex-shrink:0;overflow-y:auto;border-right:1px solid var(--dim);border-bottom:none}
   .wx-detail-pane{flex:1;overflow-y:auto}}
-.wx-row{display:flex;align-items:center;padding:9px 14px;border-bottom:1px solid var(--dim);
-  cursor:pointer;gap:9px;-webkit-tap-highlight-color:transparent}
-.wx-row:active,.wx-row.selected{background:var(--card)}
+.wx-row{display:flex;align-items:center;padding:9px 12px;gap:9px}
 .wx-cat{font-size:.67em;font-weight:800;padding:2px 5px;border-radius:4px;
   flex-shrink:0;min-width:38px;text-align:center;letter-spacing:.3px}
 .cat-VFR{background:#14532d;color:#86efac}
@@ -395,6 +402,8 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
 .wx-detail-hdr{display:flex;align-items:center;gap:8px;margin-bottom:12px;padding-bottom:10px;border-bottom:1px solid var(--dim)}
 .wx-detail-title{font-weight:700;font-size:1em;color:var(--accent-light);flex:1}
 .wx-loading-msg{text-align:center;padding:24px;color:var(--muted);font-size:.88em}
+.metar-mode-btn{background:none;border:1px solid var(--dim);color:var(--muted);font-size:.72em;padding:2px 8px;border-radius:6px;cursor:pointer;-webkit-appearance:none}
+.metar-mode-btn.active{background:var(--accent);border-color:var(--accent);color:#fff}
 </style>
 </head>
 <body>
@@ -541,7 +550,7 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
   <!-- 子 Tab Bar -->
   <div class="briefing-subtabs">
     <button class="briefing-subtab" id="subtabBtn-tools" onclick="switchBriefingTab('tools',this)">🗺️ 工具連結</button>
-    <button class="briefing-subtab active" id="subtabBtn-datis" onclick="switchBriefingTab('datis',this)">⛅ 航路氣象</button>
+    <button class="briefing-subtab active" id="subtabBtn-datis" onclick="switchBriefingTab('datis',this)">⛅ Airport WX</button>
   </div>
 
   <!-- ── 工具連結 panel ── -->
@@ -623,7 +632,7 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
   <button class="tab-btn" id="tabBtn-theme" onclick="toggleTheme()">
     <span class="tab-btn-icon" id="theme-icon">☀️</span><span id="theme-label">日間</span>
   </button>
-  <div style="position:absolute;right:4px;bottom:calc(env(safe-area-inset-bottom,0px) + 2px);font-size:.55em;color:var(--dim);pointer-events:none">v2.0</div>
+  <div style="position:absolute;right:4px;bottom:calc(env(safe-area-inset-bottom,0px) + 2px);font-size:.55em;color:var(--dim);pointer-events:none">V2.1</div>
 </div>
 
 <script>
@@ -1040,7 +1049,9 @@ var WX_AIRPORTS = {
 };
 
 var wxCurrentRegion = 'taiwan';
-var wxMetarMap = {};      // icao -> metar JSON (cleared when region changes)
+var wxMetarMap = {};      // icao -> parsed metar object (cleared when region changes)
+var wxMetarRawMap = {};   // icao -> string[] of 6h METAR lines
+var wxMetarShowAll = {};  // icao -> bool (true = show all 6h, false = latest 1)
 var wxDetailCache = {};   // icao -> rendered HTML string (persists across airport switches)
 var wxSelectedIcao = '';
 var wxSelectedName = '';
@@ -1134,52 +1145,55 @@ function parseMetarLine(raw) {
 
 function loadWxRegion(region) {
   var airports = WX_AIRPORTS[region] || [];
-  document.getElementById('wx-list-pane').innerHTML = '<div class="wx-loading-msg">載入 METAR 資料中...</div>';
+  wxMetarMap = {};
+  renderWxList(airports, region);
   var icaos = airports.map(function(a) { return a.icao; }).join(',');
-  var proxy = 'https://api.codetabs.com/v1/proxy/?quest=';
-  var url = 'https://aviationweather.gov/api/data/metar?ids=' + icaos + '&format=raw&hours=1';
-  fetch(proxy + encodeURIComponent(url))
+  fetch('/api/metar?ids=' + icaos + '&hours=1')
     .then(function(r) { return r.ok ? r.text() : ''; })
     .then(function(text) {
       wxMetarMap = {};
       text.split('\\n').forEach(function(line) {
         line = line.trim();
         if (!line) return;
-        var icao = line.split(' ')[0].toUpperCase();
-        if (/^[A-Z]{4}$/.test(icao)) wxMetarMap[icao] = parseMetarLine(line);
+        var stripped = line.replace(/^(METAR|SPECI)\\s+/, '');
+        var icao = stripped.split(' ')[0].toUpperCase();
+        if (/^[A-Z]{4}$/.test(icao)) wxMetarMap[icao] = parseMetarLine(stripped);
       });
       renderWxList(airports, region);
     })
-    .catch(function() { wxMetarMap = {}; renderWxList(airports, region); });
+    .catch(function() { renderWxList(airports, region); });
 }
 
 function renderWxList(airports, region) {
   var ts = new Date().toLocaleTimeString('zh-TW', {hour:'2-digit', minute:'2-digit'});
   var hdr = '<div class="wx-list-hdr"><span class="wx-list-ts">METAR ' + ts + '</span>'
     + '<button class="wx-refresh-btn" onclick="loadWxRegion(\\'' + region + '\\')">\\u21ba</button></div>';
-  var rows = airports.map(function(a) {
+  var cards = airports.map(function(a) {
     var m = wxMetarMap[a.icao];
     var cat = wxCalcCat(m);
-    var clsCls = 'wx-row-' + (a.cls || 'r');
+    var cardCls = 'wx-card-' + (a.cls || 'r');
     var sel = (a.icao === wxSelectedIcao) ? ' selected' : '';
-    return '<div class="wx-row ' + clsCls + sel + '" onclick="selectWxAirport(\\'' + a.icao + '\\',\\'' + a.name + '\\',this)">'
+    return '<div class="wx-card ' + cardCls + sel + '" onclick="selectWxAirport(\\'' + a.icao + '\\',\\'' + a.name + '\\',this)">'
+      + '<div class="wx-row">'
       + '<div class="wx-cat cat-' + cat + '">' + cat + '</div>'
       + '<div class="wx-icao-col">' + a.icao + '</div>'
       + '<div class="wx-name-col"><div class="wx-aname">' + a.name + '</div>'
       + '<div class="wx-wind">' + wxFmtWind(m) + '</div></div>'
       + '<div class="wx-mini">' + wxFmtVis(m) + '<br>' + wxFmtTemp(m) + '</div>'
-      + '</div>';
+      + '</div></div>';
   }).join('');
+  var bx = 'display:inline-block;width:14px;height:12px;border-radius:2px;vertical-align:middle;margin-right:4px';
   var legend = '<div class="wx-legend">'
-    + '<span class="wx-leg-r">\\u2502</span>Regular'
-    + '<span class="wx-leg-a" style="margin-left:10px">\\u2502</span>Alternate'
-    + '<span class="wx-leg-s" style="margin-left:10px">\\u2502</span>Special'
+    + '<span style="' + bx + ';border:2px solid var(--accent)"></span>Regular&nbsp;&nbsp;'
+    + '<span style="' + bx + ';border:2px dashed var(--accent);opacity:.8"></span>Alternate&nbsp;&nbsp;'
+    + '<span style="' + bx + ';border:2px solid #b45309"></span>'
+    + '<span style="' + bx + ';border:2px dashed #b45309;opacity:.8;margin-right:4px"></span>+Special'
     + '</div>';
-  document.getElementById('wx-list-pane').innerHTML = hdr + rows + legend;
+  document.getElementById('wx-list-pane').innerHTML = hdr + cards + legend;
 }
 
 function selectWxAirport(icao, name, rowEl) {
-  document.querySelectorAll('.wx-row').forEach(function(r) { r.classList.remove('selected'); });
+  document.querySelectorAll('.wx-card').forEach(function(r) { r.classList.remove('selected'); });
   rowEl.classList.add('selected');
   wxSelectedIcao = icao;
   wxSelectedName = name;
@@ -1205,23 +1219,59 @@ function refreshWxDetail(icao, name) {
   fetchWxDetail(icao, name);
 }
 
+function buildMetarCard(icao) {
+  var lines = wxMetarRawMap[icao] || [];
+  var showAll = !!wxMetarShowAll[icao];
+  var noData = '<span style="color:var(--muted);font-style:italic">\\u7121\\u8cc7\\u6599</span>';
+  var displayText = lines.length === 0 ? noData : (showAll ? lines.join('\\n\\n') : lines[0]);
+  var toggleBtns = lines.length > 1
+    ? '<div style="display:flex;gap:4px;margin-left:auto">'
+      + '<button onclick="setMetarMode(\\'' + icao + '\\',false)" class="metar-mode-btn' + (!showAll ? ' active' : '') + '">\\u6700\\u65b0</button>'
+      + '<button onclick="setMetarMode(\\'' + icao + '\\',true)" class="metar-mode-btn' + (showAll ? ' active' : '') + '">6\\u5c0f\\u6642</button>'
+      + '</div>'
+    : '';
+  return '<div class="atis-card"><div class="atis-card-title" style="display:flex;align-items:center">\\ud83c\\udf24\\ufe0f METAR'
+    + toggleBtns + '</div><pre>' + displayText + '</pre></div>';
+}
+
+function setMetarMode(icao, showAll) {
+  wxMetarShowAll[icao] = showAll;
+  delete wxDetailCache[icao];
+  if (wxSelectedIcao !== icao) return;
+  var content = document.getElementById('wx-detail-content');
+  if (!content) return;
+  var firstCard = content.querySelector('.atis-card');
+  if (firstCard) {
+    var tmp = document.createElement('div');
+    tmp.innerHTML = buildMetarCard(icao);
+    content.replaceChild(tmp.firstChild, firstCard);
+  }
+}
+
 function fetchWxDetail(icao, name) {
   var proxy = 'https://api.codetabs.com/v1/proxy/?quest=';
-  var atisP = fetch(proxy + encodeURIComponent('https://atis.guru/atis/' + icao))
-    .then(function(r) { return r.ok ? r.text() : ''; }).then(parseAtisHtml).catch(function() { return []; });
-  var metarP = fetch(proxy + encodeURIComponent('https://aviationweather.gov/api/data/metar?ids=' + icao + '&format=raw&hours=6'))
-    .then(function(r) { return r.ok ? r.text() : ''; }).then(function(t) { return t.trim(); }).catch(function() { return ''; });
+  var metarP = fetch('/api/metar?ids=' + icao + '&hours=6')
+    .then(function(r) { return r.ok ? r.text() : ''; })
+    .then(function(t) {
+      var lines = t.trim().split('\\n').filter(function(l) { return l.trim(); });
+      return lines.map(function(l) { return l.replace(/^(METAR|SPECI)\\s+/, '').trim(); }).filter(function(l) { return l.length > 0; });
+    }).catch(function() { return []; });
   var tafP = fetch(proxy + encodeURIComponent('https://aviationweather.gov/api/data/taf?ids=' + icao + '&format=raw'))
     .then(function(r) { return r.ok ? r.text() : ''; }).then(function(t) { return t.trim(); }).catch(function() { return ''; });
-  Promise.all([atisP, metarP, tafP]).then(function(res) {
-    var atisSections = res[0], metarText = res[1], tafText = res[2];
+  var atisP = fetch(proxy + encodeURIComponent('https://atis.guru/atis/' + icao))
+    .then(function(r) { return r.ok ? r.text() : ''; }).then(parseAtisHtml).catch(function() { return []; });
+  Promise.all([metarP, tafP, atisP]).then(function(res) {
+    var metarLines = res[0], tafText = res[1], atisSections = res[2];
     var content = document.getElementById('wx-detail-content');
     if (!content || wxSelectedIcao !== icao) return;
-    var noData = '<span style="color:var(--muted);font-style:italic">無資料</span>';
+    var noData = '<span style="color:var(--muted);font-style:italic">\\u7121\\u8cc7\\u6599</span>';
+    wxMetarRawMap[icao] = metarLines;
+    if (wxMetarShowAll[icao] === undefined) wxMetarShowAll[icao] = false;
+    var cards = buildMetarCard(icao);
+    cards += '<div class="atis-card"><div class="atis-card-title">\\ud83d\\udcc5 TAF</div><pre>' + (tafText || noData) + '</pre></div>';
     var atisOnly = atisSections.filter(function(s) {
       var t = s.title.toLowerCase(); return !t.includes('metar') && !t.includes('taf');
     });
-    var cards = '';
     if (atisOnly.length > 0) {
       cards += atisOnly.map(function(s) {
         return '<div class="atis-card"><div class="atis-card-title">' + s.title + '</div><pre>' + s.text + '</pre></div>';
@@ -1229,9 +1279,6 @@ function fetchWxDetail(icao, name) {
     } else {
       cards += '<div class="atis-card"><div class="atis-card-title">\\ud83d\\udcfb ATIS</div><pre>' + noData + '</pre></div>';
     }
-    var metarLines = metarText ? metarText.split('\\n').filter(function(l) { return l.trim(); }).join('\\n\\n') : '';
-    cards += '<div class="atis-card"><div class="atis-card-title">\\ud83c\\udf24\\ufe0f METAR（近6小時）</div><pre>' + (metarLines || noData) + '</pre></div>';
-    cards += '<div class="atis-card"><div class="atis-card-title">\\ud83d\\udcc5 TAF</div><pre>' + (tafText || noData) + '</pre></div>';
     wxDetailCache[icao] = cards;
     content.innerHTML = cards;
   });
