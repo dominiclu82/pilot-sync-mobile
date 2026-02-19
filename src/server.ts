@@ -346,6 +346,43 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
   text-decoration:none;font-weight:600;font-size:.82em;text-align:center;
   transition:opacity .15s;line-height:1.3}
 .tool-link-btn:active{opacity:.7}
+/* ── 航路氣象 ────────────────────────────────────────────────────── */
+.wx-routes{display:flex;flex-wrap:wrap;gap:6px;padding:10px 14px 8px;border-bottom:1px solid var(--dim)}
+.wx-route-btn{padding:4px 10px;font-size:.76em;background:none;border:1.5px solid var(--dim);
+  border-radius:14px;color:var(--muted);font-weight:500;cursor:pointer;transition:all .2s;margin:0;-webkit-appearance:none}
+.wx-route-btn.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+#briefing-wx.active{display:flex!important;flex-direction:column;padding:0!important}
+.wx-split{display:flex;flex-direction:column;flex:1}
+.wx-list-pane{border-bottom:1px solid var(--dim)}
+.wx-detail-pane{padding:16px}
+@media(min-width:640px){
+  #briefing-wx.active{height:calc(100dvh - 150px - env(safe-area-inset-top,0px));overflow:hidden}
+  .wx-split{flex-direction:row;overflow:hidden;flex:1}
+  .wx-list-pane{width:270px;flex-shrink:0;overflow-y:auto;border-right:1px solid var(--dim);border-bottom:none}
+  .wx-detail-pane{flex:1;overflow-y:auto}}
+.wx-row{display:flex;align-items:center;padding:9px 14px;border-bottom:1px solid var(--dim);
+  cursor:pointer;gap:9px;-webkit-tap-highlight-color:transparent}
+.wx-row:active,.wx-row.selected{background:var(--card)}
+.wx-cat{font-size:.67em;font-weight:800;padding:2px 5px;border-radius:4px;
+  flex-shrink:0;min-width:38px;text-align:center;letter-spacing:.3px}
+.cat-VFR{background:#14532d;color:#86efac}
+.cat-MVFR{background:#1e3a8a;color:#93c5fd}
+.cat-IFR{background:#7f1d1d;color:#fca5a5}
+.cat-LIFR{background:#581c87;color:#e9d5ff}
+.cat-UNKN{background:var(--surface);color:var(--dim);border:1px solid var(--dim)}
+.wx-icao-col{font-weight:700;font-size:.87em;flex-shrink:0;width:40px}
+.wx-name-col{flex:1;min-width:0}
+.wx-aname{font-size:.76em;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.wx-wind{font-size:.71em;color:var(--text);font-family:'Courier New',monospace;margin-top:1px}
+.wx-mini{font-size:.71em;color:var(--muted);text-align:right;line-height:1.5;flex-shrink:0}
+.wx-list-hdr{display:flex;align-items:center;padding:6px 14px;border-bottom:1px solid var(--dim);
+  background:var(--surface);position:sticky;top:0;z-index:10}
+.wx-list-ts{font-size:.72em;color:var(--muted);flex:1}
+.wx-refresh-btn{background:none;border:none;color:var(--accent);font-size:.82em;cursor:pointer;padding:4px 6px}
+.wx-empty{text-align:center;padding:40px 20px;color:var(--muted);font-size:.88em;line-height:2}
+.wx-detail-hdr{display:flex;align-items:center;gap:8px;margin-bottom:12px;padding-bottom:10px;border-bottom:1px solid var(--dim)}
+.wx-detail-title{font-weight:700;font-size:1em;color:var(--accent-light);flex:1}
+.wx-loading-msg{text-align:center;padding:24px;color:var(--muted);font-size:.88em}
 </style>
 </head>
 <body>
@@ -493,6 +530,7 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
   <div class="briefing-subtabs">
     <button class="briefing-subtab" id="subtabBtn-tools" onclick="switchBriefingTab('tools',this)">🗺️ 工具連結</button>
     <button class="briefing-subtab active" id="subtabBtn-datis" onclick="switchBriefingTab('datis',this)">📡 D-ATIS</button>
+    <button class="briefing-subtab" id="subtabBtn-wx" onclick="switchBriefingTab('wx',this)">⛅ 航路氣象</button>
   </div>
 
   <!-- ── 工具連結 panel ── -->
@@ -625,6 +663,32 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
           <button class="btn btn-secondary btn-sm" onclick="reloadCurrentAtis()" style="width:auto;padding:6px 12px;font-size:.8em">↺ 重新整理</button>
         </div>
         <div id="datisContent"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── 航路氣象 panel ── -->
+  <div id="briefing-wx" class="briefing-panel">
+    <div class="wx-routes">
+      <button class="wx-route-btn active" onclick="selectWxRegion('taiwan',this)">台灣</button>
+      <button class="wx-route-btn" onclick="selectWxRegion('hkmacao',this)">港澳</button>
+      <button class="wx-route-btn" onclick="selectWxRegion('japan',this)">日本</button>
+      <button class="wx-route-btn" onclick="selectWxRegion('korea',this)">韓國</button>
+      <button class="wx-route-btn" onclick="selectWxRegion('philippines',this)">菲律賓</button>
+      <button class="wx-route-btn" onclick="selectWxRegion('thailand',this)">泰國</button>
+      <button class="wx-route-btn" onclick="selectWxRegion('vietnam',this)">越南柬埔寨</button>
+      <button class="wx-route-btn" onclick="selectWxRegion('seasia',this)">星馬印</button>
+      <button class="wx-route-btn" onclick="selectWxRegion('usa',this)">美國</button>
+      <button class="wx-route-btn" onclick="selectWxRegion('pacific',this)">阿拉斯加太平洋</button>
+      <button class="wx-route-btn" onclick="selectWxRegion('canada',this)">加拿大</button>
+      <button class="wx-route-btn" onclick="selectWxRegion('europe',this)">歐洲</button>
+    </div>
+    <div class="wx-split">
+      <div class="wx-list-pane" id="wx-list-pane">
+        <div class="wx-loading-msg">請先選擇上方地區</div>
+      </div>
+      <div class="wx-detail-pane" id="wx-detail-pane">
+        <div class="wx-empty">← 點選左側機場<br>查看 ATIS · METAR · TAF</div>
       </div>
     </div>
   </div>
@@ -1021,6 +1085,7 @@ function switchBriefingTab(panel, btn) {
   document.querySelectorAll('.briefing-panel').forEach(p => p.classList.remove('active'));
   btn.classList.add('active');
   document.getElementById('briefing-' + panel).classList.add('active');
+  if (panel === 'wx' && !wxLoaded) { wxLoaded = true; loadWxRegion(wxCurrentRegion); }
 }
 
 // ── 工具連結內嵌 iframe ────────────────────────────────────────────────────────
@@ -1051,6 +1116,166 @@ function openHF(e) {
 function closeHF() {
   document.getElementById('hf-overlay').style.display = 'none';
   document.getElementById('hf-iframe').src = '';
+}
+
+// ── 航路氣象 ──────────────────────────────────────────────────────────────────
+var WX_AIRPORTS = {
+  taiwan:      [{icao:'RCTP',name:'桃園'},{icao:'RCKH',name:'高雄'},{icao:'RCSS',name:'松山'}],
+  hkmacao:     [{icao:'VHHH',name:'香港'},{icao:'VMMC',name:'澳門'}],
+  japan:       [{icao:'RJAA',name:'成田'},{icao:'RJBB',name:'關西'},{icao:'RJCC',name:'新千歲'},{icao:'RJFF',name:'福岡'},{icao:'RJSS',name:'仙台'},{icao:'ROAH',name:'那霸'},{icao:'RJTT',name:'羽田'}],
+  korea:       [{icao:'RKPC',name:'濟州'},{icao:'RKPK',name:'釜山'},{icao:'RKSI',name:'仁川'}],
+  philippines: [{icao:'RPLC',name:'克拉克'},{icao:'RPLL',name:'馬尼拉'},{icao:'RPVM',name:'宿霧'}],
+  thailand:    [{icao:'VTBS',name:'素萬那普'},{icao:'VTBD',name:'廊曼'},{icao:'VTBU',name:'芭達雅'},{icao:'VTCC',name:'清邁'}],
+  vietnam:     [{icao:'VVNB',name:'河內'},{icao:'VVPQ',name:'富國'},{icao:'VVTS',name:'胡志明'},{icao:'VDPP',name:'金邊'},{icao:'VVCR',name:'芽莊'},{icao:'VVDN',name:'峴港'}],
+  seasia:      [{icao:'WIII',name:'雅加達'},{icao:'WSSS',name:'新加坡'},{icao:'WADD',name:'峇里島'},{icao:'WARR',name:'泗水'},{icao:'WBGG',name:'古晉'},{icao:'WMKK',name:'吉隆坡'},{icao:'WMKP',name:'檳城'}],
+  usa:         [{icao:'KLAX',name:'洛杉磯'},{icao:'KONT',name:'安大略'},{icao:'KPHX',name:'鳳凰城'},{icao:'KSEA',name:'西雅圖'},{icao:'KSFO',name:'舊金山'},{icao:'KLAS',name:'拉斯維加斯'},{icao:'KOAK',name:'奧克蘭'},{icao:'KPDX',name:'波特蘭'},{icao:'KSMF',name:'沙加緬度'},{icao:'KTUS',name:'土森'}],
+  pacific:     [{icao:'PACD',name:'Cold Bay'},{icao:'PAFA',name:'費爾班克斯'},{icao:'PAKN',name:'King Salmon'},{icao:'PANC',name:'安克拉治'},{icao:'PASY',name:'Shemya'},{icao:'PGSN',name:'塞班'},{icao:'PGUM',name:'關島'},{icao:'PHNL',name:'檀香山'},{icao:'PMDY',name:'中途島'},{icao:'PWAK',name:'威克島'}],
+  canada:      [{icao:'CYVR',name:'溫哥華'}],
+  europe:      [{icao:'LKPR',name:'布拉格'},{icao:'EDDB',name:'柏林'},{icao:'EDDM',name:'慕尼黑'},{icao:'EPWA',name:'華沙'},{icao:'LOWL',name:'林茲'},{icao:'LOWW',name:'維也納'}],
+};
+
+var wxCurrentRegion = 'taiwan';
+var wxMetarMap = {};      // icao -> metar JSON (cleared when region changes)
+var wxDetailCache = {};   // icao -> rendered HTML string (persists across airport switches)
+var wxSelectedIcao = '';
+var wxSelectedName = '';
+var wxLoaded = false;
+
+function wxCalcCat(m) {
+  if (!m) return 'UNKN';
+  var sky = m.sky || [];
+  var ceilings = sky.filter(function(s) { return s.cover === 'BKN' || s.cover === 'OVC' || s.cover === 'OVX'; });
+  var ceiling = ceilings.length > 0 ? Math.min.apply(null, ceilings.map(function(s) { return Number(s.base) || 0; })) : 99999;
+  var vis = parseFloat(String(m.visib || '10+').replace('+','')) || 10;
+  if (ceiling < 500 || vis < 1) return 'LIFR';
+  if (ceiling < 1000 || vis < 3) return 'IFR';
+  if (ceiling < 3000 || vis < 5) return 'MVFR';
+  return 'VFR';
+}
+
+function wxFmtWind(m) {
+  if (!m || m.wspd === undefined || m.wspd === null) return '--';
+  if (m.wspd === 0) return 'Calm';
+  var dir = (m.wdir === 'VRB') ? 'VRB' : (String(m.wdir || 0).padStart(3,'0') + '\\u00b0');
+  var gst = m.wgst ? '/G' + m.wgst : '';
+  return dir + '\\u00a0' + m.wspd + 'kt' + gst;
+}
+
+function wxFmtVis(m) {
+  if (!m || m.visib === undefined) return '--';
+  var v = String(m.visib);
+  return (v === '10+' ? '>10' : v) + 'SM';
+}
+
+function wxFmtTemp(m) {
+  if (!m || m.temp === undefined || m.temp === null) return '--';
+  return m.temp + '\\u00b0C';
+}
+
+function selectWxRegion(region, btn) {
+  wxCurrentRegion = region;
+  wxSelectedIcao = '';
+  wxSelectedName = '';
+  document.querySelectorAll('.wx-route-btn').forEach(function(b) { b.classList.remove('active'); });
+  btn.classList.add('active');
+  document.getElementById('wx-detail-pane').innerHTML = '<div class="wx-empty">\\u2190 點選左側機場<br>查看 ATIS \\u00b7 METAR \\u00b7 TAF</div>';
+  loadWxRegion(region);
+}
+
+function loadWxRegion(region) {
+  var airports = WX_AIRPORTS[region] || [];
+  document.getElementById('wx-list-pane').innerHTML = '<div class="wx-loading-msg">載入氣象資料中...</div>';
+  var icaos = airports.map(function(a) { return a.icao; }).join(',');
+  var proxy = 'https://api.codetabs.com/v1/proxy/?quest=';
+  var url = 'https://aviationweather.gov/api/data/metar?ids=' + icaos + '&format=json&hours=1';
+  fetch(proxy + encodeURIComponent(url))
+    .then(function(r) { return r.ok ? r.json() : []; })
+    .then(function(data) {
+      wxMetarMap = {};
+      (Array.isArray(data) ? data : []).forEach(function(m) {
+        if (m.icaoId) wxMetarMap[m.icaoId.toUpperCase()] = m;
+      });
+      renderWxList(airports, region);
+    })
+    .catch(function() { wxMetarMap = {}; renderWxList(airports, region); });
+}
+
+function renderWxList(airports, region) {
+  var ts = new Date().toLocaleTimeString('zh-TW', {hour:'2-digit', minute:'2-digit'});
+  var hdr = '<div class="wx-list-hdr"><span class="wx-list-ts">更新 ' + ts + '</span>'
+    + '<button class="wx-refresh-btn" onclick="loadWxRegion(\\'' + region + '\\')">\\u21ba 重整</button></div>';
+  var rows = airports.map(function(a) {
+    var m = wxMetarMap[a.icao];
+    var cat = wxCalcCat(m);
+    var sel = (a.icao === wxSelectedIcao) ? ' selected' : '';
+    return '<div class="wx-row' + sel + '" onclick="selectWxAirport(\\'' + a.icao + '\\',\\'' + a.name + '\\',this)">'
+      + '<div class="wx-cat cat-' + cat + '">' + cat + '</div>'
+      + '<div class="wx-icao-col">' + a.icao + '</div>'
+      + '<div class="wx-name-col"><div class="wx-aname">' + a.name + '</div>'
+      + '<div class="wx-wind">' + wxFmtWind(m) + '</div></div>'
+      + '<div class="wx-mini">' + wxFmtVis(m) + '<br>' + wxFmtTemp(m) + '</div>'
+      + '</div>';
+  }).join('');
+  document.getElementById('wx-list-pane').innerHTML = hdr + rows;
+}
+
+function selectWxAirport(icao, name, rowEl) {
+  document.querySelectorAll('.wx-row').forEach(function(r) { r.classList.remove('selected'); });
+  rowEl.classList.add('selected');
+  wxSelectedIcao = icao;
+  wxSelectedName = name;
+  var m = wxMetarMap[icao];
+  var cat = wxCalcCat(m);
+  var detailPane = document.getElementById('wx-detail-pane');
+  detailPane.innerHTML = '<div class="wx-detail-hdr">'
+    + '<div class="wx-detail-title">' + icao + '\\u3000' + name + '</div>'
+    + '<div class="wx-cat cat-' + cat + '">' + cat + '</div>'
+    + '<button class="wx-refresh-btn" style="margin-left:4px" onclick="refreshWxDetail(\\'' + icao + '\\',\\'' + name + '\\')">\\u21ba 更新</button>'
+    + '</div>'
+    + '<div id="wx-detail-content">'
+    + (wxDetailCache[icao] ? wxDetailCache[icao] : '<div class="atis-loading">載入詳細資料...</div>')
+    + '</div>';
+  if (!wxDetailCache[icao]) fetchWxDetail(icao, name);
+  if (window.innerWidth < 640) detailPane.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function refreshWxDetail(icao, name) {
+  delete wxDetailCache[icao];
+  var content = document.getElementById('wx-detail-content');
+  if (content) content.innerHTML = '<div class="atis-loading">重新載入...</div>';
+  fetchWxDetail(icao, name);
+}
+
+function fetchWxDetail(icao, name) {
+  var proxy = 'https://api.codetabs.com/v1/proxy/?quest=';
+  var atisP = fetch(proxy + encodeURIComponent('https://atis.guru/atis/' + icao))
+    .then(function(r) { return r.ok ? r.text() : ''; }).then(parseAtisHtml).catch(function() { return []; });
+  var metarP = fetch(proxy + encodeURIComponent('https://aviationweather.gov/api/data/metar?ids=' + icao + '&format=raw&hours=6'))
+    .then(function(r) { return r.ok ? r.text() : ''; }).then(function(t) { return t.trim(); }).catch(function() { return ''; });
+  var tafP = fetch(proxy + encodeURIComponent('https://aviationweather.gov/api/data/taf?ids=' + icao + '&format=raw'))
+    .then(function(r) { return r.ok ? r.text() : ''; }).then(function(t) { return t.trim(); }).catch(function() { return ''; });
+  Promise.all([atisP, metarP, tafP]).then(function(res) {
+    var atisSections = res[0], metarText = res[1], tafText = res[2];
+    var content = document.getElementById('wx-detail-content');
+    if (!content || wxSelectedIcao !== icao) return;
+    var noData = '<span style="color:var(--muted);font-style:italic">無資料</span>';
+    var atisOnly = atisSections.filter(function(s) {
+      var t = s.title.toLowerCase(); return !t.includes('metar') && !t.includes('taf');
+    });
+    var cards = '';
+    if (atisOnly.length > 0) {
+      cards += atisOnly.map(function(s) {
+        return '<div class="atis-card"><div class="atis-card-title">' + s.title + '</div><pre>' + s.text + '</pre></div>';
+      }).join('');
+    } else {
+      cards += '<div class="atis-card"><div class="atis-card-title">\\ud83d\\udcfb ATIS</div><pre>' + noData + '</pre></div>';
+    }
+    var metarLines = metarText ? metarText.split('\\n').filter(function(l) { return l.trim(); }).join('\\n\\n') : '';
+    cards += '<div class="atis-card"><div class="atis-card-title">\\ud83c\\udf24\\ufe0f METAR（近6小時）</div><pre>' + (metarLines || noData) + '</pre></div>';
+    cards += '<div class="atis-card"><div class="atis-card-title">\\ud83d\\udcc5 TAF</div><pre>' + (tafText || noData) + '</pre></div>';
+    wxDetailCache[icao] = cards;
+    content.innerHTML = cards;
+  });
 }
 
 // ── Boot ─────────────────────────────────────────────────────────────────────
