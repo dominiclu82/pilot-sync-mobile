@@ -404,6 +404,11 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
 .wx-loading-msg{text-align:center;padding:24px;color:var(--muted);font-size:.88em}
 .metar-mode-btn{background:none;border:1px solid var(--dim);color:var(--muted);font-size:.72em;padding:2px 8px;border-radius:6px;cursor:pointer;-webkit-appearance:none}
 .metar-mode-btn.active{background:var(--accent);border-color:var(--accent);color:#fff}
+.wx-flt-def{margin:0 10px 8px;font-size:.71em}
+.wx-flt-def>summary{cursor:pointer;padding:3px 0;color:var(--accent);font-weight:600;user-select:none;list-style:none;-webkit-appearance:none}
+.wx-flt-def>summary::-webkit-details-marker{display:none}
+.wx-flt-def-body{margin-top:6px;display:flex;flex-direction:column;gap:5px;color:var(--muted);padding-bottom:2px}
+.wx-flt-def-body>div{display:flex;align-items:center;gap:8px;line-height:1.4}
 </style>
 </head>
 <body>
@@ -1186,9 +1191,19 @@ function renderWxList(airports, region) {
   var legend = '<div class="wx-legend">'
     + '<span style="' + bx + ';border:2px solid var(--accent)"></span>Regular&nbsp;&nbsp;'
     + '<span style="' + bx + ';border:2px dashed var(--accent);opacity:.8"></span>Alternate&nbsp;&nbsp;'
-    + '<span style="' + bx + ';border:2px solid #b45309"></span>'
-    + '<span style="' + bx + ';border:2px dashed #b45309;opacity:.8;margin-right:4px"></span>+Special'
-    + '</div>';
+    + '<span style="color:#b45309;font-weight:700">Special</span>'
+    + '</div>'
+    + '<details class="wx-flt-def">'
+    + '<summary>&#9656; Flight Category Definition</summary>'
+    + '<div class="wx-flt-def-body">'
+    + '<div style="color:var(--muted);font-style:italic;font-size:.95em">FAA Flight Category (used by aviationweather.gov)</div>'
+    + '<div><span class="wx-cat cat-VFR">VFR</span> Ceiling &ge; 3000 ft AGL &amp; Vis &ge; 5 SM &mdash; VMC</div>'
+    + '<div><span class="wx-cat cat-MVFR">MVFR</span> Ceiling 1000&ndash;2999 ft AGL or Vis 3&ndash;4 SM &mdash; Marginal VMC</div>'
+    + '<div><span class="wx-cat cat-IFR">IFR</span> Ceiling 500&ndash;999 ft AGL or Vis 1&ndash;2 SM &mdash; IMC</div>'
+    + '<div><span class="wx-cat cat-LIFR">LIFR</span> Ceiling &lt; 500 ft AGL or Vis &lt; 1 SM &mdash; Low IMC</div>'
+    + '<div><span class="wx-cat cat-UNKN">UNKN</span> No METAR data available</div>'
+    + '<div style="margin-top:2px;font-style:italic;font-size:.95em">ICAO standard uses VMC / IMC only. VFR/MVFR &#8776; VMC; IFR/LIFR &#8776; IMC.</div>'
+    + '</div></details>';
   document.getElementById('wx-list-pane').innerHTML = hdr + cards + legend;
 }
 
