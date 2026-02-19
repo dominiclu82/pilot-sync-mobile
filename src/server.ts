@@ -98,6 +98,22 @@ app.get(REDIRECT_PATH, oauthCallback);
 app.get('/api/oauth2callback', oauthCallback); // 雲端路徑
 app.get('/oauth/callback', oauthCallback);     // 本機 fallback
 
+// ── Pacific HF proxy ──────────────────────────────────────────────────────────
+app.get('/api/pacific-hf', async (_req, res) => {
+  try {
+    const r = await fetch('https://radio.arinc.net/pacific/', {
+      headers: { 'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15' }
+    });
+    let html = await r.text();
+    // 注入 base tag 讓相對路徑可以正確載入
+    html = html.replace(/<head>/i, '<head><base href="https://radio.arinc.net/">');
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    res.send(html);
+  } catch (e: any) {
+    res.status(502).send(`<p style="font-family:sans-serif;padding:20px;color:red">無法載入 Pacific HF 資料：${e.message}</p>`);
+  }
+});
+
 async function oauthCallback(req: express.Request, res: express.Response) {
   const { code } = req.query;
   if (!code) { res.status(400).send('Missing code'); return; }
@@ -483,15 +499,15 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
   <div id="briefing-tools" class="briefing-panel">
     <div class="briefing-section">
       <div class="tool-grid">
-        <a class="tool-link-btn" href="https://flight-plan-editor.weathernews.com/flight_plan_editor/#login" target="_blank" onclick="return loadTool(event,this)">☁️ Weathernews Flight Plan</a>
-        <a class="tool-link-btn" href="https://pilotstarspace.starlux-airlines.com/#/" target="_blank" onclick="return loadTool(event,this)">🌟 SJX Pilot Space</a>
-        <a class="tool-link-btn" href="https://elb.starlux-airlines.com/elb/#/dashboard/fleet" target="_blank" onclick="return loadTool(event,this)">🧰 STARLUX ELB Fleet</a>
+        <a class="tool-link-btn" href="https://flight-plan-editor.weathernews.com/flight_plan_editor/#login" target="_blank">☁️ Weathernews Flight Plan</a>
+        <a class="tool-link-btn" href="https://pilotstarspace.starlux-airlines.com/#/" target="_blank">🌟 SJX Pilot Space</a>
+        <a class="tool-link-btn" href="https://elb.starlux-airlines.com/elb/#/dashboard/fleet" target="_blank">🧰 STARLUX ELB Fleet</a>
         <a class="tool-link-btn" href="https://tono2.net" target="_blank" onclick="return loadTool(event,this)">🇯🇵 Tono2 航空氣象</a>
-        <a class="tool-link-btn" href="https://sjx.lido.aero/lido/las/login.jsp?DESMON_RESULT_PAGE=https://sjx.lido.aero/briefing&DESMON_CODE=LAS_001&DESMON_LANG=null" target="_blank" onclick="return loadTool(event,this)">📋 LIDO Briefing</a>
+        <a class="tool-link-btn" href="https://sjx.lido.aero/lido/las/login.jsp?DESMON_RESULT_PAGE=https://sjx.lido.aero/briefing&DESMON_CODE=LAS_001&DESMON_LANG=null" target="_blank">📋 LIDO Briefing</a>
         <a class="tool-link-btn" href="https://www.skyinfo.jp" target="_blank" onclick="return loadTool(event,this)">🇯🇵 日本NOTAM地圖</a>
         <a class="tool-link-btn" href="https://app.cwa.gov.tw/web/obsmap/typhoon.html" target="_blank" onclick="return loadTool(event,this)">🌀 颱風路徑圖</a>
         <a class="tool-link-btn" href="https://gpsjam.org/" target="_blank" onclick="return loadTool(event,this)">🛰️ GPS干擾區域</a>
-        <a class="tool-link-btn" href="https://radio.arinc.net/pacific/" target="_blank" onclick="return loadTool(event,this)">📻 Pacific HF 查詢</a>
+        <a class="tool-link-btn" href="https://radio.arinc.net/pacific/" target="_blank" onclick="return loadTool(event,this,'pacific-hf')">📻 Pacific HF 查詢</a>
       </div>
       <!-- 內嵌 iframe -->
       <div id="tool-frame-wrap" style="display:none;margin-top:16px">
@@ -996,14 +1012,15 @@ function switchBriefingTab(panel, btn) {
 }
 
 // ── 工具連結內嵌 iframe ────────────────────────────────────────────────────────
-function loadTool(e, anchor) {
+function loadTool(e, anchor, mode) {
   e.preventDefault();
-  const url = anchor.href;
+  const externalUrl = anchor.href;
+  const iframeUrl = mode === 'pacific-hf' ? '/api/pacific-hf' : externalUrl;
   const title = anchor.textContent.trim();
   const wrap = document.getElementById('tool-frame-wrap');
-  document.getElementById('tool-frame').src = url;
+  document.getElementById('tool-frame').src = iframeUrl;
   document.getElementById('tool-frame-title').textContent = title;
-  document.getElementById('tool-frame-external').href = url;
+  document.getElementById('tool-frame-external').href = externalUrl;
   wrap.style.display = 'block';
   wrap.scrollIntoView({ behavior: 'smooth', block: 'start' });
   return false;
