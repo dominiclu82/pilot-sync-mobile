@@ -365,9 +365,9 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
 .wx-route-btn{padding:4px 10px;font-size:.76em;background:none;border:1.5px solid var(--dim);
   border-radius:14px;color:var(--muted);font-weight:500;cursor:pointer;transition:all .2s;margin:0;-webkit-appearance:none}
 .wx-route-btn.active{background:var(--accent);color:#fff;border-color:var(--accent)}
-#briefing-datis.active{display:flex!important;flex-direction:column;padding:0!important;
-  height:calc(100dvh - 100px - env(safe-area-inset-top,0px) - var(--safe-bottom));overflow:hidden}
-.wx-split{display:flex;flex-direction:column;flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch}
+#briefing-datis.active{display:flex!important;flex-direction:column;padding:0!important}
+.wx-fixed-header{position:sticky;top:calc(env(safe-area-inset-top,0px) + 38px);z-index:90;background:var(--bg)}
+.wx-split{display:flex;flex-direction:column;flex:1}
 .wx-list-pane{border-bottom:1px solid var(--dim)}
 .wx-detail-pane{padding:16px}
 .wx-card{margin:5px 10px 0;border-radius:10px;cursor:pointer;overflow:hidden;-webkit-tap-highlight-color:transparent}
@@ -378,8 +378,9 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
 .wx-card:active,.wx-card.selected{opacity:1;background:rgba(255,255,255,.06)}
 .wx-legend{display:flex;gap:10px;flex-wrap:wrap;padding:8px 10px 10px;font-size:.71em;color:var(--muted);margin-top:2px}
 @media(min-width:640px){
-  #briefing-datis.active{height:calc(100dvh - 150px - env(safe-area-inset-top,0px))}
-  .wx-split{flex-direction:row;overflow:hidden;overflow-y:hidden;flex:1}
+  #briefing-datis.active{height:calc(100dvh - 150px - env(safe-area-inset-top,0px));overflow:hidden}
+  .wx-fixed-header{position:static}
+  .wx-split{flex-direction:row;overflow:hidden;flex:1}
   .wx-list-pane{width:280px;flex-shrink:0;overflow-y:auto;border-right:1px solid var(--dim);border-bottom:none}
   .wx-detail-pane{flex:1;overflow-y:auto}}
 .wx-row{display:flex;align-items:center;padding:9px 12px;gap:9px}
@@ -589,22 +590,24 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
 
   <!-- ── ⛅ 航路氣象 / D-ATIS panel ── -->
   <div id="briefing-datis" class="briefing-panel active">
-    <div class="wx-routes">
-      <button class="wx-route-btn active" onclick="selectWxRegion('taiwan',this)">台灣</button>
-      <button class="wx-route-btn" onclick="selectWxRegion('hkmacao',this)">港澳</button>
-      <button class="wx-route-btn" onclick="selectWxRegion('japan',this)">日本</button>
-      <button class="wx-route-btn" onclick="selectWxRegion('korea',this)">韓國</button>
-      <button class="wx-route-btn" onclick="selectWxRegion('philippines',this)">菲律賓</button>
-      <button class="wx-route-btn" onclick="selectWxRegion('thailand',this)">泰國</button>
-      <button class="wx-route-btn" onclick="selectWxRegion('vietnam',this)">越南柬埔寨</button>
-      <button class="wx-route-btn" onclick="selectWxRegion('seasia',this)">星馬印</button>
-      <button class="wx-route-btn" onclick="selectWxRegion('usa',this)">美國</button>
-      <button class="wx-route-btn" onclick="selectWxRegion('pacific',this)">阿拉斯加太平洋</button>
-      <button class="wx-route-btn" onclick="selectWxRegion('canada',this)">加拿大</button>
-      <button class="wx-route-btn" onclick="selectWxRegion('europe',this)">歐洲</button>
-    </div>
-    <div style="background:rgba(245,158,11,.08);border-bottom:1px solid rgba(245,158,11,.25);padding:5px 14px;font-size:.72em;color:#f59e0b;display:flex;align-items:center;gap:6px;flex-shrink:0">
-      <span>⚠</span><span>Non-operational use only. Data may not reflect current conditions.</span>
+    <div class="wx-fixed-header">
+      <div class="wx-routes">
+        <button class="wx-route-btn active" onclick="selectWxRegion('taiwan',this)">台灣</button>
+        <button class="wx-route-btn" onclick="selectWxRegion('hkmacao',this)">港澳</button>
+        <button class="wx-route-btn" onclick="selectWxRegion('japan',this)">日本</button>
+        <button class="wx-route-btn" onclick="selectWxRegion('korea',this)">韓國</button>
+        <button class="wx-route-btn" onclick="selectWxRegion('philippines',this)">菲律賓</button>
+        <button class="wx-route-btn" onclick="selectWxRegion('thailand',this)">泰國</button>
+        <button class="wx-route-btn" onclick="selectWxRegion('vietnam',this)">越南柬埔寨</button>
+        <button class="wx-route-btn" onclick="selectWxRegion('seasia',this)">星馬印</button>
+        <button class="wx-route-btn" onclick="selectWxRegion('usa',this)">美國</button>
+        <button class="wx-route-btn" onclick="selectWxRegion('pacific',this)">阿拉斯加太平洋</button>
+        <button class="wx-route-btn" onclick="selectWxRegion('canada',this)">加拿大</button>
+        <button class="wx-route-btn" onclick="selectWxRegion('europe',this)">歐洲</button>
+      </div>
+      <div style="background:rgba(245,158,11,.08);border-bottom:1px solid rgba(245,158,11,.25);padding:5px 14px;font-size:.72em;color:#f59e0b;display:flex;align-items:center;gap:6px">
+        <span>⚠</span><span>Non-operational use only. Data may not reflect current conditions.</span>
+      </div>
     </div>
     <div class="wx-split">
       <div class="wx-list-pane" id="wx-list-pane">
