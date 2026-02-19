@@ -365,8 +365,9 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
 .wx-route-btn{padding:4px 10px;font-size:.76em;background:none;border:1.5px solid var(--dim);
   border-radius:14px;color:var(--muted);font-weight:500;cursor:pointer;transition:all .2s;margin:0;-webkit-appearance:none}
 .wx-route-btn.active{background:var(--accent);color:#fff;border-color:var(--accent)}
-#briefing-datis.active{display:flex!important;flex-direction:column;padding:0!important}
-.wx-split{display:flex;flex-direction:column;flex:1}
+#briefing-datis.active{display:flex!important;flex-direction:column;padding:0!important;
+  height:calc(100dvh - 100px - env(safe-area-inset-top,0px) - var(--safe-bottom));overflow:hidden}
+.wx-split{display:flex;flex-direction:column;flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch}
 .wx-list-pane{border-bottom:1px solid var(--dim)}
 .wx-detail-pane{padding:16px}
 .wx-card{margin:5px 10px 0;border-radius:10px;cursor:pointer;overflow:hidden;-webkit-tap-highlight-color:transparent}
@@ -377,8 +378,8 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
 .wx-card:active,.wx-card.selected{opacity:1;background:rgba(255,255,255,.06)}
 .wx-legend{display:flex;gap:10px;flex-wrap:wrap;padding:8px 10px 10px;font-size:.71em;color:var(--muted);margin-top:2px}
 @media(min-width:640px){
-  #briefing-datis.active{height:calc(100dvh - 150px - env(safe-area-inset-top,0px));overflow:hidden}
-  .wx-split{flex-direction:row;overflow:hidden;flex:1}
+  #briefing-datis.active{height:calc(100dvh - 150px - env(safe-area-inset-top,0px))}
+  .wx-split{flex-direction:row;overflow:hidden;overflow-y:hidden;flex:1}
   .wx-list-pane{width:280px;flex-shrink:0;overflow-y:auto;border-right:1px solid var(--dim);border-bottom:none}
   .wx-detail-pane{flex:1;overflow-y:auto}}
 .wx-row{display:flex;align-items:center;padding:9px 12px;gap:9px}
