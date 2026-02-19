@@ -351,12 +351,24 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
 .wx-route-btn{padding:4px 10px;font-size:.76em;background:none;border:1.5px solid var(--dim);
   border-radius:14px;color:var(--muted);font-weight:500;cursor:pointer;transition:all .2s;margin:0;-webkit-appearance:none}
 .wx-route-btn.active{background:var(--accent);color:#fff;border-color:var(--accent)}
-#briefing-wx.active{display:flex!important;flex-direction:column;padding:0!important}
+#briefing-datis.active{display:flex!important;flex-direction:column;padding:0!important}
 .wx-split{display:flex;flex-direction:column;flex:1}
 .wx-list-pane{border-bottom:1px solid var(--dim)}
 .wx-detail-pane{padding:16px}
+.wx-row-r {border-left:3px solid var(--accent)}
+.wx-row-a {border-left:3px solid var(--dim);opacity:.88}
+.wx-row-rs{border-left:3px solid #b45309}
+.wx-row-as{border-left:3px solid #b45309;opacity:.88}
+.wx-row-r:active,.wx-row-r.selected,
+.wx-row-a:active,.wx-row-a.selected,
+.wx-row-rs:active,.wx-row-rs.selected,
+.wx-row-as:active,.wx-row-as.selected{opacity:1}
+.wx-legend{display:flex;gap:14px;flex-wrap:wrap;padding:7px 14px;font-size:.71em;color:var(--muted);border-top:1px solid var(--dim);background:var(--surface)}
+.wx-leg-r{color:var(--accent);font-weight:700;margin-right:2px}
+.wx-leg-a{color:var(--dim);font-weight:700;margin-right:2px}
+.wx-leg-s{color:#b45309;font-weight:700;margin-right:2px}
 @media(min-width:640px){
-  #briefing-wx.active{height:calc(100dvh - 150px - env(safe-area-inset-top,0px));overflow:hidden}
+  #briefing-datis.active{height:calc(100dvh - 150px - env(safe-area-inset-top,0px));overflow:hidden}
   .wx-split{flex-direction:row;overflow:hidden;flex:1}
   .wx-list-pane{width:270px;flex-shrink:0;overflow-y:auto;border-right:1px solid var(--dim);border-bottom:none}
   .wx-detail-pane{flex:1;overflow-y:auto}}
@@ -529,8 +541,7 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
   <!-- 子 Tab Bar -->
   <div class="briefing-subtabs">
     <button class="briefing-subtab" id="subtabBtn-tools" onclick="switchBriefingTab('tools',this)">🗺️ 工具連結</button>
-    <button class="briefing-subtab active" id="subtabBtn-datis" onclick="switchBriefingTab('datis',this)">📡 D-ATIS</button>
-    <button class="briefing-subtab" id="subtabBtn-wx" onclick="switchBriefingTab('wx',this)">⛅ 航路氣象</button>
+    <button class="briefing-subtab active" id="subtabBtn-datis" onclick="switchBriefingTab('datis',this)">⛅ 航路氣象</button>
   </div>
 
   <!-- ── 工具連結 panel ── -->
@@ -561,114 +572,8 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
     </div>
   </div>
 
-  <!-- ── D-ATIS panel ── -->
+  <!-- ── ⛅ 航路氣象 / D-ATIS panel ── -->
   <div id="briefing-datis" class="briefing-panel active">
-    <div class="briefing-section">
-      <h2>📡 D-ATIS</h2>
-      <div class="datis-tabs">
-        <button class="datis-tab active" onclick="switchDatisRegion('taiwan',this)">台灣</button>
-        <button class="datis-tab" onclick="switchDatisRegion('hkmacao',this)">港澳</button>
-        <button class="datis-tab" onclick="switchDatisRegion('japan',this)">日本</button>
-        <button class="datis-tab" onclick="switchDatisRegion('korea',this)">韓國</button>
-        <button class="datis-tab" onclick="switchDatisRegion('philippines',this)">菲律賓</button>
-        <button class="datis-tab" onclick="switchDatisRegion('thailand',this)">泰國</button>
-        <button class="datis-tab" onclick="switchDatisRegion('vietnam',this)">越南柬埔寨</button>
-        <button class="datis-tab" onclick="switchDatisRegion('seasia',this)">星馬印</button>
-        <button class="datis-tab" onclick="switchDatisRegion('usa',this)">美國</button>
-        <button class="datis-tab" onclick="switchDatisRegion('pacific',this)">阿拉斯加太平洋</button>
-        <button class="datis-tab" onclick="switchDatisRegion('canada',this)">加拿大</button>
-        <button class="datis-tab" onclick="switchDatisRegion('europe',this)">歐洲</button>
-        <button class="datis-tab" onclick="switchDatisRegion('all',this)">全部</button>
-      </div>
-      <div class="datis-grid" id="datisGrid">
-        <!-- 台灣 -->
-        <button class="datis-btn r" data-region="taiwan" onclick="openDatisLink('https://atis.guru/atis/RCTP',this)">RCTP<span>桃園</span></button>
-        <button class="datis-btn a s" data-region="taiwan" onclick="openDatisLink('https://atis.guru/atis/RCKH',this)">RCKH<span>高雄</span></button>
-        <button class="datis-btn a s" data-region="taiwan" onclick="openDatisLink('https://atis.guru/atis/RCSS',this)">RCSS<span>松山</span></button>
-        <!-- 港澳 -->
-        <button class="datis-btn r s hidden" data-region="hkmacao" onclick="openDatisLink('https://atis.guru/atis/VHHH',this)">VHHH<span>香港</span></button>
-        <button class="datis-btn r hidden" data-region="hkmacao" onclick="openDatisLink('https://atis.guru/atis/VMMC',this)">VMMC<span>澳門</span></button>
-        <!-- 日本 -->
-        <button class="datis-btn r hidden" data-region="japan" onclick="openDatisLink('https://atis.guru/atis/RJAA',this)">RJAA<span>成田</span></button>
-        <button class="datis-btn r hidden" data-region="japan" onclick="openDatisLink('https://atis.guru/atis/RJBB',this)">RJBB<span>關西</span></button>
-        <button class="datis-btn r hidden" data-region="japan" onclick="openDatisLink('https://atis.guru/atis/RJCC',this)">RJCC<span>新千歲</span></button>
-        <button class="datis-btn r s hidden" data-region="japan" onclick="openDatisLink('https://atis.guru/atis/RJFF',this)">RJFF<span>福岡</span></button>
-        <button class="datis-btn r hidden" data-region="japan" onclick="openDatisLink('https://atis.guru/atis/RJSS',this)">RJSS<span>仙台</span></button>
-        <button class="datis-btn r hidden" data-region="japan" onclick="openDatisLink('https://atis.guru/atis/ROAH',this)">ROAH<span>那霸</span></button>
-        <button class="datis-btn a hidden" data-region="japan" onclick="openDatisLink('https://atis.guru/atis/RJTT',this)">RJTT<span>羽田</span></button>
-        <!-- 韓國 -->
-        <button class="datis-btn a hidden" data-region="korea" onclick="openDatisLink('https://atis.guru/atis/RKPC',this)">RKPC<span>濟州</span></button>
-        <button class="datis-btn a s hidden" data-region="korea" onclick="openDatisLink('https://atis.guru/atis/RKPK',this)">RKPK<span>釜山</span></button>
-        <button class="datis-btn a hidden" data-region="korea" onclick="openDatisLink('https://atis.guru/atis/RKSI',this)">RKSI<span>仁川</span></button>
-        <!-- 菲律賓 -->
-        <button class="datis-btn r hidden" data-region="philippines" onclick="openDatisLink('https://atis.guru/atis/RPLC',this)">RPLC<span>克拉克</span></button>
-        <button class="datis-btn r hidden" data-region="philippines" onclick="openDatisLink('https://atis.guru/atis/RPLL',this)">RPLL<span>馬尼拉</span></button>
-        <button class="datis-btn r hidden" data-region="philippines" onclick="openDatisLink('https://atis.guru/atis/RPVM',this)">RPVM<span>宿霧</span></button>
-        <!-- 泰國 -->
-        <button class="datis-btn r hidden" data-region="thailand" onclick="openDatisLink('https://atis.guru/atis/VTBS',this)">VTBS<span>素萬那普</span></button>
-        <button class="datis-btn a hidden" data-region="thailand" onclick="openDatisLink('https://atis.guru/atis/VTBD',this)">VTBD<span>廊曼</span></button>
-        <button class="datis-btn a hidden" data-region="thailand" onclick="openDatisLink('https://atis.guru/atis/VTBU',this)">VTBU<span>芭達雅</span></button>
-        <button class="datis-btn a hidden" data-region="thailand" onclick="openDatisLink('https://atis.guru/atis/VTCC',this)">VTCC<span>清邁</span></button>
-        <!-- 越南柬埔寨 -->
-        <button class="datis-btn r hidden" data-region="vietnam" onclick="openDatisLink('https://atis.guru/atis/VVNB',this)">VVNB<span>河內</span></button>
-        <button class="datis-btn r hidden" data-region="vietnam" onclick="openDatisLink('https://atis.guru/atis/VVPQ',this)">VVPQ<span>富國</span></button>
-        <button class="datis-btn r hidden" data-region="vietnam" onclick="openDatisLink('https://atis.guru/atis/VVTS',this)">VVTS<span>胡志明</span></button>
-        <button class="datis-btn a hidden" data-region="vietnam" onclick="openDatisLink('https://atis.guru/atis/VDPP',this)">VDPP<span>金邊</span></button>
-        <button class="datis-btn a hidden" data-region="vietnam" onclick="openDatisLink('https://atis.guru/atis/VVCR',this)">VVCR<span>芽莊</span></button>
-        <button class="datis-btn a hidden" data-region="vietnam" onclick="openDatisLink('https://atis.guru/atis/VVDN',this)">VVDN<span>峴港</span></button>
-        <!-- 星馬印 -->
-        <button class="datis-btn r hidden" data-region="seasia" onclick="openDatisLink('https://atis.guru/atis/WIII',this)">WIII<span>雅加達</span></button>
-        <button class="datis-btn r hidden" data-region="seasia" onclick="openDatisLink('https://atis.guru/atis/WSSS',this)">WSSS<span>新加坡</span></button>
-        <button class="datis-btn a hidden" data-region="seasia" onclick="openDatisLink('https://atis.guru/atis/WADD',this)">WADD<span>峇里島</span></button>
-        <button class="datis-btn a hidden" data-region="seasia" onclick="openDatisLink('https://atis.guru/atis/WARR',this)">WARR<span>泗水</span></button>
-        <button class="datis-btn a hidden" data-region="seasia" onclick="openDatisLink('https://atis.guru/atis/WBGG',this)">WBGG<span>古晉</span></button>
-        <button class="datis-btn a hidden" data-region="seasia" onclick="openDatisLink('https://atis.guru/atis/WMKK',this)">WMKK<span>吉隆坡</span></button>
-        <button class="datis-btn a hidden" data-region="seasia" onclick="openDatisLink('https://atis.guru/atis/WMKP',this)">WMKP<span>檳城</span></button>
-        <!-- 美國 -->
-        <button class="datis-btn r hidden" data-region="usa" onclick="openDatisLink('https://atis.guru/atis/KLAX',this)">KLAX<span>洛杉磯</span></button>
-        <button class="datis-btn r s hidden" data-region="usa" onclick="openDatisLink('https://atis.guru/atis/KONT',this)">KONT<span>安大略</span></button>
-        <button class="datis-btn r hidden" data-region="usa" onclick="openDatisLink('https://atis.guru/atis/KPHX',this)">KPHX<span>鳳凰城</span></button>
-        <button class="datis-btn r hidden" data-region="usa" onclick="openDatisLink('https://atis.guru/atis/KSEA',this)">KSEA<span>西雅圖</span></button>
-        <button class="datis-btn r s hidden" data-region="usa" onclick="openDatisLink('https://atis.guru/atis/KSFO',this)">KSFO<span>舊金山</span></button>
-        <button class="datis-btn a hidden" data-region="usa" onclick="openDatisLink('https://atis.guru/atis/KLAS',this)">KLAS<span>拉斯維加斯</span></button>
-        <button class="datis-btn a hidden" data-region="usa" onclick="openDatisLink('https://atis.guru/atis/KOAK',this)">KOAK<span>奧克蘭</span></button>
-        <button class="datis-btn a hidden" data-region="usa" onclick="openDatisLink('https://atis.guru/atis/KPDX',this)">KPDX<span>波特蘭</span></button>
-        <button class="datis-btn a hidden" data-region="usa" onclick="openDatisLink('https://atis.guru/atis/KSMF',this)">KSMF<span>沙加緬度</span></button>
-        <button class="datis-btn a hidden" data-region="usa" onclick="openDatisLink('https://atis.guru/atis/KTUS',this)">KTUS<span>土森</span></button>
-        <!-- 阿拉斯加太平洋 -->
-        <button class="datis-btn a hidden" data-region="pacific" onclick="openDatisLink('https://atis.guru/atis/PACD',this)">PACD<span>Cold Bay</span></button>
-        <button class="datis-btn a hidden" data-region="pacific" onclick="openDatisLink('https://atis.guru/atis/PAFA',this)">PAFA<span>費爾班克斯</span></button>
-        <button class="datis-btn a hidden" data-region="pacific" onclick="openDatisLink('https://atis.guru/atis/PAKN',this)">PAKN<span>King Salmon</span></button>
-        <button class="datis-btn a hidden" data-region="pacific" onclick="openDatisLink('https://atis.guru/atis/PANC',this)">PANC<span>安克拉治</span></button>
-        <button class="datis-btn a hidden" data-region="pacific" onclick="openDatisLink('https://atis.guru/atis/PASY',this)">PASY<span>Shemya</span></button>
-        <button class="datis-btn a hidden" data-region="pacific" onclick="openDatisLink('https://atis.guru/atis/PGSN',this)">PGSN<span>塞班</span></button>
-        <button class="datis-btn a hidden" data-region="pacific" onclick="openDatisLink('https://atis.guru/atis/PGUM',this)">PGUM<span>關島</span></button>
-        <button class="datis-btn a hidden" data-region="pacific" onclick="openDatisLink('https://atis.guru/atis/PHNL',this)">PHNL<span>檀香山</span></button>
-        <button class="datis-btn a hidden" data-region="pacific" onclick="openDatisLink('https://atis.guru/atis/PMDY',this)">PMDY<span>中途島</span></button>
-        <button class="datis-btn a hidden" data-region="pacific" onclick="openDatisLink('https://atis.guru/atis/PWAK',this)">PWAK<span>威克島</span></button>
-        <!-- 加拿大 -->
-        <button class="datis-btn a hidden" data-region="canada" onclick="openDatisLink('https://atis.guru/atis/CYVR',this)">CYVR<span>溫哥華</span></button>
-        <!-- 歐洲 -->
-        <button class="datis-btn r hidden" data-region="europe" onclick="openDatisLink('https://atis.guru/atis/LKPR',this)">LKPR<span>布拉格</span></button>
-        <button class="datis-btn a hidden" data-region="europe" onclick="openDatisLink('https://atis.guru/atis/EDDB',this)">EDDB<span>柏林</span></button>
-        <button class="datis-btn a hidden" data-region="europe" onclick="openDatisLink('https://atis.guru/atis/EDDM',this)">EDDM<span>慕尼黑</span></button>
-        <button class="datis-btn a hidden" data-region="europe" onclick="openDatisLink('https://atis.guru/atis/EPWA',this)">EPWA<span>華沙</span></button>
-        <button class="datis-btn a hidden" data-region="europe" onclick="openDatisLink('https://atis.guru/atis/LOWL',this)">LOWL<span>林茲</span></button>
-        <button class="datis-btn a hidden" data-region="europe" onclick="openDatisLink('https://atis.guru/atis/LOWW',this)">LOWW<span>維也納</span></button>
-      </div>
-      <div style="margin-top:8px;font-size:.75em;color:var(--muted)">實線 = Regular　虛線 = Alternate　<span style="color:#b45309;font-weight:700">▪ Special</span></div>
-      <div id="datisDisplay" style="display:none;margin-top:1em">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.5em">
-          <div id="datisLabel" style="font-weight:700;font-size:1em"></div>
-          <button class="btn btn-secondary btn-sm" onclick="reloadCurrentAtis()" style="width:auto;padding:6px 12px;font-size:.8em">↺ 重新整理</button>
-        </div>
-        <div id="datisContent"></div>
-      </div>
-    </div>
-  </div>
-
-  <!-- ── 航路氣象 panel ── -->
-  <div id="briefing-wx" class="briefing-panel">
     <div class="wx-routes">
       <button class="wx-route-btn active" onclick="selectWxRegion('taiwan',this)">台灣</button>
       <button class="wx-route-btn" onclick="selectWxRegion('hkmacao',this)">港澳</button>
@@ -685,7 +590,7 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
     </div>
     <div class="wx-split">
       <div class="wx-list-pane" id="wx-list-pane">
-        <div class="wx-loading-msg">請先選擇上方地區</div>
+        <div class="wx-loading-msg">載入氣象資料中...</div>
       </div>
       <div class="wx-detail-pane" id="wx-detail-pane">
         <div class="wx-empty">← 點選左側機場<br>查看 ATIS · METAR · TAF</div>
@@ -1085,7 +990,7 @@ function switchBriefingTab(panel, btn) {
   document.querySelectorAll('.briefing-panel').forEach(p => p.classList.remove('active'));
   btn.classList.add('active');
   document.getElementById('briefing-' + panel).classList.add('active');
-  if (panel === 'wx' && !wxLoaded) { wxLoaded = true; loadWxRegion(wxCurrentRegion); }
+  if (panel === 'datis' && !wxLoaded) { wxLoaded = true; loadWxRegion(wxCurrentRegion); }
 }
 
 // ── 工具連結內嵌 iframe ────────────────────────────────────────────────────────
@@ -1120,18 +1025,18 @@ function closeHF() {
 
 // ── 航路氣象 ──────────────────────────────────────────────────────────────────
 var WX_AIRPORTS = {
-  taiwan:      [{icao:'RCTP',name:'桃園'},{icao:'RCKH',name:'高雄'},{icao:'RCSS',name:'松山'}],
-  hkmacao:     [{icao:'VHHH',name:'香港'},{icao:'VMMC',name:'澳門'}],
-  japan:       [{icao:'RJAA',name:'成田'},{icao:'RJBB',name:'關西'},{icao:'RJCC',name:'新千歲'},{icao:'RJFF',name:'福岡'},{icao:'RJSS',name:'仙台'},{icao:'ROAH',name:'那霸'},{icao:'RJTT',name:'羽田'}],
-  korea:       [{icao:'RKPC',name:'濟州'},{icao:'RKPK',name:'釜山'},{icao:'RKSI',name:'仁川'}],
-  philippines: [{icao:'RPLC',name:'克拉克'},{icao:'RPLL',name:'馬尼拉'},{icao:'RPVM',name:'宿霧'}],
-  thailand:    [{icao:'VTBS',name:'素萬那普'},{icao:'VTBD',name:'廊曼'},{icao:'VTBU',name:'芭達雅'},{icao:'VTCC',name:'清邁'}],
-  vietnam:     [{icao:'VVNB',name:'河內'},{icao:'VVPQ',name:'富國'},{icao:'VVTS',name:'胡志明'},{icao:'VDPP',name:'金邊'},{icao:'VVCR',name:'芽莊'},{icao:'VVDN',name:'峴港'}],
-  seasia:      [{icao:'WIII',name:'雅加達'},{icao:'WSSS',name:'新加坡'},{icao:'WADD',name:'峇里島'},{icao:'WARR',name:'泗水'},{icao:'WBGG',name:'古晉'},{icao:'WMKK',name:'吉隆坡'},{icao:'WMKP',name:'檳城'}],
-  usa:         [{icao:'KLAX',name:'洛杉磯'},{icao:'KONT',name:'安大略'},{icao:'KPHX',name:'鳳凰城'},{icao:'KSEA',name:'西雅圖'},{icao:'KSFO',name:'舊金山'},{icao:'KLAS',name:'拉斯維加斯'},{icao:'KOAK',name:'奧克蘭'},{icao:'KPDX',name:'波特蘭'},{icao:'KSMF',name:'沙加緬度'},{icao:'KTUS',name:'土森'}],
-  pacific:     [{icao:'PACD',name:'Cold Bay'},{icao:'PAFA',name:'費爾班克斯'},{icao:'PAKN',name:'King Salmon'},{icao:'PANC',name:'安克拉治'},{icao:'PASY',name:'Shemya'},{icao:'PGSN',name:'塞班'},{icao:'PGUM',name:'關島'},{icao:'PHNL',name:'檀香山'},{icao:'PMDY',name:'中途島'},{icao:'PWAK',name:'威克島'}],
-  canada:      [{icao:'CYVR',name:'溫哥華'}],
-  europe:      [{icao:'LKPR',name:'布拉格'},{icao:'EDDB',name:'柏林'},{icao:'EDDM',name:'慕尼黑'},{icao:'EPWA',name:'華沙'},{icao:'LOWL',name:'林茲'},{icao:'LOWW',name:'維也納'}],
+  taiwan:      [{icao:'RCTP',name:'桃園',cls:'r'},{icao:'RCKH',name:'高雄',cls:'as'},{icao:'RCSS',name:'松山',cls:'as'}],
+  hkmacao:     [{icao:'VHHH',name:'香港',cls:'rs'},{icao:'VMMC',name:'澳門',cls:'r'}],
+  japan:       [{icao:'RJAA',name:'成田',cls:'r'},{icao:'RJBB',name:'關西',cls:'r'},{icao:'RJCC',name:'新千歲',cls:'r'},{icao:'RJFF',name:'福岡',cls:'rs'},{icao:'RJSS',name:'仙台',cls:'r'},{icao:'ROAH',name:'那霸',cls:'r'},{icao:'RJTT',name:'羽田',cls:'a'}],
+  korea:       [{icao:'RKPC',name:'濟州',cls:'a'},{icao:'RKPK',name:'釜山',cls:'as'},{icao:'RKSI',name:'仁川',cls:'a'}],
+  philippines: [{icao:'RPLC',name:'克拉克',cls:'r'},{icao:'RPLL',name:'馬尼拉',cls:'r'},{icao:'RPVM',name:'宿霧',cls:'r'}],
+  thailand:    [{icao:'VTBS',name:'素萬那普',cls:'r'},{icao:'VTBD',name:'廊曼',cls:'a'},{icao:'VTBU',name:'芭達雅',cls:'a'},{icao:'VTCC',name:'清邁',cls:'a'}],
+  vietnam:     [{icao:'VVNB',name:'河內',cls:'r'},{icao:'VVPQ',name:'富國',cls:'r'},{icao:'VVTS',name:'胡志明',cls:'r'},{icao:'VDPP',name:'金邊',cls:'a'},{icao:'VVCR',name:'芽莊',cls:'a'},{icao:'VVDN',name:'峴港',cls:'a'}],
+  seasia:      [{icao:'WIII',name:'雅加達',cls:'r'},{icao:'WSSS',name:'新加坡',cls:'r'},{icao:'WADD',name:'峇里島',cls:'a'},{icao:'WARR',name:'泗水',cls:'a'},{icao:'WBGG',name:'古晉',cls:'a'},{icao:'WMKK',name:'吉隆坡',cls:'a'},{icao:'WMKP',name:'檳城',cls:'a'}],
+  usa:         [{icao:'KLAX',name:'洛杉磯',cls:'r'},{icao:'KONT',name:'安大略',cls:'rs'},{icao:'KPHX',name:'鳳凰城',cls:'r'},{icao:'KSEA',name:'西雅圖',cls:'r'},{icao:'KSFO',name:'舊金山',cls:'rs'},{icao:'KLAS',name:'拉斯維加斯',cls:'a'},{icao:'KOAK',name:'奧克蘭',cls:'a'},{icao:'KPDX',name:'波特蘭',cls:'a'},{icao:'KSMF',name:'沙加緬度',cls:'a'},{icao:'KTUS',name:'土森',cls:'a'}],
+  pacific:     [{icao:'PACD',name:'Cold Bay',cls:'a'},{icao:'PAFA',name:'費爾班克斯',cls:'a'},{icao:'PAKN',name:'King Salmon',cls:'a'},{icao:'PANC',name:'安克拉治',cls:'a'},{icao:'PASY',name:'Shemya',cls:'a'},{icao:'PGSN',name:'塞班',cls:'a'},{icao:'PGUM',name:'關島',cls:'a'},{icao:'PHNL',name:'檀香山',cls:'a'},{icao:'PMDY',name:'中途島',cls:'a'},{icao:'PWAK',name:'威克島',cls:'a'}],
+  canada:      [{icao:'CYVR',name:'溫哥華',cls:'a'}],
+  europe:      [{icao:'LKPR',name:'布拉格',cls:'r'},{icao:'EDDB',name:'柏林',cls:'a'},{icao:'EDDM',name:'慕尼黑',cls:'a'},{icao:'EPWA',name:'華沙',cls:'a'},{icao:'LOWL',name:'林茲',cls:'a'},{icao:'LOWW',name:'維也納',cls:'a'}],
 };
 
 var wxCurrentRegion = 'taiwan';
@@ -1182,18 +1087,66 @@ function selectWxRegion(region, btn) {
   loadWxRegion(region);
 }
 
+function parseMetarLine(raw) {
+  if (!raw || !raw.trim()) return null;
+  var s = raw.trim();
+  var result = {};
+  // Wind: 36008KT, 36008G20KT, VRB03KT, 00000KT
+  var wm = s.match(/\\b(\\d{3}|VRB)(\\d{2,3})(G(\\d{2,3}))?KT\\b/);
+  if (wm) {
+    result.wdir = wm[1] === 'VRB' ? 'VRB' : parseInt(wm[1]);
+    result.wspd = parseInt(wm[2]);
+    if (wm[4]) result.wgst = parseInt(wm[4]);
+  }
+  // CAVOK
+  if (/\\bCAVOK\\b/.test(s)) { result.visib = '10+'; result.sky = []; return result; }
+  // Visibility SM (US/Canada): 10SM, 6SM, 1/2SM, M1/4SM
+  var vSM = s.match(/\\b(M?[\\d]+(?:\\/\\d+)?)\\s*SM\\b/);
+  if (vSM) {
+    var vStr = vSM[1].replace('M','');
+    var vVal = vStr.indexOf('/') >= 0
+      ? parseInt(vStr.split('/')[0]) / parseInt(vStr.split('/')[1])
+      : parseFloat(vStr);
+    result.visib = vVal >= 10 ? '10+' : String(Math.round(vVal * 10) / 10);
+  } else {
+    // Visibility meters (ICAO): 9999, 0800, 3000
+    var vM = s.match(/\\b(\\d{4})\\b/);
+    if (vM) {
+      var meters = parseInt(vM[1]);
+      result.visib = meters >= 9000 ? '10+' : String(Math.round(meters / 160.934) / 10);
+    }
+  }
+  // Sky conditions
+  result.sky = [];
+  var skyRe = /(BKN|OVC|FEW|SCT)(\\d{3})/g;
+  var m2;
+  while ((m2 = skyRe.exec(s)) !== null) {
+    result.sky.push({ cover: m2[1], base: parseInt(m2[2]) * 100 });
+  }
+  // VV (vertical visibility): treat as OVC
+  var vv = s.match(/\\bVV(\\d{3})\\b/);
+  if (vv) result.sky.push({ cover: 'OVC', base: parseInt(vv[1]) * 100 });
+  // Temperature: 15/11 or M01/M05
+  var tm = s.match(/\\b(M?\\d{2})\\/(M?\\d{2})\\b/);
+  if (tm) result.temp = tm[1].charAt(0) === 'M' ? -parseInt(tm[1].slice(1)) : parseInt(tm[1]);
+  return result;
+}
+
 function loadWxRegion(region) {
   var airports = WX_AIRPORTS[region] || [];
-  document.getElementById('wx-list-pane').innerHTML = '<div class="wx-loading-msg">載入氣象資料中...</div>';
+  document.getElementById('wx-list-pane').innerHTML = '<div class="wx-loading-msg">載入 METAR 資料中...</div>';
   var icaos = airports.map(function(a) { return a.icao; }).join(',');
   var proxy = 'https://api.codetabs.com/v1/proxy/?quest=';
-  var url = 'https://aviationweather.gov/api/data/metar?ids=' + icaos + '&format=json&hours=1';
+  var url = 'https://aviationweather.gov/api/data/metar?ids=' + icaos + '&format=raw&hours=1';
   fetch(proxy + encodeURIComponent(url))
-    .then(function(r) { return r.ok ? r.json() : []; })
-    .then(function(data) {
+    .then(function(r) { return r.ok ? r.text() : ''; })
+    .then(function(text) {
       wxMetarMap = {};
-      (Array.isArray(data) ? data : []).forEach(function(m) {
-        if (m.icaoId) wxMetarMap[m.icaoId.toUpperCase()] = m;
+      text.split('\\n').forEach(function(line) {
+        line = line.trim();
+        if (!line) return;
+        var icao = line.split(' ')[0].toUpperCase();
+        if (/^[A-Z]{4}$/.test(icao)) wxMetarMap[icao] = parseMetarLine(line);
       });
       renderWxList(airports, region);
     })
@@ -1202,13 +1155,14 @@ function loadWxRegion(region) {
 
 function renderWxList(airports, region) {
   var ts = new Date().toLocaleTimeString('zh-TW', {hour:'2-digit', minute:'2-digit'});
-  var hdr = '<div class="wx-list-hdr"><span class="wx-list-ts">更新 ' + ts + '</span>'
-    + '<button class="wx-refresh-btn" onclick="loadWxRegion(\\'' + region + '\\')">\\u21ba 重整</button></div>';
+  var hdr = '<div class="wx-list-hdr"><span class="wx-list-ts">METAR ' + ts + '</span>'
+    + '<button class="wx-refresh-btn" onclick="loadWxRegion(\\'' + region + '\\')">\\u21ba</button></div>';
   var rows = airports.map(function(a) {
     var m = wxMetarMap[a.icao];
     var cat = wxCalcCat(m);
+    var clsCls = 'wx-row-' + (a.cls || 'r');
     var sel = (a.icao === wxSelectedIcao) ? ' selected' : '';
-    return '<div class="wx-row' + sel + '" onclick="selectWxAirport(\\'' + a.icao + '\\',\\'' + a.name + '\\',this)">'
+    return '<div class="wx-row ' + clsCls + sel + '" onclick="selectWxAirport(\\'' + a.icao + '\\',\\'' + a.name + '\\',this)">'
       + '<div class="wx-cat cat-' + cat + '">' + cat + '</div>'
       + '<div class="wx-icao-col">' + a.icao + '</div>'
       + '<div class="wx-name-col"><div class="wx-aname">' + a.name + '</div>'
@@ -1216,7 +1170,12 @@ function renderWxList(airports, region) {
       + '<div class="wx-mini">' + wxFmtVis(m) + '<br>' + wxFmtTemp(m) + '</div>'
       + '</div>';
   }).join('');
-  document.getElementById('wx-list-pane').innerHTML = hdr + rows;
+  var legend = '<div class="wx-legend">'
+    + '<span class="wx-leg-r">\\u2502</span>Regular'
+    + '<span class="wx-leg-a" style="margin-left:10px">\\u2502</span>Alternate'
+    + '<span class="wx-leg-s" style="margin-left:10px">\\u2502</span>Special'
+    + '</div>';
+  document.getElementById('wx-list-pane').innerHTML = hdr + rows + legend;
 }
 
 function selectWxAirport(icao, name, rowEl) {
@@ -1280,6 +1239,8 @@ function fetchWxDetail(icao, name) {
 
 // ── Boot ─────────────────────────────────────────────────────────────────────
 showMain();
+// 預設顯示簡報箱 datis 分頁 → 立即載入初始天氣資料
+wxLoaded = true; loadWxRegion(wxCurrentRegion);
 </script>
 </body>
 </html>`;
