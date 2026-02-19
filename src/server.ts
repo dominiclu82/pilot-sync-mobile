@@ -507,7 +507,7 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
         <a class="tool-link-btn" href="https://www.skyinfo.jp" target="_blank" onclick="return loadTool(event,this)">🇯🇵 日本NOTAM地圖</a>
         <a class="tool-link-btn" href="https://app.cwa.gov.tw/web/obsmap/typhoon.html" target="_blank" onclick="return loadTool(event,this)">🌀 颱風路徑圖</a>
         <a class="tool-link-btn" href="https://gpsjam.org/" target="_blank" onclick="return loadTool(event,this)">🛰️ GPS干擾區域</a>
-        <a class="tool-link-btn" href="https://radio.arinc.net/pacific/" target="_blank" onclick="return loadTool(event,this,'pacific-hf')">📻 Pacific HF 查詢</a>
+        <a class="tool-link-btn" href="https://radio.arinc.net/pacific/" target="_blank" onclick="return openHF(event)">📻 Pacific HF 查詢</a>
       </div>
       <!-- 內嵌 iframe -->
       <div id="tool-frame-wrap" style="display:none;margin-top:16px">
@@ -630,6 +630,18 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
   </div>
 
 </div><!-- end tab-briefing -->
+
+<!-- ══ Pacific HF 全螢幕 Overlay ════════════════════════════════════ -->
+<div id="hf-overlay" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;z-index:500;background:#fff;flex-direction:column">
+  <div style="display:flex;align-items:center;justify-content:space-between;padding:calc(env(safe-area-inset-top,0px) + 8px) 16px 8px;background:#1e293b;border-bottom:1px solid #334155;flex-shrink:0">
+    <span style="font-weight:700;font-size:.95em;color:#e2e8f0">📻 Pacific HF 查詢</span>
+    <div style="display:flex;gap:14px;align-items:center">
+      <a href="https://radio.arinc.net/pacific/" target="_blank" style="font-size:.82em;color:#7dd3fc;text-decoration:none">↗ 新分頁</a>
+      <button onclick="closeHF()" style="background:none;border:none;color:#94a3b8;font-size:1.3em;cursor:pointer;padding:0 2px;line-height:1">✕</button>
+    </div>
+  </div>
+  <iframe id="hf-iframe" src="" style="flex:1;border:none;width:100%"></iframe>
+</div>
 
 <!-- ══ Tab Bar ═══════════════════════════════════════════════════════ -->
 <div class="tab-bar">
@@ -1028,6 +1040,17 @@ function loadTool(e, anchor, mode) {
 function closeTool() {
   document.getElementById('tool-frame-wrap').style.display = 'none';
   document.getElementById('tool-frame').src = '';
+}
+function openHF(e) {
+  e.preventDefault();
+  const overlay = document.getElementById('hf-overlay');
+  document.getElementById('hf-iframe').src = '/api/pacific-hf';
+  overlay.style.display = 'flex';
+  return false;
+}
+function closeHF() {
+  document.getElementById('hf-overlay').style.display = 'none';
+  document.getElementById('hf-iframe').src = '';
 }
 
 // ── Boot ─────────────────────────────────────────────────────────────────────
