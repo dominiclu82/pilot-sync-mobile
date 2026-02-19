@@ -483,14 +483,26 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
   <div id="briefing-tools" class="briefing-panel">
     <div class="briefing-section">
       <div class="tool-grid">
-        <a class="tool-link-btn" href="https://flight-plan-editor.weathernews.com/flight_plan_editor/#login" target="_blank">☁️ Weathernews Flight Plan</a>
-        <a class="tool-link-btn" href="https://pilotstarspace.starlux-airlines.com/#/" target="_blank">🌟 SJX Pilot Space</a>
-        <a class="tool-link-btn" href="https://elb.starlux-airlines.com/elb/#/dashboard/fleet" target="_blank">🧰 STARLUX ELB Fleet</a>
-        <a class="tool-link-btn" href="https://tono2.net" target="_blank">🇯🇵 Tono2 航空氣象</a>
-        <a class="tool-link-btn" href="https://sjx.lido.aero/lido/las/login.jsp?DESMON_RESULT_PAGE=https://sjx.lido.aero/briefing&DESMON_CODE=LAS_001&DESMON_LANG=null" target="_blank">📋 LIDO Briefing</a>
-        <a class="tool-link-btn" href="https://www.skyinfo.jp" target="_blank">🇯🇵 日本NOTAM地圖</a>
-        <a class="tool-link-btn" href="https://app.cwa.gov.tw/web/obsmap/typhoon.html" target="_blank">🌀 颱風路徑圖</a>
-        <a class="tool-link-btn" href="https://gpsjam.org/" target="_blank">🛰️ GPS干擾區域</a>
+        <a class="tool-link-btn" href="https://flight-plan-editor.weathernews.com/flight_plan_editor/#login" target="_blank" onclick="return loadTool(event,this)">☁️ Weathernews Flight Plan</a>
+        <a class="tool-link-btn" href="https://pilotstarspace.starlux-airlines.com/#/" target="_blank" onclick="return loadTool(event,this)">🌟 SJX Pilot Space</a>
+        <a class="tool-link-btn" href="https://elb.starlux-airlines.com/elb/#/dashboard/fleet" target="_blank" onclick="return loadTool(event,this)">🧰 STARLUX ELB Fleet</a>
+        <a class="tool-link-btn" href="https://tono2.net" target="_blank" onclick="return loadTool(event,this)">🇯🇵 Tono2 航空氣象</a>
+        <a class="tool-link-btn" href="https://sjx.lido.aero/lido/las/login.jsp?DESMON_RESULT_PAGE=https://sjx.lido.aero/briefing&DESMON_CODE=LAS_001&DESMON_LANG=null" target="_blank" onclick="return loadTool(event,this)">📋 LIDO Briefing</a>
+        <a class="tool-link-btn" href="https://www.skyinfo.jp" target="_blank" onclick="return loadTool(event,this)">🇯🇵 日本NOTAM地圖</a>
+        <a class="tool-link-btn" href="https://app.cwa.gov.tw/web/obsmap/typhoon.html" target="_blank" onclick="return loadTool(event,this)">🌀 颱風路徑圖</a>
+        <a class="tool-link-btn" href="https://gpsjam.org/" target="_blank" onclick="return loadTool(event,this)">🛰️ GPS干擾區域</a>
+        <a class="tool-link-btn" href="https://radio.arinc.net/pacific/" target="_blank" onclick="return loadTool(event,this)">📻 Pacific HF 查詢</a>
+      </div>
+      <!-- 內嵌 iframe -->
+      <div id="tool-frame-wrap" style="display:none;margin-top:16px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+          <span id="tool-frame-title" style="font-weight:700;font-size:.9em;color:var(--text)"></span>
+          <div style="display:flex;gap:10px;align-items:center">
+            <a id="tool-frame-external" href="#" target="_blank" style="font-size:.8em;color:var(--accent);text-decoration:none">↗ 新分頁</a>
+            <button onclick="closeTool()" style="background:none;border:none;color:var(--muted);font-size:1.1em;cursor:pointer;padding:0 4px">✕</button>
+          </div>
+        </div>
+        <iframe id="tool-frame" src="" style="width:100%;height:65vh;border:none;border-radius:12px;background:var(--surface)"></iframe>
       </div>
     </div>
   </div>
@@ -981,6 +993,24 @@ function switchBriefingTab(panel, btn) {
   document.querySelectorAll('.briefing-panel').forEach(p => p.classList.remove('active'));
   btn.classList.add('active');
   document.getElementById('briefing-' + panel).classList.add('active');
+}
+
+// ── 工具連結內嵌 iframe ────────────────────────────────────────────────────────
+function loadTool(e, anchor) {
+  e.preventDefault();
+  const url = anchor.href;
+  const title = anchor.textContent.trim();
+  const wrap = document.getElementById('tool-frame-wrap');
+  document.getElementById('tool-frame').src = url;
+  document.getElementById('tool-frame-title').textContent = title;
+  document.getElementById('tool-frame-external').href = url;
+  wrap.style.display = 'block';
+  wrap.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  return false;
+}
+function closeTool() {
+  document.getElementById('tool-frame-wrap').style.display = 'none';
+  document.getElementById('tool-frame').src = '';
 }
 
 // ── Boot ─────────────────────────────────────────────────────────────────────
