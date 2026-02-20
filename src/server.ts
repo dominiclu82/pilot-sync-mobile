@@ -392,36 +392,34 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
     height:calc(100dvh - calc(56px + env(safe-area-inset-bottom,0px)));
     min-height:unset;overflow:hidden;padding:0}
   .briefing-subtabs{position:static;flex-shrink:0}
+  .briefing-subtab{flex:1}
   .briefing-panel.active{display:flex;flex-direction:column;flex:1;overflow:hidden;padding:0}
   #briefing-tools.active{overflow-y:auto;padding:16px 16px 0}
   #briefing-datis.active{display:flex;flex-direction:column;overflow:hidden}
+  #briefing-hf.active{overflow:hidden;padding:0}
+  #briefing-coldtemp.active{overflow-y:auto;padding:0}
   .wx-fixed-header{position:static;flex-shrink:0}
   .wx-split{flex-direction:row;overflow:hidden;flex:1}
   .wx-list-pane{width:280px;flex-shrink:0;overflow-y:auto;border-right:1px solid var(--dim);border-bottom:none}
   .wx-detail-pane{flex:1;overflow-y:auto}}
 .ct-panel{padding:16px;overflow-y:auto}
 .ct-form{background:var(--card);border-radius:var(--radius);padding:16px;margin-bottom:16px}
-.ct-inputs{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px}
-.ct-input-group label{font-size:.75em;color:var(--muted);font-weight:600;display:block;margin-bottom:4px}
-.ct-input-group input{width:100%;padding:10px 12px;background:var(--surface);border:1.5px solid var(--dim);
-  border-radius:10px;color:var(--text);font-size:1em;outline:none;-webkit-appearance:none}
+.ct-inputs{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px}
+.ct-input-group label{font-size:.72em;color:var(--muted);font-weight:600;display:block;margin-bottom:3px}
+.ct-input-group input{width:100%;padding:7px 10px;background:var(--surface);border:1.5px solid var(--dim);
+  border-radius:9px;color:var(--text);font-size:.9em;outline:none;-webkit-appearance:none}
 .ct-input-group input:focus{border-color:var(--accent)}
-.ct-rows{margin-bottom:12px}
-.ct-row{display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid var(--dim)}
-.ct-row:first-child{border-top:1px solid var(--dim)}
-.ct-row-label{font-size:.8em;font-weight:700;color:var(--accent-light);width:88px;flex-shrink:0}
-.ct-row-label-custom{width:88px;flex-shrink:0}
-.ct-row-right{flex:1;display:flex;flex-direction:column;align-items:flex-end;gap:2px}
-.ct-alt-input{padding:6px 10px;background:var(--surface);border:1.5px solid var(--dim);
-  border-radius:8px;color:var(--text);font-size:.9em;outline:none;-webkit-appearance:none;
-  text-align:right;width:130px}
-.ct-alt-input:focus{border-color:var(--accent)}
-.ct-label-input{padding:5px 8px;background:var(--surface);border:1.5px solid var(--dim);
-  border-radius:8px;color:var(--text);font-size:.78em;outline:none;-webkit-appearance:none;
-  width:88px;text-align:left}
-.ct-label-input:focus{border-color:var(--accent)}
-.ct-alt-result{font-size:.78em;font-weight:700;color:var(--accent-light)}
-.ct-alt-result.empty{color:var(--dim);font-weight:400}
+.ct-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px}
+.ct-card{background:var(--surface);border-radius:10px;padding:8px 6px;display:flex;flex-direction:column;align-items:stretch;gap:4px}
+.ct-card-label{font-size:.72em;font-weight:700;color:var(--accent-light);text-align:center;height:1.4em;display:flex;align-items:center;justify-content:center}
+.ct-card-input{width:100%;padding:6px 4px;background:var(--card);border:1.5px solid var(--dim);
+  border-radius:7px;color:var(--text);font-size:.88em;outline:none;text-align:center;-webkit-appearance:none}
+.ct-card-input:focus{border-color:var(--accent)}
+.ct-label-inp{width:100%;padding:4px 6px;background:var(--card);border:1.5px solid var(--dim);
+  border-radius:7px;color:var(--muted);font-size:.72em;outline:none;text-align:center;-webkit-appearance:none}
+.ct-label-inp:focus{border-color:var(--accent)}
+.ct-card-result{font-size:.7em;font-weight:700;color:var(--accent-light);text-align:center;min-height:2.2em;line-height:1.4}
+.ct-card-result.empty{color:var(--dim);font-weight:400}
 .ct-calc-btn{width:100%;padding:12px;background:var(--accent);border:none;border-radius:10px;
   color:#fff;font-size:1em;font-weight:700;cursor:pointer;-webkit-appearance:none}
 .ct-table-wrap{background:var(--card);border-radius:var(--radius);padding:16px;margin-bottom:16px;overflow-x:auto}
@@ -609,7 +607,7 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
     <button class="briefing-subtab" id="subtabBtn-tools" onclick="switchBriefingTab('tools',this)">🗺️ 工具連結</button>
     <button class="briefing-subtab active" id="subtabBtn-datis" onclick="switchBriefingTab('datis',this)">⛅ Airport WX</button>
     <button class="briefing-subtab" id="subtabBtn-coldtemp" onclick="switchBriefingTab('coldtemp',this)">❄️ 低溫修正</button>
-    <button class="briefing-subtab" onclick="openHF(event)">📻 Pacific HF</button>
+    <button class="briefing-subtab" id="subtabBtn-hf" onclick="switchBriefingTab('hf',this)">📻 Pacific HF</button>
   </div>
 
   <!-- ── 工具連結 panel ── -->
@@ -655,49 +653,37 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
             <input type="text" id="ct-oat" placeholder="e.g. −20" inputmode="text">
           </div>
         </div>
-        <!-- 高度輸入列表 -->
-        <div class="ct-rows">
-          <div class="ct-row">
-            <span class="ct-row-label">FAF</span>
-            <div class="ct-row-right">
-              <input class="ct-alt-input" type="number" id="ct-a0" inputmode="numeric" placeholder="ft">
-              <span class="ct-alt-result empty" id="ct-r0">—</span>
-            </div>
+        <!-- 高度輸入卡片格 -->
+        <div class="ct-grid">
+          <div class="ct-card">
+            <div class="ct-card-label">FAF</div>
+            <input class="ct-card-input" type="number" id="ct-a0" inputmode="numeric" placeholder="ft">
+            <div class="ct-card-result empty" id="ct-r0">—</div>
           </div>
-          <div class="ct-row">
-            <span class="ct-row-label">DA / MDA</span>
-            <div class="ct-row-right">
-              <input class="ct-alt-input" type="number" id="ct-a1" inputmode="numeric" placeholder="ft">
-              <span class="ct-alt-result empty" id="ct-r1">—</span>
-            </div>
+          <div class="ct-card">
+            <div class="ct-card-label">DA / MDA</div>
+            <input class="ct-card-input" type="number" id="ct-a1" inputmode="numeric" placeholder="ft">
+            <div class="ct-card-result empty" id="ct-r1">—</div>
           </div>
-          <div class="ct-row">
-            <span class="ct-row-label">Missed Apch</span>
-            <div class="ct-row-right">
-              <input class="ct-alt-input" type="number" id="ct-a2" inputmode="numeric" placeholder="ft">
-              <span class="ct-alt-result empty" id="ct-r2">—</span>
-            </div>
+          <div class="ct-card">
+            <div class="ct-card-label">Missed Apch</div>
+            <input class="ct-card-input" type="number" id="ct-a2" inputmode="numeric" placeholder="ft">
+            <div class="ct-card-result empty" id="ct-r2">—</div>
           </div>
-          <div class="ct-row">
-            <div class="ct-row-label-custom"><input class="ct-label-input" type="text" id="ct-l3" placeholder="自訂"></div>
-            <div class="ct-row-right">
-              <input class="ct-alt-input" type="number" id="ct-a3" inputmode="numeric" placeholder="ft">
-              <span class="ct-alt-result empty" id="ct-r3">—</span>
-            </div>
+          <div class="ct-card">
+            <input class="ct-label-inp" type="text" id="ct-l3" placeholder="自訂">
+            <input class="ct-card-input" type="number" id="ct-a3" inputmode="numeric" placeholder="ft">
+            <div class="ct-card-result empty" id="ct-r3">—</div>
           </div>
-          <div class="ct-row">
-            <div class="ct-row-label-custom"><input class="ct-label-input" type="text" id="ct-l4" placeholder="自訂"></div>
-            <div class="ct-row-right">
-              <input class="ct-alt-input" type="number" id="ct-a4" inputmode="numeric" placeholder="ft">
-              <span class="ct-alt-result empty" id="ct-r4">—</span>
-            </div>
+          <div class="ct-card">
+            <input class="ct-label-inp" type="text" id="ct-l4" placeholder="自訂">
+            <input class="ct-card-input" type="number" id="ct-a4" inputmode="numeric" placeholder="ft">
+            <div class="ct-card-result empty" id="ct-r4">—</div>
           </div>
-          <div class="ct-row">
-            <div class="ct-row-label-custom"><input class="ct-label-input" type="text" id="ct-l5" placeholder="自訂"></div>
-            <div class="ct-row-right">
-              <input class="ct-alt-input" type="number" id="ct-a5" inputmode="numeric" placeholder="ft">
-              <span class="ct-alt-result empty" id="ct-r5">—</span>
-            </div>
+          <div class="ct-card">
+            <input class="ct-label-inp" type="text" id="ct-l5" placeholder="自訂">
+            <input class="ct-card-input" type="number" id="ct-a5" inputmode="numeric" placeholder="ft">
+            <div class="ct-card-result empty" id="ct-r5">—</div>
           </div>
         </div>
         <button class="ct-calc-btn" onclick="calcColdTemp()">計算修正量</button>
@@ -745,6 +731,15 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
         <div class="wx-empty"><span class="wx-hint-desktop">← 點選左側機場</span><span class="wx-hint-mobile">↑ 點選上方機場</span><br>查看 METAR · TAF · ATIS</div>
       </div>
     </div>
+  </div>
+
+  <!-- ── 📻 Pacific HF panel ── -->
+  <div id="briefing-hf" class="briefing-panel">
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 14px;border-bottom:1px solid var(--dim);flex-shrink:0">
+      <span style="font-size:.85em;font-weight:700;color:var(--text)">📻 Pacific HF 查詢</span>
+      <a href="https://radio.arinc.net/pacific/" target="_blank" style="font-size:.78em;color:var(--accent);text-decoration:none">↗ 新分頁</a>
+    </div>
+    <iframe id="hf-panel-iframe" src="" style="flex:1;border:none;width:100%;min-height:400px"></iframe>
   </div>
 
 </div><!-- end tab-briefing -->
@@ -1210,7 +1205,7 @@ function calcColdTemp() {
   noCorr.style.display = 'none';
   for (var i = 0; i < 6; i++) {
     var rs = document.getElementById('ct-r'+i);
-    if (rs) { rs.textContent = '—'; rs.className = 'ct-alt-result empty'; }
+    if (rs) { rs.textContent = '—'; rs.className = 'ct-card-result empty'; }
   }
   if (oat >= 0) { noCorr.style.display = 'block'; return; }
   var highlighted = {};
@@ -1222,8 +1217,8 @@ function calcColdTemp() {
     if (isNaN(alt)) continue;
     var r = ctInterp(alt, elev, oat);
     var corrAlt = Math.round((alt + r.corr) / 10) * 10;
-    res.textContent = '+' + r.corr.toLocaleString() + ' ft = ' + corrAlt.toLocaleString() + ' ft';
-    res.className = 'ct-alt-result';
+    res.innerHTML = '+' + r.corr.toLocaleString() + ' ft<br>' + corrAlt.toLocaleString() + ' ft';
+    res.className = 'ct-card-result';
     // Highlight table cells (track unique cells)
     [[r.ri,r.ti],[r.ri,r.ti+1],[r.ri+1,r.ti],[r.ri+1,r.ti+1]].forEach(function(p) {
       var key = p[0]+'-'+p[1];
@@ -1242,6 +1237,10 @@ function switchBriefingTab(panel, btn) {
   btn.classList.add('active');
   document.getElementById('briefing-' + panel).classList.add('active');
   if (panel === 'datis' && !wxLoaded) { wxLoaded = true; loadWxRegion(wxCurrentRegion); }
+  if (panel === 'hf') {
+    var ifr = document.getElementById('hf-panel-iframe');
+    if (ifr && !ifr.src) ifr.src = '/api/pacific-hf';
+  }
 }
 
 // ── 工具連結內嵌 iframe ────────────────────────────────────────────────────────
