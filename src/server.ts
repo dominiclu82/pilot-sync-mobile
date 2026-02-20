@@ -383,8 +383,13 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
 .wx-hint-mobile{display:none}
 @media(max-width:639px){.wx-hint-desktop{display:none}.wx-hint-mobile{display:inline}}
 @media(min-width:640px){
-  #briefing-datis.active{height:calc(100dvh - 150px - env(safe-area-inset-top,0px));overflow:hidden;
-    display:flex;flex-direction:column}
+  #tab-briefing.tab-active{display:flex;flex-direction:column;
+    height:calc(100dvh - calc(56px + env(safe-area-inset-bottom,0px)));
+    min-height:unset;overflow:hidden;padding:0}
+  .briefing-subtabs{position:static;flex-shrink:0}
+  .briefing-panel.active{display:flex;flex-direction:column;flex:1;overflow:hidden;padding:0}
+  #briefing-tools.active{overflow-y:auto;padding:16px 16px 0}
+  #briefing-datis.active{display:flex;flex-direction:column;overflow:hidden}
   .wx-fixed-header{position:static;flex-shrink:0}
   .wx-split{flex-direction:row;overflow:hidden;flex:1}
   .wx-list-pane{width:280px;flex-shrink:0;overflow-y:auto;border-right:1px solid var(--dim);border-bottom:none}
