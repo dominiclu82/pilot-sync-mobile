@@ -397,6 +397,32 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
   .wx-split{flex-direction:row;overflow:hidden;flex:1}
   .wx-list-pane{width:280px;flex-shrink:0;overflow-y:auto;border-right:1px solid var(--dim);border-bottom:none}
   .wx-detail-pane{flex:1;overflow-y:auto}}
+.ct-panel{padding:16px;overflow-y:auto}
+.ct-form{background:var(--card);border-radius:var(--radius);padding:16px;margin-bottom:16px}
+.ct-inputs{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:12px}
+@media(max-width:480px){.ct-inputs{grid-template-columns:1fr}}
+.ct-input-group label{font-size:.75em;color:var(--muted);font-weight:600;display:block;margin-bottom:4px}
+.ct-input-group input{width:100%;padding:10px 12px;background:var(--surface);border:1.5px solid var(--dim);
+  border-radius:10px;color:var(--text);font-size:1em;outline:none;-webkit-appearance:none}
+.ct-input-group input:focus{border-color:var(--accent)}
+.ct-calc-btn{width:100%;padding:12px;background:var(--accent);border:none;border-radius:10px;
+  color:#fff;font-size:1em;font-weight:700;cursor:pointer;-webkit-appearance:none}
+.ct-result{background:var(--surface);border-radius:var(--radius);padding:14px 16px;margin-top:12px;display:none}
+.ct-result-row{display:flex;justify-content:space-between;align-items:center;padding:5px 0;
+  border-bottom:1px solid var(--dim);font-size:.9em}
+.ct-result-row:last-child{border-bottom:none}
+.ct-result-row span:first-child{color:var(--muted)}
+.ct-result-row span:last-child{font-weight:700;color:var(--text)}
+.ct-result-final span:last-child{font-size:1.15em;color:var(--accent-light)}
+.ct-table-wrap{background:var(--card);border-radius:var(--radius);padding:16px;margin-bottom:16px;overflow-x:auto}
+.ct-table-wrap h3{font-size:.85em;font-weight:700;color:var(--muted);margin-bottom:10px}
+.ct-table{border-collapse:collapse;font-size:.75em;width:100%;min-width:420px}
+.ct-table th,.ct-table td{padding:5px 8px;text-align:right;border:1px solid var(--dim)}
+.ct-table th{background:var(--surface);color:var(--muted);font-weight:700}
+.ct-table td:first-child{font-weight:700;color:var(--text);text-align:left;background:var(--surface)}
+.ct-table td.ct-hi{background:rgba(59,130,246,.25);color:#fff;font-weight:700}
+.ct-no-corr{background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.3);border-radius:10px;
+  padding:12px 16px;color:#4ade80;font-size:.9em;font-weight:600;margin-top:12px;text-align:center}
 .wx-row{display:flex;align-items:center;padding:9px 12px;gap:9px}
 .wx-cat{font-size:.67em;font-weight:800;padding:2px 5px;border-radius:4px;
   flex-shrink:0;min-width:38px;text-align:center;letter-spacing:.3px}
@@ -572,6 +598,7 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
   <div class="briefing-subtabs">
     <button class="briefing-subtab" id="subtabBtn-tools" onclick="switchBriefingTab('tools',this)">🗺️ 工具連結</button>
     <button class="briefing-subtab active" id="subtabBtn-datis" onclick="switchBriefingTab('datis',this)">⛅ Airport WX</button>
+    <button class="briefing-subtab" id="subtabBtn-coldtemp" onclick="switchBriefingTab('coldtemp',this)">🌡️ 低溫修正</button>
   </div>
 
   <!-- ── 工具連結 panel ── -->
@@ -598,6 +625,48 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
           </div>
         </div>
         <iframe id="tool-frame" src="" style="width:100%;height:65vh;border:none;border-radius:12px;background:var(--surface)"></iframe>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── 🌡️ Cold Temperature Altitude Correction panel ── -->
+  <div id="briefing-coldtemp" class="briefing-panel">
+    <div class="ct-panel">
+      <div class="ct-form">
+        <div class="ct-inputs">
+          <div class="ct-input-group">
+            <label>機場標高 Airport Elevation (ft)</label>
+            <input type="number" id="ct-elev" placeholder="e.g. 108" inputmode="numeric">
+          </div>
+          <div class="ct-input-group">
+            <label>OAT (°C)</label>
+            <input type="number" id="ct-oat" placeholder="e.g. -20" inputmode="numeric">
+          </div>
+          <div class="ct-input-group">
+            <label>氣壓高度 Indicated Alt (ft)</label>
+            <input type="number" id="ct-alt" placeholder="e.g. 3000" inputmode="numeric">
+          </div>
+        </div>
+        <button class="ct-calc-btn" onclick="calcColdTemp()">計算修正量</button>
+        <div id="ct-no-corr" class="ct-no-corr" style="display:none">✅ OAT ≥ 0°C，無需低溫修正</div>
+        <div id="ct-result" class="ct-result">
+          <div class="ct-result-row"><span>機場標高</span><span id="ct-r-elev">—</span></div>
+          <div class="ct-result-row"><span>氣壓高度 (Indicated)</span><span id="ct-r-alt">—</span></div>
+          <div class="ct-result-row"><span>HAA (Height Above Airport)</span><span id="ct-r-haa">—</span></div>
+          <div class="ct-result-row"><span>OAT</span><span id="ct-r-oat">—</span></div>
+          <div class="ct-result-row"><span>修正量 Correction</span><span id="ct-r-corr">—</span></div>
+          <div class="ct-result-row ct-result-final"><span>修正後高度 Corrected Alt</span><span id="ct-r-final">—</span></div>
+        </div>
+      </div>
+      <div class="ct-table-wrap">
+        <h3>ICAO Doc 8168 Cold Temperature Error Table（修正量 ft）</h3>
+        <table class="ct-table" id="ct-table">
+          <thead><tr>
+            <th>HAA (ft) ↓ / OAT (°C) →</th>
+            <th>0°</th><th>−10°</th><th>−20°</th><th>−30°</th><th>−40°</th><th>−50°</th>
+          </tr></thead>
+          <tbody id="ct-tbody"></tbody>
+        </table>
       </div>
     </div>
   </div>
@@ -1018,6 +1087,108 @@ function toggleTheme() {
   }
   // 預設夜間模式 → 初始 HTML 已顯示 ☀️ 日間，不需額外處理
 })();
+
+// ── Cold Temperature Altitude Correction ──────────────────────────────────────
+(function initColdTempTable() {
+  const CT_ROWS = [200,300,400,500,600,700,800,900,1000,1500,2000,3000,4000,5000,6000,7000,8000,9000,10000];
+  const CT_VALS = [
+    [20,20,30,40,50,60],
+    [20,30,40,50,70,80],
+    [30,40,50,70,90,100],
+    [30,50,70,90,110,130],
+    [40,60,80,100,130,150],
+    [40,70,90,120,150,180],
+    [50,80,100,140,170,210],
+    [50,90,120,150,190,230],
+    [60,100,130,170,210,260],
+    [90,140,190,250,310,380],
+    [120,180,250,320,400,490],
+    [170,260,360,470,580,710],
+    [220,340,470,610,760,920],
+    [270,420,570,740,920,1120],
+    [320,490,670,870,1080,1310],
+    [370,570,780,1010,1250,1510],
+    [420,640,880,1140,1410,1710],
+    [460,710,980,1260,1570,1900],
+    [510,780,1070,1390,1720,2090]
+  ];
+  const tbody = document.getElementById('ct-tbody');
+  CT_ROWS.forEach(function(haa, i) {
+    const tr = document.createElement('tr');
+    tr.id = 'ct-row-' + i;
+    const td0 = document.createElement('td');
+    td0.textContent = haa >= 1000 ? haa.toLocaleString() : haa;
+    tr.appendChild(td0);
+    CT_VALS[i].forEach(function(v, j) {
+      const td = document.createElement('td');
+      td.id = 'ct-cell-' + i + '-' + j;
+      td.textContent = v.toLocaleString();
+      tr.appendChild(td);
+    });
+    tbody.appendChild(tr);
+  });
+  window._CT_ROWS = CT_ROWS;
+  window._CT_VALS = CT_VALS;
+})();
+
+function calcColdTemp() {
+  const elev = parseFloat(document.getElementById('ct-elev').value);
+  const oat  = parseFloat(document.getElementById('ct-oat').value);
+  const alt  = parseFloat(document.getElementById('ct-alt').value);
+  const resDiv    = document.getElementById('ct-result');
+  const noCorr    = document.getElementById('ct-no-corr');
+  if (isNaN(elev) || isNaN(oat) || isNaN(alt)) return;
+  // Clear highlights
+  document.querySelectorAll('.ct-hi').forEach(function(el) { el.classList.remove('ct-hi'); });
+  resDiv.style.display = 'none';
+  noCorr.style.display = 'none';
+  if (oat >= 0) { noCorr.style.display = 'block'; return; }
+  const CT_TEMPS = [0,-10,-20,-30,-40,-50];
+  const CT_ROWS  = window._CT_ROWS;
+  const CT_VALS  = window._CT_VALS;
+  const haa = alt - elev;
+  // Clamp HAA
+  const haaC = Math.max(CT_ROWS[0], Math.min(CT_ROWS[CT_ROWS.length-1], haa));
+  // Clamp OAT to table range
+  const oatC = Math.max(-50, Math.min(0, oat));
+  // Find HAA bracket
+  let ri = CT_ROWS.length - 2;
+  for (let i = 0; i < CT_ROWS.length - 1; i++) {
+    if (haaC <= CT_ROWS[i+1]) { ri = i; break; }
+  }
+  const haaFrac = (haaC - CT_ROWS[ri]) / (CT_ROWS[ri+1] - CT_ROWS[ri]);
+  // Find OAT bracket (temps are 0,-10,-20,-30,-40,-50)
+  let ti = CT_TEMPS.length - 2;
+  for (let i = 0; i < CT_TEMPS.length - 1; i++) {
+    if (oatC >= CT_TEMPS[i+1]) { ti = i; break; }
+  }
+  const oatFrac = (CT_TEMPS[ti] - oatC) / (CT_TEMPS[ti] - CT_TEMPS[ti+1]);
+  // Bilinear interpolation
+  const v00 = CT_VALS[ri][ti];
+  const v01 = CT_VALS[ri][ti+1];
+  const v10 = CT_VALS[ri+1][ti];
+  const v11 = CT_VALS[ri+1][ti+1];
+  const corr = v00*(1-haaFrac)*(1-oatFrac) + v01*(1-haaFrac)*oatFrac
+             + v10*haaFrac*(1-oatFrac)      + v11*haaFrac*oatFrac;
+  const corrRounded = Math.round(corr / 10) * 10;
+  const correctedAlt = Math.round((alt + corrRounded) / 10) * 10;
+  // Highlight cells
+  [[ri,ti],[ri,ti+1],[ri+1,ti],[ri+1,ti+1]].forEach(function(p) {
+    const el = document.getElementById('ct-cell-'+p[0]+'-'+p[1]);
+    if (el) el.classList.add('ct-hi');
+  });
+  // Show result
+  document.getElementById('ct-r-elev').textContent  = elev.toLocaleString() + ' ft';
+  document.getElementById('ct-r-alt').textContent   = alt.toLocaleString() + ' ft';
+  document.getElementById('ct-r-haa').textContent   = Math.round(haa).toLocaleString() + ' ft';
+  document.getElementById('ct-r-oat').textContent   = oat + '°C';
+  document.getElementById('ct-r-corr').textContent  = '+' + corrRounded.toLocaleString() + ' ft';
+  document.getElementById('ct-r-final').textContent = correctedAlt.toLocaleString() + ' ft';
+  resDiv.style.display = 'block';
+  // Scroll highlighted row into view
+  const hlCell = document.getElementById('ct-cell-'+ri+'-'+ti);
+  if (hlCell) hlCell.scrollIntoView({block:'nearest',behavior:'smooth'});
+}
 
 // ── Briefing sub-tab ──────────────────────────────────────────────────────────
 function switchBriefingTab(panel, btn) {
