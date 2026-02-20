@@ -383,6 +383,9 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
 .wx-hint-mobile{display:none}
 @media(max-width:639px){.wx-hint-desktop{display:none}.wx-hint-mobile{display:inline}}
 @media(min-width:640px){
+  body{overflow-y:hidden}
+  #tab-sync.tab-active{height:calc(100dvh - calc(56px + env(safe-area-inset-bottom,0px)));
+    min-height:unset;overflow-y:auto}
   #tab-briefing.tab-active{display:flex;flex-direction:column;
     height:calc(100dvh - calc(56px + env(safe-area-inset-bottom,0px)));
     min-height:unset;overflow:hidden;padding:0}
