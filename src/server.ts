@@ -234,6 +234,7 @@ function getSPAHtml(): string {
 <link rel="apple-touch-icon" href="/icon.svg">
 <title>CrewSync</title>
 <style>
+html{overscroll-behavior:none}
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
 :root{
   --bg:#0a0e1a;--surface:#141927;--card:#1e2740;
@@ -378,6 +379,8 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
 .wx-card-as{border:2px dashed #b45309;opacity:.8}
 .wx-card:active,.wx-card.selected{opacity:1;background:rgba(255,255,255,.06)}
 .wx-legend{display:flex;gap:10px;flex-wrap:wrap;padding:8px 10px 10px;font-size:.71em;color:var(--muted);margin-top:2px}
+.wx-hint-mobile{display:none}
+@media(max-width:639px){.wx-hint-desktop{display:none}.wx-hint-mobile{display:inline}}
 @media(min-width:640px){
   #briefing-datis.active{height:calc(100dvh - 150px - env(safe-area-inset-top,0px));overflow:hidden}
   .wx-fixed-header{position:static}
@@ -615,7 +618,7 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
         <div class="wx-loading-msg">載入氣象資料中...</div>
       </div>
       <div class="wx-detail-pane" id="wx-detail-pane">
-        <div class="wx-empty">← 點選左側機場<br>查看 ATIS · METAR · TAF</div>
+        <div class="wx-empty"><span class="wx-hint-desktop">← 點選左側機場</span><span class="wx-hint-mobile">↑ 點選上方機場</span><br>查看 METAR · TAF · ATIS</div>
       </div>
     </div>
   </div>
@@ -644,8 +647,8 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
   </button>
   <button class="tab-btn" id="tabBtn-theme" onclick="toggleTheme()">
     <span class="tab-btn-icon" id="theme-icon">☀️</span><span id="theme-label">日間</span>
+    <span style="font-size:.5em;color:var(--dim);line-height:1;margin-top:1px">V2.1</span>
   </button>
-  <div style="position:absolute;right:4px;bottom:calc(env(safe-area-inset-bottom,0px) + 2px);font-size:.55em;color:var(--dim);pointer-events:none">V2.1</div>
 </div>
 
 <script>
@@ -1107,7 +1110,7 @@ function selectWxRegion(region, btn) {
   wxSelectedName = '';
   document.querySelectorAll('.wx-route-btn').forEach(function(b) { b.classList.remove('active'); });
   btn.classList.add('active');
-  document.getElementById('wx-detail-pane').innerHTML = '<div class="wx-empty">\\u2190 點選左側機場<br>查看 ATIS \\u00b7 METAR \\u00b7 TAF</div>';
+  document.getElementById('wx-detail-pane').innerHTML = '<div class="wx-empty"><span class="wx-hint-desktop">\\u2190 點選左側機場</span><span class="wx-hint-mobile">\\u2191 點選上方機場</span><br>查看 METAR \\u00b7 TAF \\u00b7 ATIS</div>';
   loadWxRegion(region);
 }
 
