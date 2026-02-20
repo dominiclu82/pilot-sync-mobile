@@ -396,12 +396,15 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
   .briefing-panel.active{display:flex;flex-direction:column;flex:1;overflow:hidden;padding:0}
   #briefing-tools.active{overflow-y:auto;padding:16px 16px 0}
   #briefing-datis.active{display:flex;flex-direction:column;overflow:hidden}
-  #briefing-hf.active{overflow:hidden;padding:0}
+  #briefing-hf.active{overflow:hidden;padding:0;height:auto}
   #briefing-coldtemp.active{overflow-y:auto;padding:0}
   .wx-fixed-header{position:static;flex-shrink:0}
   .wx-split{flex-direction:row;overflow:hidden;flex:1}
   .wx-list-pane{width:280px;flex-shrink:0;overflow-y:auto;border-right:1px solid var(--dim);border-bottom:none}
   .wx-detail-pane{flex:1;overflow-y:auto}}
+#briefing-hf.active{padding:0;display:flex;flex-direction:column;
+  height:calc(100dvh - calc(56px + env(safe-area-inset-bottom,0px)) - 40px)}
+#hf-panel-iframe{flex:1;min-height:0}
 .ct-panel{padding:16px;overflow-y:auto}
 .ct-form{background:var(--card);border-radius:var(--radius);padding:16px;margin-bottom:16px}
 .ct-inputs{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px}
