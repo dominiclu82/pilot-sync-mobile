@@ -404,19 +404,21 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
 .ct-input-group input{width:100%;padding:10px 12px;background:var(--surface);border:1.5px solid var(--dim);
   border-radius:10px;color:var(--text);font-size:1em;outline:none;-webkit-appearance:none}
 .ct-input-group input:focus{border-color:var(--accent)}
-.ct-alt-table{width:100%;border-collapse:collapse;margin-bottom:12px}
-.ct-alt-table th{font-size:.72em;color:var(--muted);font-weight:600;padding:4px 6px;
-  border-bottom:1px solid var(--dim);text-align:left}
-.ct-alt-table th:nth-child(2){text-align:right}
-.ct-alt-table th:nth-child(3){text-align:right}
-.ct-alt-table td{padding:5px 4px;vertical-align:middle}
-.ct-alt-label{font-size:.8em;font-weight:700;color:var(--accent-light);white-space:nowrap;padding-right:6px}
-.ct-alt-label-custom{font-size:.8em;color:var(--muted);white-space:nowrap;padding-right:6px}
-.ct-alt-input{width:100%;padding:7px 10px;background:var(--surface);border:1.5px solid var(--dim);
-  border-radius:8px;color:var(--text);font-size:.9em;outline:none;-webkit-appearance:none;text-align:right}
+.ct-rows{margin-bottom:12px}
+.ct-row{display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid var(--dim)}
+.ct-row:first-child{border-top:1px solid var(--dim)}
+.ct-row-label{font-size:.8em;font-weight:700;color:var(--accent-light);width:88px;flex-shrink:0}
+.ct-row-label-custom{width:88px;flex-shrink:0}
+.ct-row-right{flex:1;display:flex;flex-direction:column;align-items:flex-end;gap:2px}
+.ct-alt-input{padding:6px 10px;background:var(--surface);border:1.5px solid var(--dim);
+  border-radius:8px;color:var(--text);font-size:.9em;outline:none;-webkit-appearance:none;
+  text-align:right;width:130px}
 .ct-alt-input:focus{border-color:var(--accent)}
-.ct-alt-result{font-size:.82em;font-weight:700;color:var(--accent-light);text-align:right;
-  white-space:nowrap;padding-left:8px;min-width:120px}
+.ct-label-input{padding:5px 8px;background:var(--surface);border:1.5px solid var(--dim);
+  border-radius:8px;color:var(--text);font-size:.78em;outline:none;-webkit-appearance:none;
+  width:88px;text-align:left}
+.ct-label-input:focus{border-color:var(--accent)}
+.ct-alt-result{font-size:.78em;font-weight:700;color:var(--accent-light)}
 .ct-alt-result.empty{color:var(--dim);font-weight:400}
 .ct-calc-btn{width:100%;padding:12px;background:var(--accent);border:none;border-radius:10px;
   color:#fff;font-size:1em;font-weight:700;cursor:pointer;-webkit-appearance:none}
@@ -604,7 +606,7 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
   <div class="briefing-subtabs">
     <button class="briefing-subtab" id="subtabBtn-tools" onclick="switchBriefingTab('tools',this)">🗺️ 工具連結</button>
     <button class="briefing-subtab active" id="subtabBtn-datis" onclick="switchBriefingTab('datis',this)">⛅ Airport WX</button>
-    <button class="briefing-subtab" id="subtabBtn-coldtemp" onclick="switchBriefingTab('coldtemp',this)">🌡️ 低溫修正</button>
+    <button class="briefing-subtab" id="subtabBtn-coldtemp" onclick="switchBriefingTab('coldtemp',this)">❄️ 低溫修正</button>
   </div>
 
   <!-- ── 工具連結 panel ── -->
@@ -651,45 +653,50 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
           </div>
         </div>
         <!-- 高度輸入列表 -->
-        <table class="ct-alt-table">
-          <thead><tr>
-            <th>高度點</th>
-            <th style="text-align:right">氣壓高度 (ft)</th>
-            <th style="text-align:right">修正後高度</th>
-          </tr></thead>
-          <tbody>
-            <tr>
-              <td><span class="ct-alt-label">FAF</span></td>
-              <td><input class="ct-alt-input" type="number" id="ct-a0" inputmode="numeric" placeholder="—"></td>
-              <td><span class="ct-alt-result empty" id="ct-r0">—</span></td>
-            </tr>
-            <tr>
-              <td><span class="ct-alt-label">DA / MDA</span></td>
-              <td><input class="ct-alt-input" type="number" id="ct-a1" inputmode="numeric" placeholder="—"></td>
-              <td><span class="ct-alt-result empty" id="ct-r1">—</span></td>
-            </tr>
-            <tr>
-              <td><span class="ct-alt-label">Missed Apch</span></td>
-              <td><input class="ct-alt-input" type="number" id="ct-a2" inputmode="numeric" placeholder="—"></td>
-              <td><span class="ct-alt-result empty" id="ct-r2">—</span></td>
-            </tr>
-            <tr>
-              <td><input class="ct-alt-input" type="text" id="ct-l3" placeholder="自訂" style="width:80px;text-align:left"></td>
-              <td><input class="ct-alt-input" type="number" id="ct-a3" inputmode="numeric" placeholder="—"></td>
-              <td><span class="ct-alt-result empty" id="ct-r3">—</span></td>
-            </tr>
-            <tr>
-              <td><input class="ct-alt-input" type="text" id="ct-l4" placeholder="自訂" style="width:80px;text-align:left"></td>
-              <td><input class="ct-alt-input" type="number" id="ct-a4" inputmode="numeric" placeholder="—"></td>
-              <td><span class="ct-alt-result empty" id="ct-r4">—</span></td>
-            </tr>
-            <tr>
-              <td><input class="ct-alt-input" type="text" id="ct-l5" placeholder="自訂" style="width:80px;text-align:left"></td>
-              <td><input class="ct-alt-input" type="number" id="ct-a5" inputmode="numeric" placeholder="—"></td>
-              <td><span class="ct-alt-result empty" id="ct-r5">—</span></td>
-            </tr>
-          </tbody>
-        </table>
+        <div class="ct-rows">
+          <div class="ct-row">
+            <span class="ct-row-label">FAF</span>
+            <div class="ct-row-right">
+              <input class="ct-alt-input" type="number" id="ct-a0" inputmode="numeric" placeholder="ft">
+              <span class="ct-alt-result empty" id="ct-r0">—</span>
+            </div>
+          </div>
+          <div class="ct-row">
+            <span class="ct-row-label">DA / MDA</span>
+            <div class="ct-row-right">
+              <input class="ct-alt-input" type="number" id="ct-a1" inputmode="numeric" placeholder="ft">
+              <span class="ct-alt-result empty" id="ct-r1">—</span>
+            </div>
+          </div>
+          <div class="ct-row">
+            <span class="ct-row-label">Missed Apch</span>
+            <div class="ct-row-right">
+              <input class="ct-alt-input" type="number" id="ct-a2" inputmode="numeric" placeholder="ft">
+              <span class="ct-alt-result empty" id="ct-r2">—</span>
+            </div>
+          </div>
+          <div class="ct-row">
+            <div class="ct-row-label-custom"><input class="ct-label-input" type="text" id="ct-l3" placeholder="自訂"></div>
+            <div class="ct-row-right">
+              <input class="ct-alt-input" type="number" id="ct-a3" inputmode="numeric" placeholder="ft">
+              <span class="ct-alt-result empty" id="ct-r3">—</span>
+            </div>
+          </div>
+          <div class="ct-row">
+            <div class="ct-row-label-custom"><input class="ct-label-input" type="text" id="ct-l4" placeholder="自訂"></div>
+            <div class="ct-row-right">
+              <input class="ct-alt-input" type="number" id="ct-a4" inputmode="numeric" placeholder="ft">
+              <span class="ct-alt-result empty" id="ct-r4">—</span>
+            </div>
+          </div>
+          <div class="ct-row">
+            <div class="ct-row-label-custom"><input class="ct-label-input" type="text" id="ct-l5" placeholder="自訂"></div>
+            <div class="ct-row-right">
+              <input class="ct-alt-input" type="number" id="ct-a5" inputmode="numeric" placeholder="ft">
+              <span class="ct-alt-result empty" id="ct-r5">—</span>
+            </div>
+          </div>
+        </div>
         <button class="ct-calc-btn" onclick="calcColdTemp()">計算修正量</button>
         <div id="ct-no-corr" class="ct-no-corr" style="display:none">✅ OAT ≥ 0°C，無需低溫修正</div>
       </div>
@@ -761,7 +768,7 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
   </button>
   <button class="tab-btn" id="tabBtn-theme" onclick="toggleTheme()">
     <span class="tab-btn-icon" id="theme-icon">☀️</span><span id="theme-label">日間</span>
-    <span style="font-size:.55em;color:var(--dim);line-height:1;opacity:.7">V2.1</span>
+    <span style="font-size:.55em;color:var(--dim);line-height:1;opacity:.7">V2.2</span>
   </button>
 </div>
 
