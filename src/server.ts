@@ -245,14 +245,14 @@ html::before{content:'';position:fixed;top:0;left:0;right:0;height:env(safe-area
   --radius:14px;--safe-bottom:env(safe-area-inset-bottom,0px)
 }
 body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
-  min-height:100dvh;overflow-x:hidden;padding-bottom:56px;padding-top:env(safe-area-inset-top,0px);
+  min-height:100dvh;overflow-x:hidden;padding-bottom:calc(56px + env(safe-area-inset-bottom,0px));padding-top:env(safe-area-inset-top,0px);
   overscroll-behavior:none}
 #tab-sync{display:none;flex-direction:column;align-items:center;justify-content:center;
   min-height:calc(100dvh - 56px);padding:20px 16px calc(20px + var(--safe-bottom))}
 #tab-sync.tab-active{display:flex}
 #tab-briefing{display:none;min-height:calc(100dvh - 56px);padding:0 0 calc(20px + var(--safe-bottom))}
 #tab-briefing.tab-active{display:block}
-.tab-bar{position:fixed;bottom:0;left:0;right:0;height:56px;background:var(--card);
+.tab-bar{position:fixed;bottom:0;left:0;right:0;height:calc(56px + env(safe-area-inset-bottom,0px));background:var(--card);
   border-top:1px solid var(--dim);display:flex;z-index:200;
   padding-bottom:env(safe-area-inset-bottom,0px)}
 .tab-btn{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;
@@ -649,7 +649,7 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
   <button class="tab-btn" id="tabBtn-theme" onclick="toggleTheme()">
     <span class="tab-btn-icon" id="theme-icon">☀️</span><span id="theme-label">日間</span>
   </button>
-  <div style="position:absolute;right:0;width:33.33%;text-align:center;bottom:calc(env(safe-area-inset-bottom,0px) + 3px);font-size:.5em;color:var(--dim);pointer-events:none">V2.1</div>
+  <div style="position:absolute;right:10px;bottom:calc(env(safe-area-inset-bottom,0px) + 4px);font-size:.5em;color:var(--dim);pointer-events:none">V2.1</div>
 </div>
 
 <script>
