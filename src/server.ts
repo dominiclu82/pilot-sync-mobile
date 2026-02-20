@@ -112,6 +112,43 @@ app.get('/api/metar', async (req, res) => {
   }
 });
 
+// ── Service Worker ────────────────────────────────────────────────────────────
+app.get('/sw.js', (_req, res) => {
+  res.setHeader('Content-Type', 'application/javascript');
+  res.setHeader('Service-Worker-Allowed', '/');
+  res.send(`
+const CACHE = 'crewsync-v1';
+const SHELL = ['/'];
+self.addEventListener('install', e => {
+  e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL)));
+  self.skipWaiting();
+});
+self.addEventListener('activate', e => {
+  e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k=>k!==CACHE).map(k=>caches.delete(k)))));
+  self.clients.claim();
+});
+self.addEventListener('fetch', e => {
+  const url = e.request.url;
+  if (url.includes('/api/metar')) {
+    e.respondWith(fetch(e.request).then(r => {
+      const clone = r.clone();
+      caches.open(CACHE).then(c => c.put(e.request, clone));
+      return r;
+    }).catch(() => caches.match(e.request)));
+    return;
+  }
+  if (e.request.method !== 'GET') return;
+  e.respondWith(caches.match(e.request).then(cached => {
+    const net = fetch(e.request).then(r => {
+      caches.open(CACHE).then(c => c.put(e.request, r.clone()));
+      return r;
+    });
+    return cached || net;
+  }));
+});
+`);
+});
+
 // ── Pacific HF proxy ──────────────────────────────────────────────────────────
 app.get('/api/pacific-hf', async (_req, res) => {
   try {
@@ -447,6 +484,8 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
 .wx-aname{font-size:.76em;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .wx-wind{font-size:.71em;color:var(--text);font-family:'Courier New',monospace;margin-top:1px}
 .wx-mini{font-size:.71em;color:var(--muted);text-align:right;line-height:1.5;flex-shrink:0}
+.wx-obs-age{font-size:.65em;color:var(--dim);text-align:right;margin-top:1px}
+.wx-obs-age.stale{color:#f59e0b}
 .wx-list-hdr{display:flex;align-items:center;padding:6px 14px;border-bottom:1px solid var(--dim);
   background:var(--surface);position:sticky;top:0;z-index:10}
 .wx-list-ts{font-size:.72em;color:var(--muted);flex:1}
@@ -1294,6 +1333,7 @@ var WX_AIRPORTS = {
 
 var wxCurrentRegion = 'taiwan';
 var wxMetarMap = {};      // icao -> parsed metar object (cleared when region changes)
+var wxCacheTime = null;   // timestamp of last successful fetch (ms)
 var wxMetarRawMap = {};   // icao -> string[] of 6h METAR lines
 var wxMetarShowAll = {};  // icao -> bool (true = show all 6h, false = latest 1)
 var wxDetailCache = {};   // icao -> rendered HTML string (persists across airport switches)
@@ -1384,16 +1424,35 @@ function parseMetarLine(raw) {
   // Temperature: 15/11 or M01/M05
   var tm = s.match(/\\b(M?\\d{2})\\/(M?\\d{2})\\b/);
   if (tm) result.temp = tm[1].charAt(0) === 'M' ? -parseInt(tm[1].slice(1)) : parseInt(tm[1]);
+  // Observation time: DDHHMMZ
+  var om = s.match(/\\b(\\d{2})(\\d{2})(\\d{2})Z\\b/);
+  if (om) { result.obsDay = parseInt(om[1]); result.obsHour = parseInt(om[2]); result.obsMin = parseInt(om[3]); }
   return result;
+}
+
+function wxMinsAgo(m) {
+  if (!m || m.obsDay === undefined) return null;
+  var now = new Date();
+  var obs = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), m.obsDay, m.obsHour, m.obsMin));
+  if (obs > now) obs.setUTCMonth(obs.getUTCMonth() - 1);
+  return Math.round((now - obs) / 60000);
 }
 
 function loadWxRegion(region) {
   var airports = WX_AIRPORTS[region] || [];
-  wxMetarMap = {};
+  // 嘗試從 localStorage 讀取快取
+  try {
+    var cached = localStorage.getItem('crewsync_metar_' + region);
+    if (cached) {
+      var c = JSON.parse(cached);
+      wxMetarMap = c.data || {};
+      wxCacheTime = c.time || null;
+    } else { wxMetarMap = {}; wxCacheTime = null; }
+  } catch(e) { wxMetarMap = {}; wxCacheTime = null; }
   renderWxList(airports, region);
   var icaos = airports.map(function(a) { return a.icao; }).join(',');
   fetch('/api/metar?ids=' + icaos + '&hours=1')
-    .then(function(r) { return r.ok ? r.text() : ''; })
+    .then(function(r) { return r.ok ? r.text() : Promise.reject(); })
     .then(function(text) {
       wxMetarMap = {};
       text.split('\\n').forEach(function(line) {
@@ -1403,27 +1462,33 @@ function loadWxRegion(region) {
         var icao = stripped.split(' ')[0].toUpperCase();
         if (/^[A-Z]{4}$/.test(icao)) wxMetarMap[icao] = parseMetarLine(stripped);
       });
+      wxCacheTime = Date.now();
+      try { localStorage.setItem('crewsync_metar_' + region, JSON.stringify({data: wxMetarMap, time: wxCacheTime})); } catch(e) {}
       renderWxList(airports, region);
     })
     .catch(function() { renderWxList(airports, region); });
 }
 
 function renderWxList(airports, region) {
-  var ts = new Date().toLocaleTimeString('zh-TW', {hour:'2-digit', minute:'2-digit'});
-  var hdr = '<div class="wx-list-hdr"><span class="wx-list-ts">METAR ' + ts + '</span>'
+  var ts = wxCacheTime ? new Date(wxCacheTime).toLocaleTimeString('zh-TW', {hour:'2-digit', minute:'2-digit'}) : '—';
+  var cacheAge = wxCacheTime ? Math.round((Date.now() - wxCacheTime) / 60000) : null;
+  var cacheNote = cacheAge !== null && cacheAge > 5 ? ' <span style="color:#f59e0b;font-size:.85em">(' + cacheAge + 'm ago)</span>' : '';
+  var hdr = '<div class="wx-list-hdr"><span class="wx-list-ts">METAR ' + ts + cacheNote + '</span>'
     + '<button class="wx-refresh-btn" onclick="loadWxRegion(\\'' + region + '\\')">\\u21ba</button></div>';
   var cards = airports.map(function(a) {
     var m = wxMetarMap[a.icao];
     var cat = wxCalcCat(m);
     var cardCls = 'wx-card-' + (a.cls || 'r');
     var sel = (a.icao === wxSelectedIcao) ? ' selected' : '';
+    var mins = wxMinsAgo(m);
+    var ageHtml = mins !== null ? '<div class="wx-obs-age' + (mins > 90 ? ' stale' : '') + '">' + mins + 'm</div>' : '';
     return '<div class="wx-card ' + cardCls + sel + '" onclick="selectWxAirport(\\'' + a.icao + '\\',\\'' + a.name + '\\',this)">'
       + '<div class="wx-row">'
       + '<div class="wx-cat cat-' + cat + '">' + cat + '</div>'
       + '<div class="wx-icao-col">' + a.icao + '</div>'
       + '<div class="wx-name-col"><div class="wx-aname">' + a.name + '</div>'
       + '<div class="wx-wind">' + wxFmtWind(m) + '</div></div>'
-      + '<div class="wx-mini">' + wxFmtVis(m) + '<br>' + wxFmtTemp(m) + '</div>'
+      + '<div style="text-align:right;flex-shrink:0"><div class="wx-mini">' + wxFmtVis(m) + '<br>' + wxFmtTemp(m) + '</div>' + ageHtml + '</div>'
       + '</div></div>';
   }).join('');
   var bx = 'display:inline-block;width:14px;height:12px;border-radius:2px;vertical-align:middle;margin-right:4px';
@@ -1542,6 +1607,10 @@ function fetchWxDetail(icao, name) {
 showMain();
 // 預設顯示簡報箱 datis 分頁 → 立即載入初始天氣資料
 wxLoaded = true; loadWxRegion(wxCurrentRegion);
+// ── Service Worker 註冊 ───────────────────────────────────────────────────────
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/sw.js').catch(function(){});
+}
 </script>
 </body>
 </html>`;
