@@ -646,7 +646,7 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
         <div class="ct-inputs">
           <div class="ct-input-group">
             <label>機場標高 Airport Elevation (ft)</label>
-            <input type="number" id="ct-elev" placeholder="e.g. 108" inputmode="numeric">
+            <input type="text" id="ct-elev" placeholder="e.g. −14" inputmode="text">
           </div>
           <div class="ct-input-group">
             <label>OAT (°C)</label>
@@ -1239,7 +1239,7 @@ function switchBriefingTab(panel, btn) {
   if (panel === 'datis' && !wxLoaded) { wxLoaded = true; loadWxRegion(wxCurrentRegion); }
   if (panel === 'hf') {
     var ifr = document.getElementById('hf-panel-iframe');
-    if (ifr && !ifr.src) ifr.src = '/api/pacific-hf';
+    if (ifr && !ifr.getAttribute('src')) ifr.src = '/api/pacific-hf';
   }
 }
 
