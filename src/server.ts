@@ -260,6 +260,9 @@ body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSy
   cursor:pointer;transition:color .15s;-webkit-appearance:none}
 .tab-btn.tab-active{color:var(--accent)}
 .tab-btn-icon{font-size:1.5em;line-height:1}
+.font-ctrl{position:fixed;top:calc(env(safe-area-inset-top,0px)+8px);right:8px;z-index:150;display:flex;gap:3px}
+.font-ctrl-btn{background:var(--card);border:1px solid var(--dim);color:var(--muted);border-radius:6px;
+  padding:2px 7px;font-size:.75rem;font-weight:700;cursor:pointer;-webkit-appearance:none;font-family:inherit;line-height:1.5}
 .briefing-section{background:var(--card);border-radius:var(--radius);padding:16px;margin-bottom:16px}
 .briefing-section h2{font-size:1em;font-weight:700;margin:0 0 12px;color:var(--text);display:flex;align-items:center;gap:6px}
 .datis-tabs{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px}
@@ -638,6 +641,11 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
   <iframe id="hf-iframe" src="" style="flex:1;border:none;width:100%"></iframe>
 </div>
 
+<!-- ══ Font size control ══════════════════════════════════════════════ -->
+<div class="font-ctrl">
+  <button class="font-ctrl-btn" id="font-minus" onclick="changeFontSize(-1)">A-</button>
+  <button class="font-ctrl-btn" id="font-plus"  onclick="changeFontSize(1)">A+</button>
+</div>
 <!-- ══ Tab Bar ═══════════════════════════════════════════════════════ -->
 <div class="tab-bar">
   <button class="tab-btn" id="tabBtn-sync" onclick="switchTab('sync',this)">
@@ -648,8 +656,8 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
   </button>
   <button class="tab-btn" id="tabBtn-theme" onclick="toggleTheme()">
     <span class="tab-btn-icon" id="theme-icon">☀️</span><span id="theme-label">日間</span>
+    <span style="font-size:.55em;color:var(--dim);line-height:1;opacity:.7">V2.1</span>
   </button>
-  <div style="position:absolute;right:10px;bottom:calc(env(safe-area-inset-bottom,0px) + 4px);font-size:.5em;color:var(--dim);pointer-events:none">V2.1</div>
 </div>
 
 <script>
@@ -1009,6 +1017,21 @@ function toggleTheme() {
   }
   // 預設夜間模式 → 初始 HTML 已顯示 ☀️ 日間，不需額外處理
 })();
+
+// ── Font size ─────────────────────────────────────────────────────────────────
+const FONT_SIZES = [85, 100, 115, 130];
+let fontIdx = parseInt(localStorage.getItem('crewsync_font') || '1');
+function applyFontSize() {
+  document.documentElement.style.fontSize = FONT_SIZES[fontIdx] + '%';
+  document.getElementById('font-minus').style.opacity = fontIdx === 0 ? '.3' : '1';
+  document.getElementById('font-plus').style.opacity  = fontIdx === FONT_SIZES.length-1 ? '.3' : '1';
+}
+function changeFontSize(dir) {
+  fontIdx = Math.max(0, Math.min(FONT_SIZES.length-1, fontIdx+dir));
+  localStorage.setItem('crewsync_font', fontIdx);
+  applyFontSize();
+}
+applyFontSize();
 
 // ── Briefing sub-tab ──────────────────────────────────────────────────────────
 function switchBriefingTab(panel, btn) {
