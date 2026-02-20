@@ -350,10 +350,12 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
   --text:#1e293b;--muted:#64748b;--dim:#cbd5e1;
   --success:#15803d;--error:#dc2626
 }
-.briefing-subtabs{position:sticky;top:env(safe-area-inset-top,0px);z-index:100;background:var(--bg);display:flex;border-bottom:1.5px solid var(--dim);padding:0 16px;margin-bottom:0}
-.briefing-subtab{flex:1;padding:10px 4px;font-size:.84em;font-weight:700;background:none;
+.briefing-subtabs{position:sticky;top:env(safe-area-inset-top,0px);z-index:100;background:var(--bg);display:flex;border-bottom:1.5px solid var(--dim);padding:0 8px;margin-bottom:0;
+  overflow-x:auto;-webkit-overflow-scrolling:touch}
+.briefing-subtabs::-webkit-scrollbar{display:none}
+.briefing-subtab{flex-shrink:0;padding:10px 12px;font-size:.84em;font-weight:700;background:none;
   border:none;border-bottom:2.5px solid transparent;color:var(--muted);cursor:pointer;
-  transition:color .2s,border-color .2s;margin-bottom:-1.5px;-webkit-appearance:none}
+  transition:color .2s,border-color .2s;margin-bottom:-1.5px;-webkit-appearance:none;white-space:nowrap}
 .briefing-subtab.active{color:var(--accent);border-bottom-color:var(--accent)}
 .briefing-panel{display:none}
 .briefing-panel.active{display:block;padding:16px 16px 0}
@@ -607,6 +609,7 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
     <button class="briefing-subtab" id="subtabBtn-tools" onclick="switchBriefingTab('tools',this)">🗺️ 工具連結</button>
     <button class="briefing-subtab active" id="subtabBtn-datis" onclick="switchBriefingTab('datis',this)">⛅ Airport WX</button>
     <button class="briefing-subtab" id="subtabBtn-coldtemp" onclick="switchBriefingTab('coldtemp',this)">❄️ 低溫修正</button>
+    <button class="briefing-subtab" onclick="openHF(event)">📻 Pacific HF</button>
   </div>
 
   <!-- ── 工具連結 panel ── -->
@@ -649,7 +652,7 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
           </div>
           <div class="ct-input-group">
             <label>OAT (°C)</label>
-            <input type="number" id="ct-oat" placeholder="e.g. −20" inputmode="numeric">
+            <input type="text" id="ct-oat" placeholder="e.g. −20" inputmode="text">
           </div>
         </div>
         <!-- 高度輸入列表 -->
@@ -768,7 +771,7 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
   </button>
   <button class="tab-btn" id="tabBtn-theme" onclick="toggleTheme()">
     <span class="tab-btn-icon" id="theme-icon">☀️</span><span id="theme-label">日間</span>
-    <span style="font-size:.55em;color:var(--dim);line-height:1;opacity:.7">V2.2</span>
+    <span style="font-size:.55em;color:var(--dim);line-height:1;opacity:.7">V2.21</span>
   </button>
 </div>
 
