@@ -224,7 +224,7 @@ function getSPAHtml(): string {
 <html lang="zh-TW">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,minimum-scale=1">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="CrewSync">
@@ -235,6 +235,7 @@ function getSPAHtml(): string {
 <title>CrewSync</title>
 <style>
 html{overscroll-behavior:none}
+html::before{content:'';position:fixed;top:0;left:0;right:0;height:env(safe-area-inset-top,0px);background:var(--bg);z-index:9999}
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
 :root{
   --bg:#0a0e1a;--surface:#141927;--card:#1e2740;
@@ -647,8 +648,8 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
   </button>
   <button class="tab-btn" id="tabBtn-theme" onclick="toggleTheme()">
     <span class="tab-btn-icon" id="theme-icon">☀️</span><span id="theme-label">日間</span>
-    <span style="font-size:.5em;color:var(--dim);line-height:1;margin-top:1px">V2.1</span>
   </button>
+  <div style="position:absolute;right:0;width:33.33%;text-align:center;bottom:calc(env(safe-area-inset-bottom,0px) + 3px);font-size:.5em;color:var(--dim);pointer-events:none">V2.1</div>
 </div>
 
 <script>
