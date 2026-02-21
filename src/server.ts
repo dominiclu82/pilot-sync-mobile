@@ -435,6 +435,7 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
   #briefing-datis.active{display:flex;flex-direction:column;overflow:hidden}
   #briefing-hf.active{overflow:hidden;padding:0;height:auto}
   #briefing-coldtemp.active{overflow-y:auto;padding:0}
+  #briefing-duty.active{overflow:hidden;padding:0}
   .wx-fixed-header{position:static;flex-shrink:0}
   .wx-split{flex-direction:row;overflow:hidden;flex:1}
   .wx-list-pane{width:280px;flex-shrink:0;overflow-y:auto;border-right:1px solid var(--dim);border-bottom:none}
@@ -472,7 +473,15 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
 .ct-no-corr{background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.3);border-radius:10px;
   padding:12px 16px;color:#4ade80;font-size:.9em;font-weight:600;margin-top:12px;text-align:center}
 /* ── Duty Time ── */
-.dt-wrap{display:flex;flex-direction:column;overflow-y:auto}
+.dt-wrap{display:flex;flex-direction:column;overflow-y:auto;-webkit-overflow-scrolling:touch}
+.dt-lock-overlay{position:absolute;inset:0;z-index:50;background:var(--bg);display:flex;align-items:center;justify-content:center;padding:24px}
+.dt-lock-card{background:var(--card);border-radius:16px;padding:28px 24px;width:100%;max-width:320px;text-align:center;box-shadow:0 4px 24px rgba(0,0,0,.25)}
+.dt-lock-icon{font-size:2.5em;margin-bottom:10px}
+.dt-lock-title{font-size:1em;font-weight:800;color:var(--text);margin-bottom:4px}
+.dt-lock-sub{font-size:.75em;color:var(--dim);margin-bottom:18px}
+.dt-lock-input{width:100%;padding:12px;text-align:center;font-size:1.2em;letter-spacing:.2em;background:var(--surface);border:1.5px solid var(--dim);border-radius:10px;color:var(--text);margin-bottom:12px;box-sizing:border-box}
+.dt-lock-btn{width:100%;padding:12px;border-radius:10px;border:none;background:var(--accent);color:#fff;font-size:.95em;font-weight:800;cursor:pointer}
+.dt-lock-err{font-size:.78em;color:#ef4444;margin-top:8px;min-height:1.2em}
 .dt-config{background:var(--card);border-bottom:1px solid var(--dim);padding:10px 14px 8px}
 .dt-section-title{font-size:.68em;font-weight:800;color:var(--dim);letter-spacing:.08em;text-transform:uppercase;margin-bottom:6px}
 .dt-crew-row{display:flex;gap:5px;margin-bottom:8px}
@@ -837,8 +846,22 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
   </div>
 
   <!-- ── ⏱️ Duty Time panel ── -->
-  <div id="briefing-duty" class="briefing-panel">
-    <div class="dt-wrap">
+  <div id="briefing-duty" class="briefing-panel" style="position:relative">
+
+    <!-- 密碼鎖 -->
+    <div class="dt-lock-overlay" id="dt-lock-overlay">
+      <div class="dt-lock-card">
+        <div class="dt-lock-icon">🔒</div>
+        <div class="dt-lock-title">Duty Time Calculator</div>
+        <div class="dt-lock-sub">請輸入密碼以繼續</div>
+        <input class="dt-lock-input" type="password" id="dt-lock-pw" placeholder="••••••••" maxlength="16"
+          onkeydown="if(event.key==='Enter')dtUnlock()">
+        <button class="dt-lock-btn" onclick="dtUnlock()">解鎖</button>
+        <div class="dt-lock-err" id="dt-lock-err"></div>
+      </div>
+    </div>
+
+    <div class="dt-wrap" style="flex:1">
 
       <!-- Config -->
       <div class="dt-config">
@@ -1511,6 +1534,26 @@ function switchBriefingTab(panel, btn) {
   if (panel === 'hf') {
     var ifr = document.getElementById('hf-panel-iframe');
     if (ifr && !ifr.getAttribute('src')) ifr.src = '/api/pacific-hf';
+  }
+  if (panel === 'duty' && !dtUnlocked) {
+    document.getElementById('dt-lock-overlay').style.display = 'flex';
+    setTimeout(function(){ document.getElementById('dt-lock-pw').focus(); }, 100);
+  }
+}
+
+// ── Duty Time 密碼鎖 ──────────────────────────────────────────────────────────
+var dtUnlocked = false;
+function dtUnlock() {
+  var pw = document.getElementById('dt-lock-pw').value;
+  if (pw === '12345678') {
+    dtUnlocked = true;
+    document.getElementById('dt-lock-overlay').style.display = 'none';
+    document.getElementById('dt-lock-pw').value = '';
+    document.getElementById('dt-lock-err').textContent = '';
+  } else {
+    document.getElementById('dt-lock-err').textContent = '密碼錯誤，請再試一次';
+    document.getElementById('dt-lock-pw').value = '';
+    document.getElementById('dt-lock-pw').focus();
   }
 }
 
