@@ -522,6 +522,22 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
 .dt-tl2-track-sm{position:relative;height:11px;margin-bottom:3px}
 .dt-tl2-seg{position:absolute;top:0;height:100%;border-radius:4px;display:flex;align-items:center;justify-content:center;overflow:hidden;min-width:4px}
 .dt-tl2-lbl{font-size:.67em;font-weight:700;color:#fff;padding:0 6px;white-space:nowrap;text-shadow:0 1px 2px rgba(0,0,0,.5);pointer-events:none}
+.dt-deadline-row{display:flex;gap:10px;margin-bottom:14px}
+.dt-deadline-card{flex:1;background:var(--card);border-radius:12px;padding:14px 10px;text-align:center;border:2px solid rgba(59,130,246,.35)}
+.dt-deadline-label{font-size:.7em;color:var(--dim);margin-bottom:6px;letter-spacing:.03em}
+.dt-deadline-time{font-size:1.65em;font-weight:700;color:#60a5fa;font-variant-numeric:tabular-nums;letter-spacing:.04em}
+.dt-deadline-dur{font-size:.72em;color:var(--dim);margin-top:4px}
+.dt-ref-toggle{background:var(--card);border-radius:10px;padding:10px 14px;font-size:.8em;color:var(--dim);cursor:pointer;display:flex;justify-content:space-between;align-items:center;margin:6px 14px 2px;user-select:none}
+.dt-ref-toggle:active{opacity:.7}
+.dt-ref-panel{margin:0 14px 8px;background:var(--card);border-radius:10px;padding:14px;overflow-x:auto;display:none}
+.dt-ref-title{font-weight:700;font-size:.85em;margin-bottom:2px;color:var(--fg)}
+.dt-ref-sub{color:var(--dim);font-size:.78em;margin-bottom:8px}
+.dt-ref-table{border-collapse:collapse;min-width:400px;width:100%;font-size:.75em}
+.dt-ref-table th,.dt-ref-table td{border:1px solid rgba(148,163,184,.2);padding:5px 6px;text-align:center;vertical-align:middle;color:var(--fg)}
+.dt-ref-table th{background:rgba(59,130,246,.15);color:#93c5fd;font-weight:600}
+.dt-ref-table td.dt-ref-lbl{text-align:left;color:var(--dim);white-space:nowrap;font-size:.9em}
+.dt-ref-note{margin-top:10px;color:var(--dim);font-size:.78em;line-height:1.65}
+.dt-ref-note b{color:var(--fg)}
 .dt-tl2-fdp{background:#22c55e}
 .dt-tl2-maxfdp{background:repeating-linear-gradient(-45deg,#3b82f6 0,#3b82f6 7px,#93c5fd 7px,#93c5fd 14px)}
 .dt-tl2-minrest{background:repeating-linear-gradient(-45deg,#f59e0b 0,#f59e0b 7px,#fcd34d 7px,#fcd34d 14px)}
@@ -898,6 +914,69 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
         </div>
       </div>
 
+      <!-- Reference toggle -->
+      <div class="dt-ref-toggle" onclick="dtToggleRef()">
+        <span>📋 CAR 07-02A 規定說明</span><span id="dt-ref-arrow">▼</span>
+      </div>
+      <div class="dt-ref-panel" id="dt-ref-panel">
+        <div class="dt-ref-title">4.7.5 STARLUX Airlines Flight Time Limitation</div>
+        <div class="dt-ref-sub">REF.: CAR 07-02A ART. 37/37-2/38/38-3/38-4/39/41/42/43/43-1</div>
+        <table class="dt-ref-table">
+          <thead>
+            <tr>
+              <th></th>
+              <th>Single<br>2P</th>
+              <th>Multiple<br>3P</th>
+              <th>Double<br>4P</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="dt-ref-lbl">Min Rest Before Duty</td>
+              <td>10h</td><td>10h</td><td>10h</td>
+            </tr>
+            <tr>
+              <td class="dt-ref-lbl">Min Rest After Duty</td>
+              <td>FT≤8: 10h<br>8&lt;FT≤10: 18h</td>
+              <td>FT≤8: 10h<br>8&lt;FT≤12: 18h<br>12&lt;FT≤16: 24h</td>
+              <td>FT≤8: 10h<br>8&lt;FT≤16: 18h<br>16&lt;FT≤18: 22h</td>
+            </tr>
+            <tr>
+              <td class="dt-ref-lbl">Max FDP</td>
+              <td>14h</td><td>18h</td><td>24h</td>
+            </tr>
+            <tr>
+              <td class="dt-ref-lbl">Max FT (No C1) ①</td>
+              <td>10h</td><td>12h</td><td>12h</td>
+            </tr>
+            <tr>
+              <td class="dt-ref-lbl">Max FT (With C1) ①</td>
+              <td>10h</td><td>16h</td><td>18h</td>
+            </tr>
+            <tr>
+              <td class="dt-ref-lbl">Min Rest in 7 Days</td>
+              <td>30h</td><td>30h</td><td>30h</td>
+            </tr>
+            <tr>
+              <td class="dt-ref-lbl">Max FT in 7 Days</td>
+              <td>32h</td><td>—</td><td>—</td>
+            </tr>
+            <tr>
+              <td class="dt-ref-lbl">Max DP in 30 Days ②</td>
+              <td>230h</td><td>230h</td><td>230h</td>
+            </tr>
+          </tbody>
+        </table>
+        <div class="dt-ref-note">
+          <b>NOTE</b><br>
+          ① Flight time within 24 hours.<br>
+          ② Duty period may be extended to 260h; standby &amp; deadhead up to 30h may be counted.<br>
+          ③ Before standby duty, pilot shall have 10 consecutive hours rest.<br>
+          ④ Domestic: FT ≤ 8h/24h, FDP ≤ 12h.<br>
+          ★ PIC Discretion: +2h to Max FDP (3P only), requires report.
+        </div>
+      </div>
+
       <!-- Mode -->
       <div class="dt-body" style="padding-bottom:0">
         <div class="dt-mode-row">
@@ -924,7 +1003,7 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
 
         <!-- FDP End -->
         <div class="dt-field">
-          <div class="dt-field-label">FDP End (UTC) — Block In / Release</div>
+          <div class="dt-field-label">FDP End (UTC) — Block In / Release <span style="color:var(--dim);font-size:.85em">（選填，用於檢查實際 FDP）</span></div>
           <div class="dt-time-row">
             <input class="dt-date-box" type="text" id="dt-e-day" placeholder="DD" maxlength="2" inputmode="numeric">
             <span class="dt-sep">/</span>
@@ -987,6 +1066,20 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
       <div id="dt-results-area" style="display:none">
         <div id="dt-ext-note" class="dt-ext-note" style="display:none"></div>
         <div class="dt-results-wrap">
+
+          <!-- Deadline cards (PRIMARY) -->
+          <div class="dt-deadline-row">
+            <div class="dt-deadline-card">
+              <div class="dt-deadline-label">⏱ Max Duty 截止</div>
+              <div class="dt-deadline-time" id="dt-r-maxfdp-time">—</div>
+              <div class="dt-deadline-dur" id="dt-r-maxfdp-dur"></div>
+            </div>
+            <div class="dt-deadline-card">
+              <div class="dt-deadline-label">✈ Max Flight Time 截止</div>
+              <div class="dt-deadline-time" id="dt-r-maxft-time">—</div>
+              <div class="dt-deadline-dur" id="dt-r-maxft-dur"></div>
+            </div>
+          </div>
 
           <!-- Timeline FIRST -->
           <div class="dt-tl2">
@@ -1062,7 +1155,7 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
 
       <!-- Placeholder before calc -->
       <div id="dt-placeholder" style="padding:32px 14px;text-align:center;color:var(--dim);font-size:.82em">
-        輸入 FDP 時間後按「計算」
+        選好人數並輸入 FDP Start，按「計算」即可查看最大限制時間
       </div>
 
     </div>
@@ -2018,6 +2111,14 @@ function dtMinRest(crew, ftMin) {
   return ft <= 8 ? 10*60 : ft <= 16 ? 18*60 : 22*60;
 }
 
+function dtToggleRef() {
+  var p = document.getElementById('dt-ref-panel');
+  var a = document.getElementById('dt-ref-arrow');
+  var open = p.style.display !== 'none';
+  p.style.display = open ? 'none' : 'block';
+  a.textContent   = open ? '▼' : '▲';
+}
+
 function dtFmtHM(m) {
   if (m < 0) m = 0;
   var h = Math.floor(m/60); var mm = m%60;
@@ -2088,18 +2189,49 @@ function dtCalculate() {
   var ftMin    = (parseInt(document.getElementById('dt-ft-h').value)||0)*60 +
                  (parseInt(document.getElementById('dt-ft-m').value)||0);
 
-  if (startMin === null || endMin === null) {
-    alert('請輸入 FDP Start 和 FDP End 時間');
+  if (startMin === null) {
+    alert('請輸入 FDP Start 時間');
+    return;
+  }
+
+  var maxFdp = DT_MAX_FDP[crew] + (disc ? 2*60 : 0);
+  var maxFt  = hasC1 ? DT_MAX_FT[crew].c1 : DT_MAX_FT[crew].noC1;
+
+  // ── Deadline cards (always shown) ──────────────────────────────────────────
+  var maxFdpDeadline = startMin + maxFdp;
+  var maxFtDeadline  = startMin + maxFt;
+  document.getElementById('dt-r-maxfdp-time').textContent = dtFmtUTC(maxFdpDeadline);
+  document.getElementById('dt-r-maxfdp-dur').textContent  = dtFmtHM(maxFdp) + (disc ? ' (incl. disc.)' : '');
+  document.getElementById('dt-r-maxft-time').textContent  = dtFmtUTC(maxFtDeadline);
+  document.getElementById('dt-r-maxft-dur').textContent   = dtFmtHM(maxFt) + (hasC1 ? ' (C1)' : '');
+
+  // ── Ext note ───────────────────────────────────────────────────────────────
+  var extNote = document.getElementById('dt-ext-note');
+  if (disc) { extNote.textContent = '🟣 PIC Discretion applied: +2h to Max FDP'; extNote.style.display='block'; }
+  else extNote.style.display = 'none';
+
+  // Show results
+  document.getElementById('dt-results-area').style.display = 'block';
+  document.getElementById('dt-placeholder').style.display  = 'none';
+
+  // ── If FDP End not provided, hide compliance cards and timeline ────────────
+  if (endMin === null) {
+    document.getElementById('dt-card-fdp').style.display  = 'none';
+    document.getElementById('dt-card-ft').style.display   = 'none';
+    document.getElementById('dt-card-rest').style.display = 'none';
+    document.getElementById('dt-wocl-box').style.display  = 'none';
+    document.querySelector('.dt-tl2').style.display        = 'none';
     return;
   }
 
   // If end < start (crossed midnight), add 1 day
   if (endMin <= startMin) endMin += 1440;
 
-  var maxFdp  = DT_MAX_FDP[crew] + (disc ? 2*60 : 0);
-  var maxFt   = hasC1 ? DT_MAX_FT[crew].c1 : DT_MAX_FT[crew].noC1;
   var actFdp  = endMin - startMin;
   var minRest = dtMinRest(crew, ftMin);
+
+  // Show compliance cards and timeline
+  document.querySelector('.dt-tl2').style.display = '';
 
   // Rest calculation
   var restStart = null, restEnd = null, actRest = null;
@@ -2122,33 +2254,30 @@ function dtCalculate() {
 
   // FDP card
   var fdpOk = actFdp <= maxFdp;
-  document.getElementById('dt-r-fdp').textContent     = dtFmtHM(actFdp);
-  document.getElementById('dt-r-fdp-max').textContent = 'Max: ' + dtFmtHM(maxFdp) + (disc ? ' (incl. PIC disc.)' : '');
+  document.getElementById('dt-card-fdp').style.display    = '';
+  document.getElementById('dt-r-fdp').textContent         = dtFmtHM(actFdp);
+  document.getElementById('dt-r-fdp-max').textContent     = 'Max: ' + dtFmtHM(maxFdp) + (disc ? ' (incl. PIC disc.)' : '');
   dtCardState('dt-card-fdp', fdpOk);
 
   // FT card
   var ftOk = ftMin === 0 ? null : ftMin <= maxFt;
-  document.getElementById('dt-r-ft').textContent     = ftMin > 0 ? dtFmtHM(ftMin) : '—';
-  document.getElementById('dt-r-ft-max').textContent = 'Max: ' + dtFmtHM(maxFt) + (hasC1 ? ' (C1)' : '');
+  document.getElementById('dt-card-ft').style.display    = '';
+  document.getElementById('dt-r-ft').textContent         = ftMin > 0 ? dtFmtHM(ftMin) : '—';
+  document.getElementById('dt-r-ft-max').textContent     = 'Max: ' + dtFmtHM(maxFt) + (hasC1 ? ' (C1)' : '');
   dtCardState('dt-card-ft', ftOk);
 
   // Rest card
+  document.getElementById('dt-card-rest').style.display = '';
   if (actRest !== null) {
     var restOk = actRest >= minRest;
     document.getElementById('dt-r-rest').textContent     = dtFmtHM(actRest) + (restOk ? ' ✓' : ' ✗');
     document.getElementById('dt-r-rest-min').textContent = 'Min: ' + dtFmtHM(minRest);
     dtCardState('dt-card-rest', restOk);
-    document.getElementById('dt-card-rest').style.display = '';
   } else {
     document.getElementById('dt-r-rest').textContent     = '—';
     document.getElementById('dt-r-rest-min').textContent = 'Min required: ' + dtFmtHM(minRest);
     dtCardState('dt-card-rest', null);
   }
-
-  // Ext note
-  var extNote = document.getElementById('dt-ext-note');
-  if (disc) { extNote.textContent = '🟣 PIC Discretion applied: +2h to Max FDP'; extNote.style.display='block'; }
-  else extNote.style.display = 'none';
 
   // WOCL
   var woclHit = dtWoclCheck(startMin, endMin, tz);
@@ -2159,10 +2288,6 @@ function dtCalculate() {
   } else {
     woclBox.style.display = 'none';
   }
-
-  // Show results BEFORE rendering timeline (so DOM is visible for layout)
-  document.getElementById('dt-results-area').style.display = 'block';
-  document.getElementById('dt-placeholder').style.display  = 'none';
 
   // Timeline
   dtRenderTimeline(startMin, endMin, maxFdp, restStart, restEnd, minRest, tz);
