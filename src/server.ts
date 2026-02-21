@@ -517,7 +517,7 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
 .dt-wocl-box{background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.35);border-radius:10px;padding:8px 12px;margin-bottom:8px;font-size:.75em;color:#f59e0b;line-height:1.5}
 .dt-tl2{background:var(--surface);border-radius:10px;padding:12px;margin-bottom:8px;overflow-x:auto}
 .dt-tl2-title{font-size:.63em;font-weight:700;color:var(--dim);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px}
-.dt-tl2-canvas{position:relative;min-width:280px}
+.dt-tl2-bars{position:relative;min-width:280px;padding-bottom:2px}
 .dt-tl2-track{position:relative;height:28px;margin-bottom:3px}
 .dt-tl2-track-sm{position:relative;height:11px;margin-bottom:3px}
 .dt-tl2-seg{position:absolute;top:0;height:100%;border-radius:4px;display:flex;align-items:center;justify-content:center;overflow:hidden;min-width:4px}
@@ -526,8 +526,8 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
 .dt-tl2-maxfdp{background:repeating-linear-gradient(-45deg,#3b82f6 0,#3b82f6 7px,#93c5fd 7px,#93c5fd 14px)}
 .dt-tl2-minrest{background:repeating-linear-gradient(-45deg,#f59e0b 0,#f59e0b 7px,#fcd34d 7px,#fcd34d 14px)}
 .dt-tl2-rest{background:#374151}
-.dt-tl2-wocl{position:absolute;top:0;background:rgba(167,139,250,.25);pointer-events:none;z-index:1}
-.dt-tl2-vline{position:absolute;top:0;width:0;border-left:1.5px dashed rgba(148,163,184,.5);pointer-events:none;z-index:2}
+.dt-tl2-wocl{position:absolute;top:0;bottom:0;background:rgba(167,139,250,.25);pointer-events:none;z-index:1}
+.dt-tl2-vline{position:absolute;top:0;bottom:0;width:0;border-left:1.5px dashed rgba(148,163,184,.5);pointer-events:none;z-index:2}
 .dt-tl2-ticks{position:relative;height:44px;min-width:280px;margin-top:4px}
 .dt-tl2-tick{position:absolute;transform:translateX(-50%);text-align:center;font-size:.58em;color:var(--dim);line-height:1.35;white-space:nowrap}
 .dt-legend{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
@@ -987,34 +987,12 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
       <div id="dt-results-area" style="display:none">
         <div id="dt-ext-note" class="dt-ext-note" style="display:none"></div>
         <div class="dt-results-wrap">
-          <div class="dt-cards">
-            <div class="dt-card" id="dt-card-fdp">
-              <div class="dt-card-label">Actual FDP</div>
-              <div class="dt-card-actual" id="dt-r-fdp">—</div>
-              <div class="dt-card-max" id="dt-r-fdp-max"></div>
-            </div>
-            <div class="dt-card" id="dt-card-ft">
-              <div class="dt-card-label">Flight Time</div>
-              <div class="dt-card-actual" id="dt-r-ft">—</div>
-              <div class="dt-card-max" id="dt-r-ft-max"></div>
-            </div>
-            <div class="dt-rest-card" id="dt-card-rest">
-              <div class="dt-card-label">Actual Rest</div>
-              <div class="dt-card-actual" id="dt-r-rest">—</div>
-              <div class="dt-card-max" id="dt-r-rest-min"></div>
-            </div>
-          </div>
 
-          <!-- WOCL -->
-          <div id="dt-wocl-box" class="dt-wocl-box" style="display:none">
-            <strong>⚠ WOCL (02:00–05:00 LT)</strong><br>
-            <span id="dt-wocl-msg"></span>
-          </div>
-
-          <!-- Timeline -->
+          <!-- Timeline FIRST -->
           <div class="dt-tl2">
             <div class="dt-tl2-title">Visual Timeline</div>
-            <div class="dt-tl2-canvas" id="dt-tl2-canvas">
+            <!-- bars wrapper: vlines/wocl absolute inside here -->
+            <div class="dt-tl2-bars" id="dt-tl2-bars">
               <div class="dt-tl2-wocl"  id="dt-tl2-wocl"  style="display:none"></div>
               <div class="dt-tl2-vline" id="dt-tl2-vl-s"></div>
               <div class="dt-tl2-vline" id="dt-tl2-vl-e"></div>
@@ -1041,15 +1019,40 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
                   <span class="dt-tl2-lbl" id="dt-tl2-rest-lbl"></span>
                 </div>
               </div>
-              <!-- Tick labels -->
-              <div class="dt-tl2-ticks" id="dt-tl2-ticks"></div>
             </div>
+            <!-- Tick labels OUTSIDE bars so vlines don't cover them -->
+            <div class="dt-tl2-ticks" id="dt-tl2-ticks"></div>
             <div class="dt-legend">
               <div class="dt-leg-item"><div class="dt-leg-box" style="background:#22c55e"></div>FDP</div>
               <div class="dt-leg-item"><div class="dt-leg-box" style="background:repeating-linear-gradient(-45deg,#3b82f6 0,#3b82f6 4px,#93c5fd 4px,#93c5fd 8px)"></div>Max FDP</div>
               <div class="dt-leg-item"><div class="dt-leg-box" style="background:repeating-linear-gradient(-45deg,#f59e0b 0,#f59e0b 4px,#fcd34d 4px,#fcd34d 8px)"></div>Min Rest</div>
               <div class="dt-leg-item"><div class="dt-leg-box" style="background:#374151"></div>Rest</div>
               <div class="dt-leg-item"><div class="dt-leg-box" style="background:rgba(167,139,250,.4)"></div>WOCL</div>
+            </div>
+          </div>
+
+          <!-- WOCL -->
+          <div id="dt-wocl-box" class="dt-wocl-box" style="display:none">
+            <strong>⚠ WOCL (02:00–05:00 LT)</strong><br>
+            <span id="dt-wocl-msg"></span>
+          </div>
+
+          <!-- Number cards (secondary) -->
+          <div class="dt-cards">
+            <div class="dt-card" id="dt-card-fdp">
+              <div class="dt-card-label">Actual FDP</div>
+              <div class="dt-card-actual" id="dt-r-fdp">—</div>
+              <div class="dt-card-max" id="dt-r-fdp-max"></div>
+            </div>
+            <div class="dt-card" id="dt-card-ft">
+              <div class="dt-card-label">Flight Time</div>
+              <div class="dt-card-actual" id="dt-r-ft">—</div>
+              <div class="dt-card-max" id="dt-r-ft-max"></div>
+            </div>
+            <div class="dt-rest-card" id="dt-card-rest">
+              <div class="dt-card-label">Actual Rest</div>
+              <div class="dt-card-actual" id="dt-r-rest">—</div>
+              <div class="dt-card-max" id="dt-r-rest-min"></div>
             </div>
           </div>
 
@@ -1923,9 +1926,10 @@ function dtGetTzOffset(tzId) {
     var d = new Date(Date.UTC(y, mo+1, 0));
     while (d.getUTCDay() !== 0) d.setUTCDate(d.getUTCDate() - 1); return d;
   }
-  if (tzId === 'la')     { var s=nthSun(yr,2,2),e=nthSun(yr,10,1); return (now>=s&&now<e)?-7:-8; }
-  if (tzId === 'prague') { var s=lastSun(yr,2),e=lastSun(yr,9);    return (now>=s&&now<e)?2:1;   }
-  return {taipei:8,tokyo:9,bangkok:7,phoenix:-7}[tzId] ?? 8;
+  if (tzId === 'la')     { var sLA=nthSun(yr,2,2),eLA=nthSun(yr,10,1); return (now>=sLA&&now<eLA)?-7:-8; }
+  if (tzId === 'prague') { var sPr=lastSun(yr,2),ePr=lastSun(yr,9);   return (now>=sPr&&now<ePr)?2:1;   }
+  var fixed = {taipei:8,tokyo:9,bangkok:7,phoenix:-7};
+  return fixed[tzId] !== undefined ? fixed[tzId] : 8;
 }
 
 function dtFmtH(m) { // "HH:MM" for timeline labels
@@ -1945,14 +1949,6 @@ function dtRenderTimeline(startMin, endMin, maxFdp, restStart, restEnd, minRest,
   function setSeg(id, lm, wm) {
     var el=document.getElementById(id); el.style.left=pL(lm); el.style.width=pW(wm);
   }
-  function setH(id, h) { document.getElementById(id).style.height = h; }
-
-  // Update vline heights to span all rows
-  var canvas = document.getElementById('dt-tl2-canvas');
-  var vlineH = canvas.clientHeight + 'px';
-  ['dt-tl2-vl-s','dt-tl2-vl-e','dt-tl2-vl-n'].forEach(function(id){
-    document.getElementById(id).style.height = vlineH;
-  });
 
   // Segments
   setSeg('dt-tl2-fdp',     startMin, actFdp);
@@ -2164,11 +2160,12 @@ function dtCalculate() {
     woclBox.style.display = 'none';
   }
 
-  // Timeline
-  dtRenderTimeline(startMin, endMin, maxFdp, restStart, restEnd, minRest, tz);
-
+  // Show results BEFORE rendering timeline (so DOM is visible for layout)
   document.getElementById('dt-results-area').style.display = 'block';
   document.getElementById('dt-placeholder').style.display  = 'none';
+
+  // Timeline
+  dtRenderTimeline(startMin, endMin, maxFdp, restStart, restEnd, minRest, tz);
 }
 
 // ── Boot ─────────────────────────────────────────────────────────────────────
