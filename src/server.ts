@@ -471,6 +471,40 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
 .ct-table td.ct-hi{background:rgba(59,130,246,.25);color:#fff;font-weight:700}
 .ct-no-corr{background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.3);border-radius:10px;
   padding:12px 16px;color:#4ade80;font-size:.9em;font-weight:600;margin-top:12px;text-align:center}
+/* ── Duty Time ── */
+.dt-panel{padding:12px 14px 24px;overflow-y:auto}
+.dt-row{display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap}
+.dt-label{font-size:.76em;font-weight:700;color:var(--dim);width:110px;flex-shrink:0}
+.dt-time-inputs{display:flex;align-items:center;gap:4px}
+.dt-time-box{width:46px;padding:7px 4px;text-align:center;font-size:.95em;font-weight:700;
+  background:var(--surface);border:1.5px solid var(--dim);border-radius:8px;color:var(--text)}
+.dt-time-sep{font-weight:700;color:var(--dim);font-size:1.1em}
+.dt-crew-btns{display:flex;gap:6px}
+.dt-crew-btn{padding:7px 18px;border-radius:8px;font-size:.85em;font-weight:700;border:1.5px solid var(--dim);
+  background:none;color:var(--dim);cursor:pointer;transition:all .15s}
+.dt-crew-btn.active{border-color:var(--accent);background:var(--accent);color:#fff}
+.dt-toggle-row{display:flex;align-items:center;gap:8px;margin-bottom:10px;padding:0 2px}
+.dt-toggle-label{font-size:.78em;color:var(--text)}
+.dt-toggle{position:relative;display:inline-flex;align-items:center;cursor:pointer}
+.dt-toggle input{opacity:0;width:0;height:0;position:absolute}
+.dt-toggle-track{width:38px;height:21px;background:var(--dim);border-radius:11px;transition:.2s;flex-shrink:0}
+.dt-toggle input:checked+.dt-toggle-track{background:var(--accent)}
+.dt-toggle-thumb{position:absolute;left:3px;top:3px;width:15px;height:15px;background:#fff;border-radius:50%;transition:.2s;pointer-events:none}
+.dt-toggle input:checked~.dt-toggle-thumb{left:20px}
+.dt-divider{border:none;border-top:1px solid var(--dim);margin:14px 0}
+.dt-results{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px}
+.dt-card{background:var(--surface);border-radius:12px;padding:10px 12px}
+.dt-card-label{font-size:.68em;font-weight:700;color:var(--dim);margin-bottom:3px}
+.dt-card-val{font-size:1.25em;font-weight:800;color:var(--accent);line-height:1.1}
+.dt-card-sub{font-size:.68em;color:var(--dim);margin-top:2px}
+.dt-info-box{background:var(--surface);border-radius:12px;padding:10px 14px;margin-bottom:12px}
+.dt-info-row{display:flex;justify-content:space-between;align-items:center;padding:5px 0;font-size:.82em}
+.dt-info-row+.dt-info-row{border-top:1px solid var(--dim)}
+.dt-info-key{color:var(--dim)}
+.dt-info-val{font-weight:700;color:var(--text)}
+.dt-ok{color:#22c55e}.dt-warn{color:#f59e0b}.dt-err{color:#ef4444}
+.dt-notice{font-size:.68em;color:var(--dim);text-align:center;padding:4px 0 8px}
+.dt-hidden{display:none}
 .wx-row{display:flex;align-items:center;padding:9px 12px;gap:9px}
 .wx-cat{font-size:.67em;font-weight:800;padding:2px 5px;border-radius:4px;
   flex-shrink:0;min-width:38px;text-align:center;letter-spacing:.3px}
@@ -485,7 +519,8 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
 .wx-wind{font-size:.71em;color:var(--text);font-family:'Courier New',monospace;margin-top:1px}
 .wx-mini{font-size:.71em;color:var(--muted);text-align:right;line-height:1.5;flex-shrink:0}
 .wx-obs-age{font-size:.65em;color:var(--dim);text-align:right;margin-top:1px}
-.wx-obs-age.stale{color:#f59e0b}
+.wx-obs-age.warn{color:#f59e0b}
+.wx-obs-age.stale{color:#ef4444}
 .wx-list-hdr{display:flex;align-items:center;padding:6px 14px;border-bottom:1px solid var(--dim);
   background:var(--surface);position:sticky;top:0;z-index:10}
 .wx-list-ts{font-size:.72em;color:var(--muted);flex:1}
@@ -650,6 +685,7 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
     <button class="briefing-subtab active" id="subtabBtn-datis" onclick="switchBriefingTab('datis',this)">⛅ Airport WX</button>
     <button class="briefing-subtab" id="subtabBtn-hf" onclick="switchBriefingTab('hf',this)">📻 Pacific HF</button>
     <button class="briefing-subtab" id="subtabBtn-coldtemp" onclick="switchBriefingTab('coldtemp',this)">❄️ 低溫修正</button>
+    <button class="briefing-subtab" id="subtabBtn-duty" onclick="switchBriefingTab('duty',this)">⏱️ Duty Time</button>
   </div>
 
   <!-- ── 工具連結 panel ── -->
@@ -782,6 +818,112 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
       <a href="https://radio.arinc.net/pacific/" target="_blank" style="font-size:.78em;color:var(--accent);text-decoration:none">↗ 新分頁</a>
     </div>
     <iframe id="hf-panel-iframe" src="" style="flex:1;border:none;width:100%;min-height:400px"></iframe>
+  </div>
+
+  <!-- ── ⏱️ Duty Time panel ── -->
+  <div id="briefing-duty" class="briefing-panel">
+    <div class="dt-panel">
+
+      <!-- FDP Start -->
+      <div class="dt-row">
+        <span class="dt-label">FDP Start (UTC)</span>
+        <div class="dt-time-inputs">
+          <input class="dt-time-box" type="text" id="dt-start-h" placeholder="HH" maxlength="2" inputmode="numeric" oninput="dtAutoCalc()">
+          <span class="dt-time-sep">:</span>
+          <input class="dt-time-box" type="text" id="dt-start-m" placeholder="MM" maxlength="2" inputmode="numeric" oninput="dtAutoCalc()">
+        </div>
+      </div>
+
+      <!-- Flight Time -->
+      <div class="dt-row">
+        <span class="dt-label">Flight Time</span>
+        <div class="dt-time-inputs">
+          <input class="dt-time-box" type="text" id="dt-ft-h" placeholder="HH" maxlength="2" inputmode="numeric" oninput="dtAutoCalc()">
+          <span class="dt-time-sep">:</span>
+          <input class="dt-time-box" type="text" id="dt-ft-m" placeholder="MM" maxlength="2" inputmode="numeric" oninput="dtAutoCalc()">
+        </div>
+      </div>
+
+      <!-- Crew Type -->
+      <div class="dt-row">
+        <span class="dt-label">Crew Type</span>
+        <div class="dt-crew-btns">
+          <button class="dt-crew-btn active" data-crew="2" onclick="dtSelectCrew(this)">Single<br><span style="font-size:.75em">2P</span></button>
+          <button class="dt-crew-btn" data-crew="3" onclick="dtSelectCrew(this)">Multiple<br><span style="font-size:.75em">3P</span></button>
+          <button class="dt-crew-btn" data-crew="4" onclick="dtSelectCrew(this)">Double<br><span style="font-size:.75em">4P</span></button>
+        </div>
+      </div>
+
+      <!-- Class 1 Rest (3P/4P only) -->
+      <div class="dt-toggle-row" id="dt-c1-row" style="display:none">
+        <label class="dt-toggle">
+          <input type="checkbox" id="dt-c1" onchange="dtAutoCalc()">
+          <div class="dt-toggle-track"></div>
+          <div class="dt-toggle-thumb"></div>
+        </label>
+        <span class="dt-toggle-label">Class 1 休息艙 (Bunk)</span>
+      </div>
+
+      <!-- Commander's Discretion (3P only) -->
+      <div class="dt-toggle-row" id="dt-disc-row" style="display:none">
+        <label class="dt-toggle">
+          <input type="checkbox" id="dt-disc" onchange="dtAutoCalc()">
+          <div class="dt-toggle-track"></div>
+          <div class="dt-toggle-thumb"></div>
+        </label>
+        <span class="dt-toggle-label">Commander's Discretion (+2h)</span>
+      </div>
+
+      <!-- Next Duty Report (optional) -->
+      <div class="dt-row">
+        <span class="dt-label">Next Rpt (UTC)<br><span style="font-weight:400;font-size:.85em">選填</span></span>
+        <div class="dt-time-inputs">
+          <input class="dt-time-box" type="text" id="dt-next-h" placeholder="HH" maxlength="2" inputmode="numeric" oninput="dtAutoCalc()">
+          <span class="dt-time-sep">:</span>
+          <input class="dt-time-box" type="text" id="dt-next-m" placeholder="MM" maxlength="2" inputmode="numeric" oninput="dtAutoCalc()">
+        </div>
+        <label style="display:flex;align-items:center;gap:4px;font-size:.75em;color:var(--dim)">
+          <input type="checkbox" id="dt-next-tomorrow" onchange="dtAutoCalc()"> 次日
+        </label>
+      </div>
+
+      <hr class="dt-divider">
+
+      <!-- Results -->
+      <div id="dt-results-area" style="display:none">
+        <div class="dt-results">
+          <div class="dt-card">
+            <div class="dt-card-label">Max FDP</div>
+            <div class="dt-card-val" id="dt-r-maxfdp">—</div>
+          </div>
+          <div class="dt-card">
+            <div class="dt-card-label">Max Flight Time</div>
+            <div class="dt-card-val" id="dt-r-maxft">—</div>
+          </div>
+          <div class="dt-card" style="grid-column:1/-1">
+            <div class="dt-card-label">Latest FDP End (UTC)</div>
+            <div class="dt-card-val" id="dt-r-end" style="font-size:1.6em">—</div>
+            <div class="dt-card-sub" id="dt-r-end-sub"></div>
+          </div>
+        </div>
+        <div class="dt-info-box">
+          <div class="dt-info-row">
+            <span class="dt-info-key">Min Rest Required</span>
+            <span class="dt-info-val" id="dt-r-minrest">—</span>
+          </div>
+          <div class="dt-info-row" id="dt-r-actualrest-row" style="display:none">
+            <span class="dt-info-key">Actual Rest</span>
+            <span class="dt-info-val" id="dt-r-actualrest">—</span>
+          </div>
+          <div class="dt-info-row" id="dt-r-nextrpt-row" style="display:none">
+            <span class="dt-info-key">Next Report</span>
+            <span class="dt-info-val" id="dt-r-nextrpt">—</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="dt-notice">⚠ Non-operational reference only · CAR 07-02A · 請以公司手冊為準</div>
+    </div>
   </div>
 
 </div><!-- end tab-briefing -->
@@ -1481,7 +1623,9 @@ function renderWxList(airports, region) {
     var cardCls = 'wx-card-' + (a.cls || 'r');
     var sel = (a.icao === wxSelectedIcao) ? ' selected' : '';
     var mins = wxMinsAgo(m);
-    var ageHtml = mins !== null ? '<div class="wx-obs-age' + (mins > 90 ? ' stale' : '') + '">' + (mins > 90 ? 'expired' : mins + 'm') + '</div>' : '';
+    var ageClass = mins > 90 ? ' stale' : mins > 60 ? ' warn' : '';
+    var ageText = mins > 90 ? 'expired' : mins + 'm';
+    var ageHtml = mins !== null ? '<div class="wx-obs-age' + ageClass + '">' + ageText + '</div>' : '';
     return '<div class="wx-card ' + cardCls + sel + '" onclick="selectWxAirport(\\'' + a.icao + '\\',\\'' + a.name + '\\',this)">'
       + '<div class="wx-row">'
       + '<div class="wx-cat cat-' + cat + '">' + cat + '</div>'
@@ -1601,6 +1745,83 @@ function fetchWxDetail(icao, name) {
     wxDetailCache[icao] = cards;
     content.innerHTML = cards;
   });
+}
+
+// ── Duty Time Calculator ──────────────────────────────────────────────────────
+var DT_MAX_FDP   = {2: 14*60, 3: 18*60, 4: 24*60};
+var DT_MAX_FT    = {2:{noC1:10*60,c1:10*60}, 3:{noC1:12*60,c1:16*60}, 4:{noC1:12*60,c1:18*60}};
+
+function dtMinRest(crew, ftMin) {
+  var ft = ftMin / 60;
+  if (crew === 2) return ft <= 8 ? 10*60 : 18*60;          // max FT 10h
+  if (crew === 3) return ft <= 8 ? 10*60 : ft <= 12 ? 18*60 : 24*60;
+  /* crew===4 */  return ft <= 8 ? 10*60 : ft <= 16 ? 18*60 : 22*60;
+}
+
+function dtFmtHM(totalMin) {
+  var h = Math.floor(totalMin / 60), m = totalMin % 60;
+  return h + 'h ' + (m < 10 ? '0' : '') + m + 'm';
+}
+
+function dtFmtUTC(totalMin) {
+  var t = ((totalMin % 1440) + 1440) % 1440;
+  var h = Math.floor(t / 60), m = t % 60;
+  return (h < 10 ? '0' : '') + h + ':' + (m < 10 ? '0' : '') + m + 'Z';
+}
+
+function dtSelectCrew(btn) {
+  document.querySelectorAll('.dt-crew-btn').forEach(function(b){ b.classList.remove('active'); });
+  btn.classList.add('active');
+  var crew = parseInt(btn.dataset.crew);
+  document.getElementById('dt-c1-row').style.display   = crew >= 3 ? 'flex' : 'none';
+  document.getElementById('dt-disc-row').style.display = crew === 3 ? 'flex' : 'none';
+  if (crew !== 3) document.getElementById('dt-disc').checked = false;
+  if (crew < 3)   document.getElementById('dt-c1').checked  = false;
+  dtAutoCalc();
+}
+
+function dtAutoCalc() {
+  var startH = parseInt(document.getElementById('dt-start-h').value);
+  var startM = parseInt(document.getElementById('dt-start-m').value);
+  if (isNaN(startH) || isNaN(startM)) { document.getElementById('dt-results-area').style.display='none'; return; }
+
+  var crew    = parseInt(document.querySelector('.dt-crew-btn.active').dataset.crew);
+  var hasC1   = document.getElementById('dt-c1').checked;
+  var disc    = crew === 3 && document.getElementById('dt-disc').checked;
+  var ftH     = parseInt(document.getElementById('dt-ft-h').value) || 0;
+  var ftM     = parseInt(document.getElementById('dt-ft-m').value) || 0;
+  var nextH   = document.getElementById('dt-next-h').value;
+  var nextM   = document.getElementById('dt-next-m').value;
+  var nextTmr = document.getElementById('dt-next-tomorrow').checked;
+
+  var startMin = startH * 60 + startM;
+  var ftMin    = ftH * 60 + ftM;
+  var maxFdp   = DT_MAX_FDP[crew] + (disc ? 2*60 : 0);
+  var maxFt    = hasC1 ? DT_MAX_FT[crew].c1 : DT_MAX_FT[crew].noC1;
+  var minRest  = dtMinRest(crew, ftMin);
+  var fdpEndMin = startMin + maxFdp;
+
+  document.getElementById('dt-r-maxfdp').textContent  = dtFmtHM(maxFdp);
+  document.getElementById('dt-r-maxft').textContent   = dtFmtHM(maxFt);
+  document.getElementById('dt-r-end').textContent     = dtFmtUTC(fdpEndMin);
+  document.getElementById('dt-r-end-sub').textContent = fdpEndMin >= 1440 ? '(+1 day)' : '';
+  document.getElementById('dt-r-minrest').textContent = dtFmtHM(minRest);
+
+  // Optional: check actual rest
+  var hasNext = nextH !== '' && nextM !== '';
+  document.getElementById('dt-r-actualrest-row').style.display = hasNext ? 'flex' : 'none';
+  document.getElementById('dt-r-nextrpt-row').style.display    = hasNext ? 'flex' : 'none';
+  if (hasNext) {
+    var nextMin = parseInt(nextH)*60 + parseInt(nextM) + (nextTmr ? 1440 : 0);
+    var actualRest = nextMin - fdpEndMin;
+    var restOk     = actualRest >= minRest;
+    var restEl     = document.getElementById('dt-r-actualrest');
+    restEl.textContent = dtFmtHM(actualRest) + (restOk ? ' ✓' : ' ✗');
+    restEl.className = 'dt-info-val ' + (restOk ? 'dt-ok' : 'dt-err');
+    document.getElementById('dt-r-nextrpt').textContent = dtFmtUTC(nextMin);
+  }
+
+  document.getElementById('dt-results-area').style.display = 'block';
 }
 
 // ── Boot ─────────────────────────────────────────────────────────────────────
