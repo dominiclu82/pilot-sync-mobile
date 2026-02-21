@@ -713,17 +713,17 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
             <div class="ct-card-result empty" id="ct-r2">—</div>
           </div>
           <div class="ct-card">
-            <input class="ct-label-inp" type="text" id="ct-l3" placeholder="自訂">
+            <input class="ct-label-inp" type="text" id="ct-l3" placeholder="自訂名稱">
             <input class="ct-card-input" type="number" id="ct-a3" inputmode="numeric" placeholder="ft">
             <div class="ct-card-result empty" id="ct-r3">—</div>
           </div>
           <div class="ct-card">
-            <input class="ct-label-inp" type="text" id="ct-l4" placeholder="自訂">
+            <input class="ct-label-inp" type="text" id="ct-l4" placeholder="自訂名稱">
             <input class="ct-card-input" type="number" id="ct-a4" inputmode="numeric" placeholder="ft">
             <div class="ct-card-result empty" id="ct-r4">—</div>
           </div>
           <div class="ct-card">
-            <input class="ct-label-inp" type="text" id="ct-l5" placeholder="自訂">
+            <input class="ct-label-inp" type="text" id="ct-l5" placeholder="自訂名稱">
             <input class="ct-card-input" type="number" id="ct-a5" inputmode="numeric" placeholder="ft">
             <div class="ct-card-result empty" id="ct-r5">—</div>
           </div>
@@ -808,7 +808,7 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
   </button>
   <button class="tab-btn" id="tabBtn-theme" onclick="toggleTheme()">
     <span class="tab-btn-icon" id="theme-icon">☀️</span><span id="theme-label">日間</span>
-    <span style="font-size:.55em;color:var(--dim);line-height:1;opacity:.7">V2.21</span>
+    <span style="font-size:.55em;color:var(--dim);line-height:1;opacity:.7">V2.211</span>
   </button>
 </div>
 
@@ -1481,7 +1481,7 @@ function renderWxList(airports, region) {
     var cardCls = 'wx-card-' + (a.cls || 'r');
     var sel = (a.icao === wxSelectedIcao) ? ' selected' : '';
     var mins = wxMinsAgo(m);
-    var ageHtml = mins !== null ? '<div class="wx-obs-age' + (mins > 90 ? ' stale' : '') + '">' + mins + 'm</div>' : '';
+    var ageHtml = mins !== null ? '<div class="wx-obs-age' + (mins > 90 ? ' stale' : '') + '">' + (mins > 90 ? 'expired' : mins + 'm') + '</div>' : '';
     return '<div class="wx-card ' + cardCls + sel + '" onclick="selectWxAirport(\\'' + a.icao + '\\',\\'' + a.name + '\\',this)">'
       + '<div class="wx-row">'
       + '<div class="wx-cat cat-' + cat + '">' + cat + '</div>'
