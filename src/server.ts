@@ -515,16 +515,22 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
 .dt-rest-card.ok{border-left-color:#22c55e}.dt-rest-card.warn .dt-card-actual{color:#f59e0b}.dt-rest-card.err .dt-card-actual{color:#ef4444}
 .dt-rest-card.ok .dt-card-actual{color:#22c55e}
 .dt-wocl-box{background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.35);border-radius:10px;padding:8px 12px;margin-bottom:8px;font-size:.75em;color:#f59e0b;line-height:1.5}
-.dt-tl-wrap{background:var(--surface);border-radius:10px;padding:10px 12px;margin-bottom:8px}
-.dt-tl-label{font-size:.63em;color:var(--dim);margin-bottom:5px;font-weight:700}
-.dt-tl-bar{position:relative;height:22px;border-radius:4px;background:var(--bg);overflow:hidden}
-.dt-tl-wocl{position:absolute;top:0;height:100%;background:rgba(245,158,11,.2)}
-.dt-tl-fdp{position:absolute;top:0;height:100%;background:rgba(59,130,246,.4);border-radius:4px}
-.dt-tl-maxfdp{position:absolute;top:0;height:100%;border-right:2px dashed rgba(59,130,246,.8)}
-.dt-tl-rest{position:absolute;top:0;height:100%;background:rgba(34,197,94,.4)}
-.dt-tl-minrest{position:absolute;top:0;height:100%;border-right:2px dashed rgba(34,197,94,.8)}
-.dt-tl-ticks{display:flex;justify-content:space-between;font-size:.58em;color:var(--dim);margin-top:3px;padding:0 1px}
-.dt-legend{display:flex;flex-wrap:wrap;gap:8px;margin-top:6px}
+.dt-tl2{background:var(--surface);border-radius:10px;padding:12px;margin-bottom:8px;overflow-x:auto}
+.dt-tl2-title{font-size:.63em;font-weight:700;color:var(--dim);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px}
+.dt-tl2-canvas{position:relative;min-width:280px}
+.dt-tl2-track{position:relative;height:28px;margin-bottom:3px}
+.dt-tl2-track-sm{position:relative;height:11px;margin-bottom:3px}
+.dt-tl2-seg{position:absolute;top:0;height:100%;border-radius:4px;display:flex;align-items:center;justify-content:center;overflow:hidden;min-width:4px}
+.dt-tl2-lbl{font-size:.67em;font-weight:700;color:#fff;padding:0 6px;white-space:nowrap;text-shadow:0 1px 2px rgba(0,0,0,.5);pointer-events:none}
+.dt-tl2-fdp{background:#22c55e}
+.dt-tl2-maxfdp{background:repeating-linear-gradient(-45deg,#3b82f6 0,#3b82f6 7px,#93c5fd 7px,#93c5fd 14px)}
+.dt-tl2-minrest{background:repeating-linear-gradient(-45deg,#f59e0b 0,#f59e0b 7px,#fcd34d 7px,#fcd34d 14px)}
+.dt-tl2-rest{background:#374151}
+.dt-tl2-wocl{position:absolute;top:0;background:rgba(167,139,250,.25);pointer-events:none;z-index:1}
+.dt-tl2-vline{position:absolute;top:0;width:0;border-left:1.5px dashed rgba(148,163,184,.5);pointer-events:none;z-index:2}
+.dt-tl2-ticks{position:relative;height:44px;min-width:280px;margin-top:4px}
+.dt-tl2-tick{position:absolute;transform:translateX(-50%);text-align:center;font-size:.58em;color:var(--dim);line-height:1.35;white-space:nowrap}
+.dt-legend{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
 .dt-leg-item{display:flex;align-items:center;gap:4px;font-size:.62em;color:var(--dim)}
 .dt-leg-box{width:11px;height:9px;border-radius:2px;flex-shrink:0}
 .dt-ext-note{font-size:.72em;color:#a78bfa;margin-bottom:6px;padding:0 14px}
@@ -749,7 +755,7 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
         <div class="ct-inputs">
           <div class="ct-input-group">
             <label>機場標高 Airport Elevation (ft)</label>
-            <input type="text" id="ct-elev" placeholder="e.g. −14" inputmode="text">
+            <input type="text" id="ct-elev" placeholder="e.g. 108" inputmode="text">
           </div>
           <div class="ct-input-group">
             <label>OAT (°C)</label>
@@ -882,11 +888,12 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
         <div class="dt-opt-row" style="margin-bottom:4px">
           <span style="font-size:.72em;color:var(--dim);flex-shrink:0">時區</span>
           <select class="dt-tz-select" id="dt-tz">
-            <option value="8">Taipei / UTC+8</option>
-            <option value="9">Tokyo / UTC+9</option>
-            <option value="-8">Los Angeles / UTC−8</option>
-            <option value="-7">San Francisco / UTC−7</option>
-            <option value="0">London / UTC+0</option>
+            <option value="taipei" selected>台北 UTC+8</option>
+            <option value="tokyo">東京 UTC+9</option>
+            <option value="bangkok">曼谷 UTC+7</option>
+            <option value="prague">布拉格 UTC+1/+2★</option>
+            <option value="la">洛杉磯 UTC−8/−7★</option>
+            <option value="phoenix">鳳凰城 UTC−7</option>
           </select>
         </div>
       </div>
@@ -1005,22 +1012,44 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
           </div>
 
           <!-- Timeline -->
-          <div class="dt-tl-wrap">
-            <div class="dt-tl-label">時間軸</div>
-            <div class="dt-tl-bar" id="dt-tl-bar">
-              <div class="dt-tl-wocl" id="dt-tl-wocl" style="display:none"></div>
-              <div class="dt-tl-fdp"  id="dt-tl-fdp"></div>
-              <div class="dt-tl-maxfdp" id="dt-tl-maxfdp"></div>
-              <div class="dt-tl-rest" id="dt-tl-rest" style="display:none"></div>
-              <div class="dt-tl-minrest" id="dt-tl-minrest" style="display:none"></div>
+          <div class="dt-tl2">
+            <div class="dt-tl2-title">Visual Timeline</div>
+            <div class="dt-tl2-canvas" id="dt-tl2-canvas">
+              <div class="dt-tl2-wocl"  id="dt-tl2-wocl"  style="display:none"></div>
+              <div class="dt-tl2-vline" id="dt-tl2-vl-s"></div>
+              <div class="dt-tl2-vline" id="dt-tl2-vl-e"></div>
+              <div class="dt-tl2-vline" id="dt-tl2-vl-n" style="display:none"></div>
+              <!-- FDP (thin) -->
+              <div class="dt-tl2-track-sm">
+                <div class="dt-tl2-seg dt-tl2-fdp" id="dt-tl2-fdp"></div>
+              </div>
+              <!-- Max FDP -->
+              <div class="dt-tl2-track">
+                <div class="dt-tl2-seg dt-tl2-maxfdp" id="dt-tl2-maxfdp">
+                  <span class="dt-tl2-lbl" id="dt-tl2-maxfdp-lbl"></span>
+                </div>
+              </div>
+              <!-- Min Rest -->
+              <div class="dt-tl2-track">
+                <div class="dt-tl2-seg dt-tl2-minrest" id="dt-tl2-minrest">
+                  <span class="dt-tl2-lbl" id="dt-tl2-minrest-lbl"></span>
+                </div>
+              </div>
+              <!-- Actual Rest -->
+              <div class="dt-tl2-track" id="dt-tl2-rest-row" style="display:none">
+                <div class="dt-tl2-seg dt-tl2-rest" id="dt-tl2-rest">
+                  <span class="dt-tl2-lbl" id="dt-tl2-rest-lbl"></span>
+                </div>
+              </div>
+              <!-- Tick labels -->
+              <div class="dt-tl2-ticks" id="dt-tl2-ticks"></div>
             </div>
-            <div class="dt-tl-ticks" id="dt-tl-ticks"></div>
             <div class="dt-legend">
-              <div class="dt-leg-item"><div class="dt-leg-box" style="background:rgba(59,130,246,.4)"></div>Actual FDP</div>
-              <div class="dt-leg-item"><div class="dt-leg-box" style="border:2px dashed rgba(59,130,246,.8);background:none"></div>Max FDP</div>
-              <div class="dt-leg-item"><div class="dt-leg-box" style="background:rgba(34,197,94,.4)"></div>Actual Rest</div>
-              <div class="dt-leg-item"><div class="dt-leg-box" style="border:2px dashed rgba(34,197,94,.8);background:none"></div>Min Rest</div>
-              <div class="dt-leg-item"><div class="dt-leg-box" style="background:rgba(245,158,11,.2)"></div>WOCL</div>
+              <div class="dt-leg-item"><div class="dt-leg-box" style="background:#22c55e"></div>FDP</div>
+              <div class="dt-leg-item"><div class="dt-leg-box" style="background:repeating-linear-gradient(-45deg,#3b82f6 0,#3b82f6 4px,#93c5fd 4px,#93c5fd 8px)"></div>Max FDP</div>
+              <div class="dt-leg-item"><div class="dt-leg-box" style="background:repeating-linear-gradient(-45deg,#f59e0b 0,#f59e0b 4px,#fcd34d 4px,#fcd34d 8px)"></div>Min Rest</div>
+              <div class="dt-leg-item"><div class="dt-leg-box" style="background:#374151"></div>Rest</div>
+              <div class="dt-leg-item"><div class="dt-leg-box" style="background:rgba(167,139,250,.4)"></div>WOCL</div>
             </div>
           </div>
 
@@ -1060,7 +1089,7 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
   </button>
   <button class="tab-btn" id="tabBtn-theme" onclick="toggleTheme()">
     <span class="tab-btn-icon" id="theme-icon">☀️</span><span id="theme-label">日間</span>
-    <span style="font-size:.55em;color:var(--dim);line-height:1;opacity:.7">V2.211</span>
+    <span style="font-size:.55em;color:var(--dim);line-height:1;opacity:.7">V3.0</span>
   </button>
 </div>
 
@@ -1882,6 +1911,110 @@ var DT_MAX_FDP = {2:14*60, 3:18*60, 4:24*60};
 var DT_MAX_FT  = {2:{noC1:10*60,c1:10*60}, 3:{noC1:12*60,c1:16*60}, 4:{noC1:12*60,c1:18*60}};
 var dtMode = 'home';
 
+function dtGetTzOffset(tzId) {
+  var now = new Date();
+  var yr  = now.getUTCFullYear();
+  function nthSun(y, mo, n) { // mo: 0-indexed
+    var d = new Date(Date.UTC(y, mo, 1));
+    while (d.getUTCDay() !== 0) d.setUTCDate(d.getUTCDate() + 1);
+    d.setUTCDate(d.getUTCDate() + (n-1)*7); return d;
+  }
+  function lastSun(y, mo) {
+    var d = new Date(Date.UTC(y, mo+1, 0));
+    while (d.getUTCDay() !== 0) d.setUTCDate(d.getUTCDate() - 1); return d;
+  }
+  if (tzId === 'la')     { var s=nthSun(yr,2,2),e=nthSun(yr,10,1); return (now>=s&&now<e)?-7:-8; }
+  if (tzId === 'prague') { var s=lastSun(yr,2),e=lastSun(yr,9);    return (now>=s&&now<e)?2:1;   }
+  return {taipei:8,tokyo:9,bangkok:7,phoenix:-7}[tzId] ?? 8;
+}
+
+function dtFmtH(m) { // "HH:MM" for timeline labels
+  var h=Math.floor(m/60), mm=m%60;
+  return h+':'+(mm<10?'0':'')+mm;
+}
+
+function dtRenderTimeline(startMin, endMin, maxFdp, restStart, restEnd, minRest, tz) {
+  var actFdp = endMin - startMin;
+  var spanEnd = restEnd !== null
+    ? Math.max(startMin + maxFdp, restEnd) + 30
+    : startMin + maxFdp + minRest + 60;
+  var span = spanEnd - startMin;
+
+  function pL(m)   { return (Math.max(0,Math.min(100,(m-startMin)/span*100))).toFixed(2)+'%'; }
+  function pW(dur) { return (Math.max(0,Math.min(100,dur/span*100))).toFixed(2)+'%'; }
+  function setSeg(id, lm, wm) {
+    var el=document.getElementById(id); el.style.left=pL(lm); el.style.width=pW(wm);
+  }
+  function setH(id, h) { document.getElementById(id).style.height = h; }
+
+  // Update vline heights to span all rows
+  var canvas = document.getElementById('dt-tl2-canvas');
+  var vlineH = canvas.clientHeight + 'px';
+  ['dt-tl2-vl-s','dt-tl2-vl-e','dt-tl2-vl-n'].forEach(function(id){
+    document.getElementById(id).style.height = vlineH;
+  });
+
+  // Segments
+  setSeg('dt-tl2-fdp',     startMin, actFdp);
+  setSeg('dt-tl2-maxfdp',  startMin, maxFdp);
+  document.getElementById('dt-tl2-maxfdp-lbl').textContent = 'Max '+dtFmtH(maxFdp);
+  setSeg('dt-tl2-minrest', endMin,   minRest);
+  document.getElementById('dt-tl2-minrest-lbl').textContent = 'Min Req '+dtFmtH(minRest);
+
+  if (restEnd !== null) {
+    setSeg('dt-tl2-rest', restStart, restEnd - restStart);
+    document.getElementById('dt-tl2-rest-lbl').textContent = 'Rest '+dtFmtH(restEnd - restStart);
+    document.getElementById('dt-tl2-rest-row').style.display = '';
+  } else {
+    document.getElementById('dt-tl2-rest-row').style.display = 'none';
+  }
+
+  // Vlines
+  document.getElementById('dt-tl2-vl-s').style.left = pL(startMin);
+  document.getElementById('dt-tl2-vl-e').style.left = pL(endMin);
+  if (restEnd !== null) {
+    document.getElementById('dt-tl2-vl-n').style.left = pL(restEnd);
+    document.getElementById('dt-tl2-vl-n').style.display = '';
+  } else {
+    document.getElementById('dt-tl2-vl-n').style.display = 'none';
+  }
+
+  // WOCL band — find first occurrence within span
+  var woclBase = ((2*60 - tz*60) % 1440 + 1440) % 1440;
+  var wBand = document.getElementById('dt-tl2-wocl'), woclShown = false;
+  for (var d=0; d<3; d++) {
+    var ws = woclBase + d*1440, we = ws + 3*60;
+    if (ws < spanEnd && we > startMin) {
+      wBand.style.left = pL(ws); wBand.style.width = pW(3*60);
+      wBand.style.height = '100%'; wBand.style.display = '';
+      woclShown = true; break;
+    }
+  }
+  if (!woclShown) wBand.style.display = 'none';
+
+  // Tick labels
+  function fmtUTC(m) {
+    var t=((m%1440)+1440)%1440, h=Math.floor(t/60), mm=t%60;
+    return (h<10?'0':'')+h+':'+(mm<10?'0':'')+mm+'Z';
+  }
+  function fmtDayUTC(m) {
+    var day = Math.floor((startMin + (m - startMin)) / 1440);
+    var now = new Date(); var d = new Date(now.getFullYear(), now.getMonth(), now.getDate() + day);
+    return (d.getDate()<10?'0':'')+d.getDate()+'/'+(d.getMonth()+1<10?'0':'')+(d.getMonth()+1);
+  }
+  var html = '';
+  html += '<div class="dt-tl2-tick" style="left:'+pL(startMin)+'">Start<br>'+fmtUTC(startMin)+'</div>';
+  html += '<div class="dt-tl2-tick" style="left:'+pL(endMin)+'">Rst Start<br>(FDP End)</div>';
+  if (woclShown) {
+    var woclMid = woclBase + (woclBase < startMin ? 1440 : 0) + 90;
+    if (woclMid > startMin && woclMid < spanEnd)
+      html += '<div class="dt-tl2-tick" style="left:'+pL(woclMid)+'">WOCL</div>';
+  }
+  if (restEnd !== null)
+    html += '<div class="dt-tl2-tick" style="left:'+pL(restEnd)+'">Next Rpt<br>'+fmtUTC(restEnd)+'</div>';
+  document.getElementById('dt-tl2-ticks').innerHTML = html;
+}
+
 function dtMinRest(crew, ftMin) {
   var ft = ftMin / 60;
   if (crew === 2) return ft <= 8 ? 10*60 : 18*60;
@@ -1952,7 +2085,7 @@ function dtCalculate() {
   var crew  = parseInt(document.querySelector('.dt-crew-btn.active').dataset.crew);
   var hasC1 = document.getElementById('dt-c1').checked;
   var disc  = crew===3 && document.getElementById('dt-disc').checked;
-  var tz    = parseFloat(document.getElementById('dt-tz').value);
+  var tz    = dtGetTzOffset(document.getElementById('dt-tz').value);
 
   var startMin = dtDayMin('dt-s-day','dt-s-h','dt-s-m');
   var endMin   = dtDayMin('dt-e-day','dt-e-h','dt-e-m');
@@ -2032,43 +2165,7 @@ function dtCalculate() {
   }
 
   // Timeline
-  var span   = Math.max(actFdp + (actRest !== null ? actRest : 0) + 60, maxFdp + minRest + 60);
-  var tStart = startMin;
-  function pct(m) { return Math.max(0, Math.min(100, (m - tStart) / span * 100)).toFixed(2) + '%'; }
-  function pctW(m) { return Math.max(0, Math.min(100, m / span * 100)).toFixed(2) + '%'; }
-
-  document.getElementById('dt-tl-fdp').style.left  = pct(startMin);
-  document.getElementById('dt-tl-fdp').style.width  = pctW(actFdp);
-  document.getElementById('dt-tl-maxfdp').style.left = pct(startMin);
-  document.getElementById('dt-tl-maxfdp').style.width = pctW(maxFdp);
-
-  if (actRest !== null && restStart !== null) {
-    var re = document.getElementById('dt-tl-rest');
-    var mr = document.getElementById('dt-tl-minrest');
-    re.style.left = pct(restStart); re.style.width = pctW(actRest); re.style.display = '';
-    mr.style.left = pct(restStart); mr.style.width = pctW(minRest); mr.style.display = '';
-  } else {
-    document.getElementById('dt-tl-rest').style.display    = 'none';
-    document.getElementById('dt-tl-minrest').style.display = 'none';
-  }
-
-  // WOCL band on timeline
-  var woclStartMin = ((2*60 - tz*60) % 1440 + 1440) % 1440;
-  var woclEndMin   = ((5*60 - tz*60) % 1440 + 1440) % 1440;
-  var wBand = document.getElementById('dt-tl-wocl');
-  if (woclHit) {
-    wBand.style.left = pct(woclStartMin + (woclStartMin < startMin ? 1440 : 0));
-    wBand.style.width = pctW(3*60);
-    wBand.style.display = '';
-  } else { wBand.style.display = 'none'; }
-
-  // Ticks
-  var ticks = '';
-  for (var i = 0; i <= 4; i++) {
-    var tm = tStart + Math.round(span / 4 * i);
-    ticks += '<span>' + dtFmtUTC(tm) + '</span>';
-  }
-  document.getElementById('dt-tl-ticks').innerHTML = ticks;
+  dtRenderTimeline(startMin, endMin, maxFdp, restStart, restEnd, minRest, tz);
 
   document.getElementById('dt-results-area').style.display = 'block';
   document.getElementById('dt-placeholder').style.display  = 'none';
