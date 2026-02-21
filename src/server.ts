@@ -472,39 +472,55 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
 .ct-no-corr{background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.3);border-radius:10px;
   padding:12px 16px;color:#4ade80;font-size:.9em;font-weight:600;margin-top:12px;text-align:center}
 /* ── Duty Time ── */
-.dt-panel{padding:12px 14px 24px;overflow-y:auto}
-.dt-row{display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap}
-.dt-label{font-size:.76em;font-weight:700;color:var(--dim);width:110px;flex-shrink:0}
-.dt-time-inputs{display:flex;align-items:center;gap:4px}
-.dt-time-box{width:46px;padding:7px 4px;text-align:center;font-size:.95em;font-weight:700;
-  background:var(--surface);border:1.5px solid var(--dim);border-radius:8px;color:var(--text)}
-.dt-time-sep{font-weight:700;color:var(--dim);font-size:1.1em}
-.dt-crew-btns{display:flex;gap:6px}
-.dt-crew-btn{padding:7px 18px;border-radius:8px;font-size:.85em;font-weight:700;border:1.5px solid var(--dim);
-  background:none;color:var(--dim);cursor:pointer;transition:all .15s}
+.dt-wrap{display:flex;flex-direction:column;overflow-y:auto}
+.dt-config{background:var(--card);border-bottom:1px solid var(--dim);padding:10px 14px 8px}
+.dt-section-title{font-size:.68em;font-weight:800;color:var(--dim);letter-spacing:.08em;text-transform:uppercase;margin-bottom:6px}
+.dt-crew-row{display:flex;gap:5px;margin-bottom:8px}
+.dt-crew-btn{flex:1;padding:8px 4px;border-radius:8px;font-size:.78em;font-weight:700;border:1.5px solid var(--dim);background:none;color:var(--dim);cursor:pointer;line-height:1.3;text-align:center}
 .dt-crew-btn.active{border-color:var(--accent);background:var(--accent);color:#fff}
-.dt-toggle-row{display:flex;align-items:center;gap:8px;margin-bottom:10px;padding:0 2px}
-.dt-toggle-label{font-size:.78em;color:var(--text)}
-.dt-toggle{position:relative;display:inline-flex;align-items:center;cursor:pointer}
-.dt-toggle input{opacity:0;width:0;height:0;position:absolute}
-.dt-toggle-track{width:38px;height:21px;background:var(--dim);border-radius:11px;transition:.2s;flex-shrink:0}
-.dt-toggle input:checked+.dt-toggle-track{background:var(--accent)}
-.dt-toggle-thumb{position:absolute;left:3px;top:3px;width:15px;height:15px;background:#fff;border-radius:50%;transition:.2s;pointer-events:none}
-.dt-toggle input:checked~.dt-toggle-thumb{left:20px}
-.dt-divider{border:none;border-top:1px solid var(--dim);margin:14px 0}
-.dt-results{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px}
-.dt-card{background:var(--surface);border-radius:12px;padding:10px 12px}
-.dt-card-label{font-size:.68em;font-weight:700;color:var(--dim);margin-bottom:3px}
-.dt-card-val{font-size:1.25em;font-weight:800;color:var(--accent);line-height:1.1}
-.dt-card-sub{font-size:.68em;color:var(--dim);margin-top:2px}
-.dt-info-box{background:var(--surface);border-radius:12px;padding:10px 14px;margin-bottom:12px}
-.dt-info-row{display:flex;justify-content:space-between;align-items:center;padding:5px 0;font-size:.82em}
-.dt-info-row+.dt-info-row{border-top:1px solid var(--dim)}
-.dt-info-key{color:var(--dim)}
-.dt-info-val{font-weight:700;color:var(--text)}
+.dt-opt-row{display:flex;align-items:center;gap:12px;margin-bottom:6px;flex-wrap:wrap}
+.dt-chk-label{display:flex;align-items:center;gap:5px;font-size:.78em;color:var(--text);cursor:pointer}
+.dt-chk-label input[type=checkbox]{width:15px;height:15px;accent-color:var(--accent);cursor:pointer;flex-shrink:0}
+.dt-tz-select{background:var(--surface);border:1.5px solid var(--dim);border-radius:7px;color:var(--text);font-size:.78em;padding:4px 6px;max-width:160px}
+.dt-mode-row{display:flex;gap:0;margin-bottom:0;border-radius:8px;overflow:hidden;border:1.5px solid var(--dim)}
+.dt-mode-btn{flex:1;padding:7px;font-size:.8em;font-weight:700;border:none;background:none;color:var(--dim);cursor:pointer}
+.dt-mode-btn.active{background:var(--accent);color:#fff}
+.dt-body{padding:10px 14px 4px}
+.dt-field{margin-bottom:10px}
+.dt-field-label{font-size:.72em;font-weight:700;color:var(--dim);margin-bottom:4px}
+.dt-time-row{display:flex;align-items:center;gap:5px;flex-wrap:wrap}
+.dt-date-box{padding:7px 5px;background:var(--surface);border:1.5px solid var(--dim);border-radius:8px;color:var(--text);font-size:.85em;font-weight:600;width:48px;text-align:center}
+.dt-time-box{width:40px;padding:7px 3px;text-align:center;font-size:.92em;font-weight:700;background:var(--surface);border:1.5px solid var(--dim);border-radius:8px;color:var(--text)}
+.dt-sep{font-weight:700;color:var(--dim)}
+.dt-tag{font-size:.68em;color:var(--dim);padding:2px 5px;border:1px solid var(--dim);border-radius:4px;white-space:nowrap}
+.dt-calc-btn{width:100%;padding:12px;border-radius:10px;border:none;background:var(--accent);color:#fff;font-size:1em;font-weight:800;cursor:pointer;margin:8px 0 4px;letter-spacing:.03em}
+.dt-results-wrap{padding:8px 14px 16px}
+.dt-cards{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px}
+.dt-card{background:var(--surface);border-radius:12px;padding:10px 12px;border-left:3px solid var(--dim)}
+.dt-card.ok{border-left-color:#22c55e}.dt-card.warn{border-left-color:#f59e0b}.dt-card.err{border-left-color:#ef4444}
+.dt-card-label{font-size:.63em;font-weight:700;color:var(--dim);margin-bottom:2px}
+.dt-card-actual{font-size:1.25em;font-weight:800;line-height:1.1;color:var(--text)}
+.dt-card-max{font-size:.67em;color:var(--dim);margin-top:2px}
+.dt-card.ok .dt-card-actual{color:#22c55e}.dt-card.warn .dt-card-actual{color:#f59e0b}.dt-card.err .dt-card-actual{color:#ef4444}
+.dt-rest-card{grid-column:1/-1;background:var(--surface);border-radius:12px;padding:10px 12px;border-left:3px solid var(--dim)}
+.dt-rest-card.ok{border-left-color:#22c55e}.dt-rest-card.warn .dt-card-actual{color:#f59e0b}.dt-rest-card.err .dt-card-actual{color:#ef4444}
+.dt-rest-card.ok .dt-card-actual{color:#22c55e}
+.dt-wocl-box{background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.35);border-radius:10px;padding:8px 12px;margin-bottom:8px;font-size:.75em;color:#f59e0b;line-height:1.5}
+.dt-tl-wrap{background:var(--surface);border-radius:10px;padding:10px 12px;margin-bottom:8px}
+.dt-tl-label{font-size:.63em;color:var(--dim);margin-bottom:5px;font-weight:700}
+.dt-tl-bar{position:relative;height:22px;border-radius:4px;background:var(--bg);overflow:hidden}
+.dt-tl-wocl{position:absolute;top:0;height:100%;background:rgba(245,158,11,.2)}
+.dt-tl-fdp{position:absolute;top:0;height:100%;background:rgba(59,130,246,.4);border-radius:4px}
+.dt-tl-maxfdp{position:absolute;top:0;height:100%;border-right:2px dashed rgba(59,130,246,.8)}
+.dt-tl-rest{position:absolute;top:0;height:100%;background:rgba(34,197,94,.4)}
+.dt-tl-minrest{position:absolute;top:0;height:100%;border-right:2px dashed rgba(34,197,94,.8)}
+.dt-tl-ticks{display:flex;justify-content:space-between;font-size:.58em;color:var(--dim);margin-top:3px;padding:0 1px}
+.dt-legend{display:flex;flex-wrap:wrap;gap:8px;margin-top:6px}
+.dt-leg-item{display:flex;align-items:center;gap:4px;font-size:.62em;color:var(--dim)}
+.dt-leg-box{width:11px;height:9px;border-radius:2px;flex-shrink:0}
+.dt-ext-note{font-size:.72em;color:#a78bfa;margin-bottom:6px;padding:0 14px}
+.dt-notice{font-size:.65em;color:var(--dim);text-align:center;padding:6px 0 14px}
 .dt-ok{color:#22c55e}.dt-warn{color:#f59e0b}.dt-err{color:#ef4444}
-.dt-notice{font-size:.68em;color:var(--dim);text-align:center;padding:4px 0 8px}
-.dt-hidden{display:none}
 .wx-row{display:flex;align-items:center;padding:9px 12px;gap:9px}
 .wx-cat{font-size:.67em;font-weight:800;padding:2px 5px;border-radius:4px;
   flex-shrink:0;min-width:38px;text-align:center;letter-spacing:.3px}
@@ -822,107 +838,178 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
 
   <!-- ── ⏱️ Duty Time panel ── -->
   <div id="briefing-duty" class="briefing-panel">
-    <div class="dt-panel">
+    <div class="dt-wrap">
 
-      <!-- FDP Start -->
-      <div class="dt-row">
-        <span class="dt-label">FDP Start (UTC)</span>
-        <div class="dt-time-inputs">
-          <input class="dt-time-box" type="text" id="dt-start-h" placeholder="HH" maxlength="2" inputmode="numeric" oninput="dtAutoCalc()">
-          <span class="dt-time-sep">:</span>
-          <input class="dt-time-box" type="text" id="dt-start-m" placeholder="MM" maxlength="2" inputmode="numeric" oninput="dtAutoCalc()">
+      <!-- Config -->
+      <div class="dt-config">
+        <div class="dt-section-title">機組配置</div>
+        <div class="dt-crew-row">
+          <button class="dt-crew-btn active" data-crew="2" onclick="dtSelectCrew(this)">Single<br>2P</button>
+          <button class="dt-crew-btn" data-crew="3" onclick="dtSelectCrew(this)">Multiple<br>3P</button>
+          <button class="dt-crew-btn" data-crew="4" onclick="dtSelectCrew(this)">Double<br>4P</button>
+        </div>
+        <div class="dt-opt-row">
+          <label class="dt-chk-label" id="dt-c1-row" style="display:none">
+            <input type="checkbox" id="dt-c1"> Class 1 Bunk
+          </label>
+          <label class="dt-chk-label" id="dt-disc-row" style="display:none">
+            <input type="checkbox" id="dt-disc"> PIC Discretion (+2h)
+          </label>
+        </div>
+        <div class="dt-opt-row" style="margin-bottom:4px">
+          <span style="font-size:.72em;color:var(--dim);flex-shrink:0">時區</span>
+          <select class="dt-tz-select" id="dt-tz">
+            <option value="8">Taipei / UTC+8</option>
+            <option value="9">Tokyo / UTC+9</option>
+            <option value="-8">Los Angeles / UTC−8</option>
+            <option value="-7">San Francisco / UTC−7</option>
+            <option value="0">London / UTC+0</option>
+          </select>
         </div>
       </div>
 
-      <!-- Flight Time -->
-      <div class="dt-row">
-        <span class="dt-label">Flight Time</span>
-        <div class="dt-time-inputs">
-          <input class="dt-time-box" type="text" id="dt-ft-h" placeholder="HH" maxlength="2" inputmode="numeric" oninput="dtAutoCalc()">
-          <span class="dt-time-sep">:</span>
-          <input class="dt-time-box" type="text" id="dt-ft-m" placeholder="MM" maxlength="2" inputmode="numeric" oninput="dtAutoCalc()">
+      <!-- Mode -->
+      <div class="dt-body" style="padding-bottom:0">
+        <div class="dt-mode-row">
+          <button class="dt-mode-btn active" id="dt-mode-home" onclick="dtSetMode('home')">🏠 Home Base</button>
+          <button class="dt-mode-btn" id="dt-mode-out" onclick="dtSetMode('out')">✈️ Outstation</button>
         </div>
       </div>
 
-      <!-- Crew Type -->
-      <div class="dt-row">
-        <span class="dt-label">Crew Type</span>
-        <div class="dt-crew-btns">
-          <button class="dt-crew-btn active" data-crew="2" onclick="dtSelectCrew(this)">Single<br><span style="font-size:.75em">2P</span></button>
-          <button class="dt-crew-btn" data-crew="3" onclick="dtSelectCrew(this)">Multiple<br><span style="font-size:.75em">3P</span></button>
-          <button class="dt-crew-btn" data-crew="4" onclick="dtSelectCrew(this)">Double<br><span style="font-size:.75em">4P</span></button>
+      <!-- Inputs -->
+      <div class="dt-body">
+
+        <!-- FDP Start -->
+        <div class="dt-field">
+          <div class="dt-field-label">FDP Start (UTC) — Report Time</div>
+          <div class="dt-time-row">
+            <input class="dt-date-box" type="text" id="dt-s-day" placeholder="DD" maxlength="2" inputmode="numeric">
+            <span class="dt-sep">/</span>
+            <input class="dt-time-box" type="text" id="dt-s-h" placeholder="HH" maxlength="2" inputmode="numeric">
+            <span class="dt-sep">:</span>
+            <input class="dt-time-box" type="text" id="dt-s-m" placeholder="MM" maxlength="2" inputmode="numeric">
+            <span class="dt-tag">UTC</span>
+          </div>
         </div>
-      </div>
 
-      <!-- Class 1 Rest (3P/4P only) -->
-      <div class="dt-toggle-row" id="dt-c1-row" style="display:none">
-        <label class="dt-toggle">
-          <input type="checkbox" id="dt-c1" onchange="dtAutoCalc()">
-          <div class="dt-toggle-track"></div>
-          <div class="dt-toggle-thumb"></div>
-        </label>
-        <span class="dt-toggle-label">Class 1 休息艙 (Bunk)</span>
-      </div>
-
-      <!-- Commander's Discretion (3P only) -->
-      <div class="dt-toggle-row" id="dt-disc-row" style="display:none">
-        <label class="dt-toggle">
-          <input type="checkbox" id="dt-disc" onchange="dtAutoCalc()">
-          <div class="dt-toggle-track"></div>
-          <div class="dt-toggle-thumb"></div>
-        </label>
-        <span class="dt-toggle-label">Commander's Discretion (+2h)</span>
-      </div>
-
-      <!-- Next Duty Report (optional) -->
-      <div class="dt-row">
-        <span class="dt-label">Next Rpt (UTC)<br><span style="font-weight:400;font-size:.85em">選填</span></span>
-        <div class="dt-time-inputs">
-          <input class="dt-time-box" type="text" id="dt-next-h" placeholder="HH" maxlength="2" inputmode="numeric" oninput="dtAutoCalc()">
-          <span class="dt-time-sep">:</span>
-          <input class="dt-time-box" type="text" id="dt-next-m" placeholder="MM" maxlength="2" inputmode="numeric" oninput="dtAutoCalc()">
+        <!-- FDP End -->
+        <div class="dt-field">
+          <div class="dt-field-label">FDP End (UTC) — Block In / Release</div>
+          <div class="dt-time-row">
+            <input class="dt-date-box" type="text" id="dt-e-day" placeholder="DD" maxlength="2" inputmode="numeric">
+            <span class="dt-sep">/</span>
+            <input class="dt-time-box" type="text" id="dt-e-h" placeholder="HH" maxlength="2" inputmode="numeric">
+            <span class="dt-sep">:</span>
+            <input class="dt-time-box" type="text" id="dt-e-m" placeholder="MM" maxlength="2" inputmode="numeric">
+            <span class="dt-tag">UTC</span>
+          </div>
         </div>
-        <label style="display:flex;align-items:center;gap:4px;font-size:.75em;color:var(--dim)">
-          <input type="checkbox" id="dt-next-tomorrow" onchange="dtAutoCalc()"> 次日
-        </label>
-      </div>
 
-      <hr class="dt-divider">
+        <!-- Flight Time -->
+        <div class="dt-field">
+          <div class="dt-field-label">Flight Time (Block Time)</div>
+          <div class="dt-time-row">
+            <input class="dt-time-box" type="text" id="dt-ft-h" placeholder="HH" maxlength="2" inputmode="numeric">
+            <span class="dt-sep">:</span>
+            <input class="dt-time-box" type="text" id="dt-ft-m" placeholder="MM" maxlength="2" inputmode="numeric">
+          </div>
+        </div>
+
+        <!-- Home Base: Next Report -->
+        <div class="dt-field" id="dt-next-section">
+          <div class="dt-field-label">Next Duty Report (UTC) — 選填</div>
+          <div class="dt-time-row">
+            <input class="dt-date-box" type="text" id="dt-n-day" placeholder="DD" maxlength="2" inputmode="numeric">
+            <span class="dt-sep">/</span>
+            <input class="dt-time-box" type="text" id="dt-n-h" placeholder="HH" maxlength="2" inputmode="numeric">
+            <span class="dt-sep">:</span>
+            <input class="dt-time-box" type="text" id="dt-n-m" placeholder="MM" maxlength="2" inputmode="numeric">
+            <span class="dt-tag">UTC</span>
+          </div>
+        </div>
+
+        <!-- Outstation: Hotel Check-in / Check-out -->
+        <div class="dt-field" id="dt-hotel-section" style="display:none">
+          <div class="dt-field-label">Hotel Check-in (UTC)</div>
+          <div class="dt-time-row">
+            <input class="dt-date-box" type="text" id="dt-ci-day" placeholder="DD" maxlength="2" inputmode="numeric">
+            <span class="dt-sep">/</span>
+            <input class="dt-time-box" type="text" id="dt-ci-h" placeholder="HH" maxlength="2" inputmode="numeric">
+            <span class="dt-sep">:</span>
+            <input class="dt-time-box" type="text" id="dt-ci-m" placeholder="MM" maxlength="2" inputmode="numeric">
+            <span class="dt-tag">UTC</span>
+          </div>
+          <div class="dt-field-label" style="margin-top:8px">Hotel Check-out (UTC)</div>
+          <div class="dt-time-row">
+            <input class="dt-date-box" type="text" id="dt-co-day" placeholder="DD" maxlength="2" inputmode="numeric">
+            <span class="dt-sep">/</span>
+            <input class="dt-time-box" type="text" id="dt-co-h" placeholder="HH" maxlength="2" inputmode="numeric">
+            <span class="dt-sep">:</span>
+            <input class="dt-time-box" type="text" id="dt-co-m" placeholder="MM" maxlength="2" inputmode="numeric">
+            <span class="dt-tag">UTC</span>
+          </div>
+        </div>
+
+        <button class="dt-calc-btn" onclick="dtCalculate()">計算</button>
+      </div>
 
       <!-- Results -->
       <div id="dt-results-area" style="display:none">
-        <div class="dt-results">
-          <div class="dt-card">
-            <div class="dt-card-label">Max FDP</div>
-            <div class="dt-card-val" id="dt-r-maxfdp">—</div>
+        <div id="dt-ext-note" class="dt-ext-note" style="display:none"></div>
+        <div class="dt-results-wrap">
+          <div class="dt-cards">
+            <div class="dt-card" id="dt-card-fdp">
+              <div class="dt-card-label">Actual FDP</div>
+              <div class="dt-card-actual" id="dt-r-fdp">—</div>
+              <div class="dt-card-max" id="dt-r-fdp-max"></div>
+            </div>
+            <div class="dt-card" id="dt-card-ft">
+              <div class="dt-card-label">Flight Time</div>
+              <div class="dt-card-actual" id="dt-r-ft">—</div>
+              <div class="dt-card-max" id="dt-r-ft-max"></div>
+            </div>
+            <div class="dt-rest-card" id="dt-card-rest">
+              <div class="dt-card-label">Actual Rest</div>
+              <div class="dt-card-actual" id="dt-r-rest">—</div>
+              <div class="dt-card-max" id="dt-r-rest-min"></div>
+            </div>
           </div>
-          <div class="dt-card">
-            <div class="dt-card-label">Max Flight Time</div>
-            <div class="dt-card-val" id="dt-r-maxft">—</div>
+
+          <!-- WOCL -->
+          <div id="dt-wocl-box" class="dt-wocl-box" style="display:none">
+            <strong>⚠ WOCL (02:00–05:00 LT)</strong><br>
+            <span id="dt-wocl-msg"></span>
           </div>
-          <div class="dt-card" style="grid-column:1/-1">
-            <div class="dt-card-label">Latest FDP End (UTC)</div>
-            <div class="dt-card-val" id="dt-r-end" style="font-size:1.6em">—</div>
-            <div class="dt-card-sub" id="dt-r-end-sub"></div>
+
+          <!-- Timeline -->
+          <div class="dt-tl-wrap">
+            <div class="dt-tl-label">時間軸</div>
+            <div class="dt-tl-bar" id="dt-tl-bar">
+              <div class="dt-tl-wocl" id="dt-tl-wocl" style="display:none"></div>
+              <div class="dt-tl-fdp"  id="dt-tl-fdp"></div>
+              <div class="dt-tl-maxfdp" id="dt-tl-maxfdp"></div>
+              <div class="dt-tl-rest" id="dt-tl-rest" style="display:none"></div>
+              <div class="dt-tl-minrest" id="dt-tl-minrest" style="display:none"></div>
+            </div>
+            <div class="dt-tl-ticks" id="dt-tl-ticks"></div>
+            <div class="dt-legend">
+              <div class="dt-leg-item"><div class="dt-leg-box" style="background:rgba(59,130,246,.4)"></div>Actual FDP</div>
+              <div class="dt-leg-item"><div class="dt-leg-box" style="border:2px dashed rgba(59,130,246,.8);background:none"></div>Max FDP</div>
+              <div class="dt-leg-item"><div class="dt-leg-box" style="background:rgba(34,197,94,.4)"></div>Actual Rest</div>
+              <div class="dt-leg-item"><div class="dt-leg-box" style="border:2px dashed rgba(34,197,94,.8);background:none"></div>Min Rest</div>
+              <div class="dt-leg-item"><div class="dt-leg-box" style="background:rgba(245,158,11,.2)"></div>WOCL</div>
+            </div>
           </div>
-        </div>
-        <div class="dt-info-box">
-          <div class="dt-info-row">
-            <span class="dt-info-key">Min Rest Required</span>
-            <span class="dt-info-val" id="dt-r-minrest">—</span>
-          </div>
-          <div class="dt-info-row" id="dt-r-actualrest-row" style="display:none">
-            <span class="dt-info-key">Actual Rest</span>
-            <span class="dt-info-val" id="dt-r-actualrest">—</span>
-          </div>
-          <div class="dt-info-row" id="dt-r-nextrpt-row" style="display:none">
-            <span class="dt-info-key">Next Report</span>
-            <span class="dt-info-val" id="dt-r-nextrpt">—</span>
-          </div>
+
+          <div class="dt-notice">⚠ Non-operational reference only · CAR 07-02A · 請以公司手冊為準</div>
         </div>
       </div>
 
-      <div class="dt-notice">⚠ Non-operational reference only · CAR 07-02A · 請以公司手冊為準</div>
+      <!-- Placeholder before calc -->
+      <div id="dt-placeholder" style="padding:32px 14px;text-align:center;color:var(--dim);font-size:.82em">
+        輸入 FDP 時間後按「計算」
+      </div>
+
     </div>
   </div>
 
@@ -1748,80 +1835,200 @@ function fetchWxDetail(icao, name) {
 }
 
 // ── Duty Time Calculator ──────────────────────────────────────────────────────
-var DT_MAX_FDP   = {2: 14*60, 3: 18*60, 4: 24*60};
-var DT_MAX_FT    = {2:{noC1:10*60,c1:10*60}, 3:{noC1:12*60,c1:16*60}, 4:{noC1:12*60,c1:18*60}};
+var DT_MAX_FDP = {2:14*60, 3:18*60, 4:24*60};
+var DT_MAX_FT  = {2:{noC1:10*60,c1:10*60}, 3:{noC1:12*60,c1:16*60}, 4:{noC1:12*60,c1:18*60}};
+var dtMode = 'home';
 
 function dtMinRest(crew, ftMin) {
   var ft = ftMin / 60;
-  if (crew === 2) return ft <= 8 ? 10*60 : 18*60;          // max FT 10h
+  if (crew === 2) return ft <= 8 ? 10*60 : 18*60;
   if (crew === 3) return ft <= 8 ? 10*60 : ft <= 12 ? 18*60 : 24*60;
-  /* crew===4 */  return ft <= 8 ? 10*60 : ft <= 16 ? 18*60 : 22*60;
+  return ft <= 8 ? 10*60 : ft <= 16 ? 18*60 : 22*60;
 }
 
-function dtFmtHM(totalMin) {
-  var h = Math.floor(totalMin / 60), m = totalMin % 60;
-  return h + 'h ' + (m < 10 ? '0' : '') + m + 'm';
+function dtFmtHM(m) {
+  if (m < 0) m = 0;
+  var h = Math.floor(m/60); var mm = m%60;
+  return h + 'h ' + (mm<10?'0':'') + mm + 'm';
 }
 
-function dtFmtUTC(totalMin) {
-  var t = ((totalMin % 1440) + 1440) % 1440;
-  var h = Math.floor(t / 60), m = t % 60;
-  return (h < 10 ? '0' : '') + h + ':' + (m < 10 ? '0' : '') + m + 'Z';
+function dtFmtUTC(m) {
+  var t = ((m%1440)+1440)%1440;
+  var h = Math.floor(t/60); var mm = t%60;
+  return (h<10?'0':'') + h + ':' + (mm<10?'0':'') + mm + 'Z';
+}
+
+function dtDayMin(dayId, hId, mId) {
+  var d = parseInt(document.getElementById(dayId).value);
+  var h = parseInt(document.getElementById(hId).value);
+  var m = parseInt(document.getElementById(mId).value);
+  if (isNaN(h) || isNaN(m)) return null;
+  var base = isNaN(d) ? 0 : d * 1440;
+  return base + h*60 + m;
 }
 
 function dtSelectCrew(btn) {
-  document.querySelectorAll('.dt-crew-btn').forEach(function(b){ b.classList.remove('active'); });
+  document.querySelectorAll('.dt-crew-btn').forEach(function(b){b.classList.remove('active');});
   btn.classList.add('active');
   var crew = parseInt(btn.dataset.crew);
   document.getElementById('dt-c1-row').style.display   = crew >= 3 ? 'flex' : 'none';
   document.getElementById('dt-disc-row').style.display = crew === 3 ? 'flex' : 'none';
   if (crew !== 3) document.getElementById('dt-disc').checked = false;
   if (crew < 3)   document.getElementById('dt-c1').checked  = false;
-  dtAutoCalc();
 }
 
-function dtAutoCalc() {
-  var startH = parseInt(document.getElementById('dt-start-h').value);
-  var startM = parseInt(document.getElementById('dt-start-m').value);
-  if (isNaN(startH) || isNaN(startM)) { document.getElementById('dt-results-area').style.display='none'; return; }
+function dtSetMode(mode) {
+  dtMode = mode;
+  document.getElementById('dt-mode-home').classList.toggle('active', mode==='home');
+  document.getElementById('dt-mode-out').classList.toggle('active',  mode==='out');
+  document.getElementById('dt-next-section').style.display  = mode==='home' ? 'block' : 'none';
+  document.getElementById('dt-hotel-section').style.display = mode==='out'  ? 'block' : 'none';
+}
 
-  var crew    = parseInt(document.querySelector('.dt-crew-btn.active').dataset.crew);
-  var hasC1   = document.getElementById('dt-c1').checked;
-  var disc    = crew === 3 && document.getElementById('dt-disc').checked;
-  var ftH     = parseInt(document.getElementById('dt-ft-h').value) || 0;
-  var ftM     = parseInt(document.getElementById('dt-ft-m').value) || 0;
-  var nextH   = document.getElementById('dt-next-h').value;
-  var nextM   = document.getElementById('dt-next-m').value;
-  var nextTmr = document.getElementById('dt-next-tomorrow').checked;
+function dtCardState(cardId, ok) {
+  var el = document.getElementById(cardId);
+  el.classList.remove('ok','warn','err');
+  el.classList.add(ok === true ? 'ok' : ok === false ? 'err' : '');
+}
 
-  var startMin = startH * 60 + startM;
-  var ftMin    = ftH * 60 + ftM;
-  var maxFdp   = DT_MAX_FDP[crew] + (disc ? 2*60 : 0);
-  var maxFt    = hasC1 ? DT_MAX_FT[crew].c1 : DT_MAX_FT[crew].noC1;
-  var minRest  = dtMinRest(crew, ftMin);
-  var fdpEndMin = startMin + maxFdp;
+function dtWoclCheck(startMin, endMin, tzOffset) {
+  // WOCL = 02:00–05:00 local = (02:00 - tzOffset) UTC
+  var woclStart = (2*60 - tzOffset*60 + 1440*3) % 1440;
+  var woclEnd   = (5*60 - tzOffset*60 + 1440*3) % 1440;
+  // Check if FDP window overlaps WOCL (simple daily check)
+  var s = startMin % 1440, e = endMin % 1440;
+  function overlaps(a1,a2,b1,b2) {
+    if (b1 < b2) return a1 < b2 && a2 > b1;
+    return a1 < b2 || a2 > b1; // wraps midnight
+  }
+  if (woclStart < woclEnd) return overlaps(s, e, woclStart, woclEnd);
+  return s < woclEnd || e > woclStart;
+}
 
-  document.getElementById('dt-r-maxfdp').textContent  = dtFmtHM(maxFdp);
-  document.getElementById('dt-r-maxft').textContent   = dtFmtHM(maxFt);
-  document.getElementById('dt-r-end').textContent     = dtFmtUTC(fdpEndMin);
-  document.getElementById('dt-r-end-sub').textContent = fdpEndMin >= 1440 ? '(+1 day)' : '';
-  document.getElementById('dt-r-minrest').textContent = dtFmtHM(minRest);
+function dtCalculate() {
+  var crew  = parseInt(document.querySelector('.dt-crew-btn.active').dataset.crew);
+  var hasC1 = document.getElementById('dt-c1').checked;
+  var disc  = crew===3 && document.getElementById('dt-disc').checked;
+  var tz    = parseFloat(document.getElementById('dt-tz').value);
 
-  // Optional: check actual rest
-  var hasNext = nextH !== '' && nextM !== '';
-  document.getElementById('dt-r-actualrest-row').style.display = hasNext ? 'flex' : 'none';
-  document.getElementById('dt-r-nextrpt-row').style.display    = hasNext ? 'flex' : 'none';
-  if (hasNext) {
-    var nextMin = parseInt(nextH)*60 + parseInt(nextM) + (nextTmr ? 1440 : 0);
-    var actualRest = nextMin - fdpEndMin;
-    var restOk     = actualRest >= minRest;
-    var restEl     = document.getElementById('dt-r-actualrest');
-    restEl.textContent = dtFmtHM(actualRest) + (restOk ? ' ✓' : ' ✗');
-    restEl.className = 'dt-info-val ' + (restOk ? 'dt-ok' : 'dt-err');
-    document.getElementById('dt-r-nextrpt').textContent = dtFmtUTC(nextMin);
+  var startMin = dtDayMin('dt-s-day','dt-s-h','dt-s-m');
+  var endMin   = dtDayMin('dt-e-day','dt-e-h','dt-e-m');
+  var ftMin    = (parseInt(document.getElementById('dt-ft-h').value)||0)*60 +
+                 (parseInt(document.getElementById('dt-ft-m').value)||0);
+
+  if (startMin === null || endMin === null) {
+    alert('請輸入 FDP Start 和 FDP End 時間');
+    return;
   }
 
+  // If end < start (crossed midnight), add 1 day
+  if (endMin <= startMin) endMin += 1440;
+
+  var maxFdp  = DT_MAX_FDP[crew] + (disc ? 2*60 : 0);
+  var maxFt   = hasC1 ? DT_MAX_FT[crew].c1 : DT_MAX_FT[crew].noC1;
+  var actFdp  = endMin - startMin;
+  var minRest = dtMinRest(crew, ftMin);
+
+  // Rest calculation
+  var restStart = null, restEnd = null, actRest = null;
+  if (dtMode === 'home') {
+    var nxtMin = dtDayMin('dt-n-day','dt-n-h','dt-n-m');
+    if (nxtMin !== null) {
+      restStart = endMin; restEnd = nxtMin;
+      if (restEnd <= restStart) restEnd += 1440;
+      actRest = restEnd - restStart;
+    }
+  } else {
+    var ciMin = dtDayMin('dt-ci-day','dt-ci-h','dt-ci-m');
+    var coMin = dtDayMin('dt-co-day','dt-co-h','dt-co-m');
+    if (ciMin !== null && coMin !== null) {
+      restStart = ciMin; restEnd = coMin;
+      if (restEnd <= restStart) restEnd += 1440;
+      actRest = restEnd - restStart;
+    }
+  }
+
+  // FDP card
+  var fdpOk = actFdp <= maxFdp;
+  document.getElementById('dt-r-fdp').textContent     = dtFmtHM(actFdp);
+  document.getElementById('dt-r-fdp-max').textContent = 'Max: ' + dtFmtHM(maxFdp) + (disc ? ' (incl. PIC disc.)' : '');
+  dtCardState('dt-card-fdp', fdpOk);
+
+  // FT card
+  var ftOk = ftMin === 0 ? null : ftMin <= maxFt;
+  document.getElementById('dt-r-ft').textContent     = ftMin > 0 ? dtFmtHM(ftMin) : '—';
+  document.getElementById('dt-r-ft-max').textContent = 'Max: ' + dtFmtHM(maxFt) + (hasC1 ? ' (C1)' : '');
+  dtCardState('dt-card-ft', ftOk);
+
+  // Rest card
+  if (actRest !== null) {
+    var restOk = actRest >= minRest;
+    document.getElementById('dt-r-rest').textContent     = dtFmtHM(actRest) + (restOk ? ' ✓' : ' ✗');
+    document.getElementById('dt-r-rest-min').textContent = 'Min: ' + dtFmtHM(minRest);
+    dtCardState('dt-card-rest', restOk);
+    document.getElementById('dt-card-rest').style.display = '';
+  } else {
+    document.getElementById('dt-r-rest').textContent     = '—';
+    document.getElementById('dt-r-rest-min').textContent = 'Min required: ' + dtFmtHM(minRest);
+    dtCardState('dt-card-rest', null);
+  }
+
+  // Ext note
+  var extNote = document.getElementById('dt-ext-note');
+  if (disc) { extNote.textContent = '🟣 PIC Discretion applied: +2h to Max FDP'; extNote.style.display='block'; }
+  else extNote.style.display = 'none';
+
+  // WOCL
+  var woclHit = dtWoclCheck(startMin, endMin, tz);
+  var woclBox = document.getElementById('dt-wocl-box');
+  if (woclHit) {
+    document.getElementById('dt-wocl-msg').textContent = 'FDP 觸碰 WOCL 時段。連續2天需34h休息，連續3天需54h休息。例外：每次WOCL後有14h休息則免除。';
+    woclBox.style.display = 'block';
+  } else {
+    woclBox.style.display = 'none';
+  }
+
+  // Timeline
+  var span   = Math.max(actFdp + (actRest !== null ? actRest : 0) + 60, maxFdp + minRest + 60);
+  var tStart = startMin;
+  function pct(m) { return Math.max(0, Math.min(100, (m - tStart) / span * 100)).toFixed(2) + '%'; }
+  function pctW(m) { return Math.max(0, Math.min(100, m / span * 100)).toFixed(2) + '%'; }
+
+  document.getElementById('dt-tl-fdp').style.left  = pct(startMin);
+  document.getElementById('dt-tl-fdp').style.width  = pctW(actFdp);
+  document.getElementById('dt-tl-maxfdp').style.left = pct(startMin);
+  document.getElementById('dt-tl-maxfdp').style.width = pctW(maxFdp);
+
+  if (actRest !== null && restStart !== null) {
+    var re = document.getElementById('dt-tl-rest');
+    var mr = document.getElementById('dt-tl-minrest');
+    re.style.left = pct(restStart); re.style.width = pctW(actRest); re.style.display = '';
+    mr.style.left = pct(restStart); mr.style.width = pctW(minRest); mr.style.display = '';
+  } else {
+    document.getElementById('dt-tl-rest').style.display    = 'none';
+    document.getElementById('dt-tl-minrest').style.display = 'none';
+  }
+
+  // WOCL band on timeline
+  var woclStartMin = ((2*60 - tz*60) % 1440 + 1440) % 1440;
+  var woclEndMin   = ((5*60 - tz*60) % 1440 + 1440) % 1440;
+  var wBand = document.getElementById('dt-tl-wocl');
+  if (woclHit) {
+    wBand.style.left = pct(woclStartMin + (woclStartMin < startMin ? 1440 : 0));
+    wBand.style.width = pctW(3*60);
+    wBand.style.display = '';
+  } else { wBand.style.display = 'none'; }
+
+  // Ticks
+  var ticks = '';
+  for (var i = 0; i <= 4; i++) {
+    var tm = tStart + Math.round(span / 4 * i);
+    ticks += '<span>' + dtFmtUTC(tm) + '</span>';
+  }
+  document.getElementById('dt-tl-ticks').innerHTML = ticks;
+
   document.getElementById('dt-results-area').style.display = 'block';
+  document.getElementById('dt-placeholder').style.display  = 'none';
 }
 
 // ── Boot ─────────────────────────────────────────────────────────────────────
