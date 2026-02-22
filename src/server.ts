@@ -1185,7 +1185,7 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
   </button>
   <button class="tab-btn" id="tabBtn-theme" onclick="toggleTheme()">
     <span class="tab-btn-icon" id="theme-icon">☀️</span><span id="theme-label">日間</span>
-    <span style="font-size:.55em;color:var(--dim);line-height:1;opacity:.7">V3.0</span>
+    <span style="font-size:.55em;color:var(--dim);line-height:1;opacity:.7">V3.001</span>
   </button>
 </div>
 
@@ -2037,10 +2037,13 @@ function dtRenderTimeline(startMin, endMin, maxFdp, restStart, restEnd, minRest,
     : startMin + maxFdp + minRest + 60;
   var span = spanEnd - startMin;
 
-  function pL(m)   { return (Math.max(0,Math.min(100,(m-startMin)/span*100))).toFixed(2)+'%'; }
-  function pW(dur) { return (Math.max(0,Math.min(100,dur/span*100))).toFixed(2)+'%'; }
+  // Use pixel-based positioning to avoid % issues with nested absolute containers
+  var barsEl = document.getElementById('dt-tl2-bars');
+  var W = barsEl.offsetWidth || 320;
+  function px(m)   { return Math.max(0, Math.min(W, (m-startMin)/span*W)).toFixed(1)+'px'; }
+  function pw(dur) { return Math.max(0, Math.min(W, dur/span*W)).toFixed(1)+'px'; }
   function setSeg(id, lm, wm) {
-    var el=document.getElementById(id); el.style.left=pL(lm); el.style.width=pW(wm);
+    var el=document.getElementById(id); el.style.left=px(lm); el.style.width=pw(wm);
   }
 
   // Segments
@@ -2059,24 +2062,24 @@ function dtRenderTimeline(startMin, endMin, maxFdp, restStart, restEnd, minRest,
   }
 
   // Vlines
-  document.getElementById('dt-tl2-vl-s').style.left = pL(startMin);
-  document.getElementById('dt-tl2-vl-e').style.left = pL(endMin);
+  document.getElementById('dt-tl2-vl-s').style.left = px(startMin);
+  document.getElementById('dt-tl2-vl-e').style.left = px(endMin);
   if (restEnd !== null) {
-    document.getElementById('dt-tl2-vl-n').style.left = pL(restEnd);
+    document.getElementById('dt-tl2-vl-n').style.left = px(restEnd);
     document.getElementById('dt-tl2-vl-n').style.display = '';
   } else {
     document.getElementById('dt-tl2-vl-n').style.display = 'none';
   }
 
   // WOCL band — find occurrence near startMin (handles absolute minutes with day offset)
-  var woclTimeOfDay = ((2*60 - tz*60) % 1440 + 1440) % 1440; // UTC time of 02:00 local
+  var woclTimeOfDay = ((2*60 - tz*60) % 1440 + 1440) % 1440;
   var startDay = Math.floor(startMin / 1440);
   var firstWoclAbs = (startDay - 1) * 1440 + woclTimeOfDay;
   var wBand = document.getElementById('dt-tl2-wocl'), woclShown = false, woclStart_abs = 0;
   for (var d=0; d<4; d++) {
     var ws = firstWoclAbs + d*1440, we = ws + 3*60;
     if (ws < spanEnd && we > startMin) {
-      wBand.style.left = pL(ws); wBand.style.width = pW(3*60);
+      wBand.style.left = px(ws); wBand.style.width = pw(3*60);
       wBand.style.height = '100%'; wBand.style.display = '';
       woclStart_abs = ws; woclShown = true; break;
     }
@@ -2089,15 +2092,15 @@ function dtRenderTimeline(startMin, endMin, maxFdp, restStart, restEnd, minRest,
     return (h<10?'0':'')+h+':'+(mm<10?'0':'')+mm+'Z';
   }
   var html = '';
-  html += '<div class="dt-tl2-tick" style="left:'+pL(startMin)+'">Start<br>'+fmtUTC(startMin)+'</div>';
-  html += '<div class="dt-tl2-tick" style="left:'+pL(endMin)+'">Rst Start<br>(FDP End)</div>';
+  html += '<div class="dt-tl2-tick" style="left:'+px(startMin)+'">Start<br>'+fmtUTC(startMin)+'</div>';
+  html += '<div class="dt-tl2-tick" style="left:'+px(endMin)+'">Rst Start<br>(FDP End)</div>';
   if (woclShown) {
     var woclMid = woclStart_abs + 90;
     if (woclMid > startMin && woclMid < spanEnd)
-      html += '<div class="dt-tl2-tick" style="left:'+pL(woclMid)+'">WOCL</div>';
+      html += '<div class="dt-tl2-tick" style="left:'+px(woclMid)+'">WOCL</div>';
   }
   if (restEnd !== null)
-    html += '<div class="dt-tl2-tick" style="left:'+pL(restEnd)+'">Next Rpt<br>'+fmtUTC(restEnd)+'</div>';
+    html += '<div class="dt-tl2-tick" style="left:'+px(restEnd)+'">Next Rpt<br>'+fmtUTC(restEnd)+'</div>';
   document.getElementById('dt-tl2-ticks').innerHTML = html;
 }
 
