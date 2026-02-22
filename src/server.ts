@@ -1185,7 +1185,7 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
   </button>
   <button class="tab-btn" id="tabBtn-theme" onclick="toggleTheme()">
     <span class="tab-btn-icon" id="theme-icon">☀️</span><span id="theme-label">日間</span>
-    <span style="font-size:.55em;color:var(--dim);line-height:1;opacity:.7">V3.001</span>
+    <span style="font-size:.55em;color:var(--dim);line-height:1;opacity:.7">V3.002</span>
   </button>
 </div>
 
@@ -2289,8 +2289,9 @@ function dtCalculate() {
     woclBox.style.display = 'none';
   }
 
-  // Timeline
-  dtRenderTimeline(startMin, endMin, maxFdp, restStart, restEnd, minRest, tz);
+  // Timeline — defer one frame so display:block has been laid out before measuring offsetWidth
+  var _s=startMin,_e=endMin,_mf=maxFdp,_rs=restStart,_re=restEnd,_mr=minRest,_tz=tz;
+  requestAnimationFrame(function(){ dtRenderTimeline(_s,_e,_mf,_rs,_re,_mr,_tz); });
 }
 
 // ── Boot ─────────────────────────────────────────────────────────────────────
