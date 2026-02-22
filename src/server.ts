@@ -517,8 +517,8 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
 .dt-wocl-box{background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.35);border-radius:10px;padding:8px 12px;margin-bottom:8px;font-size:.75em;color:#f59e0b;line-height:1.5}
 .dt-tl2{background:var(--surface);border-radius:10px;padding:12px;margin-bottom:8px;overflow-x:auto}
 .dt-tl2-title{font-size:.63em;font-weight:700;color:var(--dim);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px}
-.dt-tl2-bars{position:relative;min-width:280px;padding-bottom:2px}
-.dt-tl2-track{position:relative;height:28px;margin-bottom:3px}
+.dt-tl2-bars{position:relative;min-width:280px;width:100%;padding-bottom:2px;box-sizing:border-box}
+.dt-tl2-track{position:relative;height:28px;margin-bottom:3px;width:100%}
 .dt-tl2-track-sm{position:relative;height:11px;margin-bottom:3px}
 .dt-tl2-seg{position:absolute;top:0;height:100%;border-radius:4px;display:flex;align-items:center;justify-content:center;overflow:hidden;min-width:4px}
 .dt-tl2-lbl{font-size:.67em;font-weight:700;color:#fff;padding:0 6px;white-space:nowrap;text-shadow:0 1px 2px rgba(0,0,0,.5);pointer-events:none}
@@ -2068,15 +2068,17 @@ function dtRenderTimeline(startMin, endMin, maxFdp, restStart, restEnd, minRest,
     document.getElementById('dt-tl2-vl-n').style.display = 'none';
   }
 
-  // WOCL band — find first occurrence within span
-  var woclBase = ((2*60 - tz*60) % 1440 + 1440) % 1440;
-  var wBand = document.getElementById('dt-tl2-wocl'), woclShown = false;
-  for (var d=0; d<3; d++) {
-    var ws = woclBase + d*1440, we = ws + 3*60;
+  // WOCL band — find occurrence near startMin (handles absolute minutes with day offset)
+  var woclTimeOfDay = ((2*60 - tz*60) % 1440 + 1440) % 1440; // UTC time of 02:00 local
+  var startDay = Math.floor(startMin / 1440);
+  var firstWoclAbs = (startDay - 1) * 1440 + woclTimeOfDay;
+  var wBand = document.getElementById('dt-tl2-wocl'), woclShown = false, woclStart_abs = 0;
+  for (var d=0; d<4; d++) {
+    var ws = firstWoclAbs + d*1440, we = ws + 3*60;
     if (ws < spanEnd && we > startMin) {
       wBand.style.left = pL(ws); wBand.style.width = pW(3*60);
       wBand.style.height = '100%'; wBand.style.display = '';
-      woclShown = true; break;
+      woclStart_abs = ws; woclShown = true; break;
     }
   }
   if (!woclShown) wBand.style.display = 'none';
@@ -2086,16 +2088,11 @@ function dtRenderTimeline(startMin, endMin, maxFdp, restStart, restEnd, minRest,
     var t=((m%1440)+1440)%1440, h=Math.floor(t/60), mm=t%60;
     return (h<10?'0':'')+h+':'+(mm<10?'0':'')+mm+'Z';
   }
-  function fmtDayUTC(m) {
-    var day = Math.floor((startMin + (m - startMin)) / 1440);
-    var now = new Date(); var d = new Date(now.getFullYear(), now.getMonth(), now.getDate() + day);
-    return (d.getDate()<10?'0':'')+d.getDate()+'/'+(d.getMonth()+1<10?'0':'')+(d.getMonth()+1);
-  }
   var html = '';
   html += '<div class="dt-tl2-tick" style="left:'+pL(startMin)+'">Start<br>'+fmtUTC(startMin)+'</div>';
   html += '<div class="dt-tl2-tick" style="left:'+pL(endMin)+'">Rst Start<br>(FDP End)</div>';
   if (woclShown) {
-    var woclMid = woclBase + (woclBase < startMin ? 1440 : 0) + 90;
+    var woclMid = woclStart_abs + 90;
     if (woclMid > startMin && woclMid < spanEnd)
       html += '<div class="dt-tl2-tick" style="left:'+pL(woclMid)+'">WOCL</div>';
   }
