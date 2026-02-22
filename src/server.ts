@@ -1185,7 +1185,7 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
   </button>
   <button class="tab-btn" id="tabBtn-theme" onclick="toggleTheme()">
     <span class="tab-btn-icon" id="theme-icon">☀️</span><span id="theme-label">日間</span>
-    <span style="font-size:.55em;color:var(--dim);line-height:1;opacity:.7">V3.002</span>
+    <span style="font-size:.55em;color:var(--dim);line-height:1;opacity:.7">V3.003</span>
   </button>
 </div>
 
@@ -2039,7 +2039,7 @@ function dtRenderTimeline(startMin, endMin, maxFdp, restStart, restEnd, minRest,
 
   // Use pixel-based positioning to avoid % issues with nested absolute containers
   var barsEl = document.getElementById('dt-tl2-bars');
-  var W = barsEl.offsetWidth || 320;
+  var W = Math.max(barsEl.offsetWidth, barsEl.parentElement ? barsEl.parentElement.offsetWidth - 24 : 0, 280);
   function px(m)   { return Math.max(0, Math.min(W, (m-startMin)/span*W)).toFixed(1)+'px'; }
   function pw(dur) { return Math.max(0, Math.min(W, dur/span*W)).toFixed(1)+'px'; }
   function setSeg(id, lm, wm) {
@@ -2289,9 +2289,11 @@ function dtCalculate() {
     woclBox.style.display = 'none';
   }
 
-  // Timeline — defer one frame so display:block has been laid out before measuring offsetWidth
+  // Timeline — defer 2 frames so layout is fully computed before measuring offsetWidth
   var _s=startMin,_e=endMin,_mf=maxFdp,_rs=restStart,_re=restEnd,_mr=minRest,_tz=tz;
-  requestAnimationFrame(function(){ dtRenderTimeline(_s,_e,_mf,_rs,_re,_mr,_tz); });
+  requestAnimationFrame(function(){
+    requestAnimationFrame(function(){ dtRenderTimeline(_s,_e,_mf,_rs,_re,_mr,_tz); });
+  });
 }
 
 // ── Boot ─────────────────────────────────────────────────────────────────────
