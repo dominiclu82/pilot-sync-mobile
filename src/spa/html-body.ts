@@ -502,18 +502,18 @@ export function getSpaHtmlBody(): string {
             <div class="dt-tl2-title">Visual Timeline</div>
             <div id="dt-tl2-bars" style="position:relative;width:100%;height:156px">
               <!-- WOCL overlay -->
-              <div id="dt-bar-wocl" style="position:absolute;top:0;bottom:0;background:rgba(167,139,250,.22);border-radius:4px;display:none;z-index:1"></div>
+              <div id="dt-bar-wocl" style="position:absolute;top:0;bottom:0;background:rgba(251,191,36,.18);border-radius:4px;display:none;z-index:1"></div>
               <!-- Bars (z-index:2) -->
-              <div id="dt-bar-fdp" style="position:absolute;top:0;height:28px;background:#22c55e;border-radius:4px;display:flex;align-items:center;overflow:hidden;z-index:2">
+              <div id="dt-bar-fdp" style="position:absolute;top:0;height:28px;background:#0ea5e9;border-radius:4px;display:flex;align-items:center;overflow:hidden;z-index:2">
                 <span id="dt-lbl-fdp" style="font-size:.65em;font-weight:700;color:#fff;white-space:nowrap;padding:0 6px"></span>
               </div>
-              <div id="dt-bar-maxfdp" style="position:absolute;top:34px;height:28px;background:repeating-linear-gradient(-45deg,#3b82f6 0,#3b82f6 7px,#93c5fd 7px,#93c5fd 14px);border-radius:4px;display:flex;align-items:center;overflow:hidden;z-index:2">
+              <div id="dt-bar-maxfdp" style="position:absolute;top:34px;height:28px;background:repeating-linear-gradient(-45deg,#a855f7 0,#a855f7 7px,#c084fc 7px,#c084fc 14px);border-radius:4px;display:flex;align-items:center;overflow:hidden;z-index:2">
                 <span id="dt-lbl-maxfdp" style="font-size:.65em;font-weight:700;color:#fff;white-space:nowrap;padding:0 6px"></span>
               </div>
-              <div id="dt-bar-minrest" style="position:absolute;top:68px;height:28px;background:repeating-linear-gradient(-45deg,#f59e0b 0,#f59e0b 7px,#fcd34d 7px,#fcd34d 14px);border-radius:4px;display:flex;align-items:center;overflow:hidden;z-index:2">
+              <div id="dt-bar-minrest" style="position:absolute;top:68px;height:28px;background:repeating-linear-gradient(-45deg,#f97316 0,#f97316 7px,#fdba74 7px,#fdba74 14px);border-radius:4px;display:flex;align-items:center;overflow:hidden;z-index:2">
                 <span id="dt-lbl-minrest" style="font-size:.65em;font-weight:700;color:#fff;white-space:nowrap;padding:0 6px"></span>
               </div>
-              <div id="dt-bar-rest" style="position:absolute;top:102px;height:28px;background:#ef4444;border-radius:4px;display:flex;align-items:center;overflow:hidden;display:none;z-index:2">
+              <div id="dt-bar-rest" style="position:absolute;top:102px;height:28px;background:#64748b;border-radius:4px;display:flex;align-items:center;overflow:hidden;display:none;z-index:2">
                 <span id="dt-lbl-rest" style="font-size:.65em;font-weight:700;color:#fff;white-space:nowrap;padding:0 6px"></span>
               </div>
               <!-- Vertical lines (z-index:3) -->
@@ -524,11 +524,11 @@ export function getSpaHtmlBody(): string {
             <!-- Tick labels (positioned absolutely inside relative container) -->
             <div id="dt-tl2-ticks" style="position:relative;height:40px;margin-top:4px"></div>
             <div class="dt-legend">
-              <div class="dt-leg-item"><div class="dt-leg-box" style="background:#22c55e"></div>FDP</div>
-              <div class="dt-leg-item"><div class="dt-leg-box" style="background:rgba(167,139,250,.35)"></div>WOCL (02-05)</div>
-              <div class="dt-leg-item"><div class="dt-leg-box" style="background:repeating-linear-gradient(-45deg,#3b82f6 0,#3b82f6 4px,#93c5fd 4px,#93c5fd 8px)"></div>Max FDP</div>
-              <div class="dt-leg-item"><div class="dt-leg-box" style="background:repeating-linear-gradient(-45deg,#f59e0b 0,#f59e0b 4px,#fcd34d 4px,#fcd34d 8px)"></div>Min Rest</div>
-              <div class="dt-leg-item"><div class="dt-leg-box" style="background:#ef4444"></div>Rest</div>
+              <div class="dt-leg-item"><div class="dt-leg-box" style="background:#0ea5e9"></div>FDP</div>
+              <div class="dt-leg-item"><div class="dt-leg-box" style="background:rgba(251,191,36,.35)"></div>WOCL (02-05)</div>
+              <div class="dt-leg-item"><div class="dt-leg-box" style="background:repeating-linear-gradient(-45deg,#a855f7 0,#a855f7 4px,#c084fc 4px,#c084fc 8px)"></div>Max FDP</div>
+              <div class="dt-leg-item"><div class="dt-leg-box" style="background:repeating-linear-gradient(-45deg,#f97316 0,#f97316 4px,#fdba74 4px,#fdba74 8px)"></div>Min Rest</div>
+              <div class="dt-leg-item"><div class="dt-leg-box" style="background:#64748b"></div>Rest</div>
             </div>
           </div>
 
@@ -593,7 +593,7 @@ export function getSpaHtmlBody(): string {
   </button>
   <button class="tab-btn" id="tabBtn-theme" onclick="toggleTheme()">
     <span class="tab-btn-icon" id="theme-icon">☀️</span><span id="theme-label">日間</span>
-    <span style="font-size:.55em;color:var(--dim);line-height:1;opacity:.7">V3.024</span>
+    <span style="font-size:.55em;color:var(--dim);line-height:1;opacity:.7">V3.025</span>
   </button>
 </div>
 

@@ -168,7 +168,10 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
   .wx-fixed-header{position:static;flex-shrink:0}
   .wx-split{flex-direction:row;overflow:hidden;flex:1}
   .wx-list-pane{width:280px;flex-shrink:0;overflow-y:auto;border-right:1px solid var(--dim);border-bottom:none}
-  .wx-detail-pane{flex:1;overflow-y:auto}}
+  .wx-detail-pane{flex:1;overflow-y:auto}
+  .dt-ref-table{font-size:.95em}
+  .dt-ref-table th,.dt-ref-table td{padding:10px 14px}
+}
 #briefing-hf.active{padding:0;display:flex;flex-direction:column;
   height:calc(100dvh - calc(56px + env(safe-area-inset-bottom,0px)) - 40px)}
 #hf-panel-iframe{flex:1;min-height:0}
