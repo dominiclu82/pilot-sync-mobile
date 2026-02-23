@@ -1093,36 +1093,28 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
 
           <!-- Timeline (flex-based, no absolute positioning) -->
           <div class="dt-tl2">
-            <div id="dt-tl2-bars" style="display:flex;flex-direction:column;gap:3px;width:100%">
+            <div id="dt-tl2-bars" style="width:100%">
               <!-- FDP (thin row) -->
-              <div style="display:flex;height:11px;width:100%">
-                <div id="dt-fl-fdp-l" style="min-width:0"></div>
-                <div id="dt-fl-fdp-b" style="background:#22c55e;border-radius:3px;min-width:0"></div>
-                <div id="dt-fl-fdp-r" style="min-width:0;flex:1"></div>
+              <div style="width:100%;height:11px;margin-bottom:3px;overflow:hidden">
+                <div id="dt-bar-fdp" style="height:100%;background:#22c55e;border-radius:3px"></div>
               </div>
               <!-- Max FDP -->
-              <div style="display:flex;height:28px;width:100%">
-                <div id="dt-fl-maxfdp-l" style="min-width:0"></div>
-                <div id="dt-fl-maxfdp-b" style="background:repeating-linear-gradient(-45deg,#3b82f6 0,#3b82f6 7px,#93c5fd 7px,#93c5fd 14px);border-radius:4px;display:flex;align-items:center;justify-content:center;overflow:hidden;min-width:0">
-                  <span id="dt-fl-maxfdp-lbl" style="font-size:.65em;font-weight:700;color:#fff;white-space:nowrap;padding:0 6px"></span>
+              <div style="width:100%;height:28px;margin-bottom:3px;overflow:hidden">
+                <div id="dt-bar-maxfdp" style="height:100%;background:repeating-linear-gradient(-45deg,#3b82f6 0,#3b82f6 7px,#93c5fd 7px,#93c5fd 14px);border-radius:4px;display:flex;align-items:center;overflow:hidden">
+                  <span id="dt-lbl-maxfdp" style="font-size:.65em;font-weight:700;color:#fff;white-space:nowrap;padding:0 6px"></span>
                 </div>
-                <div id="dt-fl-maxfdp-r" style="min-width:0;flex:1"></div>
               </div>
               <!-- Min Rest -->
-              <div style="display:flex;height:28px;width:100%">
-                <div id="dt-fl-minrest-l" style="min-width:0"></div>
-                <div id="dt-fl-minrest-b" style="background:repeating-linear-gradient(-45deg,#f59e0b 0,#f59e0b 7px,#fcd34d 7px,#fcd34d 14px);border-radius:4px;display:flex;align-items:center;justify-content:center;overflow:hidden;min-width:0">
-                  <span id="dt-fl-minrest-lbl" style="font-size:.65em;font-weight:700;color:#fff;white-space:nowrap;padding:0 6px"></span>
+              <div style="width:100%;height:28px;margin-bottom:3px;overflow:hidden">
+                <div id="dt-bar-minrest" style="height:100%;background:repeating-linear-gradient(-45deg,#f59e0b 0,#f59e0b 7px,#fcd34d 7px,#fcd34d 14px);border-radius:4px;display:flex;align-items:center;overflow:hidden">
+                  <span id="dt-lbl-minrest" style="font-size:.65em;font-weight:700;color:#fff;white-space:nowrap;padding:0 6px"></span>
                 </div>
-                <div id="dt-fl-minrest-r" style="min-width:0;flex:1"></div>
               </div>
               <!-- Actual Rest -->
-              <div id="dt-fl-rest-row" style="display:none;height:28px;width:100%">
-                <div id="dt-fl-rest-l" style="min-width:0"></div>
-                <div id="dt-fl-rest-b" style="background:#ef4444;border-radius:4px;display:flex;align-items:center;justify-content:center;overflow:hidden;min-width:0">
-                  <span id="dt-fl-rest-lbl" style="font-size:.65em;font-weight:700;color:#fff;white-space:nowrap;padding:0 6px"></span>
+              <div id="dt-row-rest" style="display:none;width:100%;height:28px;margin-bottom:3px;overflow:hidden">
+                <div id="dt-bar-rest" style="height:100%;background:#ef4444;border-radius:4px;display:flex;align-items:center;overflow:hidden">
+                  <span id="dt-lbl-rest" style="font-size:.65em;font-weight:700;color:#fff;white-space:nowrap;padding:0 6px"></span>
                 </div>
-                <div id="dt-fl-rest-r" style="min-width:0;flex:1"></div>
               </div>
             </div>
             <!-- Time labels -->
@@ -1196,7 +1188,7 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
   </button>
   <button class="tab-btn" id="tabBtn-theme" onclick="toggleTheme()">
     <span class="tab-btn-icon" id="theme-icon">☀️</span><span id="theme-label">日間</span>
-    <span style="font-size:.55em;color:var(--dim);line-height:1;opacity:.7">V3.009</span>
+    <span style="font-size:.55em;color:var(--dim);line-height:1;opacity:.7">V3.010</span>
   </button>
 </div>
 
@@ -2048,40 +2040,26 @@ function dtRenderTimeline(startMin, endMin, maxFdp, restStart, restEnd, minRest,
     : startMin + maxFdp + minRest + 60;
   var span = spanEnd - startMin;
 
-  // Flex-based rendering: each row = [left-spacer | bar | right-spacer]
-  // Use explicit flexBasis percentages to avoid browser inconsistencies with large unitless flex values
-  function setRow(lId, bId, rId, offset, dur) {
-    var pct  = 100 / span;
-    var offP = (Math.max(0, offset) * pct).toFixed(3) + '%';
-    var durP = (Math.max(0.1, Math.min(dur, span - Math.max(0, offset))) * pct).toFixed(3) + '%';
-    var elL  = document.getElementById(lId);
-    var elB  = document.getElementById(bId);
-    var elR  = document.getElementById(rId);
-    elL.style.flexGrow = '0'; elL.style.flexShrink = '0'; elL.style.flexBasis = offP;
-    elB.style.flexGrow = '0'; elB.style.flexShrink = '0'; elB.style.flexBasis = durP;
-    elR.style.flexGrow = '1'; elR.style.flexShrink = '1'; elR.style.flexBasis = '0';
+  // Single-bar rendering: each bar is one div with margin-left% + width%
+  function setBar(barId, offset, dur) {
+    var pct = 100 / span;
+    var el  = document.getElementById(barId);
+    el.style.marginLeft = (Math.max(0, offset) * pct).toFixed(2) + '%';
+    el.style.width = (Math.max(0.1, Math.min(dur, span - Math.max(0, offset))) * pct).toFixed(2) + '%';
   }
 
-  // FDP bar (starts at 0, duration = actFdp)
-  setRow('dt-fl-fdp-l', 'dt-fl-fdp-b', 'dt-fl-fdp-r', 0, actFdp);
+  setBar('dt-bar-fdp', 0, actFdp);
+  setBar('dt-bar-maxfdp', 0, maxFdp);
+  document.getElementById('dt-lbl-maxfdp').textContent = 'Max ' + dtFmtH(maxFdp);
+  setBar('dt-bar-minrest', actFdp, minRest);
+  document.getElementById('dt-lbl-minrest').textContent = 'Min Req ' + dtFmtH(minRest);
 
-  // Max FDP bar (starts at 0, duration = maxFdp)
-  setRow('dt-fl-maxfdp-l', 'dt-fl-maxfdp-b', 'dt-fl-maxfdp-r', 0, maxFdp);
-  document.getElementById('dt-fl-maxfdp-lbl').textContent = 'Max ' + dtFmtH(maxFdp);
-
-  // Min Rest bar (starts at actFdp, duration = minRest)
-  setRow('dt-fl-minrest-l', 'dt-fl-minrest-b', 'dt-fl-minrest-r', actFdp, minRest);
-  document.getElementById('dt-fl-minrest-lbl').textContent = 'Min Req ' + dtFmtH(minRest);
-
-  // Actual Rest bar (optional)
   if (restEnd !== null) {
-    var restOffset = restStart - startMin;
-    var restDur    = restEnd - restStart;
-    document.getElementById('dt-fl-rest-row').style.display = 'flex';
-    setRow('dt-fl-rest-l', 'dt-fl-rest-b', 'dt-fl-rest-r', restOffset, restDur);
-    document.getElementById('dt-fl-rest-lbl').textContent = 'Rest ' + dtFmtH(restDur);
+    document.getElementById('dt-row-rest').style.display = 'block';
+    setBar('dt-bar-rest', restStart - startMin, restEnd - restStart);
+    document.getElementById('dt-lbl-rest').textContent = 'Rest ' + dtFmtH(restEnd - restStart);
   } else {
-    document.getElementById('dt-fl-rest-row').style.display = 'none';
+    document.getElementById('dt-row-rest').style.display = 'none';
   }
 
   // Tick labels (simple flex row, no absolute positioning)
