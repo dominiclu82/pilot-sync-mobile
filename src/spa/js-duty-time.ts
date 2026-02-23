@@ -130,7 +130,8 @@ function dtSetMode(mode) {
 function dtCardState(cardId, ok) {
   var el = document.getElementById(cardId);
   el.classList.remove('ok','warn','err');
-  el.classList.add(ok === true ? 'ok' : ok === false ? 'err' : '');
+  if (ok === true) el.classList.add('ok');
+  else if (ok === false) el.classList.add('err');
 }
 
 function dtWoclCheck(startMin, endMin, tzOffset) {
