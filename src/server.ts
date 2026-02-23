@@ -515,7 +515,7 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
 .dt-rest-card.ok{border-left-color:#22c55e}.dt-rest-card.warn .dt-card-actual{color:#f59e0b}.dt-rest-card.err .dt-card-actual{color:#ef4444}
 .dt-rest-card.ok .dt-card-actual{color:#22c55e}
 .dt-wocl-box{background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.35);border-radius:10px;padding:8px 12px;margin-bottom:8px;font-size:.75em;color:#f59e0b;line-height:1.5}
-.dt-tl2{background:var(--surface);border-radius:10px;padding:12px;margin-bottom:8px;overflow-x:auto}
+.dt-tl2{background:var(--surface);border-radius:10px;padding:12px;margin-bottom:8px}
 .dt-tl2-title{font-size:.63em;font-weight:700;color:var(--dim);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px}
 .dt-tl2-bars{position:relative;min-width:280px;width:100%;padding-bottom:2px;box-sizing:border-box}
 .dt-tl2-track{position:relative;height:28px;margin-bottom:3px;width:100%}
@@ -1093,7 +1093,6 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
 
           <!-- Timeline (flex-based, no absolute positioning) -->
           <div class="dt-tl2">
-            <div class="dt-tl2-title">Visual Timeline</div>
             <div id="dt-tl2-bars" style="display:flex;flex-direction:column;gap:3px;width:100%">
               <!-- FDP (thin row) -->
               <div style="display:flex;height:11px;width:100%">
@@ -1197,7 +1196,7 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
   </button>
   <button class="tab-btn" id="tabBtn-theme" onclick="toggleTheme()">
     <span class="tab-btn-icon" id="theme-icon">☀️</span><span id="theme-label">日間</span>
-    <span style="font-size:.55em;color:var(--dim);line-height:1;opacity:.7">V3.008</span>
+    <span style="font-size:.55em;color:var(--dim);line-height:1;opacity:.7">V3.009</span>
   </button>
 </div>
 
