@@ -32,17 +32,20 @@ function dtRenderTimeline(startMin, endMin, maxFdp, restStart, restEnd, minRest,
   try {
   var actFdp = endMin - startMin;
   var spanEnd = restEnd !== null
-    ? Math.max(startMin + maxFdp, restEnd) + 30
+    ? Math.max(startMin + maxFdp, restEnd) + 60
     : startMin + maxFdp + minRest + 60;
   var span = spanEnd - startMin;
 
+  function pct(offset) { return (Math.max(0, offset) / span * 100).toFixed(2); }
   function setBar(barId, offset, dur) {
     var el = document.getElementById(barId);
-    el.style.left  = (Math.max(0, offset) / span * 100).toFixed(2) + '%';
+    el.style.left  = pct(offset) + '%';
     el.style.width = (Math.max(0.1, Math.min(dur, span - Math.max(0, offset))) / span * 100).toFixed(2) + '%';
   }
 
+  // Bars
   setBar('dt-bar-fdp', 0, actFdp);
+  document.getElementById('dt-lbl-fdp').textContent = 'Actual ' + dtFmtH(actFdp);
   setBar('dt-bar-maxfdp', 0, maxFdp);
   document.getElementById('dt-lbl-maxfdp').textContent = 'Max ' + dtFmtH(maxFdp);
   setBar('dt-bar-minrest', actFdp, minRest);
@@ -57,16 +60,52 @@ function dtRenderTimeline(startMin, endMin, maxFdp, restStart, restEnd, minRest,
     document.getElementById('dt-bar-rest').style.display = 'none';
   }
 
+  // WOCL overlay (02:00-05:00 local time)
+  var woclSUTC = ((2*60 - tz*60) % 1440 + 1440) % 1440;
+  var woclEUTC = ((5*60 - tz*60) % 1440 + 1440) % 1440;
+  var woclEl = document.getElementById('dt-bar-wocl');
+  // Map WOCL to timeline-relative minutes
+  var sDay = Math.floor(startMin / 1440) * 1440;
+  var wS = sDay + woclSUTC;
+  // If WOCL start is before FDP start, try next day
+  if (wS + (woclSUTC < woclEUTC ? (woclEUTC - woclSUTC) : (1440 - woclSUTC + woclEUTC)) <= startMin) wS += 1440;
+  var wDur = woclSUTC < woclEUTC ? (woclEUTC - woclSUTC) : (1440 - woclSUTC + woclEUTC);
+  var wOff = wS - startMin;
+  // Show if WOCL overlaps the visible span
+  if (wOff < span && wOff + wDur > 0) {
+    woclEl.style.display = '';
+    woclEl.style.left = pct(Math.max(0, wOff)) + '%';
+    var visW = Math.min(wDur, span - Math.max(0, wOff));
+    if (wOff < 0) visW = Math.min(wDur + wOff, span);
+    woclEl.style.width = (Math.max(0, visW) / span * 100).toFixed(2) + '%';
+  } else {
+    woclEl.style.display = 'none';
+  }
+
+  // Vertical lines
+  function setVline(id, offset, show) {
+    var el = document.getElementById(id);
+    if (show) { el.style.display = ''; el.style.left = pct(offset) + '%'; }
+    else el.style.display = 'none';
+  }
+  setVline('dt-vline-start', 0, true);
+  setVline('dt-vline-end', actFdp, true);
+  setVline('dt-vline-next', restEnd !== null ? restEnd - startMin : 0, restEnd !== null);
+
   // Tick labels
   function fmtUTC(m) {
     var t=((m%1440)+1440)%1440, h=Math.floor(t/60), mm=t%60;
     return (h<10?'0':'')+h+':'+(mm<10?'0':'')+mm+'Z';
   }
+  function makeTick(leftPct, line1, line2) {
+    return '<div style="position:absolute;left:' + leftPct + '%;transform:translateX(-50%);text-align:center;font-size:.58em;color:var(--dim);line-height:1.35;white-space:nowrap">' + line1 + '<br>' + line2 + '</div>';
+  }
   var ticks = document.getElementById('dt-tl2-ticks');
-  ticks.innerHTML =
-    '<span>Start ' + fmtUTC(startMin) + '</span>' +
-    '<span>FDP End ' + fmtUTC(endMin) + '</span>' +
-    (restEnd !== null ? '<span>Next ' + fmtUTC(restEnd) + '</span>' : '');
+  var html = makeTick(pct(0), 'FDP Start', fmtUTC(startMin));
+  html += makeTick(pct(actFdp), 'Rst Start (FDP End)', fmtUTC(endMin));
+  if (restEnd !== null) html += makeTick(pct(restEnd - startMin), 'Next Rpt', fmtUTC(restEnd));
+  ticks.innerHTML = html;
+
   } catch(e) { alert('Timeline Error: ' + e.message); }
 }
 
