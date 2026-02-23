@@ -29,9 +29,6 @@ function dtFmtH(m) { // "HH:MM" for timeline labels
 }
 
 function dtRenderTimeline(startMin, endMin, maxFdp, restStart, restEnd, minRest, tz) {
-  // Force red bar FIRST — before any calculation
-  document.getElementById('dt-bar-fdp').style.width = '50%';
-  document.getElementById('dt-bar-fdp').style.backgroundColor = 'red';
   try {
   var actFdp = endMin - startMin;
   var spanEnd = restEnd !== null
@@ -45,6 +42,7 @@ function dtRenderTimeline(startMin, endMin, maxFdp, restStart, restEnd, minRest,
     el.style.width = (Math.max(0.1, Math.min(dur, span - Math.max(0, offset))) / span * 100).toFixed(2) + '%';
   }
 
+  setBar('dt-bar-fdp', 0, actFdp);
   setBar('dt-bar-maxfdp', 0, maxFdp);
   document.getElementById('dt-lbl-maxfdp').textContent = 'Max ' + dtFmtH(maxFdp);
   setBar('dt-bar-minrest', actFdp, minRest);
