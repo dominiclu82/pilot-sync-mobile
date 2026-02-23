@@ -1169,7 +1169,7 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
   </button>
   <button class="tab-btn" id="tabBtn-theme" onclick="toggleTheme()">
     <span class="tab-btn-icon" id="theme-icon">☀️</span><span id="theme-label">日間</span>
-    <span style="font-size:.55em;color:var(--dim);line-height:1;opacity:.7">V3.015</span>
+    <span style="font-size:.55em;color:var(--dim);line-height:1;opacity:.7">V3.016</span>
   </button>
 </div>
 
@@ -2021,14 +2021,11 @@ function dtRenderTimeline(startMin, endMin, maxFdp, restStart, restEnd, minRest,
     : startMin + maxFdp + minRest + 60;
   var span = spanEnd - startMin;
 
-  // position:absolute bars: use pixel values calculated from container offsetWidth
-  var totalW = document.getElementById('dt-tl2-bars').offsetWidth;
+  // CSS percentages: browser re-evaluates on every reflow, no need for offsetWidth timing hacks
   function setBar(barId, offset, dur) {
     var el = document.getElementById(barId);
-    var offPx = Math.round(Math.max(0, offset) / span * totalW);
-    var durPx = Math.round(Math.max(1, Math.min(dur, span - Math.max(0, offset))) / span * totalW);
-    el.style.left  = offPx + 'px';
-    el.style.width = durPx + 'px';
+    el.style.left  = (Math.max(0, offset) / span * 100).toFixed(2) + '%';
+    el.style.width = (Math.max(0.1, Math.min(dur, span - Math.max(0, offset))) / span * 100).toFixed(2) + '%';
   }
 
   setBar('dt-bar-fdp', 0, actFdp);
@@ -2243,9 +2240,8 @@ function dtCalculate() {
     woclBox.style.display = 'none';
   }
 
-  // Defer timeline render to next event loop so browser completes layout before offsetWidth is read
-  var _s=startMin,_e=endMin,_mf=maxFdp,_rs=restStart,_re=restEnd,_mr=minRest,_tz=tz;
-  setTimeout(function(){ dtRenderTimeline(_s,_e,_mf,_rs,_re,_mr,_tz); }, 0);
+  // CSS percentages recalculate on reflow, no timing hacks needed
+  dtRenderTimeline(startMin, endMin, maxFdp, restStart, restEnd, minRest, tz);
 }
 
 // ── Boot ─────────────────────────────────────────────────────────────────────
