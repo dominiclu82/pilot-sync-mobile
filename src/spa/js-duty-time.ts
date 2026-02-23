@@ -29,12 +29,15 @@ function dtFmtH(m) { // "HH:MM" for timeline labels
 }
 
 function dtRenderTimeline(startMin, endMin, maxFdp, restStart, restEnd, minRest, tz) {
+  document.getElementById('dt-bar-fdp').style.width = '50%';
+  document.getElementById('dt-bar-fdp').style.backgroundColor = 'red';
   try {
   var actFdp = endMin - startMin;
   var spanEnd = restEnd !== null
     ? Math.max(startMin + maxFdp, restEnd) + 30
     : startMin + maxFdp + minRest + 60;
   var span = spanEnd - startMin;
+  alert("Timeline Data: actFdp=" + actFdp + ", maxFdp=" + maxFdp + ", minRest=" + minRest + ", span=" + span);
 
   function setBar(barId, offset, dur) {
     var el = document.getElementById(barId);
