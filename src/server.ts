@@ -977,15 +977,6 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
         </div>
       </div>
 
-      <!-- ── TEST: Flex Timeline ── -->
-      <div style="padding:10px 14px 4px">
-        <div style="font-size:.65em;color:var(--dim);letter-spacing:.06em;text-transform:uppercase;margin-bottom:6px">Visual Timeline (Test)</div>
-        <div style="display:flex;width:100%;border-radius:6px;overflow:hidden;height:28px">
-          <div style="flex:2;background:#22c55e;display:flex;align-items:center;justify-content:center;font-size:.65em;font-weight:700;color:#fff">FDP</div>
-          <div style="flex:1;background:repeating-linear-gradient(-45deg,#f59e0b 0,#f59e0b 7px,#fcd34d 7px,#fcd34d 14px);display:flex;align-items:center;justify-content:center;font-size:.65em;font-weight:700;color:#fff">Min Rest</div>
-          <div style="flex:1;background:rgba(255,255,255,.06)"></div>
-        </div>
-      </div>
 
       <!-- Mode -->
       <div class="dt-body" style="padding-bottom:0">
@@ -1093,8 +1084,9 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
 
           <!-- Timeline -->
           <div class="dt-tl2">
+            <div class="dt-tl2-title">Visual Timeline</div>
             <!-- position:relative container, bars are position:absolute with left%+width% -->
-            <div id="dt-tl2-bars" style="position:relative;width:100%;height:120px;background:rgba(255,0,0,0.15)">
+            <div id="dt-tl2-bars" style="position:relative;width:100%;height:120px">
               <div id="dt-bar-fdp"     style="position:absolute;top:0;height:11px;background:#22c55e;border-radius:3px"></div>
               <div id="dt-bar-maxfdp"  style="position:absolute;top:17px;height:28px;background:repeating-linear-gradient(-45deg,#3b82f6 0,#3b82f6 7px,#93c5fd 7px,#93c5fd 14px);border-radius:4px;display:flex;align-items:center;overflow:hidden">
                 <span id="dt-lbl-maxfdp" style="font-size:.65em;font-weight:700;color:#fff;white-space:nowrap;padding:0 6px"></span>
@@ -1102,7 +1094,7 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
               <div id="dt-bar-minrest" style="position:absolute;top:49px;height:28px;background:repeating-linear-gradient(-45deg,#f59e0b 0,#f59e0b 7px,#fcd34d 7px,#fcd34d 14px);border-radius:4px;display:flex;align-items:center;overflow:hidden">
                 <span id="dt-lbl-minrest" style="font-size:.65em;font-weight:700;color:#fff;white-space:nowrap;padding:0 6px"></span>
               </div>
-              <div id="dt-bar-rest"    style="display:none;position:absolute;top:81px;height:28px;background:#ef4444;border-radius:4px;display:flex;align-items:center;overflow:hidden">
+              <div id="dt-bar-rest"    style="position:absolute;top:81px;height:28px;background:#ef4444;border-radius:4px;overflow:hidden;display:none">
                 <span id="dt-lbl-rest" style="font-size:.65em;font-weight:700;color:#fff;white-space:nowrap;padding:0 6px"></span>
               </div>
             </div>
@@ -1177,7 +1169,7 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
   </button>
   <button class="tab-btn" id="tabBtn-theme" onclick="toggleTheme()">
     <span class="tab-btn-icon" id="theme-icon">☀️</span><span id="theme-label">日間</span>
-    <span style="font-size:.55em;color:var(--dim);line-height:1;opacity:.7">V3.013</span>
+    <span style="font-size:.55em;color:var(--dim);line-height:1;opacity:.7">V3.014</span>
   </button>
 </div>
 
@@ -2029,12 +2021,14 @@ function dtRenderTimeline(startMin, endMin, maxFdp, restStart, restEnd, minRest,
     : startMin + maxFdp + minRest + 60;
   var span = spanEnd - startMin;
 
-  // position:absolute bars: set left% and width% (same approach as zihchi.github.io/flight-time)
+  // position:absolute bars: use pixel values calculated from container offsetWidth
+  var totalW = document.getElementById('dt-tl2-bars').offsetWidth;
   function setBar(barId, offset, dur) {
-    var pct = 100 / span;
-    var el  = document.getElementById(barId);
-    el.style.left  = (Math.max(0, offset) * pct).toFixed(2) + '%';
-    el.style.width = (Math.max(0.1, Math.min(dur, span - Math.max(0, offset))) * pct).toFixed(2) + '%';
+    var el = document.getElementById(barId);
+    var offPx = Math.round(Math.max(0, offset) / span * totalW);
+    var durPx = Math.round(Math.max(1, Math.min(dur, span - Math.max(0, offset))) / span * totalW);
+    el.style.left  = offPx + 'px';
+    el.style.width = durPx + 'px';
   }
 
   setBar('dt-bar-fdp', 0, actFdp);
@@ -2057,12 +2051,11 @@ function dtRenderTimeline(startMin, endMin, maxFdp, restStart, restEnd, minRest,
     var t=((m%1440)+1440)%1440, h=Math.floor(t/60), mm=t%60;
     return (h<10?'0':'')+h+':'+(mm<10?'0':'')+mm+'Z';
   }
-  var barsEl = document.getElementById('dt-tl2-bars');
   var ticks = document.getElementById('dt-tl2-ticks');
   ticks.innerHTML =
     '<span>Start ' + fmtUTC(startMin) + '</span>' +
     '<span>FDP End ' + fmtUTC(endMin) + '</span>' +
-    '<span style="color:#f87171">bars W=' + barsEl.offsetWidth + ' span=' + span + '</span>';
+    (restEnd !== null ? '<span>Next ' + fmtUTC(restEnd) + '</span>' : '');
 }
 
 function dtMinRest(crew, ftMin) {
