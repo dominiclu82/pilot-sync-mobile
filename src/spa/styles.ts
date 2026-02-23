@@ -164,8 +164,10 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
   #briefing-datis.active{display:flex;flex-direction:column;overflow:hidden}
   #briefing-hf.active{overflow:hidden;padding:0;height:auto}
   #briefing-coldtemp.active{overflow-y:auto;padding:0}
-  #briefing-duty.active{overflow-y:auto;padding:0}
+  #briefing-duty.active{flex:none;overflow:visible;padding:0}
   #briefing-duty .dt-wrap{flex:none}
+  html:has(#briefing-duty.active),html:has(#briefing-duty.active) body{overflow-y:auto;height:auto}
+  #tab-briefing.tab-active:has(#briefing-duty.active){height:auto;overflow:visible}
   .wx-fixed-header{position:static;flex-shrink:0}
   .wx-split{flex-direction:row;overflow:hidden;flex:1}
   .wx-list-pane{width:280px;flex-shrink:0;overflow-y:auto;border-right:1px solid var(--dim);border-bottom:none}
