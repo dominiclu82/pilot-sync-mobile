@@ -1169,7 +1169,7 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
   </button>
   <button class="tab-btn" id="tabBtn-theme" onclick="toggleTheme()">
     <span class="tab-btn-icon" id="theme-icon">☀️</span><span id="theme-label">日間</span>
-    <span style="font-size:.55em;color:var(--dim);line-height:1;opacity:.7">V3.016</span>
+    <span style="font-size:.55em;color:var(--dim);line-height:1;opacity:.7">V3.017</span>
   </button>
 </div>
 
@@ -2021,14 +2021,22 @@ function dtRenderTimeline(startMin, endMin, maxFdp, restStart, restEnd, minRest,
     : startMin + maxFdp + minRest + 60;
   var span = spanEnd - startMin;
 
-  // CSS percentages: browser re-evaluates on every reflow, no need for offsetWidth timing hacks
+  // ★ 終極診斷：alert 顯示實際數值 + 寫死 50% 測試 CSS
+  alert('actFdp=' + actFdp + ' maxFdp=' + maxFdp + ' minRest=' + minRest + ' span=' + span + ' startMin=' + startMin + ' endMin=' + endMin);
+
+  // 暴力測試：寫死 50% 看 CSS 有沒有效
+  var testEl = document.getElementById('dt-bar-fdp');
+  testEl.style.left = '0%';
+  testEl.style.width = '50%';
+  testEl.style.background = 'red';
+
+  // 正常計算邏輯（在暴力測試後執行，只影響其他 bar）
   function setBar(barId, offset, dur) {
     var el = document.getElementById(barId);
     el.style.left  = (Math.max(0, offset) / span * 100).toFixed(2) + '%';
     el.style.width = (Math.max(0.1, Math.min(dur, span - Math.max(0, offset))) / span * 100).toFixed(2) + '%';
   }
 
-  setBar('dt-bar-fdp', 0, actFdp);
   setBar('dt-bar-maxfdp', 0, maxFdp);
   document.getElementById('dt-lbl-maxfdp').textContent = 'Max ' + dtFmtH(maxFdp);
   setBar('dt-bar-minrest', actFdp, minRest);
