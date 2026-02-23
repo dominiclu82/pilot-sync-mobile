@@ -1169,7 +1169,7 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
   </button>
   <button class="tab-btn" id="tabBtn-theme" onclick="toggleTheme()">
     <span class="tab-btn-icon" id="theme-icon">☀️</span><span id="theme-label">日間</span>
-    <span style="font-size:.55em;color:var(--dim);line-height:1;opacity:.7">V3.017</span>
+    <span style="font-size:.55em;color:var(--dim);line-height:1;opacity:.7">V3.018</span>
   </button>
 </div>
 
@@ -2015,22 +2015,16 @@ function dtFmtH(m) { // "HH:MM" for timeline labels
 }
 
 function dtRenderTimeline(startMin, endMin, maxFdp, restStart, restEnd, minRest, tz) {
+  // Force red bar FIRST — before any calculation
+  document.getElementById('dt-bar-fdp').style.width = '50%';
+  document.getElementById('dt-bar-fdp').style.backgroundColor = 'red';
+  try {
   var actFdp = endMin - startMin;
   var spanEnd = restEnd !== null
     ? Math.max(startMin + maxFdp, restEnd) + 30
     : startMin + maxFdp + minRest + 60;
   var span = spanEnd - startMin;
 
-  // ★ 終極診斷：alert 顯示實際數值 + 寫死 50% 測試 CSS
-  alert('actFdp=' + actFdp + ' maxFdp=' + maxFdp + ' minRest=' + minRest + ' span=' + span + ' startMin=' + startMin + ' endMin=' + endMin);
-
-  // 暴力測試：寫死 50% 看 CSS 有沒有效
-  var testEl = document.getElementById('dt-bar-fdp');
-  testEl.style.left = '0%';
-  testEl.style.width = '50%';
-  testEl.style.background = 'red';
-
-  // 正常計算邏輯（在暴力測試後執行，只影響其他 bar）
   function setBar(barId, offset, dur) {
     var el = document.getElementById(barId);
     el.style.left  = (Math.max(0, offset) / span * 100).toFixed(2) + '%';
@@ -2051,7 +2045,7 @@ function dtRenderTimeline(startMin, endMin, maxFdp, restStart, restEnd, minRest,
     document.getElementById('dt-bar-rest').style.display = 'none';
   }
 
-  // Tick labels (simple flex row, no absolute positioning)
+  // Tick labels
   function fmtUTC(m) {
     var t=((m%1440)+1440)%1440, h=Math.floor(t/60), mm=t%60;
     return (h<10?'0':'')+h+':'+(mm<10?'0':'')+mm+'Z';
@@ -2061,6 +2055,7 @@ function dtRenderTimeline(startMin, endMin, maxFdp, restStart, restEnd, minRest,
     '<span>Start ' + fmtUTC(startMin) + '</span>' +
     '<span>FDP End ' + fmtUTC(endMin) + '</span>' +
     (restEnd !== null ? '<span>Next ' + fmtUTC(restEnd) + '</span>' : '');
+  } catch(e) { alert('Timeline Error: ' + e.message); }
 }
 
 function dtMinRest(crew, ftMin) {
