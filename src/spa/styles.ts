@@ -151,27 +151,29 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
 .wx-hint-mobile{display:none}
 @media(max-width:639px){.wx-hint-desktop{display:none}.wx-hint-mobile{display:inline}}
 @media(min-width:640px){
-  html,body{overflow:hidden;height:100dvh}
-  #tab-sync.tab-active{height:calc(100dvh - calc(56px + env(safe-area-inset-bottom,0px)));
-    min-height:unset;overflow-y:auto}
-  #tab-briefing.tab-active{display:flex;flex-direction:column;
+  /* ── 預設：可捲動 ── */
+  .briefing-subtabs{position:sticky;top:0;z-index:100;flex-shrink:0}
+  .briefing-subtab{flex:1}
+  .briefing-panel.active{padding:0}
+  /* ── 需要固定高度的 tab：datis 分割面板、HF iframe ── */
+  html:has(#briefing-datis.active),html:has(#briefing-hf.active),
+  html:has(#tab-sync.tab-active){overflow:hidden;height:100dvh}
+  html:has(#briefing-datis.active) body,html:has(#briefing-hf.active) body,
+  html:has(#tab-sync.tab-active) body{overflow:hidden;height:100dvh}
+  html:has(#briefing-datis.active) #tab-briefing.tab-active,
+  html:has(#briefing-hf.active) #tab-briefing.tab-active{
+    display:flex;flex-direction:column;
     height:calc(100dvh - calc(56px + env(safe-area-inset-bottom,0px)));
     min-height:unset;overflow:hidden;padding:0}
-  .briefing-subtabs{position:static;flex-shrink:0}
-  .briefing-subtab{flex:1}
-  .briefing-panel.active{display:flex;flex-direction:column;flex:1;overflow:hidden;padding:0}
-  #briefing-tools.active{overflow-y:auto;padding:16px 16px 0}
-  #briefing-datis.active{display:flex;flex-direction:column;overflow:hidden}
-  #briefing-hf.active{overflow:hidden;padding:0;height:auto}
-  #briefing-coldtemp.active{overflow-y:auto;padding:0}
-  #briefing-duty.active{flex:none;overflow:visible;padding:0}
-  #briefing-duty .dt-wrap{flex:none}
-  html:has(#briefing-duty.active),html:has(#briefing-duty.active) body{overflow-y:auto;height:auto}
-  #tab-briefing.tab-active:has(#briefing-duty.active){height:auto;overflow:visible}
+  #tab-sync.tab-active{height:calc(100dvh - calc(56px + env(safe-area-inset-bottom,0px)));
+    min-height:unset;overflow-y:auto}
+  #briefing-datis.active{display:flex;flex-direction:column;flex:1;overflow:hidden}
+  #briefing-hf.active{display:flex;flex-direction:column;flex:1;overflow:hidden;padding:0}
   .wx-fixed-header{position:static;flex-shrink:0}
   .wx-split{flex-direction:row;overflow:hidden;flex:1}
   .wx-list-pane{width:280px;flex-shrink:0;overflow-y:auto;border-right:1px solid var(--dim);border-bottom:none}
   .wx-detail-pane{flex:1;overflow-y:auto}
+  /* ── 桌面版表格加大 ── */
   .dt-ref-table{font-size:.95em}
   .dt-ref-table th,.dt-ref-table td{padding:10px 14px}
 }
