@@ -1197,7 +1197,7 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
   </button>
   <button class="tab-btn" id="tabBtn-theme" onclick="toggleTheme()">
     <span class="tab-btn-icon" id="theme-icon">☀️</span><span id="theme-label">日間</span>
-    <span style="font-size:.55em;color:var(--dim);line-height:1;opacity:.7">V3.007</span>
+    <span style="font-size:.55em;color:var(--dim);line-height:1;opacity:.7">V3.008</span>
   </button>
 </div>
 
@@ -2050,14 +2050,17 @@ function dtRenderTimeline(startMin, endMin, maxFdp, restStart, restEnd, minRest,
   var span = spanEnd - startMin;
 
   // Flex-based rendering: each row = [left-spacer | bar | right-spacer]
-  // flex values are proportional to time (minutes), no pixel measurement needed
+  // Use explicit flexBasis percentages to avoid browser inconsistencies with large unitless flex values
   function setRow(lId, bId, rId, offset, dur) {
-    var off = Math.max(0, offset);
-    var d   = Math.max(0.01, Math.min(dur, span - off));
-    var rem = Math.max(0, span - off - d);
-    document.getElementById(lId).style.flex = String(off);
-    document.getElementById(bId).style.flex = String(d);
-    document.getElementById(rId).style.flex = String(rem);
+    var pct  = 100 / span;
+    var offP = (Math.max(0, offset) * pct).toFixed(3) + '%';
+    var durP = (Math.max(0.1, Math.min(dur, span - Math.max(0, offset))) * pct).toFixed(3) + '%';
+    var elL  = document.getElementById(lId);
+    var elB  = document.getElementById(bId);
+    var elR  = document.getElementById(rId);
+    elL.style.flexGrow = '0'; elL.style.flexShrink = '0'; elL.style.flexBasis = offP;
+    elB.style.flexGrow = '0'; elB.style.flexShrink = '0'; elB.style.flexBasis = durP;
+    elR.style.flexGrow = '1'; elR.style.flexShrink = '1'; elR.style.flexBasis = '0';
   }
 
   // FDP bar (starts at 0, duration = actFdp)
