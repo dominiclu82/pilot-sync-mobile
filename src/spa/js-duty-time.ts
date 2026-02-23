@@ -45,7 +45,7 @@ function dtRenderTimeline(startMin, endMin, maxFdp, restStart, restEnd, minRest,
 
   // Bars
   setBar('dt-bar-fdp', 0, actFdp);
-  document.getElementById('dt-lbl-fdp').textContent = 'Actual ' + dtFmtH(actFdp);
+  document.getElementById('dt-lbl-fdp').textContent = 'Actual FDP ' + dtFmtH(actFdp);
   setBar('dt-bar-maxfdp', 0, maxFdp);
   document.getElementById('dt-lbl-maxfdp').textContent = 'Max ' + dtFmtH(maxFdp);
   setBar('dt-bar-minrest', actFdp, minRest);
@@ -97,11 +97,13 @@ function dtRenderTimeline(startMin, endMin, maxFdp, restStart, restEnd, minRest,
     var t=((m%1440)+1440)%1440, h=Math.floor(t/60), mm=t%60;
     return (h<10?'0':'')+h+':'+(mm<10?'0':'')+mm+'Z';
   }
-  function makeTick(leftPct, line1, line2) {
-    return '<div style="position:absolute;left:' + leftPct + '%;transform:translateX(-50%);text-align:center;font-size:.58em;color:var(--dim);line-height:1.35;white-space:nowrap">' + line1 + '<br>' + line2 + '</div>';
+  function makeTick(leftPct, line1, line2, align) {
+    var tx = align === 'left' ? 'translateX(0)' : align === 'right' ? 'translateX(-100%)' : 'translateX(-50%)';
+    var ta = align === 'left' ? 'left' : align === 'right' ? 'right' : 'center';
+    return '<div style="position:absolute;left:' + leftPct + '%;transform:' + tx + ';text-align:' + ta + ';font-size:.58em;color:var(--dim);line-height:1.35;white-space:nowrap">' + line1 + '<br>' + line2 + '</div>';
   }
   var ticks = document.getElementById('dt-tl2-ticks');
-  var html = makeTick(pct(0), 'FDP Start', fmtUTC(startMin));
+  var html = makeTick(pct(0), 'FDP Start', fmtUTC(startMin), 'left');
   html += makeTick(pct(actFdp), 'Rst Start (FDP End)', fmtUTC(endMin));
   if (restEnd !== null) html += makeTick(pct(restEnd - startMin), 'Next Rpt', fmtUTC(restEnd));
   ticks.innerHTML = html;
