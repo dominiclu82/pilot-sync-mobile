@@ -1094,15 +1094,15 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
           <!-- Timeline (flex-based, no absolute positioning) -->
           <div class="dt-tl2">
             <div class="dt-tl2-title">Visual Timeline</div>
-            <div id="dt-tl2-bars" style="display:flex;flex-direction:column;gap:3px">
+            <div id="dt-tl2-bars" style="display:flex;flex-direction:column;gap:3px;width:100%">
               <!-- FDP (thin row) -->
-              <div style="display:flex;height:11px;min-width:0">
+              <div style="display:flex;height:11px;width:100%">
                 <div id="dt-fl-fdp-l" style="min-width:0"></div>
                 <div id="dt-fl-fdp-b" style="background:#22c55e;border-radius:3px;min-width:0"></div>
                 <div id="dt-fl-fdp-r" style="min-width:0;flex:1"></div>
               </div>
               <!-- Max FDP -->
-              <div style="display:flex;height:28px;min-width:0">
+              <div style="display:flex;height:28px;width:100%">
                 <div id="dt-fl-maxfdp-l" style="min-width:0"></div>
                 <div id="dt-fl-maxfdp-b" style="background:repeating-linear-gradient(-45deg,#3b82f6 0,#3b82f6 7px,#93c5fd 7px,#93c5fd 14px);border-radius:4px;display:flex;align-items:center;justify-content:center;overflow:hidden;min-width:0">
                   <span id="dt-fl-maxfdp-lbl" style="font-size:.65em;font-weight:700;color:#fff;white-space:nowrap;padding:0 6px"></span>
@@ -1110,7 +1110,7 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
                 <div id="dt-fl-maxfdp-r" style="min-width:0;flex:1"></div>
               </div>
               <!-- Min Rest -->
-              <div style="display:flex;height:28px;min-width:0">
+              <div style="display:flex;height:28px;width:100%">
                 <div id="dt-fl-minrest-l" style="min-width:0"></div>
                 <div id="dt-fl-minrest-b" style="background:repeating-linear-gradient(-45deg,#f59e0b 0,#f59e0b 7px,#fcd34d 7px,#fcd34d 14px);border-radius:4px;display:flex;align-items:center;justify-content:center;overflow:hidden;min-width:0">
                   <span id="dt-fl-minrest-lbl" style="font-size:.65em;font-weight:700;color:#fff;white-space:nowrap;padding:0 6px"></span>
@@ -1118,7 +1118,7 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
                 <div id="dt-fl-minrest-r" style="min-width:0;flex:1"></div>
               </div>
               <!-- Actual Rest -->
-              <div id="dt-fl-rest-row" style="display:none;height:28px;min-width:0">
+              <div id="dt-fl-rest-row" style="display:none;height:28px;width:100%">
                 <div id="dt-fl-rest-l" style="min-width:0"></div>
                 <div id="dt-fl-rest-b" style="background:#ef4444;border-radius:4px;display:flex;align-items:center;justify-content:center;overflow:hidden;min-width:0">
                   <span id="dt-fl-rest-lbl" style="font-size:.65em;font-weight:700;color:#fff;white-space:nowrap;padding:0 6px"></span>
@@ -1197,7 +1197,7 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
   </button>
   <button class="tab-btn" id="tabBtn-theme" onclick="toggleTheme()">
     <span class="tab-btn-icon" id="theme-icon">☀️</span><span id="theme-label">日間</span>
-    <span style="font-size:.55em;color:var(--dim);line-height:1;opacity:.7">V3.006</span>
+    <span style="font-size:.55em;color:var(--dim);line-height:1;opacity:.7">V3.007</span>
   </button>
 </div>
 
