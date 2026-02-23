@@ -1185,7 +1185,7 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
   </button>
   <button class="tab-btn" id="tabBtn-theme" onclick="toggleTheme()">
     <span class="tab-btn-icon" id="theme-icon">☀️</span><span id="theme-label">日間</span>
-    <span style="font-size:.55em;color:var(--dim);line-height:1;opacity:.7">V3.003</span>
+    <span style="font-size:.55em;color:var(--dim);line-height:1;opacity:.7">V3.004</span>
   </button>
 </div>
 
@@ -2037,9 +2037,11 @@ function dtRenderTimeline(startMin, endMin, maxFdp, restStart, restEnd, minRest,
     : startMin + maxFdp + minRest + 60;
   var span = spanEnd - startMin;
 
-  // Use pixel-based positioning to avoid % issues with nested absolute containers
+  // Use window width minus known paddings — reliable regardless of CSS cascade
   var barsEl = document.getElementById('dt-tl2-bars');
-  var W = Math.max(barsEl.offsetWidth, barsEl.parentElement ? barsEl.parentElement.offsetWidth - 24 : 0, 280);
+  var W = Math.max(window.innerWidth - 80, 200);
+  barsEl.style.width = W + 'px';
+  document.getElementById('dt-tl2-ticks').style.width = W + 'px';
   function px(m)   { return Math.max(0, Math.min(W, (m-startMin)/span*W)).toFixed(1)+'px'; }
   function pw(dur) { return Math.max(0, Math.min(W, dur/span*W)).toFixed(1)+'px'; }
   function setSeg(id, lm, wm) {
