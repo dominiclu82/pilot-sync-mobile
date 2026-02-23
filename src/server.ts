@@ -1094,7 +1094,7 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
           <!-- Timeline -->
           <div class="dt-tl2">
             <!-- position:relative container, bars are position:absolute with left%+width% -->
-            <div id="dt-tl2-bars" style="position:relative;width:100%;height:120px">
+            <div id="dt-tl2-bars" style="position:relative;width:100%;height:120px;background:rgba(255,0,0,0.15)">
               <div id="dt-bar-fdp"     style="position:absolute;top:0;height:11px;background:#22c55e;border-radius:3px"></div>
               <div id="dt-bar-maxfdp"  style="position:absolute;top:17px;height:28px;background:repeating-linear-gradient(-45deg,#3b82f6 0,#3b82f6 7px,#93c5fd 7px,#93c5fd 14px);border-radius:4px;display:flex;align-items:center;overflow:hidden">
                 <span id="dt-lbl-maxfdp" style="font-size:.65em;font-weight:700;color:#fff;white-space:nowrap;padding:0 6px"></span>
@@ -1177,7 +1177,7 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
   </button>
   <button class="tab-btn" id="tabBtn-theme" onclick="toggleTheme()">
     <span class="tab-btn-icon" id="theme-icon">☀️</span><span id="theme-label">日間</span>
-    <span style="font-size:.55em;color:var(--dim);line-height:1;opacity:.7">V3.012</span>
+    <span style="font-size:.55em;color:var(--dim);line-height:1;opacity:.7">V3.013</span>
   </button>
 </div>
 
@@ -2057,11 +2057,12 @@ function dtRenderTimeline(startMin, endMin, maxFdp, restStart, restEnd, minRest,
     var t=((m%1440)+1440)%1440, h=Math.floor(t/60), mm=t%60;
     return (h<10?'0':'')+h+':'+(mm<10?'0':'')+mm+'Z';
   }
+  var barsEl = document.getElementById('dt-tl2-bars');
   var ticks = document.getElementById('dt-tl2-ticks');
   ticks.innerHTML =
     '<span>Start ' + fmtUTC(startMin) + '</span>' +
     '<span>FDP End ' + fmtUTC(endMin) + '</span>' +
-    (restEnd !== null ? '<span>Next ' + fmtUTC(restEnd) + '</span>' : '');
+    '<span style="color:#f87171">bars W=' + barsEl.offsetWidth + ' span=' + span + '</span>';
 }
 
 function dtMinRest(crew, ftMin) {
