@@ -1091,30 +1091,19 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
             </div>
           </div>
 
-          <!-- Timeline (flex-based, no absolute positioning) -->
+          <!-- Timeline -->
           <div class="dt-tl2">
-            <div id="dt-tl2-bars" style="width:100%">
-              <!-- FDP (thin row): wrapper sized by JS, inner bar fills wrapper -->
-              <div style="width:100%;height:11px;margin-bottom:3px">
-                <div id="dt-wrap-fdp"><div style="width:100%;height:11px;background:#22c55e;border-radius:3px"></div></div>
+            <!-- position:relative container, bars are position:absolute with left%+width% -->
+            <div id="dt-tl2-bars" style="position:relative;width:100%;height:120px">
+              <div id="dt-bar-fdp"     style="position:absolute;top:0;height:11px;background:#22c55e;border-radius:3px"></div>
+              <div id="dt-bar-maxfdp"  style="position:absolute;top:17px;height:28px;background:repeating-linear-gradient(-45deg,#3b82f6 0,#3b82f6 7px,#93c5fd 7px,#93c5fd 14px);border-radius:4px;display:flex;align-items:center;overflow:hidden">
+                <span id="dt-lbl-maxfdp" style="font-size:.65em;font-weight:700;color:#fff;white-space:nowrap;padding:0 6px"></span>
               </div>
-              <!-- Max FDP -->
-              <div style="width:100%;height:28px;margin-bottom:3px">
-                <div id="dt-wrap-maxfdp"><div style="width:100%;height:28px;background:repeating-linear-gradient(-45deg,#3b82f6 0,#3b82f6 7px,#93c5fd 7px,#93c5fd 14px);border-radius:4px;display:flex;align-items:center;overflow:hidden">
-                  <span id="dt-lbl-maxfdp" style="font-size:.65em;font-weight:700;color:#fff;white-space:nowrap;padding:0 6px"></span>
-                </div></div>
+              <div id="dt-bar-minrest" style="position:absolute;top:49px;height:28px;background:repeating-linear-gradient(-45deg,#f59e0b 0,#f59e0b 7px,#fcd34d 7px,#fcd34d 14px);border-radius:4px;display:flex;align-items:center;overflow:hidden">
+                <span id="dt-lbl-minrest" style="font-size:.65em;font-weight:700;color:#fff;white-space:nowrap;padding:0 6px"></span>
               </div>
-              <!-- Min Rest -->
-              <div style="width:100%;height:28px;margin-bottom:3px">
-                <div id="dt-wrap-minrest"><div style="width:100%;height:28px;background:repeating-linear-gradient(-45deg,#f59e0b 0,#f59e0b 7px,#fcd34d 7px,#fcd34d 14px);border-radius:4px;display:flex;align-items:center;overflow:hidden">
-                  <span id="dt-lbl-minrest" style="font-size:.65em;font-weight:700;color:#fff;white-space:nowrap;padding:0 6px"></span>
-                </div></div>
-              </div>
-              <!-- Actual Rest -->
-              <div id="dt-row-rest" style="display:none;width:100%;height:28px;margin-bottom:3px">
-                <div id="dt-wrap-rest"><div style="width:100%;height:28px;background:#ef4444;border-radius:4px;display:flex;align-items:center;overflow:hidden">
-                  <span id="dt-lbl-rest" style="font-size:.65em;font-weight:700;color:#fff;white-space:nowrap;padding:0 6px"></span>
-                </div></div>
+              <div id="dt-bar-rest"    style="display:none;position:absolute;top:81px;height:28px;background:#ef4444;border-radius:4px;display:flex;align-items:center;overflow:hidden">
+                <span id="dt-lbl-rest" style="font-size:.65em;font-weight:700;color:#fff;white-space:nowrap;padding:0 6px"></span>
               </div>
             </div>
             <!-- Time labels -->
@@ -1188,7 +1177,7 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
   </button>
   <button class="tab-btn" id="tabBtn-theme" onclick="toggleTheme()">
     <span class="tab-btn-icon" id="theme-icon">☀️</span><span id="theme-label">日間</span>
-    <span style="font-size:.55em;color:var(--dim);line-height:1;opacity:.7">V3.011</span>
+    <span style="font-size:.55em;color:var(--dim);line-height:1;opacity:.7">V3.012</span>
   </button>
 </div>
 
@@ -2040,26 +2029,27 @@ function dtRenderTimeline(startMin, endMin, maxFdp, restStart, restEnd, minRest,
     : startMin + maxFdp + minRest + 60;
   var span = spanEnd - startMin;
 
-  // Single-bar rendering: each bar is one div with margin-left% + width%
+  // position:absolute bars: set left% and width% (same approach as zihchi.github.io/flight-time)
   function setBar(barId, offset, dur) {
     var pct = 100 / span;
     var el  = document.getElementById(barId);
-    el.style.marginLeft = (Math.max(0, offset) * pct).toFixed(2) + '%';
+    el.style.left  = (Math.max(0, offset) * pct).toFixed(2) + '%';
     el.style.width = (Math.max(0.1, Math.min(dur, span - Math.max(0, offset))) * pct).toFixed(2) + '%';
   }
 
-  setBar('dt-wrap-fdp', 0, actFdp);
-  setBar('dt-wrap-maxfdp', 0, maxFdp);
+  setBar('dt-bar-fdp', 0, actFdp);
+  setBar('dt-bar-maxfdp', 0, maxFdp);
   document.getElementById('dt-lbl-maxfdp').textContent = 'Max ' + dtFmtH(maxFdp);
-  setBar('dt-wrap-minrest', actFdp, minRest);
+  setBar('dt-bar-minrest', actFdp, minRest);
   document.getElementById('dt-lbl-minrest').textContent = 'Min Req ' + dtFmtH(minRest);
 
   if (restEnd !== null) {
-    document.getElementById('dt-row-rest').style.display = 'block';
-    setBar('dt-wrap-rest', restStart - startMin, restEnd - restStart);
+    var restEl = document.getElementById('dt-bar-rest');
+    restEl.style.display = 'flex';
+    setBar('dt-bar-rest', restStart - startMin, restEnd - restStart);
     document.getElementById('dt-lbl-rest').textContent = 'Rest ' + dtFmtH(restEnd - restStart);
   } else {
-    document.getElementById('dt-row-rest').style.display = 'none';
+    document.getElementById('dt-bar-rest').style.display = 'none';
   }
 
   // Tick labels (simple flex row, no absolute positioning)
