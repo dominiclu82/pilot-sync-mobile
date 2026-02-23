@@ -1091,46 +1091,48 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
             </div>
           </div>
 
-          <!-- Timeline FIRST -->
+          <!-- Timeline (flex-based, no absolute positioning) -->
           <div class="dt-tl2">
             <div class="dt-tl2-title">Visual Timeline</div>
-            <!-- bars wrapper: vlines/wocl absolute inside here -->
-            <div class="dt-tl2-bars" id="dt-tl2-bars">
-              <div class="dt-tl2-wocl"  id="dt-tl2-wocl"  style="display:none"></div>
-              <div class="dt-tl2-vline" id="dt-tl2-vl-s"></div>
-              <div class="dt-tl2-vline" id="dt-tl2-vl-e"></div>
-              <div class="dt-tl2-vline" id="dt-tl2-vl-n" style="display:none"></div>
-              <!-- FDP (thin) -->
-              <div class="dt-tl2-track-sm">
-                <div class="dt-tl2-seg dt-tl2-fdp" id="dt-tl2-fdp"></div>
+            <div id="dt-tl2-bars" style="display:flex;flex-direction:column;gap:3px">
+              <!-- FDP (thin row) -->
+              <div style="display:flex;height:11px;min-width:0">
+                <div id="dt-fl-fdp-l" style="min-width:0"></div>
+                <div id="dt-fl-fdp-b" style="background:#22c55e;border-radius:3px;min-width:0"></div>
+                <div id="dt-fl-fdp-r" style="min-width:0;flex:1"></div>
               </div>
               <!-- Max FDP -->
-              <div class="dt-tl2-track">
-                <div class="dt-tl2-seg dt-tl2-maxfdp" id="dt-tl2-maxfdp">
-                  <span class="dt-tl2-lbl" id="dt-tl2-maxfdp-lbl"></span>
+              <div style="display:flex;height:28px;min-width:0">
+                <div id="dt-fl-maxfdp-l" style="min-width:0"></div>
+                <div id="dt-fl-maxfdp-b" style="background:repeating-linear-gradient(-45deg,#3b82f6 0,#3b82f6 7px,#93c5fd 7px,#93c5fd 14px);border-radius:4px;display:flex;align-items:center;justify-content:center;overflow:hidden;min-width:0">
+                  <span id="dt-fl-maxfdp-lbl" style="font-size:.65em;font-weight:700;color:#fff;white-space:nowrap;padding:0 6px"></span>
                 </div>
+                <div id="dt-fl-maxfdp-r" style="min-width:0;flex:1"></div>
               </div>
               <!-- Min Rest -->
-              <div class="dt-tl2-track">
-                <div class="dt-tl2-seg dt-tl2-minrest" id="dt-tl2-minrest">
-                  <span class="dt-tl2-lbl" id="dt-tl2-minrest-lbl"></span>
+              <div style="display:flex;height:28px;min-width:0">
+                <div id="dt-fl-minrest-l" style="min-width:0"></div>
+                <div id="dt-fl-minrest-b" style="background:repeating-linear-gradient(-45deg,#f59e0b 0,#f59e0b 7px,#fcd34d 7px,#fcd34d 14px);border-radius:4px;display:flex;align-items:center;justify-content:center;overflow:hidden;min-width:0">
+                  <span id="dt-fl-minrest-lbl" style="font-size:.65em;font-weight:700;color:#fff;white-space:nowrap;padding:0 6px"></span>
                 </div>
+                <div id="dt-fl-minrest-r" style="min-width:0;flex:1"></div>
               </div>
               <!-- Actual Rest -->
-              <div class="dt-tl2-track" id="dt-tl2-rest-row" style="display:none">
-                <div class="dt-tl2-seg dt-tl2-rest" id="dt-tl2-rest">
-                  <span class="dt-tl2-lbl" id="dt-tl2-rest-lbl"></span>
+              <div id="dt-fl-rest-row" style="display:none;height:28px;min-width:0">
+                <div id="dt-fl-rest-l" style="min-width:0"></div>
+                <div id="dt-fl-rest-b" style="background:#ef4444;border-radius:4px;display:flex;align-items:center;justify-content:center;overflow:hidden;min-width:0">
+                  <span id="dt-fl-rest-lbl" style="font-size:.65em;font-weight:700;color:#fff;white-space:nowrap;padding:0 6px"></span>
                 </div>
+                <div id="dt-fl-rest-r" style="min-width:0;flex:1"></div>
               </div>
             </div>
-            <!-- Tick labels OUTSIDE bars so vlines don't cover them -->
-            <div class="dt-tl2-ticks" id="dt-tl2-ticks"></div>
+            <!-- Time labels -->
+            <div id="dt-tl2-ticks" style="display:flex;justify-content:space-between;margin-top:6px;font-size:.65em;color:var(--dim)"></div>
             <div class="dt-legend">
               <div class="dt-leg-item"><div class="dt-leg-box" style="background:#22c55e"></div>FDP</div>
               <div class="dt-leg-item"><div class="dt-leg-box" style="background:repeating-linear-gradient(-45deg,#3b82f6 0,#3b82f6 4px,#93c5fd 4px,#93c5fd 8px)"></div>Max FDP</div>
               <div class="dt-leg-item"><div class="dt-leg-box" style="background:repeating-linear-gradient(-45deg,#f59e0b 0,#f59e0b 4px,#fcd34d 4px,#fcd34d 8px)"></div>Min Rest</div>
-              <div class="dt-leg-item"><div class="dt-leg-box" style="background:#374151"></div>Rest</div>
-              <div class="dt-leg-item"><div class="dt-leg-box" style="background:rgba(167,139,250,.4)"></div>WOCL</div>
+              <div class="dt-leg-item"><div class="dt-leg-box" style="background:#ef4444"></div>Rest</div>
             </div>
           </div>
 
@@ -1195,7 +1197,7 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
   </button>
   <button class="tab-btn" id="tabBtn-theme" onclick="toggleTheme()">
     <span class="tab-btn-icon" id="theme-icon">☀️</span><span id="theme-label">日間</span>
-    <span style="font-size:.55em;color:var(--dim);line-height:1;opacity:.7">V3.005</span>
+    <span style="font-size:.55em;color:var(--dim);line-height:1;opacity:.7">V3.006</span>
   </button>
 </div>
 
@@ -2047,73 +2049,49 @@ function dtRenderTimeline(startMin, endMin, maxFdp, restStart, restEnd, minRest,
     : startMin + maxFdp + minRest + 60;
   var span = spanEnd - startMin;
 
-  // Use window width minus known paddings — reliable regardless of CSS cascade
-  var barsEl = document.getElementById('dt-tl2-bars');
-  var W = Math.max(window.innerWidth - 80, 200);
-  barsEl.style.width = W + 'px';
-  document.getElementById('dt-tl2-ticks').style.width = W + 'px';
-  function px(m)   { return Math.max(0, Math.min(W, (m-startMin)/span*W)).toFixed(1)+'px'; }
-  function pw(dur) { return Math.max(0, Math.min(W, dur/span*W)).toFixed(1)+'px'; }
-  function setSeg(id, lm, wm) {
-    var el=document.getElementById(id); el.style.left=px(lm); el.style.width=pw(wm);
+  // Flex-based rendering: each row = [left-spacer | bar | right-spacer]
+  // flex values are proportional to time (minutes), no pixel measurement needed
+  function setRow(lId, bId, rId, offset, dur) {
+    var off = Math.max(0, offset);
+    var d   = Math.max(0.01, Math.min(dur, span - off));
+    var rem = Math.max(0, span - off - d);
+    document.getElementById(lId).style.flex = String(off);
+    document.getElementById(bId).style.flex = String(d);
+    document.getElementById(rId).style.flex = String(rem);
   }
 
-  // Segments
-  setSeg('dt-tl2-fdp',     startMin, actFdp);
-  setSeg('dt-tl2-maxfdp',  startMin, maxFdp);
-  document.getElementById('dt-tl2-maxfdp-lbl').textContent = 'Max '+dtFmtH(maxFdp);
-  setSeg('dt-tl2-minrest', endMin,   minRest);
-  document.getElementById('dt-tl2-minrest-lbl').textContent = 'Min Req '+dtFmtH(minRest);
+  // FDP bar (starts at 0, duration = actFdp)
+  setRow('dt-fl-fdp-l', 'dt-fl-fdp-b', 'dt-fl-fdp-r', 0, actFdp);
 
+  // Max FDP bar (starts at 0, duration = maxFdp)
+  setRow('dt-fl-maxfdp-l', 'dt-fl-maxfdp-b', 'dt-fl-maxfdp-r', 0, maxFdp);
+  document.getElementById('dt-fl-maxfdp-lbl').textContent = 'Max ' + dtFmtH(maxFdp);
+
+  // Min Rest bar (starts at actFdp, duration = minRest)
+  setRow('dt-fl-minrest-l', 'dt-fl-minrest-b', 'dt-fl-minrest-r', actFdp, minRest);
+  document.getElementById('dt-fl-minrest-lbl').textContent = 'Min Req ' + dtFmtH(minRest);
+
+  // Actual Rest bar (optional)
   if (restEnd !== null) {
-    setSeg('dt-tl2-rest', restStart, restEnd - restStart);
-    document.getElementById('dt-tl2-rest-lbl').textContent = 'Rest '+dtFmtH(restEnd - restStart);
-    document.getElementById('dt-tl2-rest-row').style.display = '';
+    var restOffset = restStart - startMin;
+    var restDur    = restEnd - restStart;
+    document.getElementById('dt-fl-rest-row').style.display = 'flex';
+    setRow('dt-fl-rest-l', 'dt-fl-rest-b', 'dt-fl-rest-r', restOffset, restDur);
+    document.getElementById('dt-fl-rest-lbl').textContent = 'Rest ' + dtFmtH(restDur);
   } else {
-    document.getElementById('dt-tl2-rest-row').style.display = 'none';
+    document.getElementById('dt-fl-rest-row').style.display = 'none';
   }
 
-  // Vlines
-  document.getElementById('dt-tl2-vl-s').style.left = px(startMin);
-  document.getElementById('dt-tl2-vl-e').style.left = px(endMin);
-  if (restEnd !== null) {
-    document.getElementById('dt-tl2-vl-n').style.left = px(restEnd);
-    document.getElementById('dt-tl2-vl-n').style.display = '';
-  } else {
-    document.getElementById('dt-tl2-vl-n').style.display = 'none';
-  }
-
-  // WOCL band — find occurrence near startMin (handles absolute minutes with day offset)
-  var woclTimeOfDay = ((2*60 - tz*60) % 1440 + 1440) % 1440;
-  var startDay = Math.floor(startMin / 1440);
-  var firstWoclAbs = (startDay - 1) * 1440 + woclTimeOfDay;
-  var wBand = document.getElementById('dt-tl2-wocl'), woclShown = false, woclStart_abs = 0;
-  for (var d=0; d<4; d++) {
-    var ws = firstWoclAbs + d*1440, we = ws + 3*60;
-    if (ws < spanEnd && we > startMin) {
-      wBand.style.left = px(ws); wBand.style.width = pw(3*60);
-      wBand.style.height = '100%'; wBand.style.display = '';
-      woclStart_abs = ws; woclShown = true; break;
-    }
-  }
-  if (!woclShown) wBand.style.display = 'none';
-
-  // Tick labels
+  // Tick labels (simple flex row, no absolute positioning)
   function fmtUTC(m) {
     var t=((m%1440)+1440)%1440, h=Math.floor(t/60), mm=t%60;
     return (h<10?'0':'')+h+':'+(mm<10?'0':'')+mm+'Z';
   }
-  var html = '';
-  html += '<div class="dt-tl2-tick" style="left:'+px(startMin)+'">Start<br>'+fmtUTC(startMin)+'</div>';
-  html += '<div class="dt-tl2-tick" style="left:'+px(endMin)+'">Rst Start<br>(FDP End)</div>';
-  if (woclShown) {
-    var woclMid = woclStart_abs + 90;
-    if (woclMid > startMin && woclMid < spanEnd)
-      html += '<div class="dt-tl2-tick" style="left:'+px(woclMid)+'">WOCL</div>';
-  }
-  if (restEnd !== null)
-    html += '<div class="dt-tl2-tick" style="left:'+px(restEnd)+'">Next Rpt<br>'+fmtUTC(restEnd)+'</div>';
-  document.getElementById('dt-tl2-ticks').innerHTML = html;
+  var ticks = document.getElementById('dt-tl2-ticks');
+  ticks.innerHTML =
+    '<span>Start ' + fmtUTC(startMin) + '</span>' +
+    '<span>FDP End ' + fmtUTC(endMin) + '</span>' +
+    (restEnd !== null ? '<span>Next ' + fmtUTC(restEnd) + '</span>' : '');
 }
 
 function dtMinRest(crew, ftMin) {
@@ -2301,11 +2279,8 @@ function dtCalculate() {
     woclBox.style.display = 'none';
   }
 
-  // Timeline — defer 2 frames so layout is fully computed before measuring offsetWidth
-  var _s=startMin,_e=endMin,_mf=maxFdp,_rs=restStart,_re=restEnd,_mr=minRest,_tz=tz;
-  requestAnimationFrame(function(){
-    requestAnimationFrame(function(){ dtRenderTimeline(_s,_e,_mf,_rs,_re,_mr,_tz); });
-  });
+  // Timeline — flex layout needs no width measurement, call directly
+  dtRenderTimeline(startMin, endMin, maxFdp, restStart, restEnd, minRest, tz);
 }
 
 // ── Boot ─────────────────────────────────────────────────────────────────────
