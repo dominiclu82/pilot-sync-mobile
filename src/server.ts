@@ -977,6 +977,16 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
         </div>
       </div>
 
+      <!-- ── TEST: Flex Timeline ── -->
+      <div style="padding:10px 14px 4px">
+        <div style="font-size:.65em;color:var(--dim);letter-spacing:.06em;text-transform:uppercase;margin-bottom:6px">Visual Timeline (Test)</div>
+        <div style="display:flex;width:100%;border-radius:6px;overflow:hidden;height:28px">
+          <div style="flex:2;background:#22c55e;display:flex;align-items:center;justify-content:center;font-size:.65em;font-weight:700;color:#fff">FDP</div>
+          <div style="flex:1;background:repeating-linear-gradient(-45deg,#f59e0b 0,#f59e0b 7px,#fcd34d 7px,#fcd34d 14px);display:flex;align-items:center;justify-content:center;font-size:.65em;font-weight:700;color:#fff">Min Rest</div>
+          <div style="flex:1;background:rgba(255,255,255,.06)"></div>
+        </div>
+      </div>
+
       <!-- Mode -->
       <div class="dt-body" style="padding-bottom:0">
         <div class="dt-mode-row">
@@ -1185,7 +1195,7 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
   </button>
   <button class="tab-btn" id="tabBtn-theme" onclick="toggleTheme()">
     <span class="tab-btn-icon" id="theme-icon">☀️</span><span id="theme-label">日間</span>
-    <span style="font-size:.55em;color:var(--dim);line-height:1;opacity:.7">V3.004</span>
+    <span style="font-size:.55em;color:var(--dim);line-height:1;opacity:.7">V3.005</span>
   </button>
 </div>
 
