@@ -165,6 +165,7 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
   #briefing-hf.active{overflow:hidden;padding:0;height:auto}
   #briefing-coldtemp.active{overflow-y:auto;padding:0}
   #briefing-duty.active{overflow-y:auto;padding:0}
+  #briefing-duty .dt-wrap{flex:none}
   .wx-fixed-header{position:static;flex-shrink:0}
   .wx-split{flex-direction:row;overflow:hidden;flex:1}
   .wx-list-pane{width:280px;flex-shrink:0;overflow-y:auto;border-right:1px solid var(--dim);border-bottom:none}
