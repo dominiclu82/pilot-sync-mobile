@@ -15,6 +15,7 @@ import { getSpaDutyTimeJs } from './spa/js-duty-time.js';
 import { getSpaGateInfoJs } from './spa/js-gate-info.js';
 import puppeteerExtra from 'puppeteer-extra';
 import StealthPlugin from 'puppeteer-extra-plugin-stealth';
+import { chromium as pwChromium } from 'playwright';
 
 
 config({ path: path.join(ROOT, '.env') });
@@ -459,9 +460,11 @@ async function _ontScrape(): Promise<{ arrivals: any[]; departures: any[] }> {
   const pageUrl = Buffer.from('aHR0cHM6Ly93d3cuZmx5b250YXJpby5jb20vZmxpZ2h0cw==', 'base64').toString();
   let browser: any;
   try {
-    console.log('[ONT] Launching stealth browser...');
+    const execPath = pwChromium.executablePath();
+    console.log('[ONT] Launching stealth browser, chrome:', execPath);
     browser = await _stealthBrowser.launch({
       headless: true,
+      executablePath: execPath,
       args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage',
              '--disable-gpu', '--single-process']
     });
