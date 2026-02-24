@@ -505,14 +505,15 @@ async function fetchONT(): Promise<any[]> {
 
 app.get('/api/fids-us', async (_req, res) => {
   try {
+    let ontErr = '';
     const [sfo, phx, sea, lax, ont] = await Promise.all([
       fetchSFO().catch(() => []),
       fetchPHX().catch(() => []),
       fetchSEA().catch(() => []),
       fetchLAX().catch(() => []),
-      fetchONT().catch(() => [])
+      fetchONT().catch((e: any) => { ontErr = e.message || String(e); return []; })
     ]);
-    res.json({ sfo, phx, sea, lax, ont });
+    res.json({ sfo, phx, sea, lax, ont, _ontErr: ontErr || undefined });
   } catch (e: any) {
     console.error('FIDS-US proxy error:', e.message);
     res.status(502).json({ error: e.message });
