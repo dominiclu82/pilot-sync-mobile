@@ -189,7 +189,14 @@ app.get('/api/fids', async (_req, res) => {
       ODate: odate, OTimeOpen: null, OTimeClose: null,
       BNO: null, AState: '', language: 'ch', keyword: ''
     };
-    const hdrs = { 'Content-Type': 'application/json', 'User-Agent': 'Mozilla/5.0' };
+    const hdrs: Record<string, string> = {
+      'Content-Type': 'application/json',
+      'Accept': 'application/json, text/plain, */*',
+      'Accept-Language': 'zh-TW,zh;q=0.9',
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+      'Origin': 'https://www.taoyuan-airport.com',
+      'Referer': 'https://www.taoyuan-airport.com/flight_arrival'
+    };
     const ep = 'https://www.taoyuan-airport.com/api/api/flight/a_flight';
 
     const [dR, aR] = await Promise.all([

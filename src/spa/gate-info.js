@@ -1,6 +1,11 @@
 // ── Gate Info ──────────────────────────────────────────────────────────────────
 var gateFlightsLoaded = false;
 
+function giFmtTime(t) {
+  if (!t) return '';
+  return t.replace(/:00$/, '');
+}
+
 function loadGateFlights() {
   var statusEl = document.getElementById('gate-status');
   var tableBody = document.getElementById('gate-tbody');
@@ -32,10 +37,10 @@ function loadGateFlights() {
         m.origin = 'TPE';
         m.dest = f.CityCode || '';
         m.destName = f.CityName || f.CityCode || '';
-        m.checkin = f.Counter || '';
+        m.checkin = f.CheckIn || '';
         m.gate = f.Gate || '';
-        m.std = f.OTime || '';
-        m.atd = f.RTime || '';
+        m.std = giFmtTime(f.OTime);
+        m.atd = giFmtTime(f.RTime);
         m.depTerminal = f.BNO ? 'T' + f.BNO : '';
         m.depMemo = f.Memo || '';
       });
@@ -50,8 +55,8 @@ function loadGateFlights() {
         m.dest = m.dest || 'TPE';
         m.parking = f.Gate || '';
         m.carousel = f.StopCode || '';
-        m.sta = f.OTime || '';
-        m.ata = f.RTime || '';
+        m.sta = giFmtTime(f.OTime);
+        m.ata = giFmtTime(f.RTime);
         m.arrTerminal = f.BNO ? 'T' + f.BNO : '';
         m.arrMemo = f.Memo || '';
       });
