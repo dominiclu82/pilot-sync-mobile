@@ -596,7 +596,10 @@ export function getSpaHtmlBody(): string {
         <span class="gi-title">JX Flight Info</span>
         <span class="gi-date" id="gate-date"></span>
       </div>
-      <button class="gi-refresh-btn" onclick="refreshGateFlights()">🔄 更新航班資訊</button>
+      <div class="gi-header-btns">
+        <button class="gi-time-btn" id="gi-time-btn" onclick="toggleGiTime()">⏱ 時間</button>
+        <button class="gi-refresh-btn" onclick="refreshGateFlights()">🔄 更新航班資訊</button>
+      </div>
     </div>
     <div class="gi-search-bar">
       <span class="gi-search-prefix">JX</span>
@@ -604,7 +607,7 @@ export function getSpaHtmlBody(): string {
     </div>
     <div id="gate-status" class="gi-status">按下「更新航班資訊」載入今日航班</div>
     <div id="gate-table-wrap" class="gi-table-wrap" style="display:none">
-      <table class="gi-table">
+      <table class="gi-table gi-hide-time" id="gi-table">
         <thead>
           <tr>
             <th class="gi-sticky-col">航班</th>
@@ -612,14 +615,14 @@ export function getSpaHtmlBody(): string {
             <th>Terminal</th>
             <th>Check-in</th>
             <th>Gate</th>
-            <th>STD</th>
-            <th>ATD</th>
+            <th class="gi-time-col">STD</th>
+            <th class="gi-time-col">ATD</th>
             <th>目的地</th>
             <th>Terminal</th>
             <th>Parking</th>
             <th>轉盤</th>
-            <th>STA</th>
-            <th>ATA</th>
+            <th class="gi-time-col">STA</th>
+            <th class="gi-time-col">ATA</th>
           </tr>
         </thead>
         <tbody id="gate-tbody"></tbody>
@@ -655,7 +658,7 @@ export function getSpaHtmlBody(): string {
   </button>
   <button class="tab-btn" id="tabBtn-theme" onclick="toggleTheme()">
     <span class="tab-btn-icon" id="theme-icon">☀️</span><span id="theme-label">日間</span>
-    <span style="font-size:.55em;color:var(--dim);line-height:1;opacity:.7">V4.004</span>
+    <span style="font-size:.55em;color:var(--dim);line-height:1;opacity:.7">V4.005</span>
   </button>
 </div>
 

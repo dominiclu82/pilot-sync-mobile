@@ -67,20 +67,34 @@ function giMakeRow(f) {
     { val: f.ata || '—' }
   ];
 
+  var timeCols = { 5:1, 6:1, 11:1, 12:1 };
   cells.forEach(function(c, idx) {
     var td = document.createElement('td');
     td.textContent = c.val;
     if (idx === 0) td.className = 'gi-fno gi-sticky-col';
+    if (timeCols[idx]) td.className = (td.className ? td.className + ' ' : '') + 'gi-time-col';
     tr.appendChild(td);
   });
 
   return tr;
 }
 
+function toggleGiTime() {
+  var table = document.getElementById('gi-table');
+  var btn = document.getElementById('gi-time-btn');
+  if (table.classList.contains('gi-hide-time')) {
+    table.classList.remove('gi-hide-time');
+    btn.classList.add('gi-time-btn-on');
+  } else {
+    table.classList.add('gi-hide-time');
+    btn.classList.remove('gi-time-btn-on');
+  }
+}
+
 function renderGateFlights() {
   var tableBody = document.getElementById('gate-tbody');
   var searchInput = document.getElementById('gate-search');
-  var searchTerm = (searchInput && searchInput.value || '').replace(/\s/g, '');
+  var searchTerm = (searchInput && searchInput.value || '').replace(/\s/g, '').replace(/^0+/, '');
 
   tableBody.innerHTML = '';
 
@@ -213,7 +227,5 @@ function loadGateFlights() {
 }
 
 function refreshGateFlights() {
-  var searchInput = document.getElementById('gate-search');
-  if (searchInput) searchInput.value = '';
   loadGateFlights();
 }

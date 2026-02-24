@@ -156,12 +156,12 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
   .briefing-subtab{flex:1}
   .briefing-panel.active{padding:0}
   /* ── 需要固定高度的 tab：datis 分割面板、HF iframe ── */
-  html:has(#briefing-datis.active),html:has(#briefing-hf.active),
-  html:has(#tab-sync.tab-active){overflow:hidden;height:100dvh}
-  html:has(#briefing-datis.active) body,html:has(#briefing-hf.active) body,
-  html:has(#tab-sync.tab-active) body{overflow:hidden;height:100dvh}
-  html:has(#briefing-datis.active) #tab-briefing.tab-active,
-  html:has(#briefing-hf.active) #tab-briefing.tab-active{
+  html:has(#tab-briefing.tab-active #briefing-datis.active),html:has(#tab-briefing.tab-active #briefing-hf.active),
+  html:has(#tab-sync.tab-active),html:has(#tab-gate.tab-active){overflow:hidden;height:100dvh}
+  html:has(#tab-briefing.tab-active #briefing-datis.active) body,html:has(#tab-briefing.tab-active #briefing-hf.active) body,
+  html:has(#tab-sync.tab-active) body,html:has(#tab-gate.tab-active) body{overflow:hidden;height:100dvh}
+  html:has(#tab-briefing.tab-active #briefing-datis.active) #tab-briefing.tab-active,
+  html:has(#tab-briefing.tab-active #briefing-hf.active) #tab-briefing.tab-active{
     display:flex;flex-direction:column;
     height:calc(100dvh - calc(56px + env(safe-area-inset-bottom,0px)));
     min-height:unset;overflow:hidden;padding:0}
@@ -321,17 +321,19 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
 .wx-flt-def-body{margin-top:6px;display:flex;flex-direction:column;gap:5px;color:var(--muted);padding-bottom:2px}
 .wx-flt-def-body>div{display:flex;align-items:center;gap:8px;line-height:1.4}
 /* ── Gate Info ── */
-#tab-gate{display:none;position:relative;padding:0 0 calc(20px + var(--safe-bottom))}
-#tab-gate.tab-active{display:block}
+#tab-gate{display:none;position:relative}
+#tab-gate.tab-active{display:flex;flex-direction:column;
+  height:calc(100dvh - calc(56px + env(safe-area-inset-bottom,0px)))}
 .gi-header{display:flex;align-items:center;justify-content:space-between;padding:12px 14px;
-  border-bottom:1px solid var(--dim);position:sticky;top:0;background:var(--bg);z-index:10}
+  border-bottom:1px solid var(--dim);background:var(--bg);flex-shrink:0}
 .gi-header-left{display:flex;flex-direction:column;gap:2px}
 .gi-title{font-weight:700;font-size:.95em;color:var(--text)}
 .gi-date{font-size:.72em;color:var(--dim)}
 .gi-refresh-btn{background:var(--accent);color:#fff;border:none;border-radius:8px;
   padding:8px 14px;font-size:.82em;font-weight:600;cursor:pointer;white-space:nowrap;-webkit-appearance:none}
 .gi-refresh-btn:active{opacity:.7}
-.gi-search-bar{display:flex;align-items:center;gap:0;padding:10px 14px;border-bottom:1px solid rgba(148,163,184,.1)}
+.gi-search-bar{display:flex;align-items:center;gap:0;padding:10px 14px;
+  border-bottom:1px solid rgba(148,163,184,.1);flex-shrink:0}
 .gi-search-prefix{font-weight:800;font-size:.95em;color:var(--accent-light);padding:7px 2px 7px 12px;
   background:var(--surface);border:1.5px solid var(--dim);border-right:none;border-radius:8px 0 0 8px}
 .gi-search-input{flex:1;max-width:160px;padding:7px 10px;background:var(--surface);border:1.5px solid var(--dim);
@@ -340,18 +342,23 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
 .gi-search-input::placeholder{color:var(--dim);font-weight:400}
 .gi-search-input:focus{border-color:var(--accent)}
 .gi-status{text-align:center;padding:32px 16px;color:var(--muted);font-size:.88em}
-.gi-table-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;padding:0 0 8px}
-.gi-table{border-collapse:collapse;font-size:.75em;width:100%;min-width:720px}
+.gi-table-wrap{flex:1;overflow:auto;-webkit-overflow-scrolling:touch;min-height:0}
+.gi-table{table-layout:fixed;border-collapse:collapse;font-size:.75em;width:100%;min-width:900px}
 .gi-table thead{position:sticky;top:0;z-index:5}
 .gi-table th{background:var(--surface);color:var(--muted);font-weight:700;padding:8px 6px;
   text-align:center;border-bottom:2px solid var(--dim);white-space:nowrap;font-size:.85em}
 .gi-table td{padding:6px 6px;text-align:center;border-bottom:1px solid rgba(148,163,184,.15);
-  white-space:nowrap;color:var(--text)}
+  white-space:nowrap;color:var(--text);overflow:hidden;text-overflow:ellipsis}
 .gi-table tbody tr:hover{background:rgba(59,130,246,.08)}
 .gi-fno{font-weight:700;color:var(--accent-light)!important}
 .gi-sticky-col{position:sticky;left:0;z-index:3;background:var(--surface)}
 .gi-table tbody .gi-sticky-col{background:var(--bg)}
 .gi-separator td{height:12px;border-bottom:2px solid var(--accent);background:none}
-.gi-notice{font-size:.65em;color:var(--dim);text-align:center;padding:8px 0 16px}
+.gi-hide-time .gi-time-col{display:none}
+.gi-header-btns{display:flex;gap:8px;align-items:center}
+.gi-time-btn{background:none;color:var(--muted);border:1.5px solid var(--dim);border-radius:8px;
+  padding:8px 12px;font-size:.82em;font-weight:600;cursor:pointer;white-space:nowrap;-webkit-appearance:none}
+.gi-time-btn-on{border-color:var(--accent);color:var(--accent)}
+.gi-notice{flex-shrink:0;font-size:.65em;color:var(--dim);text-align:center;padding:8px 0 16px}
 `;
 }
