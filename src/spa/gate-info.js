@@ -138,7 +138,8 @@ function filterGateFlights() {
 
 function _giMergeUS(map, usData) {
   var allFlights = [].concat(
-    usData.sfo || [], usData.phx || [], usData.sea || [], usData.lax || []
+    usData.sfo || [], usData.phx || [], usData.sea || [], usData.lax || [],
+    usData.ont || []
   );
   allFlights.forEach(function(f) {
     var key = f.fno;

@@ -384,15 +384,52 @@ async function fetchLAX(): Promise<any[]> {
   return results;
 }
 
+async function fetchONT(): Promise<any[]> {
+  const results: any[] = [];
+  const base = atob('aHR0cHM6Ly93d3cuZmx5b250YXJpby5jb20vYXBpL2pzb24vZmxpZ2h0cw==');
+  for (const dir of ['arrivals', 'departures']) {
+    try {
+      const r = await fetch(`${base}/${dir}`, {
+        headers: { 'User-Agent': 'Mozilla/5.0', 'Accept': 'application/json' }
+      });
+      if (!r.ok) continue;
+      const data = await r.json();
+      const flights = Array.isArray(data) ? data : (data.data || data.flights || []);
+      for (const f of flights) {
+        const airline = (f.airline_name || '').toUpperCase();
+        const fno = (f.flightno || '').replace(/\s/g, '').toUpperCase();
+        if (!fno.startsWith('JX') && !/STARLUX/i.test(airline)) continue;
+        const normalFno = fno.startsWith('JX') ? fno : fno;
+        results.push({
+          airport: 'ONT',
+          fno: normalFno,
+          direction: dir === 'arrivals' ? 'A' : 'D',
+          gate: f.gate || '',
+          terminal: f.terminal || '',
+          carousel: '',
+          scheduled: f.schedule_time || '',
+          estimated: '',
+          actual: '',
+          status: f.status || '',
+          origin: dir === 'arrivals' ? (f.origin || '') : 'ONT',
+          dest: dir === 'arrivals' ? 'ONT' : (f.origin || '')
+        });
+      }
+    } catch {}
+  }
+  return results;
+}
+
 app.get('/api/fids-us', async (_req, res) => {
   try {
-    const [sfo, phx, sea, lax] = await Promise.all([
+    const [sfo, phx, sea, lax, ont] = await Promise.all([
       fetchSFO().catch(() => []),
       fetchPHX().catch(() => []),
       fetchSEA().catch(() => []),
-      fetchLAX().catch(() => [])
+      fetchLAX().catch(() => []),
+      fetchONT().catch(() => [])
     ]);
-    res.json({ sfo, phx, sea, lax });
+    res.json({ sfo, phx, sea, lax, ont });
   } catch (e: any) {
     console.error('FIDS-US proxy error:', e.message);
     res.status(502).json({ error: e.message });

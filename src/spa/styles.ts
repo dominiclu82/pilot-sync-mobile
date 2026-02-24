@@ -354,6 +354,8 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
   font-weight:600;-webkit-appearance:none}
 .gi-search-input::placeholder{color:var(--dim);font-weight:400}
 .gi-search-input:focus{border-color:var(--accent)}
+.gi-dev-note{font-size:.72em;color:#f59e0b;text-align:center;padding:6px 14px;
+  background:rgba(245,158,11,.08);border-bottom:1px solid rgba(245,158,11,.15)}
 .gi-status{text-align:center;padding:32px 16px;color:var(--muted);font-size:.88em}
 .gi-table-wrap{flex:1;overflow:auto;-webkit-overflow-scrolling:touch;min-height:0}
 .gi-table{table-layout:fixed;border-collapse:collapse;font-size:.75em;width:100%;min-width:900px}
