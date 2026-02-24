@@ -224,18 +224,10 @@ app.get('/api/fids', async (_req, res) => {
 });
 
 // ── US FIDS proxy ────────────────────────────────────────────────────────────
-async function fetchSFO(): Promise<any[]> {
-  const r = await fetch('https://www.flysfo.com/flysfo/api/flight-status', {
-    headers: { 'User-Agent': 'Mozilla/5.0', 'Accept': 'application/json' }
-  });
-  if (!r.ok) return [];
-  const data = await r.json();
-  const flights = (data.data || data || []).filter((f: any) =>
-    f.airline?.iata_code === 'JX'
-  );
-  return flights.map((f: any) => ({
+function _sfoMap(f: any): any {
+  return {
     airport: 'SFO',
-    fno: 'JX' + (f.flight_number || ''),
+    fno: (f.airline?.iata_code || '') + (f.flight_number || ''),
     direction: f.flight_kind === 'Arrival' ? 'A' : 'D',
     gate: f.gate?.gate_number || '',
     terminal: f.terminal?.terminal_code || '',
@@ -246,7 +238,42 @@ async function fetchSFO(): Promise<any[]> {
     status: f.remark || '',
     origin: f.flight_kind === 'Arrival' ? (f.routes?.[0]?.origin_airport?.iata_code || '') : 'SFO',
     dest: f.flight_kind === 'Arrival' ? 'SFO' : (f.routes?.[0]?.destination_airport?.iata_code || '')
-  }));
+  };
+}
+
+async function fetchSFO(): Promise<any[]> {
+  const r = await fetch('https://www.flysfo.com/flysfo/api/flight-status', {
+    headers: { 'User-Agent': 'Mozilla/5.0', 'Accept': 'application/json' }
+  });
+  if (!r.ok) return [];
+  const data = await r.json();
+  const all = data.data || data || [];
+  const jx = all.filter((f: any) => f.airline?.iata_code === 'JX');
+  if (jx.length > 0) return jx.map(_sfoMap);
+  // Test: return first available flight as sample
+  if (all.length > 0) {
+    const s = _sfoMap(all[0]);
+    s._test = true;
+    return [s];
+  }
+  return [];
+}
+
+function _phxMap(f: any): any {
+  return {
+    airport: 'PHX',
+    fno: (f.LineCode || '') + (f.Flightnumber || ''),
+    direction: f.AD === 'A' ? 'A' : 'D',
+    gate: f.Gate || '',
+    terminal: f.Terminal ? 'T' + f.Terminal : '',
+    carousel: f.BagClaim || '',
+    scheduled: f.ScheduledDateTime || f.ScheduledTime || '',
+    estimated: f.Estimated || '',
+    actual: f.Actual || '',
+    status: f.Status || '',
+    origin: f.AD === 'A' ? (f.Destination || '').replace(/.*\((\w+)\).*/, '$1') : 'PHX',
+    dest: f.AD === 'A' ? 'PHX' : (f.Destination || '').replace(/.*\((\w+)\).*/, '$1')
+  };
 }
 
 async function fetchPHX(): Promise<any[]> {
@@ -255,54 +282,85 @@ async function fetchPHX(): Promise<any[]> {
   });
   if (!r.ok) return [];
   const data = await r.json();
-  const flights = (data || []).filter((f: any) => f.LineCode === 'JX');
-  return flights.map((f: any) => ({
-    airport: 'PHX',
-    fno: 'JX' + (f.Flightnumber || ''),
-    direction: f.AD === 'A' ? 'A' : 'D',
-    gate: f.Gate || '',
-    terminal: f.Terminal || '',
-    carousel: f.BagClaim || '',
-    scheduled: f.ScheduledTime || '',
-    estimated: f.Estimated || '',
-    actual: f.Actual || '',
-    status: f.Status || '',
-    origin: f.AD === 'A' ? '' : 'PHX',
-    dest: f.AD === 'A' ? 'PHX' : ''
-  }));
+  const all = data || [];
+  const jx = all.filter((f: any) => f.LineCode === 'JX');
+  if (jx.length > 0) return jx.map(_phxMap);
+  if (all.length > 0) {
+    const s = _phxMap(all[0]);
+    s._test = true;
+    return [s];
+  }
+  return [];
+}
+
+function _seaMapRow(cells: string[], dir: string, isTest: boolean): any {
+  const obj: any = {
+    airport: 'SEA',
+    fno: cells[2] || '',
+    direction: dir,
+    gate: cells[6] || '',
+    terminal: '',
+    carousel: cells[7] || '',
+    scheduled: cells[4] || '',
+    estimated: '',
+    actual: '',
+    status: cells[5] || '',
+    origin: dir === 'A' ? (cells[0] || '') : 'SEA',
+    dest: dir === 'A' ? 'SEA' : (cells[0] || '')
+  };
+  if (isTest) obj._test = true;
+  return obj;
 }
 
 async function fetchSEA(): Promise<any[]> {
   const results: any[] = [];
   for (const dir of ['A', 'D']) {
     const r = await fetch(
-      `https://www.portseattle.org/pos/flights?arr_or_depart=${dir}&airline=JX&flightNo=&city=&flight_date=`,
+      `https://www.portseattle.org/pos/flights?arr_or_depart=${dir}&airline=&flightNo=&city=&flight_date=`,
       { headers: { 'User-Agent': 'Mozilla/5.0' } }
     );
     if (!r.ok) continue;
     const html = await r.text();
     const rows = html.match(/<tr[^>]*>[\s\S]*?<\/tr>/gi) || [];
+    let foundJX = false;
+    let firstRow: string[] | null = null;
     for (const row of rows) {
       const cells = (row.match(/<td[^>]*>([\s\S]*?)<\/td>/gi) || [])
         .map((c: string) => c.replace(/<[^>]+>/g, '').trim());
-      if (cells.length < 7 || !cells[2].startsWith('JX')) continue;
-      results.push({
-        airport: 'SEA',
-        fno: cells[2],
-        direction: dir,
-        gate: cells[6] || '',
-        terminal: '',
-        carousel: cells[7] || '',
-        scheduled: cells[4] || '',
-        estimated: '',
-        actual: '',
-        status: cells[5] || '',
-        origin: dir === 'A' ? '' : 'SEA',
-        dest: dir === 'A' ? 'SEA' : ''
-      });
+      if (cells.length < 7) continue;
+      if (!firstRow) firstRow = cells;
+      if ((cells[2] || '').startsWith('JX')) {
+        results.push(_seaMapRow(cells, dir, false));
+        foundJX = true;
+      }
+    }
+    if (!foundJX && firstRow) {
+      results.push(_seaMapRow(firstRow, dir, true));
     }
   }
   return results;
+}
+
+function _laxParseRow(row: string, type: string): any | null {
+  const cells = (row.match(/<td[^>]*>([\s\S]*?)<\/td>/gi) || [])
+    .map((c: string) => c.replace(/<[^>]+>/g, '').trim());
+  const fnMatch = row.match(/fn=([A-Z0-9]+\d+)/i);
+  const fno = fnMatch ? fnMatch[1].toUpperCase() : (cells[1] || '').replace(/\s/g, '');
+  if (!fno) return null;
+  const gateRaw = cells[2] || '';
+  const gateMatch = gateRaw.match(/T([^-\s]+)\s*-\s*(\S+)/);
+  const terminal = gateMatch ? gateMatch[1] : '';
+  const gate = gateMatch ? gateMatch[2] : gateRaw;
+  return {
+    airport: 'LAX', fno,
+    direction: type === 'arr' ? 'A' : 'D',
+    gate, terminal: terminal ? 'T' + terminal : '',
+    carousel: '',
+    scheduled: cells[4] || '', estimated: '', actual: '',
+    status: (cells[5] || '').replace(/<[^>]+>/g, '').trim(),
+    origin: type === 'arr' ? (cells[3] || '') : 'LAX',
+    dest: type === 'arr' ? 'LAX' : (cells[3] || '')
+  };
 }
 
 async function fetchLAX(): Promise<any[]> {
@@ -314,39 +372,24 @@ async function fetchLAX(): Promise<any[]> {
     );
     if (!r.ok) continue;
     const html = await r.text();
-    // Split into table rows, find JX rows by data-airlinecode or flight link
     const rows = html.match(/<tr[^>]*>[\s\S]*?<\/tr>/gi) || [];
+    let foundJX = false;
+    let firstParsed: any = null;
     for (const row of rows) {
+      const parsed = _laxParseRow(row, type);
+      if (!parsed) continue;
+      if (!firstParsed) firstParsed = parsed;
       const isJX = /data-airlinecode="JX"/i.test(row) ||
                    /fn=JX\d/i.test(row) ||
                    /STARLUX/i.test(row);
-      if (!isJX) continue;
-      const cells = (row.match(/<td[^>]*>([\s\S]*?)<\/td>/gi) || [])
-        .map((c: string) => c.replace(/<[^>]+>/g, '').trim());
-      // Extract flight number from link
-      const fnMatch = row.match(/fn=(JX\d+)/i);
-      const fno = fnMatch ? fnMatch[1].toUpperCase() : '';
-      if (!fno) continue;
-      // cells: [airline, flightNum, gate, destination/origin, schedTime, status]
-      const gateRaw = cells[2] || '';
-      // Gate format: "TB - 151" → terminal=B, gate=151; or "T4 - 46B" → terminal=4, gate=46B
-      const gateMatch = gateRaw.match(/T([^-\s]+)\s*-\s*(\S+)/);
-      const terminal = gateMatch ? gateMatch[1] : '';
-      const gate = gateMatch ? gateMatch[2] : gateRaw;
-      results.push({
-        airport: 'LAX',
-        fno,
-        direction: type === 'arr' ? 'A' : 'D',
-        gate,
-        terminal: terminal ? 'T' + terminal : '',
-        carousel: '',
-        scheduled: cells[4] || '',
-        estimated: '',
-        actual: '',
-        status: (cells[5] || '').replace(/<[^>]+>/g, '').trim(),
-        origin: type === 'arr' ? '' : 'LAX',
-        dest: type === 'arr' ? 'LAX' : ''
-      });
+      if (isJX) {
+        results.push(parsed);
+        foundJX = true;
+      }
+    }
+    if (!foundJX && firstParsed) {
+      firstParsed._test = true;
+      results.push(firstParsed);
     }
   }
   // Also try baggage claim page for carousel info
@@ -360,13 +403,12 @@ async function fetchLAX(): Promise<any[]> {
         if (!/STARLUX/i.test(row) && !/\bJX\b/i.test(row)) continue;
         const cells = (row.match(/<td[^>]*>([\s\S]*?)<\/td>/gi) || [])
           .map((c: string) => c.replace(/<[^>]+>/g, '').trim());
-        // cells: [airline, flightNum, terminal, carousel]
         if (cells.length < 4) continue;
         const fnRaw = cells[1] || '';
         const fnMatch2 = fnRaw.match(/(JX\d+)/i);
         if (!fnMatch2) continue;
         const fno2 = fnMatch2[1].toUpperCase();
-        const existing = results.find(f => f.fno === fno2 && f.direction === 'A');
+        const existing = results.find((f: any) => f.fno === fno2 && f.direction === 'A');
         if (existing) {
           existing.carousel = cells[3] || existing.carousel;
           if (!existing.terminal && cells[2]) existing.terminal = cells[2];
@@ -384,6 +426,23 @@ async function fetchLAX(): Promise<any[]> {
   return results;
 }
 
+function _ontMap(f: any, dir: string): any {
+  return {
+    airport: 'ONT',
+    fno: (f.flightno || '').replace(/\s/g, '').toUpperCase(),
+    direction: dir === 'arrivals' ? 'A' : 'D',
+    gate: f.gate || '',
+    terminal: f.terminal || '',
+    carousel: '',
+    scheduled: f.schedule_time || '',
+    estimated: '',
+    actual: '',
+    status: f.status || '',
+    origin: dir === 'arrivals' ? (f.origin || '') : 'ONT',
+    dest: dir === 'arrivals' ? 'ONT' : (f.origin || '')
+  };
+}
+
 async function fetchONT(): Promise<any[]> {
   const results: any[] = [];
   const base = atob('aHR0cHM6Ly93d3cuZmx5b250YXJpby5jb20vYXBpL2pzb24vZmxpZ2h0cw==');
@@ -395,25 +454,21 @@ async function fetchONT(): Promise<any[]> {
       if (!r.ok) continue;
       const data = await r.json();
       const flights = Array.isArray(data) ? data : (data.data || data.flights || []);
+      let foundJX = false;
+      let firstFlight: any = null;
       for (const f of flights) {
+        if (!firstFlight && f.flightno) firstFlight = f;
         const airline = (f.airline_name || '').toUpperCase();
         const fno = (f.flightno || '').replace(/\s/g, '').toUpperCase();
-        if (!fno.startsWith('JX') && !/STARLUX/i.test(airline)) continue;
-        const normalFno = fno.startsWith('JX') ? fno : fno;
-        results.push({
-          airport: 'ONT',
-          fno: normalFno,
-          direction: dir === 'arrivals' ? 'A' : 'D',
-          gate: f.gate || '',
-          terminal: f.terminal || '',
-          carousel: '',
-          scheduled: f.schedule_time || '',
-          estimated: '',
-          actual: '',
-          status: f.status || '',
-          origin: dir === 'arrivals' ? (f.origin || '') : 'ONT',
-          dest: dir === 'arrivals' ? 'ONT' : (f.origin || '')
-        });
+        if (fno.startsWith('JX') || /STARLUX/i.test(airline)) {
+          results.push(_ontMap(f, dir));
+          foundJX = true;
+        }
+      }
+      if (!foundJX && firstFlight) {
+        const s = _ontMap(firstFlight, dir);
+        s._test = true;
+        results.push(s);
       }
     } catch {}
   }

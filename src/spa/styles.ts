@@ -369,6 +369,9 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
 .gi-sticky-col{position:sticky;left:0;z-index:3;background:var(--surface)}
 .gi-table tbody .gi-sticky-col{background:var(--bg)}
 .gi-separator td{height:12px;border-bottom:2px solid var(--accent);background:none}
+.gi-test-header td{background:#f59e0b22;color:#f59e0b;font-size:.75em;font-weight:700;text-align:center;padding:6px}
+.gi-test-row{background:#f59e0b11}
+.gi-test-row td{color:#f59e0b;font-size:.82em}
 .gi-hide-time .gi-time-col{display:none}
 .gi-header-btns{display:flex;gap:8px;align-items:center}
 .gi-time-btn{background:none;color:var(--muted);border:1.5px solid var(--dim);border-radius:8px;

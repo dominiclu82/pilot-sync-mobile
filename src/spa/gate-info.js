@@ -91,12 +91,59 @@ function toggleGiTime() {
   }
 }
 
+function giMakeTestRow(f) {
+  var tr = document.createElement('tr');
+  tr.className = 'gi-test-row';
+  var dir = f.direction === 'A' ? 'Arr' : 'Dep';
+  var cells = [
+    { val: '[TEST] ' + f.airport },
+    { val: f.fno },
+    { val: '' },
+    { val: '' },
+    { val: f.gate || '—' },
+    { val: f.scheduled || '—' },
+    { val: '' },
+    { val: f.origin || '—' },
+    { val: f.terminal || '—' },
+    { val: '' },
+    { val: f.carousel || '—' },
+    { val: '' },
+    { val: dir + ': ' + (f.status || '—') }
+  ];
+  cells.forEach(function(c) {
+    var td = document.createElement('td');
+    td.textContent = c.val;
+    tr.appendChild(td);
+  });
+  return tr;
+}
+
 function renderGateFlights() {
   var tableBody = document.getElementById('gate-tbody');
   var searchInput = document.getElementById('gate-search');
   var searchTerm = (searchInput && searchInput.value || '').replace(/\s/g, '').replace(/^0+/, '');
 
   tableBody.innerHTML = '';
+
+  // Show test rows at top
+  if (_giTestRows.length > 0) {
+    var testHeader = document.createElement('tr');
+    testHeader.className = 'gi-test-header';
+    var th = document.createElement('td');
+    th.colSpan = 13;
+    th.textContent = '⚠ 以下為測試資料（驗證各機場資料來源）';
+    testHeader.appendChild(th);
+    tableBody.appendChild(testHeader);
+    _giTestRows.forEach(function(f) {
+      tableBody.appendChild(giMakeTestRow(f));
+    });
+    var sep0 = document.createElement('tr');
+    sep0.className = 'gi-separator';
+    var td0 = document.createElement('td');
+    td0.colSpan = 13;
+    sep0.appendChild(td0);
+    tableBody.appendChild(sep0);
+  }
 
   var pinned = [];
   var others = [];
@@ -172,7 +219,10 @@ function _giFetchONTDirect() {
   }).catch(function() { return []; });
 }
 
+var _giTestRows = [];
+
 function _giMergeUS(map, usData) {
+  _giTestRows = [];
   var allFlights = [].concat(
     usData.sfo || [], usData.phx || [], usData.sea || [], usData.lax || [],
     usData.ont || []
@@ -180,16 +230,18 @@ function _giMergeUS(map, usData) {
   allFlights.forEach(function(f) {
     var key = f.fno;
     if (!key) return;
+    if (f._test) {
+      _giTestRows.push(f);
+      return;
+    }
     if (!map[key]) map[key] = { fno: key };
     var m = map[key];
     if (f.direction === 'D') {
-      // Departure from US airport (= origin side for return flights)
       if (!m.gate || m.gate === '—') m.gate = f.gate || m.gate;
       if (!m.depTerminal) m.depTerminal = f.terminal || '';
       if (!m.origin) m.origin = f.airport;
       if (!m.originCode) m.originCode = f.airport;
     } else {
-      // Arrival at US airport (= destination side for outbound flights)
       if (!m.parking) m.parking = f.gate || '';
       if (!m.carousel) m.carousel = f.carousel || '';
       if (!m.arrTerminal) m.arrTerminal = f.terminal || '';
