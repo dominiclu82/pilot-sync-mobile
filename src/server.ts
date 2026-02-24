@@ -204,10 +204,17 @@ app.get('/api/fids', async (_req, res) => {
       fetch(ep, { method: 'POST', headers: hdrs, body: JSON.stringify({ ...base, AState: 'A' }) })
     ]);
 
+    if (!dR.ok || !aR.ok) {
+      console.error(`FIDS proxy upstream error: dep=${dR.status} arr=${aR.status}`);
+      res.status(502).json({ error: `upstream ${dR.status}/${aR.status}` });
+      return;
+    }
+
     const dep = await dR.json();
     const arr = await aR.json();
     res.json({ dep, arr, date: odate });
   } catch (e: any) {
+    console.error('FIDS proxy error:', e.message);
     res.status(502).json({ error: e.message });
   }
 });

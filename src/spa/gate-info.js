@@ -6,6 +6,36 @@ function giFmtTime(t) {
   return t.replace(/:00$/, '');
 }
 
+function _giDate() {
+  var now = new Date();
+  var tw = new Date(now.getTime() + 8 * 60 * 60 * 1000);
+  return tw.getUTCFullYear() + '/' +
+    String(tw.getUTCMonth() + 1).padStart(2, '0') + '/' +
+    String(tw.getUTCDate()).padStart(2, '0');
+}
+
+function _giFetchDirect() {
+  var ep = atob('aHR0cHM6Ly93d3cudGFveXVhbi1haXJwb3J0LmNvbS9hcGkvYXBpL2ZsaWdodC9hX2ZsaWdodA==');
+  var odate = _giDate();
+  var base = {
+    ODate: odate, OTimeOpen: null, OTimeClose: null,
+    BNO: null, AState: '', language: 'ch', keyword: ''
+  };
+  var hdrs = {
+    'Content-Type': 'application/json',
+    'Accept': 'application/json, text/plain, */*'
+  };
+  return Promise.all([
+    fetch(ep, { method: 'POST', headers: hdrs, body: JSON.stringify(Object.assign({}, base, { AState: 'D' })) }),
+    fetch(ep, { method: 'POST', headers: hdrs, body: JSON.stringify(Object.assign({}, base, { AState: 'A' })) })
+  ]).then(function(res) {
+    if (!res[0].ok || !res[1].ok) throw new Error('HTTP ' + res[0].status + '/' + res[1].status);
+    return Promise.all([res[0].json(), res[1].json()]);
+  }).then(function(data) {
+    return { dep: data[0], arr: data[1], date: odate };
+  });
+}
+
 function loadGateFlights() {
   var statusEl = document.getElementById('gate-status');
   var tableBody = document.getElementById('gate-tbody');
@@ -18,10 +48,18 @@ function loadGateFlights() {
   tableBody.innerHTML = '';
 
   fetch('/api/fids')
-    .then(function(r) { return r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status)); })
+    .then(function(r) {
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      return r.json();
+    })
     .then(function(data) {
       if (data.error) throw new Error(data.error);
-
+      return data;
+    })
+    .catch(function() {
+      return _giFetchDirect();
+    })
+    .then(function(data) {
       dateEl.textContent = data.date || '';
 
       var dep = (data.dep || []).filter(function(f) { return f.ACode === 'JX'; });
@@ -77,7 +115,6 @@ function loadGateFlights() {
       flights.forEach(function(f) {
         var tr = document.createElement('tr');
 
-        // For origin display: if it came from departure data, origin is TPE; from arrival, use originName
         var originDisplay = '';
         if (f.originName) {
           originDisplay = f.originName;
@@ -85,7 +122,6 @@ function loadGateFlights() {
           originDisplay = f.origin;
         }
 
-        // For dest display: if it came from departure data, use destName; from arrival, dest is TPE
         var destDisplay = '';
         if (f.destName) {
           destDisplay = f.destName;
@@ -115,7 +151,6 @@ function loadGateFlights() {
           tr.appendChild(td);
         });
 
-        // Memo as tooltip
         var memo = [f.depMemo, f.arrMemo].filter(Boolean).join(' / ');
         if (memo) tr.title = memo;
 
