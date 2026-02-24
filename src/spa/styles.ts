@@ -26,6 +26,18 @@ body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSy
   cursor:pointer;transition:color .15s;-webkit-appearance:none}
 .tab-btn.tab-active{color:var(--accent)}
 .tab-btn-icon{font-size:1.5em;line-height:1}
+.tab-util{cursor:default;gap:1px}
+.tab-util-row{display:flex;gap:6px;align-items:center;justify-content:center}
+.tab-util-btn{background:none;border:none;color:var(--muted);font-size:1em;font-weight:600;
+  cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:1px;padding:0;-webkit-appearance:none}
+.tab-util-btn span{font-size:1.3em;line-height:1}
+.install-overlay{position:fixed;inset:0;z-index:999;background:rgba(0,0,0,.6);
+  display:flex;align-items:center;justify-content:center;padding:24px}
+.install-card{background:var(--card);border-radius:16px;padding:28px 24px;width:100%;
+  max-width:320px;text-align:center;box-shadow:0 4px 24px rgba(0,0,0,.25)}
+.install-steps{font-size:.88em;color:var(--text);line-height:1.8;text-align:left;margin-bottom:18px}
+.install-close-btn{width:100%;padding:12px;border-radius:10px;border:none;background:var(--accent);
+  color:#fff;font-size:.95em;font-weight:700;cursor:pointer;-webkit-appearance:none}
 .briefing-section{background:var(--card);border-radius:var(--radius);padding:16px;margin-bottom:16px}
 .briefing-section h2{font-size:1em;font-weight:700;margin:0 0 12px;color:var(--text);display:flex;align-items:center;gap:6px}
 .datis-tabs{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px}

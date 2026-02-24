@@ -64,24 +64,6 @@ export function getSpaHtmlBody(): string {
     </form>
   </div>
 
-  <details class="how-to">
-    <summary>📲 如何加入主畫面？</summary>
-    <div class="how-to-body">
-      <div class="how-to-os">
-        <strong>🍎 iPhone / iPad（Safari）</strong>
-        1. 點底部 <b>分享</b> 按鈕（方框加箭頭）<br>
-        2. 向下滑，點「<b>加入主畫面</b>」<br>
-        3. 右上角點「<b>新增</b>」
-      </div>
-      <div class="how-to-os">
-        <strong>🤖 Android（Chrome）</strong>
-        1. 點右上角 <b>⋮</b> 選單<br>
-        2. 點「<b>新增至主畫面</b>」或「<b>安裝應用程式</b>」<br>
-        3. 點「<b>新增</b>」
-      </div>
-    </div>
-  </details>
-
   <div style="text-align:center">
     <button class="link-btn" onclick="showSettings()">⚙️ 設定</button>
   </div>
@@ -162,7 +144,6 @@ export function getSpaHtmlBody(): string {
         <a class="tool-link-btn" href="https://www.skyinfo.jp" target="_blank" onclick="return loadTool(event,this)">🇯🇵 日本NOTAM地圖</a>
         <a class="tool-link-btn" href="https://app.cwa.gov.tw/web/obsmap/typhoon.html" target="_blank" onclick="return loadTool(event,this)">🌀 颱風路徑圖</a>
         <a class="tool-link-btn" href="https://gpsjam.org/" target="_blank" onclick="return loadTool(event,this)">🛰️ GPS干擾區域</a>
-        <a class="tool-link-btn" href="https://radio.arinc.net/pacific/" target="_blank" onclick="return openHF(event)">📻 Pacific HF 查詢</a>
       </div>
       <!-- 內嵌 iframe -->
       <div id="tool-frame-wrap" style="display:none;margin-top:16px">
@@ -656,10 +637,31 @@ export function getSpaHtmlBody(): string {
   <button class="tab-btn" id="tabBtn-gate" onclick="switchTab('gate',this)">
     <span class="tab-btn-icon">🚪</span>Gate Info
   </button>
-  <button class="tab-btn" id="tabBtn-theme" onclick="toggleTheme()">
-    <span class="tab-btn-icon" id="theme-icon">☀️</span><span id="theme-label">日間</span>
-    <span style="font-size:.55em;color:var(--dim);line-height:1;opacity:.7">V4.005</span>
-  </button>
+  <div class="tab-btn tab-util">
+    <div class="tab-util-row">
+      <button class="tab-util-btn" onclick="toggleTheme()" id="tabBtn-theme">
+        <span id="theme-icon">☀️</span><span id="theme-label">日間</span>
+      </button>
+      <button class="tab-util-btn tab-install-btn" id="tab-install-btn" onclick="showInstallGuide()" style="display:none">
+        <span>📲</span>安裝
+      </button>
+    </div>
+    <span style="font-size:.55em;color:var(--dim);line-height:1;opacity:.7">V4.006</span>
+  </div>
+</div>
+
+<!-- iOS 安裝說明 -->
+<div id="install-overlay" class="install-overlay" style="display:none" onclick="if(event.target===this)closeInstallGuide()">
+  <div class="install-card">
+    <div style="font-size:2em;margin-bottom:8px">📲</div>
+    <div style="font-weight:700;font-size:1em;margin-bottom:12px">加入主畫面</div>
+    <div class="install-steps">
+      1. 點 Safari 底部的 <b>分享按鈕</b>（⬆️ 方框加箭頭）<br>
+      2. 向下滑，點「<b>加入主畫面</b>」<br>
+      3. 右上角點「<b>新增</b>」
+    </div>
+    <button class="install-close-btn" onclick="closeInstallGuide()">知道了</button>
+  </div>
 </div>
 
 `;

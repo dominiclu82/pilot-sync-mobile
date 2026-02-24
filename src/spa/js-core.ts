@@ -545,5 +545,23 @@ function closeHF() {
   document.getElementById('hf-iframe').src = '';
 }
 
+// ── iOS Install Guide ─────────────────────────────────────────────────────────
+function showInstallGuide() {
+  document.getElementById('install-overlay').style.display = 'flex';
+}
+function closeInstallGuide() {
+  document.getElementById('install-overlay').style.display = 'none';
+}
+(function() {
+  var isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  var isStandalone = window.navigator.standalone === true ||
+    window.matchMedia('(display-mode: standalone)').matches;
+  if (isIOS && !isStandalone) {
+    var btn = document.getElementById('tab-install-btn');
+    if (btn) btn.style.display = '';
+  }
+})();
+
 `;
 }
