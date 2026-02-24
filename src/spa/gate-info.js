@@ -1,6 +1,8 @@
 // ── Gate Info ──────────────────────────────────────────────────────────────────
 var gateFlightsLoaded = false;
 var gateFlightsList = [];
+var giSortKey = 'fno';
+var giSortAsc = true;
 
 function giFmtTime(t) {
   if (!t) return '';
@@ -148,8 +150,10 @@ function renderGateFlights() {
   var pinned = [];
   var others = [];
 
+  var sorted = _giSortList(gateFlightsList);
+
   if (searchTerm) {
-    gateFlightsList.forEach(function(f) {
+    sorted.forEach(function(f) {
       var num = f.fno.replace(/^JX/, '');
       if (num === searchTerm || num.indexOf(searchTerm) === 0) {
         pinned.push(f);
@@ -158,7 +162,7 @@ function renderGateFlights() {
       }
     });
   } else {
-    others = gateFlightsList;
+    others = sorted;
   }
 
   pinned.forEach(function(f) {
@@ -177,6 +181,53 @@ function renderGateFlights() {
   others.forEach(function(f) {
     tableBody.appendChild(giMakeRow(f));
   });
+}
+
+function _giGetSortVal(f, key) {
+  if (key === 'fno') return f.fno || '';
+  if (key === 'origin') return (f.originName || f.originCode || f.origin || '');
+  if (key === 'dest') return (f.destName || f.destCode || f.dest || '');
+  return '';
+}
+
+function _giSortList(list) {
+  var sorted = list.slice();
+  sorted.sort(function(a, b) {
+    var va = _giGetSortVal(a, giSortKey);
+    var vb = _giGetSortVal(b, giSortKey);
+    if (giSortKey === 'origin' || giSortKey === 'dest') {
+      var aTPE = /TPE|桃園/.test(va) ? 0 : 1;
+      var bTPE = /TPE|桃園/.test(vb) ? 0 : 1;
+      if (aTPE !== bTPE) return giSortAsc ? aTPE - bTPE : bTPE - aTPE;
+    }
+    if (giSortKey === 'fno') {
+      var cmp = va.localeCompare(vb, undefined, { numeric: true });
+      return giSortAsc ? cmp : -cmp;
+    }
+    var cmp2 = va.localeCompare(vb);
+    return giSortAsc ? cmp2 : -cmp2;
+  });
+  return sorted;
+}
+
+function giSort(key) {
+  if (giSortKey === key) {
+    giSortAsc = !giSortAsc;
+  } else {
+    giSortKey = key;
+    giSortAsc = true;
+  }
+  // Update header indicators
+  var ths = document.querySelectorAll('#gi-table thead th.gi-sortable');
+  ths.forEach(function(th) {
+    th.classList.remove('gi-sort-asc', 'gi-sort-desc');
+  });
+  var labels = { fno: 0, origin: 1, dest: 2 };
+  var idx = labels[key];
+  if (idx !== undefined && ths[idx]) {
+    ths[idx].classList.add(giSortAsc ? 'gi-sort-asc' : 'gi-sort-desc');
+  }
+  renderGateFlights();
 }
 
 function filterGateFlights() {

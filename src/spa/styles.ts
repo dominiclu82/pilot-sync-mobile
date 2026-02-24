@@ -361,6 +361,11 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
 .gi-table thead{position:sticky;top:0;z-index:5}
 .gi-table th{background:var(--surface);color:var(--muted);font-weight:700;padding:8px 6px;
   text-align:center;border-bottom:2px solid var(--dim);white-space:nowrap;font-size:.85em}
+.gi-sortable{cursor:pointer;user-select:none}
+.gi-sortable:hover{color:var(--accent-light)}
+.gi-sortable::after{content:'';margin-left:3px;font-size:.7em;opacity:.5}
+.gi-sort-asc::after{content:'▲';opacity:1;color:var(--accent-light)}
+.gi-sort-desc::after{content:'▼';opacity:1;color:var(--accent-light)}
 .gi-table td{padding:6px 6px;text-align:center;border-bottom:1px solid rgba(148,163,184,.15);
   white-space:nowrap;color:var(--text);overflow:hidden;text-overflow:ellipsis}
 .gi-table tbody tr:hover{background:rgba(59,130,246,.08)}
