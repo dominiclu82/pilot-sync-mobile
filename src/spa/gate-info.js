@@ -136,6 +136,42 @@ function filterGateFlights() {
   if (gateFlightsList.length > 0) renderGateFlights();
 }
 
+function _giFetchONTDirect() {
+  var base = atob('aHR0cHM6Ly93d3cuZmx5b250YXJpby5jb20vYXBpL2pzb24vZmxpZ2h0cw==');
+  return Promise.all([
+    fetch(base + '/arrivals', { headers: { 'Accept': 'application/json' } }),
+    fetch(base + '/departures', { headers: { 'Accept': 'application/json' } })
+  ]).then(function(res) {
+    return Promise.all([
+      res[0].ok ? res[0].json() : [],
+      res[1].ok ? res[1].json() : []
+    ]);
+  }).then(function(data) {
+    var results = [];
+    var arrData = Array.isArray(data[0]) ? data[0] : (data[0].data || data[0].flights || []);
+    var depData = Array.isArray(data[1]) ? data[1] : (data[1].data || data[1].flights || []);
+    arrData.forEach(function(f) {
+      var fno = (f.flightno || '').replace(/\s/g, '').toUpperCase();
+      if (!fno.startsWith('JX') && !/STARLUX/i.test(f.airline_name || '')) return;
+      results.push({
+        airport: 'ONT', fno: fno, direction: 'A',
+        gate: f.gate || '', terminal: f.terminal || '', carousel: '',
+        origin: f.origin || '', dest: 'ONT'
+      });
+    });
+    depData.forEach(function(f) {
+      var fno = (f.flightno || '').replace(/\s/g, '').toUpperCase();
+      if (!fno.startsWith('JX') && !/STARLUX/i.test(f.airline_name || '')) return;
+      results.push({
+        airport: 'ONT', fno: fno, direction: 'D',
+        gate: f.gate || '', terminal: f.terminal || '', carousel: '',
+        origin: 'ONT', dest: f.origin || ''
+      });
+    });
+    return results;
+  }).catch(function() { return []; });
+}
+
 function _giMergeUS(map, usData) {
   var allFlights = [].concat(
     usData.sfo || [], usData.phx || [], usData.sea || [], usData.lax || [],
@@ -193,13 +229,25 @@ function loadGateFlights() {
       return r.json();
     })
     .catch(function() {
-      return { sfo: [], phx: [], sea: [], lax: [] };
+      return { sfo: [], phx: [], sea: [], lax: [], ont: [] };
     });
 
   Promise.all([tpePromise, usPromise])
     .then(function(results) {
       var data = results[0];
       var usData = results[1];
+
+      // ONT client-side fallback if server returned empty
+      var ontFallback = (!usData.ont || usData.ont.length === 0)
+        ? _giFetchONTDirect() : Promise.resolve(null);
+      return ontFallback.then(function(ontDirect) {
+        if (ontDirect && ontDirect.length > 0) usData.ont = ontDirect;
+        return { data: data, usData: usData };
+      });
+    })
+    .then(function(r) {
+      var data = r.data;
+      var usData = r.usData;
 
       dateEl.textContent = data.date || '';
 
