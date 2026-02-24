@@ -562,7 +562,6 @@ export function getSpaHtmlBody(): string {
       <div class="dt-lock-icon">🔒</div>
       <div class="dt-lock-title">Gate Info</div>
       <div class="dt-lock-sub">請輸入密碼以繼續</div>
-      <div style="margin:8px 0 4px;font-size:.82em;color:#f59e0b">功能開發中，敬請期待</div>
       <input class="dt-lock-input" type="password" id="gate-lock-pw" placeholder="••••••••" maxlength="16"
         onkeydown="if(event.key==='Enter')gateUnlock()">
       <button class="dt-lock-btn" onclick="gateUnlock()">解鎖</button>
@@ -646,7 +645,7 @@ export function getSpaHtmlBody(): string {
         <span>📲</span>安裝
       </button>
     </div>
-    <span style="font-size:.55em;color:var(--dim);line-height:1;opacity:.7">V4.007</span>
+    <span style="font-size:.55em;color:var(--dim);line-height:1;opacity:.7">V4.008</span>
   </div>
 </div>
 

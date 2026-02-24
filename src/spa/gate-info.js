@@ -136,6 +136,31 @@ function filterGateFlights() {
   if (gateFlightsList.length > 0) renderGateFlights();
 }
 
+function _giMergeUS(map, usData) {
+  var allFlights = [].concat(
+    usData.sfo || [], usData.phx || [], usData.sea || [], usData.lax || []
+  );
+  allFlights.forEach(function(f) {
+    var key = f.fno;
+    if (!key) return;
+    if (!map[key]) map[key] = { fno: key };
+    var m = map[key];
+    if (f.direction === 'D') {
+      // Departure from US airport (= origin side for return flights)
+      if (!m.gate || m.gate === '—') m.gate = f.gate || m.gate;
+      if (!m.depTerminal) m.depTerminal = f.terminal || '';
+      if (!m.origin) m.origin = f.airport;
+      if (!m.originCode) m.originCode = f.airport;
+    } else {
+      // Arrival at US airport (= destination side for outbound flights)
+      if (!m.parking) m.parking = f.gate || '';
+      if (!m.carousel) m.carousel = f.carousel || '';
+      if (!m.arrTerminal) m.arrTerminal = f.terminal || '';
+      if (!m.dest && f.airport) { m.dest = f.airport; m.destCode = f.airport; }
+    }
+  });
+}
+
 function loadGateFlights() {
   var statusEl = document.getElementById('gate-status');
   var tableBody = document.getElementById('gate-tbody');
@@ -148,7 +173,7 @@ function loadGateFlights() {
   tableBody.innerHTML = '';
   gateFlightsList = [];
 
-  fetch('/api/fids')
+  var tpePromise = fetch('/api/fids')
     .then(function(r) {
       if (!r.ok) throw new Error('HTTP ' + r.status);
       return r.json();
@@ -159,8 +184,22 @@ function loadGateFlights() {
     })
     .catch(function() {
       return _giFetchDirect();
+    });
+
+  var usPromise = fetch('/api/fids-us')
+    .then(function(r) {
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      return r.json();
     })
-    .then(function(data) {
+    .catch(function() {
+      return { sfo: [], phx: [], sea: [], lax: [] };
+    });
+
+  Promise.all([tpePromise, usPromise])
+    .then(function(results) {
+      var data = results[0];
+      var usData = results[1];
+
       dateEl.textContent = data.date || '';
 
       var dep = (data.dep || []).filter(function(f) { return f.ACode && f.ACode.trim() === 'JX'; });
@@ -203,6 +242,9 @@ function loadGateFlights() {
         m.arrTerminal = f.BNO ? 'T' + f.BNO : '';
         m.arrMemo = f.Memo || '';
       });
+
+      // Merge US airport data
+      _giMergeUS(map, usData);
 
       var flights = Object.values(map);
       flights.sort(function(a, b) {

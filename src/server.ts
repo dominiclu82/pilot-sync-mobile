@@ -140,6 +140,10 @@ self.addEventListener('fetch', e => {
     e.respondWith(fetch(e.request).catch(() => caches.match(e.request)));
     return;
   }
+  if (url.includes('/api/fids-us')) {
+    e.respondWith(fetch(e.request).catch(() => caches.match(e.request)));
+    return;
+  }
   if (url.includes('/api/metar')) {
     e.respondWith(fetch(e.request).then(r => {
       const clone = r.clone();
@@ -215,6 +219,182 @@ app.get('/api/fids', async (_req, res) => {
     res.json({ dep, arr, date: odate });
   } catch (e: any) {
     console.error('FIDS proxy error:', e.message);
+    res.status(502).json({ error: e.message });
+  }
+});
+
+// ── US FIDS proxy ────────────────────────────────────────────────────────────
+async function fetchSFO(): Promise<any[]> {
+  const r = await fetch('https://www.flysfo.com/flysfo/api/flight-status', {
+    headers: { 'User-Agent': 'Mozilla/5.0', 'Accept': 'application/json' }
+  });
+  if (!r.ok) return [];
+  const data = await r.json();
+  const flights = (data.data || data || []).filter((f: any) =>
+    f.airline?.iata_code === 'JX'
+  );
+  return flights.map((f: any) => ({
+    airport: 'SFO',
+    fno: 'JX' + (f.flight_number || ''),
+    direction: f.flight_kind === 'Arrival' ? 'A' : 'D',
+    gate: f.gate?.gate_number || '',
+    terminal: f.terminal?.terminal_code || '',
+    carousel: f.baggage_carousel?.carousel_name || '',
+    scheduled: f.scheduled_aod_time || '',
+    estimated: f.estimated_aod_time || '',
+    actual: f.actual_aod_time || '',
+    status: f.remark || '',
+    origin: f.flight_kind === 'Arrival' ? (f.routes?.[0]?.origin_airport?.iata_code || '') : 'SFO',
+    dest: f.flight_kind === 'Arrival' ? 'SFO' : (f.routes?.[0]?.destination_airport?.iata_code || '')
+  }));
+}
+
+async function fetchPHX(): Promise<any[]> {
+  const r = await fetch('https://api.phx.aero/flight-information?Key=4f85fe2ef5a240d59809b63de94ef536', {
+    headers: { 'User-Agent': 'Mozilla/5.0', 'Accept': 'application/json' }
+  });
+  if (!r.ok) return [];
+  const data = await r.json();
+  const flights = (data || []).filter((f: any) => f.LineCode === 'JX');
+  return flights.map((f: any) => ({
+    airport: 'PHX',
+    fno: 'JX' + (f.Flightnumber || ''),
+    direction: f.AD === 'A' ? 'A' : 'D',
+    gate: f.Gate || '',
+    terminal: f.Terminal || '',
+    carousel: f.BagClaim || '',
+    scheduled: f.ScheduledTime || '',
+    estimated: f.Estimated || '',
+    actual: f.Actual || '',
+    status: f.Status || '',
+    origin: f.AD === 'A' ? '' : 'PHX',
+    dest: f.AD === 'A' ? 'PHX' : ''
+  }));
+}
+
+async function fetchSEA(): Promise<any[]> {
+  const results: any[] = [];
+  for (const dir of ['A', 'D']) {
+    const r = await fetch(
+      `https://www.portseattle.org/pos/flights?arr_or_depart=${dir}&airline=JX&flightNo=&city=&flight_date=`,
+      { headers: { 'User-Agent': 'Mozilla/5.0' } }
+    );
+    if (!r.ok) continue;
+    const html = await r.text();
+    const rows = html.match(/<tr[^>]*>[\s\S]*?<\/tr>/gi) || [];
+    for (const row of rows) {
+      const cells = (row.match(/<td[^>]*>([\s\S]*?)<\/td>/gi) || [])
+        .map((c: string) => c.replace(/<[^>]+>/g, '').trim());
+      if (cells.length < 7 || !cells[2].startsWith('JX')) continue;
+      results.push({
+        airport: 'SEA',
+        fno: cells[2],
+        direction: dir,
+        gate: cells[6] || '',
+        terminal: '',
+        carousel: cells[7] || '',
+        scheduled: cells[4] || '',
+        estimated: '',
+        actual: '',
+        status: cells[5] || '',
+        origin: dir === 'A' ? '' : 'SEA',
+        dest: dir === 'A' ? 'SEA' : ''
+      });
+    }
+  }
+  return results;
+}
+
+async function fetchLAX(): Promise<any[]> {
+  const results: any[] = [];
+  for (const type of ['arr', 'dep']) {
+    const r = await fetch(
+      `https://www.flylax.com/flight-search-list?type=${type}`,
+      { headers: { 'User-Agent': 'Mozilla/5.0' } }
+    );
+    if (!r.ok) continue;
+    const html = await r.text();
+    // Split into table rows, find JX rows by data-airlinecode or flight link
+    const rows = html.match(/<tr[^>]*>[\s\S]*?<\/tr>/gi) || [];
+    for (const row of rows) {
+      const isJX = /data-airlinecode="JX"/i.test(row) ||
+                   /fn=JX\d/i.test(row) ||
+                   /STARLUX/i.test(row);
+      if (!isJX) continue;
+      const cells = (row.match(/<td[^>]*>([\s\S]*?)<\/td>/gi) || [])
+        .map((c: string) => c.replace(/<[^>]+>/g, '').trim());
+      // Extract flight number from link
+      const fnMatch = row.match(/fn=(JX\d+)/i);
+      const fno = fnMatch ? fnMatch[1].toUpperCase() : '';
+      if (!fno) continue;
+      // cells: [airline, flightNum, gate, destination/origin, schedTime, status]
+      const gateRaw = cells[2] || '';
+      // Gate format: "TB - 151" → terminal=B, gate=151; or "T4 - 46B" → terminal=4, gate=46B
+      const gateMatch = gateRaw.match(/T([^-\s]+)\s*-\s*(\S+)/);
+      const terminal = gateMatch ? gateMatch[1] : '';
+      const gate = gateMatch ? gateMatch[2] : gateRaw;
+      results.push({
+        airport: 'LAX',
+        fno,
+        direction: type === 'arr' ? 'A' : 'D',
+        gate,
+        terminal: terminal ? 'T' + terminal : '',
+        carousel: '',
+        scheduled: cells[4] || '',
+        estimated: '',
+        actual: '',
+        status: (cells[5] || '').replace(/<[^>]+>/g, '').trim(),
+        origin: type === 'arr' ? '' : 'LAX',
+        dest: type === 'arr' ? 'LAX' : ''
+      });
+    }
+  }
+  // Also try baggage claim page for carousel info
+  try {
+    const r = await fetch('https://www.flylax.com/lax-baggage-claim',
+      { headers: { 'User-Agent': 'Mozilla/5.0' } });
+    if (r.ok) {
+      const html = await r.text();
+      const rows = html.match(/<tr[^>]*>[\s\S]*?<\/tr>/gi) || [];
+      for (const row of rows) {
+        if (!/STARLUX/i.test(row) && !/\bJX\b/i.test(row)) continue;
+        const cells = (row.match(/<td[^>]*>([\s\S]*?)<\/td>/gi) || [])
+          .map((c: string) => c.replace(/<[^>]+>/g, '').trim());
+        // cells: [airline, flightNum, terminal, carousel]
+        if (cells.length < 4) continue;
+        const fnRaw = cells[1] || '';
+        const fnMatch2 = fnRaw.match(/(JX\d+)/i);
+        if (!fnMatch2) continue;
+        const fno2 = fnMatch2[1].toUpperCase();
+        const existing = results.find(f => f.fno === fno2 && f.direction === 'A');
+        if (existing) {
+          existing.carousel = cells[3] || existing.carousel;
+          if (!existing.terminal && cells[2]) existing.terminal = cells[2];
+        } else {
+          results.push({
+            airport: 'LAX', fno: fno2, direction: 'A',
+            gate: '', terminal: cells[2] || '', carousel: cells[3] || '',
+            scheduled: '', estimated: '', actual: '', status: '',
+            origin: '', dest: 'LAX'
+          });
+        }
+      }
+    }
+  } catch {}
+  return results;
+}
+
+app.get('/api/fids-us', async (_req, res) => {
+  try {
+    const [sfo, phx, sea, lax] = await Promise.all([
+      fetchSFO().catch(() => []),
+      fetchPHX().catch(() => []),
+      fetchSEA().catch(() => []),
+      fetchLAX().catch(() => [])
+    ]);
+    res.json({ sfo, phx, sea, lax });
+  } catch (e: any) {
+    console.error('FIDS-US proxy error:', e.message);
     res.status(502).json({ error: e.message });
   }
 });
