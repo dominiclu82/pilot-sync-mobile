@@ -223,14 +223,36 @@ function mkStat(n, label) {
 
 // ── Tab switching ─────────────────────────────────────────────────────────────
 function switchTab(tab, btn) {
-  document.getElementById('tab-sync').classList.remove('tab-active');
-  document.getElementById('tab-briefing').classList.remove('tab-active');
-  document.getElementById('tab-sync').style.display = '';
-  document.getElementById('tab-briefing').style.display = '';
+  ['tab-sync','tab-briefing','tab-gate'].forEach(function(id) {
+    var el = document.getElementById(id);
+    if (el) { el.classList.remove('tab-active'); el.style.display = 'none'; }
+  });
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('tab-active'));
-  document.getElementById('tab-' + tab).classList.add('tab-active');
+  var target = document.getElementById('tab-' + tab);
+  if (target) { target.style.display = ''; target.classList.add('tab-active'); }
   btn.classList.add('tab-active');
+  if (tab === 'gate' && !gateUnlocked) {
+    document.getElementById('gate-lock-overlay').style.display = 'flex';
+    setTimeout(function(){ document.getElementById('gate-lock-pw').focus(); }, 100);
+  }
   window.scrollTo(0, 0);
+}
+
+// ── Gate Info 密碼鎖 ──────────────────────────────────────────────────────────
+var gateUnlocked = false;
+function gateUnlock() {
+  var pw = document.getElementById('gate-lock-pw').value;
+  if (pw === '12345678') {
+    gateUnlocked = true;
+    document.getElementById('gate-lock-overlay').style.display = 'none';
+    document.getElementById('gate-content').style.display = '';
+    document.getElementById('gate-lock-pw').value = '';
+    document.getElementById('gate-lock-err').textContent = '';
+  } else {
+    document.getElementById('gate-lock-err').textContent = '密碼錯誤，請再試一次';
+    document.getElementById('gate-lock-pw').value = '';
+    document.getElementById('gate-lock-pw').focus();
+  }
 }
 
 // ── D-ATIS ────────────────────────────────────────────────────────────────────

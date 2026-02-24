@@ -291,6 +291,7 @@ export function getSpaHtmlBody(): string {
         <div class="dt-lock-icon">🔒</div>
         <div class="dt-lock-title">Duty Time Calculator</div>
         <div class="dt-lock-sub">請輸入密碼以繼續</div>
+        <div style="margin:8px 0 4px;font-size:.82em;color:#f59e0b">功能開發中，敬請期待</div>
         <input class="dt-lock-input" type="password" id="dt-lock-pw" placeholder="••••••••" maxlength="16"
           onkeydown="if(event.key==='Enter')dtUnlock()">
         <button class="dt-lock-btn" onclick="dtUnlock()">解鎖</button>
@@ -571,6 +572,32 @@ export function getSpaHtmlBody(): string {
 
 </div><!-- end tab-briefing -->
 
+<!-- ══ Tab: Gate Info ═══════════════════════════════════════════════ -->
+<div id="tab-gate" style="display:none">
+
+  <!-- 密碼鎖 -->
+  <div class="dt-lock-overlay" id="gate-lock-overlay" style="display:flex">
+    <div class="dt-lock-card">
+      <div class="dt-lock-icon">🔒</div>
+      <div class="dt-lock-title">Gate Info</div>
+      <div class="dt-lock-sub">請輸入密碼以繼續</div>
+      <div style="margin:8px 0 4px;font-size:.82em;color:#f59e0b">功能開發中，敬請期待</div>
+      <input class="dt-lock-input" type="password" id="gate-lock-pw" placeholder="••••••••" maxlength="16"
+        onkeydown="if(event.key==='Enter')gateUnlock()">
+      <button class="dt-lock-btn" onclick="gateUnlock()">解鎖</button>
+      <div class="dt-lock-err" id="gate-lock-err"></div>
+    </div>
+  </div>
+
+  <!-- Gate Info 內容（解鎖後顯示） -->
+  <div id="gate-content" style="display:none;padding:16px">
+    <div style="text-align:center;color:var(--dim);font-size:.9em;padding:40px 0">
+      Gate Info 內容即將推出
+    </div>
+  </div>
+
+</div><!-- end tab-gate -->
+
 <!-- ══ Pacific HF 全螢幕 Overlay ════════════════════════════════════ -->
 <div id="hf-overlay" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;z-index:500;background:#fff;flex-direction:column">
   <div style="display:flex;align-items:center;justify-content:space-between;padding:calc(env(safe-area-inset-top,0px) + 8px) 16px 8px;background:#1e293b;border-bottom:1px solid #334155;flex-shrink:0">
@@ -591,9 +618,12 @@ export function getSpaHtmlBody(): string {
   <button class="tab-btn tab-active" id="tabBtn-briefing" onclick="switchTab('briefing',this)">
     <span class="tab-btn-icon">📦</span>A350簡報箱
   </button>
+  <button class="tab-btn" id="tabBtn-gate" onclick="switchTab('gate',this)">
+    <span class="tab-btn-icon">🚪</span>Gate Info
+  </button>
   <button class="tab-btn" id="tabBtn-theme" onclick="toggleTheme()">
     <span class="tab-btn-icon" id="theme-icon">☀️</span><span id="theme-label">日間</span>
-    <span style="font-size:.55em;color:var(--dim);line-height:1;opacity:.7">V3.030</span>
+    <span style="font-size:.55em;color:var(--dim);line-height:1;opacity:.7">V3.031</span>
   </button>
 </div>
 
