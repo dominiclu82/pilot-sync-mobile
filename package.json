@@ -10,14 +10,15 @@
     "dev": "tsx watch src/server.ts"
   },
   "dependencies": {
-    "@sparticuz/chromium": "^143.0.4",
     "cors": "^2.8.5",
     "dotenv": "^16.5.0",
     "express": "^5.1.0",
     "googleapis": "^150.0.1",
     "ical": "^0.8.0",
     "playwright": "^1.53.1",
-    "puppeteer-core": "^24.37.5"
+    "puppeteer": "^24.37.5",
+    "puppeteer-extra": "^3.3.6",
+    "puppeteer-extra-plugin-stealth": "^2.11.2"
   },
   "devDependencies": {
     "@types/cors": "^2.8.17",

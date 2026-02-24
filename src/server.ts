@@ -13,8 +13,8 @@ import { getSpaCoreJs } from './spa/js-core.js';
 import { getSpaWeatherJs } from './spa/js-weather.js';
 import { getSpaDutyTimeJs } from './spa/js-duty-time.js';
 import { getSpaGateInfoJs } from './spa/js-gate-info.js';
-import puppeteer from 'puppeteer-core';
-import chromium from '@sparticuz/chromium';
+import puppeteerExtra from 'puppeteer-extra';
+import StealthPlugin from 'puppeteer-extra-plugin-stealth';
 
 
 config({ path: path.join(ROOT, '.env') });
@@ -449,26 +449,45 @@ function _ontMap(f: any, dir: string): any {
   };
 }
 
-async function _ontBrowserFetch(url: string): Promise<any[]> {
-  const execPath = await chromium.executablePath();
-  const browser = await puppeteer.launch({
-    executablePath: execPath,
-    headless: chromium.headless,
-    args: chromium.args
+// Stealth puppeteer for Cloudflare-protected sites
+const _stealthBrowser = (() => {
+  puppeteerExtra.use(StealthPlugin());
+  return puppeteerExtra;
+})();
+
+async function _ontScrape(): Promise<{ arrivals: any[]; departures: any[] }> {
+  const pageUrl = Buffer.from('aHR0cHM6Ly93d3cuZmx5b250YXJpby5jb20vZmxpZ2h0cw==', 'base64').toString();
+  const browser = await _stealthBrowser.launch({
+    headless: true,
+    args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage',
+           '--disable-gpu', '--single-process']
   });
   try {
     const page = await browser.newPage();
-    await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36');
-    const resp = await page.goto(url, { waitUntil: 'networkidle0', timeout: 30000 });
-    const text = await resp?.text() || '';
-    let data: any;
-    try {
-      data = JSON.parse(text);
-    } catch {
-      const bodyText = await page.evaluate(() => document.body?.innerText || '');
-      data = JSON.parse(bodyText);
-    }
-    return Array.isArray(data) ? data : (data.data || data.flights || []);
+    await page.setViewport({ width: 1280, height: 800 });
+
+    // Intercept the page's own API calls to get clean JSON
+    const captured: { arrivals: any[]; departures: any[] } = { arrivals: [], departures: [] };
+    page.on('response', async (resp: any) => {
+      const url: string = resp.url();
+      try {
+        if (url.includes('/flights/arrivals')) {
+          const json = await resp.json();
+          captured.arrivals = json.data || json || [];
+        } else if (url.includes('/flights/departures')) {
+          const json = await resp.json();
+          captured.departures = json.data || json || [];
+        }
+      } catch { /* non-JSON response, skip */ }
+    });
+
+    await page.goto(pageUrl, { waitUntil: 'networkidle0', timeout: 60000 });
+
+    // Wait for table rows to confirm data loaded
+    await page.waitForSelector('.flights__table table tbody tr', { timeout: 30000 })
+      .catch(() => { /* table might not render if no flights */ });
+
+    return captured;
   } finally {
     await browser.close();
   }
@@ -476,10 +495,10 @@ async function _ontBrowserFetch(url: string): Promise<any[]> {
 
 async function fetchONT(): Promise<any[]> {
   const results: any[] = [];
-  const base = atob('aHR0cHM6Ly93d3cuZmx5b250YXJpby5jb20vYXBpL2pzb24vZmxpZ2h0cw==');
-  for (const dir of ['arrivals', 'departures']) {
-    try {
-      const flights = await _ontBrowserFetch(`${base}/${dir}`);
+  try {
+    const { arrivals, departures } = await _ontScrape();
+    let hasTest = false;
+    for (const [dir, flights] of [['arrivals', arrivals], ['departures', departures]] as const) {
       let foundJX = false;
       let firstFlight: any = null;
       for (const f of flights) {
@@ -491,16 +510,17 @@ async function fetchONT(): Promise<any[]> {
           foundJX = true;
         }
       }
-      if (!foundJX && firstFlight) {
+      if (!foundJX && firstFlight && !hasTest) {
         const s = _ontMap(firstFlight, dir);
         s._test = true;
         results.push(s);
+        hasTest = true;
       }
-    } catch (e: any) {
-      const msg = 'ONT(' + dir + '): ' + (e.message || String(e));
-      console.error(msg);
-      results.push({ _ontErr: msg });
     }
+  } catch (e: any) {
+    const msg = 'ONT: ' + (e.message || String(e));
+    console.error(msg);
+    results.push({ _ontErr: msg });
   }
   return results;
 }
