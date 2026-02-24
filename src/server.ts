@@ -497,7 +497,9 @@ async function fetchONT(): Promise<any[]> {
         results.push(s);
       }
     } catch (e: any) {
-      console.error('ONT puppeteer error (' + dir + '):', e.message);
+      const msg = 'ONT(' + dir + '): ' + (e.message || String(e));
+      console.error(msg);
+      results.push({ _ontErr: msg });
     }
   }
   return results;

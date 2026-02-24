@@ -96,21 +96,26 @@ function toggleGiTime() {
 function giMakeTestRow(f) {
   var tr = document.createElement('tr');
   tr.className = 'gi-test-row';
-  var dir = f.direction === 'A' ? 'Arr' : 'Dep';
+  var originVal = f.direction === 'A' ? (f.origin || '—') : f.airport;
+  var destVal = f.direction === 'A' ? f.airport : (f.dest || '—');
+  var depTerminal = f.direction === 'D' ? (f.terminal || '—') : '—';
+  var arrTerminal = f.direction === 'A' ? (f.terminal || '—') : '—';
+  var parking = f.direction === 'A' ? (f.gate || '—') : '—';
+  var gate = f.direction === 'D' ? (f.gate || '—') : '—';
   var cells = [
-    { val: '[TEST] ' + f.airport },
-    { val: f.fno },
-    { val: '' },
-    { val: '' },
-    { val: f.gate || '—' },
+    { val: '[TEST] ' + f.fno },
+    { val: originVal },
+    { val: depTerminal },
+    { val: '—' },
+    { val: gate },
     { val: f.scheduled || '—' },
-    { val: '' },
-    { val: f.origin || '—' },
-    { val: f.terminal || '—' },
-    { val: '' },
+    { val: '—' },
+    { val: destVal },
+    { val: arrTerminal },
+    { val: parking },
     { val: f.carousel || '—' },
-    { val: '' },
-    { val: dir + ': ' + (f.status || '—') }
+    { val: '—' },
+    { val: f.status || '—' }
   ];
   var timeCols = { 5:1, 6:1, 11:1, 12:1 };
   cells.forEach(function(c, idx) {
