@@ -314,6 +314,7 @@ function _seaMapRow(cells: string[], dir: string, isTest: boolean): any {
 
 async function fetchSEA(): Promise<any[]> {
   const results: any[] = [];
+  let hasTest = false;
   for (const dir of ['A', 'D']) {
     const r = await fetch(
       `https://www.portseattle.org/pos/flights?arr_or_depart=${dir}&airline=&flightNo=&city=&flight_date=`,
@@ -334,8 +335,9 @@ async function fetchSEA(): Promise<any[]> {
         foundJX = true;
       }
     }
-    if (!foundJX && firstRow) {
+    if (!foundJX && firstRow && !hasTest) {
       results.push(_seaMapRow(firstRow, dir, true));
+      hasTest = true;
     }
   }
   return results;
@@ -365,6 +367,7 @@ function _laxParseRow(row: string, type: string): any | null {
 
 async function fetchLAX(): Promise<any[]> {
   const results: any[] = [];
+  let hasTest = false;
   for (const type of ['arr', 'dep']) {
     const r = await fetch(
       `https://www.flylax.com/flight-search-list?type=${type}`,
@@ -387,9 +390,10 @@ async function fetchLAX(): Promise<any[]> {
         foundJX = true;
       }
     }
-    if (!foundJX && firstParsed) {
+    if (!foundJX && firstParsed && !hasTest) {
       firstParsed._test = true;
       results.push(firstParsed);
+      hasTest = true;
     }
   }
   // Also try baggage claim page for carousel info

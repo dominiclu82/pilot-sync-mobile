@@ -349,13 +349,12 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
   border-bottom:1px solid rgba(148,163,184,.1);flex-shrink:0}
 .gi-search-prefix{font-weight:800;font-size:.95em;color:var(--accent-light);padding:7px 2px 7px 12px;
   background:var(--surface);border:1.5px solid var(--dim);border-right:none;border-radius:8px 0 0 8px}
-.gi-search-input{flex:1;max-width:160px;padding:7px 10px;background:var(--surface);border:1.5px solid var(--dim);
+.gi-search-input{flex:0;width:80px;padding:7px 10px;background:var(--surface);border:1.5px solid var(--dim);
   border-left:none;border-radius:0 8px 8px 0;color:var(--text);font-size:.95em;outline:none;
   font-weight:600;-webkit-appearance:none}
 .gi-search-input::placeholder{color:var(--dim);font-weight:400}
 .gi-search-input:focus{border-color:var(--accent)}
-.gi-dev-note{font-size:.72em;color:#f59e0b;text-align:center;padding:6px 14px;
-  background:rgba(245,158,11,.08);border-bottom:1px solid rgba(245,158,11,.15)}
+.gi-dev-note{font-size:.62em;color:#6b9e78;margin-left:10px;white-space:nowrap;opacity:.85}
 .gi-status{text-align:center;padding:32px 16px;color:var(--muted);font-size:.88em}
 .gi-table-wrap{flex:1;overflow:auto;-webkit-overflow-scrolling:touch;min-height:0}
 .gi-table{table-layout:fixed;border-collapse:collapse;font-size:.75em;width:100%;min-width:900px}
