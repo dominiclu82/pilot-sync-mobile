@@ -245,7 +245,7 @@ function gateUnlock() {
   if (pw === '12345678') {
     gateUnlocked = true;
     document.getElementById('gate-lock-overlay').style.display = 'none';
-    document.getElementById('gate-content').style.display = '';
+    document.getElementById('gate-content').style.display = 'flex';
     document.getElementById('gate-lock-pw').value = '';
     document.getElementById('gate-lock-err').textContent = '';
     if (!gateFlightsLoaded) loadGateFlights();

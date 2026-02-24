@@ -336,6 +336,7 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
 #tab-gate{display:none;position:relative}
 #tab-gate.tab-active{display:flex;flex-direction:column;
   height:calc(100dvh - calc(56px + env(safe-area-inset-bottom,0px)))}
+#gate-content{flex:1;flex-direction:column;min-height:0}
 .gi-header{display:flex;align-items:center;justify-content:space-between;padding:12px 14px;
   border-bottom:1px solid var(--dim);background:var(--bg);flex-shrink:0}
 .gi-header-left{display:flex;flex-direction:column;gap:2px}
