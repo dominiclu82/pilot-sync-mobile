@@ -112,9 +112,11 @@ function giMakeTestRow(f) {
     { val: '' },
     { val: dir + ': ' + (f.status || '—') }
   ];
-  cells.forEach(function(c) {
+  var timeCols = { 5:1, 6:1, 11:1, 12:1 };
+  cells.forEach(function(c, idx) {
     var td = document.createElement('td');
     td.textContent = c.val;
+    if (timeCols[idx]) td.className = 'gi-time-col';
     tr.appendChild(td);
   });
   return tr;
