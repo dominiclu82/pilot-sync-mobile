@@ -623,7 +623,7 @@ export function getSpaHtmlBody(): string {
   </button>
   <button class="tab-btn" id="tabBtn-theme" onclick="toggleTheme()">
     <span class="tab-btn-icon" id="theme-icon">☀️</span><span id="theme-label">日間</span>
-    <span style="font-size:.55em;color:var(--dim);line-height:1;opacity:.7">V3.031</span>
+    <span style="font-size:.55em;color:var(--dim);line-height:1;opacity:.7">V3.032</span>
   </button>
 </div>
 
