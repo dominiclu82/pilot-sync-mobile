@@ -248,6 +248,7 @@ function gateUnlock() {
     document.getElementById('gate-content').style.display = '';
     document.getElementById('gate-lock-pw').value = '';
     document.getElementById('gate-lock-err').textContent = '';
+    if (!gateFlightsLoaded) loadGateFlights();
   } else {
     document.getElementById('gate-lock-err').textContent = '密碼錯誤，請再試一次';
     document.getElementById('gate-lock-pw').value = '';

@@ -12,6 +12,7 @@ import { getSpaHtmlBody } from './spa/html-body.js';
 import { getSpaCoreJs } from './spa/js-core.js';
 import { getSpaWeatherJs } from './spa/js-weather.js';
 import { getSpaDutyTimeJs } from './spa/js-duty-time.js';
+import { getSpaGateInfoJs } from './spa/js-gate-info.js';
 
 
 config({ path: path.join(ROOT, '.env') });
@@ -135,6 +136,10 @@ self.addEventListener('activate', e => {
 });
 self.addEventListener('fetch', e => {
   const url = e.request.url;
+  if (url.includes('/api/fids')) {
+    e.respondWith(fetch(e.request).catch(() => caches.match(e.request)));
+    return;
+  }
   if (url.includes('/api/metar')) {
     e.respondWith(fetch(e.request).then(r => {
       const clone = r.clone();
@@ -168,6 +173,35 @@ app.get('/api/pacific-hf', async (_req, res) => {
     res.send(html);
   } catch (e: any) {
     res.status(502).send(`<p style="font-family:sans-serif;padding:20px;color:red">無法載入 Pacific HF 資料：${e.message}</p>`);
+  }
+});
+
+// ── FIDS proxy ──────────────────────────────────────────────────────────────
+app.get('/api/fids', async (_req, res) => {
+  try {
+    const now = new Date();
+    const tw = new Date(now.getTime() + 8 * 60 * 60 * 1000);
+    const odate = tw.getUTCFullYear() + '/' +
+      String(tw.getUTCMonth() + 1).padStart(2, '0') + '/' +
+      String(tw.getUTCDate()).padStart(2, '0');
+
+    const base = {
+      ODate: odate, OTimeOpen: null, OTimeClose: null,
+      BNO: null, AState: '', language: 'ch', keyword: ''
+    };
+    const hdrs = { 'Content-Type': 'application/json', 'User-Agent': 'Mozilla/5.0' };
+    const ep = 'https://www.taoyuan-airport.com/api/api/flight/a_flight';
+
+    const [dR, aR] = await Promise.all([
+      fetch(ep, { method: 'POST', headers: hdrs, body: JSON.stringify({ ...base, AState: 'D' }) }),
+      fetch(ep, { method: 'POST', headers: hdrs, body: JSON.stringify({ ...base, AState: 'A' }) })
+    ]);
+
+    const dep = await dR.json();
+    const arr = await aR.json();
+    res.json({ dep, arr, date: odate });
+  } catch (e: any) {
+    res.status(502).json({ error: e.message });
   }
 });
 
@@ -286,6 +320,7 @@ ${getSpaHtmlBody()}
 ${getSpaCoreJs()}
 ${getSpaWeatherJs()}
 ${getSpaDutyTimeJs()}
+${getSpaGateInfoJs()}
 </script>
 </body>
 </html>`;

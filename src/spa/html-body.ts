@@ -590,10 +590,36 @@ export function getSpaHtmlBody(): string {
   </div>
 
   <!-- Gate Info 內容（解鎖後顯示） -->
-  <div id="gate-content" style="display:none;padding:16px">
-    <div style="text-align:center;color:var(--dim);font-size:.9em;padding:40px 0">
-      Gate Info 內容即將推出
+  <div id="gate-content" style="display:none">
+    <div class="gi-header">
+      <div class="gi-header-left">
+        <span class="gi-title">JX Flight Info</span>
+        <span class="gi-date" id="gate-date"></span>
+      </div>
+      <button class="gi-refresh-btn" onclick="refreshGateFlights()">🔄 更新航班資訊</button>
     </div>
+    <div id="gate-status" class="gi-status">按下「更新航班資訊」載入今日航班</div>
+    <div id="gate-table-wrap" class="gi-table-wrap" style="display:none">
+      <table class="gi-table">
+        <thead>
+          <tr>
+            <th class="gi-sticky-col">航班</th>
+            <th>出發地</th>
+            <th>Check-in</th>
+            <th>Gate</th>
+            <th>STD</th>
+            <th>ATD</th>
+            <th>目的地</th>
+            <th>Parking</th>
+            <th>轉盤</th>
+            <th>STA</th>
+            <th>ATA</th>
+          </tr>
+        </thead>
+        <tbody id="gate-tbody"></tbody>
+      </table>
+    </div>
+    <div class="gi-notice">⚠ Non-operational reference only</div>
   </div>
 
 </div><!-- end tab-gate -->
@@ -623,7 +649,7 @@ export function getSpaHtmlBody(): string {
   </button>
   <button class="tab-btn" id="tabBtn-theme" onclick="toggleTheme()">
     <span class="tab-btn-icon" id="theme-icon">☀️</span><span id="theme-label">日間</span>
-    <span style="font-size:.55em;color:var(--dim);line-height:1;opacity:.7">V3.032</span>
+    <span style="font-size:.55em;color:var(--dim);line-height:1;opacity:.7">V4.001</span>
   </button>
 </div>
 
