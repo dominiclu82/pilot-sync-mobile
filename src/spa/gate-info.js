@@ -1,9 +1,15 @@
 // ── Gate Info ──────────────────────────────────────────────────────────────────
 var gateFlightsLoaded = false;
+var gateFlightsList = [];
 
 function giFmtTime(t) {
   if (!t) return '';
-  return t.replace(/:00$/, '');
+  return t.replace(/:\d{2}$/, '');
+}
+
+function giAirportDisplay(name, code) {
+  if (name && code && name !== code) return name + ' ' + code;
+  return name || code || '';
 }
 
 function _giDate() {
@@ -36,6 +42,86 @@ function _giFetchDirect() {
   });
 }
 
+function giMakeRow(f) {
+  var tr = document.createElement('tr');
+
+  var originDisplay = giAirportDisplay(f.originName, f.originCode || (f.origin === 'TPE' ? 'TPE' : ''));
+  if (!originDisplay && f.origin) originDisplay = f.origin;
+
+  var destDisplay = giAirportDisplay(f.destName, f.destCode || (f.dest === 'TPE' ? 'TPE' : ''));
+  if (!destDisplay && f.dest) destDisplay = f.dest;
+
+  var cells = [
+    { val: f.fno },
+    { val: originDisplay || '—' },
+    { val: f.depTerminal || '—' },
+    { val: f.checkin || '—' },
+    { val: f.gate || '—' },
+    { val: f.std || '—' },
+    { val: f.atd || '—' },
+    { val: destDisplay || '—' },
+    { val: f.arrTerminal || '—' },
+    { val: f.parking || '—' },
+    { val: f.carousel || '—' },
+    { val: f.sta || '—' },
+    { val: f.ata || '—' }
+  ];
+
+  cells.forEach(function(c, idx) {
+    var td = document.createElement('td');
+    td.textContent = c.val;
+    if (idx === 0) td.className = 'gi-fno gi-sticky-col';
+    tr.appendChild(td);
+  });
+
+  return tr;
+}
+
+function renderGateFlights() {
+  var tableBody = document.getElementById('gate-tbody');
+  var searchInput = document.getElementById('gate-search');
+  var searchTerm = (searchInput && searchInput.value || '').replace(/\s/g, '');
+
+  tableBody.innerHTML = '';
+
+  var pinned = [];
+  var others = [];
+
+  if (searchTerm) {
+    gateFlightsList.forEach(function(f) {
+      var num = f.fno.replace(/^JX/, '');
+      if (num === searchTerm || num.indexOf(searchTerm) === 0) {
+        pinned.push(f);
+      } else {
+        others.push(f);
+      }
+    });
+  } else {
+    others = gateFlightsList;
+  }
+
+  pinned.forEach(function(f) {
+    tableBody.appendChild(giMakeRow(f));
+  });
+
+  if (pinned.length > 0 && others.length > 0) {
+    var sep = document.createElement('tr');
+    sep.className = 'gi-separator';
+    var td = document.createElement('td');
+    td.colSpan = 13;
+    sep.appendChild(td);
+    tableBody.appendChild(sep);
+  }
+
+  others.forEach(function(f) {
+    tableBody.appendChild(giMakeRow(f));
+  });
+}
+
+function filterGateFlights() {
+  if (gateFlightsList.length > 0) renderGateFlights();
+}
+
 function loadGateFlights() {
   var statusEl = document.getElementById('gate-status');
   var tableBody = document.getElementById('gate-tbody');
@@ -46,6 +132,7 @@ function loadGateFlights() {
   statusEl.style.display = 'block';
   wrapEl.style.display = 'none';
   tableBody.innerHTML = '';
+  gateFlightsList = [];
 
   fetch('/api/fids')
     .then(function(r) {
@@ -62,10 +149,9 @@ function loadGateFlights() {
     .then(function(data) {
       dateEl.textContent = data.date || '';
 
-      var dep = (data.dep || []).filter(function(f) { return f.ACode === 'JX'; });
-      var arr = (data.arr || []).filter(function(f) { return f.ACode === 'JX'; });
+      var dep = (data.dep || []).filter(function(f) { return f.ACode && f.ACode.trim() === 'JX'; });
+      var arr = (data.arr || []).filter(function(f) { return f.ACode && f.ACode.trim() === 'JX'; });
 
-      // Merge by flight number
       var map = {};
 
       dep.forEach(function(f) {
@@ -73,7 +159,10 @@ function loadGateFlights() {
         if (!map[key]) map[key] = { fno: key };
         var m = map[key];
         m.origin = 'TPE';
+        m.originCode = 'TPE';
+        m.originName = '桃園';
         m.dest = f.CityCode || '';
+        m.destCode = f.CityCode || '';
         m.destName = f.CityName || f.CityCode || '';
         m.checkin = f.CheckIn || '';
         m.gate = f.Gate || '';
@@ -90,7 +179,9 @@ function loadGateFlights() {
         m.originCode = f.CityCode || '';
         m.originName = f.CityName || f.CityCode || '';
         if (!m.origin) m.origin = f.CityCode || '';
-        m.dest = m.dest || 'TPE';
+        if (!m.dest) m.dest = 'TPE';
+        if (!m.destCode) m.destCode = 'TPE';
+        if (!m.destName) m.destName = '桃園';
         m.parking = f.Gate || '';
         m.carousel = f.StopCode || '';
         m.sta = giFmtTime(f.OTime);
@@ -109,54 +200,10 @@ function loadGateFlights() {
         return;
       }
 
+      gateFlightsList = flights;
       statusEl.style.display = 'none';
       wrapEl.style.display = '';
-
-      flights.forEach(function(f) {
-        var tr = document.createElement('tr');
-
-        var originDisplay = '';
-        if (f.originName) {
-          originDisplay = f.originName;
-        } else if (f.origin) {
-          originDisplay = f.origin;
-        }
-
-        var destDisplay = '';
-        if (f.destName) {
-          destDisplay = f.destName;
-        } else if (f.dest) {
-          destDisplay = f.dest;
-        }
-
-        var cells = [
-          { val: f.fno, cls: 'gi-fno' },
-          { val: originDisplay || '—' },
-          { val: f.checkin || '—' },
-          { val: f.gate || '—' },
-          { val: f.std || '—' },
-          { val: f.atd || '—', cls: (f.atd && f.std && f.atd !== f.std) ? 'gi-actual' : '' },
-          { val: destDisplay || '—' },
-          { val: f.parking || '—' },
-          { val: f.carousel || '—' },
-          { val: f.sta || '—' },
-          { val: f.ata || '—', cls: (f.ata && f.sta && f.ata !== f.sta) ? 'gi-actual' : '' }
-        ];
-
-        cells.forEach(function(c, idx) {
-          var td = document.createElement('td');
-          td.textContent = c.val;
-          if (c.cls) td.className = c.cls;
-          if (idx === 0) td.className = 'gi-fno gi-sticky-col';
-          tr.appendChild(td);
-        });
-
-        var memo = [f.depMemo, f.arrMemo].filter(Boolean).join(' / ');
-        if (memo) tr.title = memo;
-
-        tableBody.appendChild(tr);
-      });
-
+      renderGateFlights();
       gateFlightsLoaded = true;
     })
     .catch(function(e) {
@@ -166,5 +213,7 @@ function loadGateFlights() {
 }
 
 function refreshGateFlights() {
+  var searchInput = document.getElementById('gate-search');
+  if (searchInput) searchInput.value = '';
   loadGateFlights();
 }

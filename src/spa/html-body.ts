@@ -598,6 +598,10 @@ export function getSpaHtmlBody(): string {
       </div>
       <button class="gi-refresh-btn" onclick="refreshGateFlights()">🔄 更新航班資訊</button>
     </div>
+    <div class="gi-search-bar">
+      <span class="gi-search-prefix">JX</span>
+      <input type="text" id="gate-search" class="gi-search-input" placeholder="航班號碼" inputmode="numeric" oninput="filterGateFlights()">
+    </div>
     <div id="gate-status" class="gi-status">按下「更新航班資訊」載入今日航班</div>
     <div id="gate-table-wrap" class="gi-table-wrap" style="display:none">
       <table class="gi-table">
@@ -605,11 +609,13 @@ export function getSpaHtmlBody(): string {
           <tr>
             <th class="gi-sticky-col">航班</th>
             <th>出發地</th>
+            <th>Terminal</th>
             <th>Check-in</th>
             <th>Gate</th>
             <th>STD</th>
             <th>ATD</th>
             <th>目的地</th>
+            <th>Terminal</th>
             <th>Parking</th>
             <th>轉盤</th>
             <th>STA</th>
@@ -649,7 +655,7 @@ export function getSpaHtmlBody(): string {
   </button>
   <button class="tab-btn" id="tabBtn-theme" onclick="toggleTheme()">
     <span class="tab-btn-icon" id="theme-icon">☀️</span><span id="theme-label">日間</span>
-    <span style="font-size:.55em;color:var(--dim);line-height:1;opacity:.7">V4.003</span>
+    <span style="font-size:.55em;color:var(--dim);line-height:1;opacity:.7">V4.004</span>
   </button>
 </div>
 

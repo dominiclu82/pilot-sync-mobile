@@ -321,7 +321,7 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
 .wx-flt-def-body{margin-top:6px;display:flex;flex-direction:column;gap:5px;color:var(--muted);padding-bottom:2px}
 .wx-flt-def-body>div{display:flex;align-items:center;gap:8px;line-height:1.4}
 /* ── Gate Info ── */
-#tab-gate{display:none;min-height:calc(100dvh - 56px)}
+#tab-gate{display:none;position:relative;padding:0 0 calc(20px + var(--safe-bottom))}
 #tab-gate.tab-active{display:block}
 .gi-header{display:flex;align-items:center;justify-content:space-between;padding:12px 14px;
   border-bottom:1px solid var(--dim);position:sticky;top:0;background:var(--bg);z-index:10}
@@ -331,6 +331,14 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
 .gi-refresh-btn{background:var(--accent);color:#fff;border:none;border-radius:8px;
   padding:8px 14px;font-size:.82em;font-weight:600;cursor:pointer;white-space:nowrap;-webkit-appearance:none}
 .gi-refresh-btn:active{opacity:.7}
+.gi-search-bar{display:flex;align-items:center;gap:0;padding:10px 14px;border-bottom:1px solid rgba(148,163,184,.1)}
+.gi-search-prefix{font-weight:800;font-size:.95em;color:var(--accent-light);padding:7px 2px 7px 12px;
+  background:var(--surface);border:1.5px solid var(--dim);border-right:none;border-radius:8px 0 0 8px}
+.gi-search-input{flex:1;max-width:160px;padding:7px 10px;background:var(--surface);border:1.5px solid var(--dim);
+  border-left:none;border-radius:0 8px 8px 0;color:var(--text);font-size:.95em;outline:none;
+  font-weight:600;-webkit-appearance:none}
+.gi-search-input::placeholder{color:var(--dim);font-weight:400}
+.gi-search-input:focus{border-color:var(--accent)}
 .gi-status{text-align:center;padding:32px 16px;color:var(--muted);font-size:.88em}
 .gi-table-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;padding:0 0 8px}
 .gi-table{border-collapse:collapse;font-size:.75em;width:100%;min-width:720px}
@@ -343,7 +351,7 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
 .gi-fno{font-weight:700;color:var(--accent-light)!important}
 .gi-sticky-col{position:sticky;left:0;z-index:3;background:var(--surface)}
 .gi-table tbody .gi-sticky-col{background:var(--bg)}
-.gi-actual{color:#f59e0b!important;font-weight:600}
+.gi-separator td{height:12px;border-bottom:2px solid var(--accent);background:none}
 .gi-notice{font-size:.65em;color:var(--dim);text-align:center;padding:8px 0 16px}
 `;
 }
