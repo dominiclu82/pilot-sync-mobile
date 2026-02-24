@@ -242,7 +242,7 @@ function switchTab(tab, btn) {
 var gateUnlocked = false;
 function gateUnlock() {
   var pw = document.getElementById('gate-lock-pw').value;
-  if (pw === '12345678') {
+  if (pw === 'qwertyui') {
     gateUnlocked = true;
     document.getElementById('gate-lock-overlay').style.display = 'none';
     document.getElementById('gate-content').style.display = 'flex';

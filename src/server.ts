@@ -13,7 +13,8 @@ import { getSpaCoreJs } from './spa/js-core.js';
 import { getSpaWeatherJs } from './spa/js-weather.js';
 import { getSpaDutyTimeJs } from './spa/js-duty-time.js';
 import { getSpaGateInfoJs } from './spa/js-gate-info.js';
-import puppeteer from 'puppeteer';
+import puppeteer from 'puppeteer-core';
+import chromium from '@sparticuz/chromium';
 
 
 config({ path: path.join(ROOT, '.env') });
@@ -449,21 +450,21 @@ function _ontMap(f: any, dir: string): any {
 }
 
 async function _ontBrowserFetch(url: string): Promise<any[]> {
+  const execPath = await chromium.executablePath();
   const browser = await puppeteer.launch({
-    headless: true,
-    args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage']
+    executablePath: execPath,
+    headless: chromium.headless,
+    args: chromium.args
   });
   try {
     const page = await browser.newPage();
     await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36');
     const resp = await page.goto(url, { waitUntil: 'networkidle0', timeout: 30000 });
     const text = await resp?.text() || '';
-    // The page might return JSON directly or wrap in HTML after Cloudflare challenge
     let data: any;
     try {
       data = JSON.parse(text);
     } catch {
-      // Try extracting JSON from <pre> or body text
       const bodyText = await page.evaluate(() => document.body?.innerText || '');
       data = JSON.parse(bodyText);
     }
