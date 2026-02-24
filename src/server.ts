@@ -457,11 +457,19 @@ const _stealthBrowser = (() => {
 
 async function _ontScrape(): Promise<{ arrivals: any[]; departures: any[] }> {
   const pageUrl = Buffer.from('aHR0cHM6Ly93d3cuZmx5b250YXJpby5jb20vZmxpZ2h0cw==', 'base64').toString();
-  const browser = await _stealthBrowser.launch({
-    headless: true,
-    args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage',
-           '--disable-gpu', '--single-process']
-  });
+  let browser: any;
+  try {
+    console.log('[ONT] Launching stealth browser...');
+    browser = await _stealthBrowser.launch({
+      headless: true,
+      args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage',
+             '--disable-gpu', '--single-process']
+    });
+    console.log('[ONT] Browser launched OK');
+  } catch (launchErr: any) {
+    console.error('[ONT] Browser launch FAILED:', launchErr.message || launchErr);
+    throw new Error('Browser launch failed: ' + (launchErr.message || String(launchErr)));
+  }
   try {
     const page = await browser.newPage();
     await page.setViewport({ width: 1280, height: 800 });
@@ -474,22 +482,28 @@ async function _ontScrape(): Promise<{ arrivals: any[]; departures: any[] }> {
         if (url.includes('/flights/arrivals')) {
           const json = await resp.json();
           captured.arrivals = json.data || json || [];
+          console.log('[ONT] Captured arrivals:', captured.arrivals.length, 'flights');
         } else if (url.includes('/flights/departures')) {
           const json = await resp.json();
           captured.departures = json.data || json || [];
+          console.log('[ONT] Captured departures:', captured.departures.length, 'flights');
         }
       } catch { /* non-JSON response, skip */ }
     });
 
+    console.log('[ONT] Navigating to page...');
     await page.goto(pageUrl, { waitUntil: 'networkidle0', timeout: 60000 });
+    console.log('[ONT] Page loaded, current URL:', page.url());
 
     // Wait for table rows to confirm data loaded
     await page.waitForSelector('.flights__table table tbody tr', { timeout: 30000 })
-      .catch(() => { /* table might not render if no flights */ });
+      .catch(() => { console.log('[ONT] No table rows found (timeout)'); });
 
+    console.log('[ONT] Result: arrivals=' + captured.arrivals.length + ' departures=' + captured.departures.length);
     return captured;
   } finally {
     await browser.close();
+    console.log('[ONT] Browser closed');
   }
 }
 
