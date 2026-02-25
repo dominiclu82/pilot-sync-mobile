@@ -391,6 +391,6 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
 .gi-time-btn{background:none;color:var(--muted);border:1.5px solid var(--dim);border-radius:8px;
   padding:8px 12px;font-size:.82em;font-weight:600;cursor:pointer;white-space:nowrap;-webkit-appearance:none}
 .gi-time-btn-on{border-color:var(--accent);color:var(--accent)}
-.gi-notice{flex-shrink:0;font-size:.65em;color:var(--dim);text-align:center;padding:8px 0 calc(8px + env(safe-area-inset-bottom,0px));background:var(--bg)}
+.gi-notice{flex-shrink:0;font-size:.65em;color:var(--dim);text-align:center;padding:6px 0;background:var(--bg);min-height:24px}
 `;
 }

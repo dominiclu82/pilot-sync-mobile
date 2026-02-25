@@ -573,7 +573,7 @@ export function getSpaHtmlBody(): string {
       </div>
     </div>
     <div class="gi-search-bar">
-      <span class="gi-search-label">輸入航班號數字 / 機場代碼 / 機場名搜尋</span>
+      <span class="gi-search-label">輸入航班號 / 機場代碼 / 機場名搜尋</span>
       <input type="text" id="gate-search" class="gi-search-input" placeholder="搜尋..." oninput="filterGateFlights()">
     </div>
     <div id="gi-pinned-wrap" class="gi-pinned-wrap" style="display:none">
@@ -642,7 +642,7 @@ export function getSpaHtmlBody(): string {
         <span>📲</span>安裝
       </button>
     </div>
-    <span style="font-size:.55em;color:var(--dim);line-height:1;opacity:.7">V4.033</span>
+    <span style="font-size:.55em;color:var(--dim);line-height:1;opacity:.7">V4.034</span>
   </div>
 </div>
 
