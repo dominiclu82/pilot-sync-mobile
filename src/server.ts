@@ -369,40 +369,12 @@ async function _faRefreshCache(): Promise<void> {
 setTimeout(() => _faRefreshCache(), 5000);
 setInterval(() => _faRefreshCache(), 5 * 60 * 1000);
 
-let _faRefreshing = false;
-
 app.get('/api/fids-fa', (_req, res) => {
   res.json({
     flights: _faCache.flights,
     updatedAt: _faCache.updatedAt ? new Date(_faCache.updatedAt).toISOString() : null,
     count: Object.keys(_faCache.flights).length
   });
-});
-
-app.post('/api/fids-fa/refresh', async (_req, res) => {
-  if (_faRefreshing) {
-    res.json({
-      status: 'already_running',
-      flights: _faCache.flights,
-      updatedAt: _faCache.updatedAt ? new Date(_faCache.updatedAt).toISOString() : null,
-      count: Object.keys(_faCache.flights).length
-    });
-    return;
-  }
-  _faRefreshing = true;
-  try {
-    await _faRefreshCache();
-    res.json({
-      status: 'ok',
-      flights: _faCache.flights,
-      updatedAt: _faCache.updatedAt ? new Date(_faCache.updatedAt).toISOString() : null,
-      count: Object.keys(_faCache.flights).length
-    });
-  } catch (e: any) {
-    res.status(500).json({ status: 'error', error: e.message });
-  } finally {
-    _faRefreshing = false;
-  }
 });
 
 async function oauthCallback(req: express.Request, res: express.Response) {

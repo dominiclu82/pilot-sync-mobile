@@ -600,10 +600,7 @@ export function getSpaHtmlBody(): string {
         <tbody id="gate-tbody"></tbody>
       </table>
     </div>
-    <div class="gi-notice">
-      <span>⚠ Non-operational Reference only</span>
-      <button class="gi-force-refresh" id="gi-force-refresh-btn" onclick="forceRefreshGateFlights()">🔄 重新抓取外站 (約30-60秒)</button>
-    </div>
+    <div class="gi-notice">⚠ Non-operational Reference only</div>
   </div>
 
 </div><!-- end tab-gate -->
@@ -640,7 +637,7 @@ export function getSpaHtmlBody(): string {
         <span>📲</span>安裝
       </button>
     </div>
-    <span style="font-size:.55em;color:var(--dim);line-height:1;opacity:.7">V4.026</span>
+    <span style="font-size:.55em;color:var(--dim);line-height:1;opacity:.7">V4.027</span>
   </div>
 </div>
 

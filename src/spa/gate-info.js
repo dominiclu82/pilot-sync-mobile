@@ -142,10 +142,13 @@ function giMakeTestRow(f) {
 
 function renderGateFlights() {
   var tableBody = document.getElementById('gate-tbody');
+  var thead = document.querySelector('#gi-table thead');
   var searchInput = document.getElementById('gate-search');
   var searchTerm = (searchInput && searchInput.value || '').replace(/\s/g, '').replace(/^0+/, '');
 
   tableBody.innerHTML = '';
+  // Remove old pinned rows from thead
+  thead.querySelectorAll('.gi-pinned-row, .gi-pinned-sep').forEach(function(el) { el.remove(); });
 
   // Show test rows at top
   if (_giTestRows.length > 0) {
@@ -185,17 +188,19 @@ function renderGateFlights() {
     others = sorted;
   }
 
-  pinned.forEach(function(f) {
-    tableBody.appendChild(giMakeRow(f));
-  });
-
-  if (pinned.length > 0 && others.length > 0) {
+  // Pinned rows go into thead (sticky with header)
+  if (pinned.length > 0) {
+    pinned.forEach(function(f) {
+      var tr = giMakeRow(f);
+      tr.classList.add('gi-pinned-row');
+      thead.appendChild(tr);
+    });
     var sep = document.createElement('tr');
-    sep.className = 'gi-separator';
+    sep.className = 'gi-pinned-sep';
     var td = document.createElement('td');
     td.colSpan = 13;
     sep.appendChild(td);
-    tableBody.appendChild(sep);
+    thead.appendChild(sep);
   }
 
   others.forEach(function(f) {
@@ -494,30 +499,3 @@ function giToday() {
   loadGateFlights();
 }
 
-function forceRefreshGateFlights() {
-  var btn = document.getElementById('gi-force-refresh-btn');
-  var statusEl = document.getElementById('gate-status');
-  if (!btn) return;
-  btn.disabled = true;
-  btn.textContent = '⏳ 抓取中，請稍候...';
-  statusEl.textContent = '正在重新抓取外站資料，約需 30-60 秒...';
-  statusEl.style.display = 'block';
-
-  fetch('/api/fids-fa/refresh', { method: 'POST' })
-    .then(function(r) { return r.json(); })
-    .then(function(data) {
-      btn.disabled = false;
-      btn.textContent = '🔄 重新抓取外站 (約30-60秒)';
-      if (data.status === 'already_running') {
-        statusEl.textContent = '已有抓取作業進行中，請稍後再試';
-        setTimeout(function() { loadGateFlights(); }, 2000);
-      } else {
-        loadGateFlights();
-      }
-    })
-    .catch(function() {
-      btn.disabled = false;
-      btn.textContent = '🔄 重新抓取外站 (約30-60秒)';
-      statusEl.textContent = '抓取失敗，請稍後再試';
-    });
-}
