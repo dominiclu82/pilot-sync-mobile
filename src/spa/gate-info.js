@@ -186,20 +186,12 @@ function renderGateFlights() {
   }
 
   // Pinned rows in tbody with sticky td cells
-  pinned.forEach(function(f) {
+  pinned.forEach(function(f, i) {
     var tr = giMakeRow(f);
     tr.classList.add('gi-pinned-row');
+    if (i === pinned.length - 1 && others.length > 0) tr.classList.add('gi-pinned-last');
     tableBody.appendChild(tr);
   });
-
-  if (pinned.length > 0 && others.length > 0) {
-    var sep = document.createElement('tr');
-    sep.className = 'gi-pinned-sep';
-    var td = document.createElement('td');
-    td.colSpan = 13;
-    sep.appendChild(td);
-    tableBody.appendChild(sep);
-  }
 
   others.forEach(function(f) {
     tableBody.appendChild(giMakeRow(f));
@@ -219,16 +211,6 @@ function renderGateFlights() {
       });
       offset += tr.getBoundingClientRect().height;
     });
-    // Separator also sticky
-    var sepRow = tableBody.querySelector('.gi-pinned-sep');
-    if (sepRow) {
-      var sepTd = sepRow.querySelector('td');
-      if (sepTd) {
-        sepTd.style.position = 'sticky';
-        sepTd.style.top = offset + 'px';
-        sepTd.style.zIndex = '4';
-      }
-    }
   }
 }
 

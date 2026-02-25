@@ -600,8 +600,8 @@ export function getSpaHtmlBody(): string {
         <tbody id="gate-tbody"></tbody>
       </table>
     </div>
-    <div class="gi-notice">⚠ Non-operational Reference only</div>
   </div>
+  <div class="gi-notice">⚠ Non-operational Reference only</div>
 
 </div><!-- end tab-gate -->
 
@@ -637,7 +637,7 @@ export function getSpaHtmlBody(): string {
         <span>📲</span>安裝
       </button>
     </div>
-    <span style="font-size:.55em;color:var(--dim);line-height:1;opacity:.7">V4.029</span>
+    <span style="font-size:.55em;color:var(--dim);line-height:1;opacity:.7">V4.030</span>
   </div>
 </div>
 

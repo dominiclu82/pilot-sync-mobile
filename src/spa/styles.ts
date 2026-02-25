@@ -334,9 +334,9 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
 .wx-flt-def-body>div{display:flex;align-items:center;gap:8px;line-height:1.4}
 /* ── Gate Info ── */
 #tab-gate{display:none;position:relative}
-#tab-gate.tab-active{display:flex;flex-direction:column;overflow:hidden;
+#tab-gate.tab-active{display:flex;flex-direction:column;
   height:calc(100dvh - calc(56px + env(safe-area-inset-bottom,0px)))}
-#gate-content{display:flex;flex:1;flex-direction:column;min-height:0;overflow:hidden}
+#gate-content{display:flex;flex:1;flex-direction:column;min-height:0}
 .gi-header{display:flex;align-items:center;justify-content:space-between;padding:12px 14px;
   border-bottom:1px solid var(--dim);background:var(--bg);flex-shrink:0}
 .gi-header-left{display:flex;flex-direction:column;gap:2px}
@@ -369,7 +369,7 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
   text-align:center;border-bottom:2px solid var(--dim);white-space:nowrap;font-size:.85em}
 .gi-pinned-row td{background:var(--bg);border-bottom:1px solid rgba(148,163,184,.15)}
 .gi-pinned-row .gi-sticky-col{background:var(--bg);z-index:6}
-.gi-pinned-sep td{height:3px;padding:0;border-bottom:2px solid var(--accent);background:var(--bg)}
+.gi-pinned-last td{border-bottom:2px solid var(--accent)}
 .gi-sortable{cursor:pointer;user-select:none}
 .gi-sortable:hover{color:var(--accent-light)}
 .gi-sortable::after{content:'△▽';margin-left:3px;font-size:.55em;opacity:.4;letter-spacing:-2px}
