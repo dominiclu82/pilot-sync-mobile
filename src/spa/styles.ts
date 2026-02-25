@@ -353,12 +353,10 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
 .gi-refresh-btn:active{opacity:.7}
 .gi-search-bar{display:flex;align-items:center;gap:0;padding:10px 14px;
   border-bottom:1px solid rgba(148,163,184,.1);flex-shrink:0}
-.gi-search-prefix{font-weight:800;font-size:.95em;color:var(--accent-light);padding:7px 2px 7px 12px;
-  background:var(--surface);border:1.5px solid var(--dim);border-right:none;border-radius:8px 0 0 8px}
-.gi-search-input{flex:0;width:80px;padding:7px 10px;background:var(--surface);border:1.5px solid var(--dim);
-  border-left:none;border-radius:0 8px 8px 0;color:var(--text);font-size:.95em;outline:none;
+.gi-search-input{flex:0;width:200px;padding:7px 12px;background:var(--surface);border:1.5px solid var(--dim);
+  border-radius:8px;color:var(--text);font-size:.88em;outline:none;
   font-weight:600;-webkit-appearance:none}
-.gi-search-input::placeholder{color:var(--dim);font-weight:400}
+.gi-search-input::placeholder{color:var(--dim);font-weight:400;font-size:.85em}
 .gi-search-input:focus{border-color:var(--accent)}
 .gi-dev-note{font-size:.62em;color:#6b9e78;margin-left:10px;white-space:nowrap;opacity:.85}
 .gi-status{text-align:center;padding:32px 16px;color:var(--muted);font-size:.88em}
@@ -367,8 +365,9 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
 .gi-table thead{position:sticky;top:0;z-index:5;background:var(--surface)}
 .gi-table th{background:var(--surface);color:var(--muted);font-weight:700;padding:8px 6px;
   text-align:center;border-bottom:2px solid var(--dim);white-space:nowrap;font-size:.85em}
-.gi-pinned-row td{background:var(--bg);border-bottom:1px solid rgba(148,163,184,.15)}
-.gi-pinned-row .gi-sticky-col{background:var(--bg);z-index:6}
+.gi-search-header td{background:rgba(59,130,246,.12);color:var(--accent-light);font-size:.72em;font-weight:700;text-align:center;padding:5px 6px;border-bottom:1px solid rgba(59,130,246,.25)}
+.gi-pinned-row td{background:rgba(59,130,246,.06);border-bottom:1px solid rgba(148,163,184,.15)}
+.gi-pinned-row .gi-sticky-col{background:rgba(59,130,246,.06);z-index:6}
 .gi-pinned-last td{border-bottom:2px solid var(--accent)}
 .gi-sortable{cursor:pointer;user-select:none}
 .gi-sortable:hover{color:var(--accent-light)}

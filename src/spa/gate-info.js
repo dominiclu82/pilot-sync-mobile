@@ -21,6 +21,17 @@ var _giCityNames = {
   PRG:'布拉格',TPE:'桃園'
 };
 
+var _giIcaoToIata = {
+  KSFO:'SFO',KLAX:'LAX',KSEA:'SEA',KPHX:'PHX',KONT:'ONT',
+  RJAA:'NRT',RJBB:'KIX',RJFF:'FUK',RJCC:'CTS',ROAH:'OKA',RJFT:'KMJ',
+  RJGG:'NGO',RJSS:'SDJ',RJFK:'KOJ',RJSA:'AOJ',RJOT:'TAK',RJBE:'UKB',RCMQ:'RMQ',
+  RKSI:'ICN',RKPK:'PUS',
+  VHHH:'HKG',VMMC:'MFM',
+  WSSS:'SIN',VTBS:'BKK',VVTS:'SGN',VVNB:'HAN',VDPP:'PNH',
+  RPLL:'MNL',RPVM:'CEB',WIII:'CGK',WADD:'DPS',WMKK:'KUL',WMKP:'PEN',
+  LKPR:'PRG',RCTP:'TPE'
+};
+
 function giAirportDisplay(name, code) {
   var n = name || _giCityNames[code] || '';
   if (n && code && n !== code) return n + ' ' + code;
@@ -173,9 +184,38 @@ function renderGateFlights() {
   var sorted = _giSortList(gateFlightsList);
 
   if (searchTerm) {
+    var isNumeric = /^\d+$/.test(searchTerm);
+    var termUpper = searchTerm.toUpperCase();
+    // If ICAO code, convert to IATA for matching
+    var iataFromIcao = _giIcaoToIata[termUpper] || '';
+
     sorted.forEach(function(f) {
-      var num = f.fno.replace(/^JX/, '');
-      if (num === searchTerm || num.indexOf(searchTerm) === 0) {
+      var matched = false;
+      if (isNumeric) {
+        // Flight number search
+        var num = f.fno.replace(/^JX/, '');
+        matched = (num === searchTerm || num.indexOf(searchTerm) === 0);
+      } else {
+        // Station search: IATA code, ICAO (via mapping), or city name
+        var oCode = (f.originCode || '').toUpperCase();
+        var dCode = (f.destCode || '').toUpperCase();
+        var oName = f.originName || '';
+        var dName = f.destName || '';
+        var fno = f.fno.toUpperCase();
+
+        matched = fno.indexOf(termUpper) >= 0
+          || oCode.indexOf(termUpper) >= 0
+          || dCode.indexOf(termUpper) >= 0
+          || oName.indexOf(searchTerm) >= 0
+          || dName.indexOf(searchTerm) >= 0;
+
+        // ICAO match
+        if (!matched && iataFromIcao) {
+          matched = (oCode === iataFromIcao || dCode === iataFromIcao);
+        }
+      }
+
+      if (matched) {
         pinned.push(f);
       } else {
         others.push(f);
@@ -185,7 +225,16 @@ function renderGateFlights() {
     others = sorted;
   }
 
-  // Pinned rows in tbody with sticky td cells
+  // Pinned search result header + rows
+  if (pinned.length > 0) {
+    var hdrTr = document.createElement('tr');
+    hdrTr.className = 'gi-search-header';
+    var hdrTd = document.createElement('td');
+    hdrTd.colSpan = 13;
+    hdrTd.textContent = '搜尋結果（' + pinned.length + ' 筆）';
+    hdrTr.appendChild(hdrTd);
+    tableBody.appendChild(hdrTr);
+  }
   pinned.forEach(function(f, i) {
     var tr = giMakeRow(f);
     tr.classList.add('gi-pinned-row');
@@ -199,8 +248,25 @@ function renderGateFlights() {
 
   // Apply sticky positioning to pinned rows
   if (pinned.length > 0) {
+    // Scroll back to top-left so pinned rows are fully visible
+    var wrap = document.getElementById('gate-table-wrap');
+    if (wrap) { wrap.scrollLeft = 0; wrap.scrollTop = 0; }
+
     var theadH = document.querySelector('#gi-table thead').getBoundingClientRect().height;
     var offset = theadH;
+
+    // Make search header sticky
+    var searchHdr = tableBody.querySelector('.gi-search-header');
+    if (searchHdr) {
+      var hdrTd = searchHdr.querySelector('td');
+      if (hdrTd) {
+        hdrTd.style.position = 'sticky';
+        hdrTd.style.top = offset + 'px';
+        hdrTd.style.zIndex = '4';
+      }
+      offset += searchHdr.getBoundingClientRect().height;
+    }
+
     var pinnedTrs = tableBody.querySelectorAll('.gi-pinned-row');
     pinnedTrs.forEach(function(tr) {
       var cells = tr.querySelectorAll('td');

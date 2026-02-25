@@ -573,8 +573,7 @@ export function getSpaHtmlBody(): string {
       </div>
     </div>
     <div class="gi-search-bar">
-      <span class="gi-search-prefix">JX</span>
-      <input type="text" id="gate-search" class="gi-search-input" placeholder="航班號碼" inputmode="numeric" oninput="filterGateFlights()">
+      <input type="text" id="gate-search" class="gi-search-input" placeholder="航班號碼 / 機場代碼 / 城市" oninput="filterGateFlights()">
       <span class="gi-dev-note">外站資訊持續開發中 ｜ Outstation Gate Info In Progress</span>
     </div>
     <div id="gate-status" class="gi-status">按下「更新航班資訊」載入今日航班</div>
@@ -637,7 +636,7 @@ export function getSpaHtmlBody(): string {
         <span>📲</span>安裝
       </button>
     </div>
-    <span style="font-size:.55em;color:var(--dim);line-height:1;opacity:.7">V4.030</span>
+    <span style="font-size:.55em;color:var(--dim);line-height:1;opacity:.7">V4.031</span>
   </div>
 </div>
 
