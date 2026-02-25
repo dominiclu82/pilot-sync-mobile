@@ -142,13 +142,10 @@ function giMakeTestRow(f) {
 
 function renderGateFlights() {
   var tableBody = document.getElementById('gate-tbody');
-  var thead = document.querySelector('#gi-table thead');
   var searchInput = document.getElementById('gate-search');
   var searchTerm = (searchInput && searchInput.value || '').replace(/\s/g, '').replace(/^0+/, '');
 
   tableBody.innerHTML = '';
-  // Remove old pinned rows from thead
-  thead.querySelectorAll('.gi-pinned-row, .gi-pinned-sep').forEach(function(el) { el.remove(); });
 
   // Show test rows at top
   if (_giTestRows.length > 0) {
@@ -188,24 +185,51 @@ function renderGateFlights() {
     others = sorted;
   }
 
-  // Pinned rows go into thead (sticky with header)
-  if (pinned.length > 0) {
-    pinned.forEach(function(f) {
-      var tr = giMakeRow(f);
-      tr.classList.add('gi-pinned-row');
-      thead.appendChild(tr);
-    });
+  // Pinned rows in tbody with sticky td cells
+  pinned.forEach(function(f) {
+    var tr = giMakeRow(f);
+    tr.classList.add('gi-pinned-row');
+    tableBody.appendChild(tr);
+  });
+
+  if (pinned.length > 0 && others.length > 0) {
     var sep = document.createElement('tr');
     sep.className = 'gi-pinned-sep';
     var td = document.createElement('td');
     td.colSpan = 13;
     sep.appendChild(td);
-    thead.appendChild(sep);
+    tableBody.appendChild(sep);
   }
 
   others.forEach(function(f) {
     tableBody.appendChild(giMakeRow(f));
   });
+
+  // Apply sticky positioning to pinned rows
+  if (pinned.length > 0) {
+    var theadH = document.querySelector('#gi-table thead').getBoundingClientRect().height;
+    var offset = theadH;
+    var pinnedTrs = tableBody.querySelectorAll('.gi-pinned-row');
+    pinnedTrs.forEach(function(tr) {
+      var cells = tr.querySelectorAll('td');
+      cells.forEach(function(td) {
+        td.style.position = 'sticky';
+        td.style.top = offset + 'px';
+        td.style.zIndex = '4';
+      });
+      offset += tr.getBoundingClientRect().height;
+    });
+    // Separator also sticky
+    var sepRow = tableBody.querySelector('.gi-pinned-sep');
+    if (sepRow) {
+      var sepTd = sepRow.querySelector('td');
+      if (sepTd) {
+        sepTd.style.position = 'sticky';
+        sepTd.style.top = offset + 'px';
+        sepTd.style.zIndex = '4';
+      }
+    }
+  }
 }
 
 function _giGetSortVal(f, key) {

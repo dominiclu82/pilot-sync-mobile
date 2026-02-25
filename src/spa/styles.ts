@@ -334,9 +334,9 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
 .wx-flt-def-body>div{display:flex;align-items:center;gap:8px;line-height:1.4}
 /* ── Gate Info ── */
 #tab-gate{display:none;position:relative}
-#tab-gate.tab-active{display:flex;flex-direction:column;
+#tab-gate.tab-active{display:flex;flex-direction:column;overflow:hidden;
   height:calc(100dvh - calc(56px + env(safe-area-inset-bottom,0px)))}
-#gate-content{flex:1;flex-direction:column;min-height:0}
+#gate-content{display:flex;flex:1;flex-direction:column;min-height:0;overflow:hidden}
 .gi-header{display:flex;align-items:center;justify-content:space-between;padding:12px 14px;
   border-bottom:1px solid var(--dim);background:var(--bg);flex-shrink:0}
 .gi-header-left{display:flex;flex-direction:column;gap:2px}
@@ -362,14 +362,14 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
 .gi-search-input:focus{border-color:var(--accent)}
 .gi-dev-note{font-size:.62em;color:#6b9e78;margin-left:10px;white-space:nowrap;opacity:.85}
 .gi-status{text-align:center;padding:32px 16px;color:var(--muted);font-size:.88em}
-.gi-table-wrap{flex:1;overflow:auto;-webkit-overflow-scrolling:touch;min-height:0}
+.gi-table-wrap{flex:1;overflow:auto;-webkit-overflow-scrolling:touch;min-height:0;overscroll-behavior:contain}
 .gi-table{table-layout:fixed;border-collapse:collapse;font-size:.75em;width:100%;min-width:900px}
 .gi-table thead{position:sticky;top:0;z-index:5;background:var(--surface)}
 .gi-table th{background:var(--surface);color:var(--muted);font-weight:700;padding:8px 6px;
   text-align:center;border-bottom:2px solid var(--dim);white-space:nowrap;font-size:.85em}
-.gi-pinned-row td{background:var(--bg)!important;border-bottom:1px solid rgba(148,163,184,.15)}
-.gi-pinned-row .gi-sticky-col{background:var(--bg)!important}
-.gi-pinned-sep td{height:3px;padding:0;border-bottom:2px solid var(--accent);background:none!important}
+.gi-pinned-row td{background:var(--bg);border-bottom:1px solid rgba(148,163,184,.15)}
+.gi-pinned-row .gi-sticky-col{background:var(--bg);z-index:6}
+.gi-pinned-sep td{height:3px;padding:0;border-bottom:2px solid var(--accent);background:var(--bg)}
 .gi-sortable{cursor:pointer;user-select:none}
 .gi-sortable:hover{color:var(--accent-light)}
 .gi-sortable::after{content:'△▽';margin-left:3px;font-size:.55em;opacity:.4;letter-spacing:-2px}
