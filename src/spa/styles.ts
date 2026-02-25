@@ -389,7 +389,7 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
 .gi-time-btn{background:none;color:var(--muted);border:1.5px solid var(--dim);border-radius:8px;
   padding:8px 12px;font-size:.82em;font-weight:600;cursor:pointer;white-space:nowrap;-webkit-appearance:none}
 .gi-time-btn-on{border-color:var(--accent);color:var(--accent)}
-.gi-notice{flex-shrink:0;font-size:.65em;color:var(--dim);padding:8px 12px 16px;display:flex;align-items:center;justify-content:space-between}
-.gi-notice .gi-force-refresh{font-size:1em;padding:4px 8px;margin-left:8px;white-space:nowrap}
+.gi-notice{flex-shrink:0;font-size:.65em;color:var(--dim);padding:8px 12px 16px;display:flex;align-items:center;justify-content:center;position:relative}
+.gi-notice .gi-force-refresh{font-size:1em;padding:4px 8px;position:absolute;right:12px;white-space:nowrap}
 `;
 }
