@@ -574,7 +574,12 @@ export function getSpaHtmlBody(): string {
     <div class="gi-header">
       <div class="gi-header-left">
         <span class="gi-title">JX Flight Info</span>
-        <span class="gi-date" id="gate-date"></span>
+        <div class="gi-date-nav">
+          <button class="gi-nav-btn" id="gi-prev-day" onclick="giPrevDay()">◀</button>
+          <span class="gi-date" id="gate-date"></span>
+          <button class="gi-nav-btn gi-today-btn" id="gi-today-btn" onclick="giToday()" style="display:none">今天</button>
+          <button class="gi-nav-btn" id="gi-next-day" onclick="giNextDay()">▶</button>
+        </div>
       </div>
       <div class="gi-header-btns">
         <button class="gi-time-btn" id="gi-time-btn" onclick="toggleGiTime()">⏱ 時間</button>
@@ -647,7 +652,7 @@ export function getSpaHtmlBody(): string {
         <span>📲</span>安裝
       </button>
     </div>
-    <span style="font-size:.55em;color:var(--dim);line-height:1;opacity:.7">V4.022</span>
+    <span style="font-size:.55em;color:var(--dim);line-height:1;opacity:.7">V4.023</span>
   </div>
 </div>
 

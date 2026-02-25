@@ -177,13 +177,16 @@ app.get('/api/pacific-hf', async (_req, res) => {
 });
 
 // ── FIDS proxy ──────────────────────────────────────────────────────────────
-app.get('/api/fids', async (_req, res) => {
+app.get('/api/fids', async (req, res) => {
   try {
-    const now = new Date();
-    const tw = new Date(now.getTime() + 8 * 60 * 60 * 1000);
-    const odate = tw.getUTCFullYear() + '/' +
-      String(tw.getUTCMonth() + 1).padStart(2, '0') + '/' +
-      String(tw.getUTCDate()).padStart(2, '0');
+    let odate = req.query.date as string || '';
+    if (!odate || !/^\d{4}\/\d{2}\/\d{2}$/.test(odate)) {
+      const now = new Date();
+      const tw = new Date(now.getTime() + 8 * 60 * 60 * 1000);
+      odate = tw.getUTCFullYear() + '/' +
+        String(tw.getUTCMonth() + 1).padStart(2, '0') + '/' +
+        String(tw.getUTCDate()).padStart(2, '0');
+    }
 
     const base = {
       ODate: odate, OTimeOpen: null, OTimeClose: null,
@@ -327,14 +330,26 @@ async function _faRefreshCache(): Promise<void> {
 
     console.log('[FA] Found', identSet.size, 'JX flights:', [...identSet].join(', '));
 
+    // Today's date range (Taiwan time, with 6h buffer on each side)
+    const now = Date.now();
+    const tw = new Date(now + 8 * 60 * 60 * 1000);
+    const todayStart = new Date(Date.UTC(tw.getUTCFullYear(), tw.getUTCMonth(), tw.getUTCDate()));
+    const rangeStart = todayStart.getTime() - 6 * 60 * 60 * 1000; // 6h before midnight TW
+    const rangeEnd = todayStart.getTime() + 30 * 60 * 60 * 1000;  // 6h after midnight+1 TW
+
     // Fetch each flight page (with delay to avoid rate limiting)
     const newFlights: Record<string, FaFlightData> = {};
     for (const ident of identSet) {
       const entries = await _faFetchFlight(ident);
-      // Use the most recent entry that has gate data, fall back to first
       for (const entry of entries) {
         const key = entry.fno;
         if (!key) continue;
+        // Filter: only keep today's flights (by scheduled departure time)
+        const depTime = entry.scheduledDep ? new Date(entry.scheduledDep).getTime() : 0;
+        const arrTime = entry.scheduledArr ? new Date(entry.scheduledArr).getTime() : 0;
+        const refTime = depTime || arrTime;
+        if (refTime && (refTime < rangeStart || refTime > rangeEnd)) continue;
+        // Prefer entry with gate data
         if (!newFlights[key] || entry.origin.gate || entry.destination.gate) {
           newFlights[key] = entry;
         }

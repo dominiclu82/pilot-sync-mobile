@@ -342,6 +342,12 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
 .gi-header-left{display:flex;flex-direction:column;gap:2px}
 .gi-title{font-weight:700;font-size:.95em;color:var(--text)}
 .gi-date{font-size:.72em;color:var(--dim)}
+.gi-date-nav{display:flex;align-items:center;gap:6px}
+.gi-nav-btn{background:none;border:1px solid var(--dim);color:var(--muted);border-radius:6px;
+  padding:2px 8px;font-size:.72em;cursor:pointer;-webkit-appearance:none;line-height:1.4}
+.gi-nav-btn:active{opacity:.6}
+.gi-nav-btn:disabled{opacity:.25;cursor:default}
+.gi-today-btn{color:var(--accent);border-color:var(--accent)}
 .gi-refresh-btn{background:var(--accent);color:#fff;border:none;border-radius:8px;
   padding:8px 14px;font-size:.82em;font-weight:600;cursor:pointer;white-space:nowrap;-webkit-appearance:none}
 .gi-refresh-btn:active{opacity:.7}

@@ -1,17 +1,30 @@
 // ── Gate Info ──────────────────────────────────────────────────────────────────
 var gateFlightsLoaded = false;
 var gateFlightsList = [];
-var giSortKey = 'fno';
+var giSortKey = 'origin';
 var giSortAsc = true;
+var _giSelectedDate = null; // null = today, 'YYYY/MM/DD' = specific date
 
 function giFmtTime(t) {
   if (!t) return '';
   return t.replace(/:\d{2}$/, '');
 }
 
+var _giCityNames = {
+  SFO:'舊金山',LAX:'洛杉磯',SEA:'西雅圖',PHX:'鳳凰城',ONT:'安大略',
+  NRT:'成田',KIX:'關西',FUK:'福岡',CTS:'札幌',OKA:'沖繩',KMJ:'熊本',
+  NGO:'名古屋',SDJ:'仙台',KOJ:'鹿兒島',AOJ:'青森',
+  ICN:'仁川',PUS:'釜山',
+  HKG:'香港',MFM:'澳門',
+  SIN:'新加坡',BKK:'曼谷',SGN:'胡志明',HAN:'河內',PNH:'金邊',
+  MNL:'馬尼拉',CEB:'宿霧',CGK:'雅加達',DPS:'峇里島',KUL:'吉隆坡',PEN:'檳城',
+  PRG:'布拉格',TPE:'桃園'
+};
+
 function giAirportDisplay(name, code) {
-  if (name && code && name !== code) return name + ' ' + code;
-  return name || code || '';
+  var n = name || _giCityNames[code] || '';
+  if (n && code && n !== code) return n + ' ' + code;
+  return n || code || '';
 }
 
 function _giDate() {
@@ -22,9 +35,9 @@ function _giDate() {
     String(tw.getUTCDate()).padStart(2, '0');
 }
 
-function _giFetchDirect() {
+function _giFetchDirect(dateOverride) {
   var ep = atob('aHR0cHM6Ly93d3cudGFveXVhbi1haXJwb3J0LmNvbS9hcGkvYXBpL2ZsaWdodC9hX2ZsaWdodA==');
-  var odate = _giDate();
+  var odate = dateOverride || _giDate();
   var base = {
     ODate: odate, OTimeOpen: null, OTimeClose: null,
     BNO: null, AState: '', language: 'ch', keyword: ''
@@ -283,7 +296,10 @@ function loadGateFlights() {
   tableBody.innerHTML = '';
   gateFlightsList = [];
 
-  var tpePromise = fetch('/api/fids')
+  var isToday = !_giSelectedDate;
+  var fidsUrl = isToday ? '/api/fids' : '/api/fids?date=' + encodeURIComponent(_giSelectedDate);
+
+  var tpePromise = fetch(fidsUrl)
     .then(function(r) {
       if (!r.ok) throw new Error('HTTP ' + r.status);
       return r.json();
@@ -293,17 +309,19 @@ function loadGateFlights() {
       return data;
     })
     .catch(function() {
-      return _giFetchDirect();
+      return _giFetchDirect(_giSelectedDate);
     });
 
-  var faPromise = fetch('/api/fids-fa')
-    .then(function(r) {
-      if (!r.ok) throw new Error('HTTP ' + r.status);
-      return r.json();
-    })
-    .catch(function() {
-      return { flights: {}, updatedAt: null, count: 0 };
-    });
+  var faPromise = isToday
+    ? fetch('/api/fids-fa')
+        .then(function(r) {
+          if (!r.ok) throw new Error('HTTP ' + r.status);
+          return r.json();
+        })
+        .catch(function() {
+          return { flights: {}, updatedAt: null, count: 0 };
+        })
+    : Promise.resolve({ flights: {}, updatedAt: null, count: 0 });
 
   Promise.all([tpePromise, faPromise])
     .then(function(results) {
@@ -385,6 +403,64 @@ function loadGateFlights() {
 }
 
 function refreshGateFlights() {
+  loadGateFlights();
+}
+
+function _giTodayStr() {
+  var now = new Date();
+  var tw = new Date(now.getTime() + 8 * 60 * 60 * 1000);
+  return tw.getUTCFullYear() + '/' +
+    String(tw.getUTCMonth() + 1).padStart(2, '0') + '/' +
+    String(tw.getUTCDate()).padStart(2, '0');
+}
+
+function _giShiftDate(dateStr, days) {
+  var parts = dateStr.split('/');
+  var d = new Date(Date.UTC(+parts[0], +parts[1] - 1, +parts[2]));
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.getUTCFullYear() + '/' +
+    String(d.getUTCMonth() + 1).padStart(2, '0') + '/' +
+    String(d.getUTCDate()).padStart(2, '0');
+}
+
+function _giUpdateDateNav() {
+  var today = _giTodayStr();
+  var current = _giSelectedDate || today;
+  var prevBtn = document.getElementById('gi-prev-day');
+  var nextBtn = document.getElementById('gi-next-day');
+  var todayBtn = document.getElementById('gi-today-btn');
+  var tomorrow = _giShiftDate(today, 1);
+  var yesterday = _giShiftDate(today, -1);
+  if (prevBtn) prevBtn.disabled = (current <= yesterday);
+  if (nextBtn) nextBtn.disabled = (current >= tomorrow);
+  if (todayBtn) todayBtn.style.display = (current === today) ? 'none' : '';
+}
+
+function giPrevDay() {
+  var today = _giTodayStr();
+  var current = _giSelectedDate || today;
+  var prev = _giShiftDate(current, -1);
+  var yesterday = _giShiftDate(today, -1);
+  if (prev < yesterday) return;
+  _giSelectedDate = (prev === today) ? null : prev;
+  _giUpdateDateNav();
+  loadGateFlights();
+}
+
+function giNextDay() {
+  var today = _giTodayStr();
+  var current = _giSelectedDate || today;
+  var next = _giShiftDate(current, 1);
+  var tomorrow = _giShiftDate(today, 1);
+  if (next > tomorrow) return;
+  _giSelectedDate = (next === today) ? null : next;
+  _giUpdateDateNav();
+  loadGateFlights();
+}
+
+function giToday() {
+  _giSelectedDate = null;
+  _giUpdateDateNav();
   loadGateFlights();
 }
 
