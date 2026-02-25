@@ -362,7 +362,7 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
 .gi-search-input:focus{border-color:var(--accent)}
 .gi-dev-note{font-size:.62em;color:#6b9e78;margin-left:10px;white-space:nowrap;opacity:.85}
 .gi-status{text-align:center;padding:32px 16px;color:var(--muted);font-size:.88em}
-.gi-table-wrap{flex:1;overflow:auto;-webkit-overflow-scrolling:touch;min-height:0;overscroll-behavior:contain}
+.gi-table-wrap{flex:1;overflow:auto;-webkit-overflow-scrolling:touch;min-height:0;overscroll-behavior:none}
 .gi-table{table-layout:fixed;border-collapse:collapse;font-size:.75em;width:100%;min-width:900px}
 .gi-table thead{position:sticky;top:0;z-index:5;background:var(--surface)}
 .gi-table th{background:var(--surface);color:var(--muted);font-weight:700;padding:8px 6px;
