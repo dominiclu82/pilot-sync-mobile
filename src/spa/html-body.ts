@@ -556,21 +556,7 @@ export function getSpaHtmlBody(): string {
 <!-- ══ Tab: Gate Info ═══════════════════════════════════════════════ -->
 <div id="tab-gate" style="display:none">
 
-  <!-- 密碼鎖 -->
-  <div class="dt-lock-overlay" id="gate-lock-overlay" style="display:flex">
-    <div class="dt-lock-card">
-      <div class="dt-lock-icon">🔒</div>
-      <div class="dt-lock-title">Gate Info</div>
-      <div class="dt-lock-sub">請輸入密碼以繼續</div>
-      <input class="dt-lock-input" type="password" id="gate-lock-pw" placeholder="••••••••" maxlength="16"
-        onkeydown="if(event.key==='Enter')gateUnlock()">
-      <button class="dt-lock-btn" onclick="gateUnlock()">解鎖</button>
-      <div class="dt-lock-err" id="gate-lock-err"></div>
-    </div>
-  </div>
-
-  <!-- Gate Info 內容（解鎖後顯示） -->
-  <div id="gate-content" style="display:none">
+  <div id="gate-content" style="display:flex;flex-direction:column">
     <div class="gi-header">
       <div class="gi-header-left">
         <span class="gi-title">JX Flight Info</span>
@@ -654,7 +640,7 @@ export function getSpaHtmlBody(): string {
         <span>📲</span>安裝
       </button>
     </div>
-    <span style="font-size:.55em;color:var(--dim);line-height:1;opacity:.7">V4.025</span>
+    <span style="font-size:.55em;color:var(--dim);line-height:1;opacity:.7">V4.026</span>
   </div>
 </div>
 

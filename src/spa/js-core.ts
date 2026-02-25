@@ -231,29 +231,10 @@ function switchTab(tab, btn) {
   var target = document.getElementById('tab-' + tab);
   if (target) { target.style.display = ''; target.classList.add('tab-active'); }
   btn.classList.add('tab-active');
-  if (tab === 'gate' && !gateUnlocked) {
-    document.getElementById('gate-lock-overlay').style.display = 'flex';
-    setTimeout(function(){ document.getElementById('gate-lock-pw').focus(); }, 100);
+  if (tab === 'gate' && !gateFlightsLoaded) {
+    loadGateFlights();
   }
   window.scrollTo(0, 0);
-}
-
-// ── Gate Info 密碼鎖 ──────────────────────────────────────────────────────────
-var gateUnlocked = false;
-function gateUnlock() {
-  var pw = document.getElementById('gate-lock-pw').value;
-  if (pw === 'qwertyui') {
-    gateUnlocked = true;
-    document.getElementById('gate-lock-overlay').style.display = 'none';
-    document.getElementById('gate-content').style.display = 'flex';
-    document.getElementById('gate-lock-pw').value = '';
-    document.getElementById('gate-lock-err').textContent = '';
-    if (!gateFlightsLoaded) loadGateFlights();
-  } else {
-    document.getElementById('gate-lock-err').textContent = '密碼錯誤，請再試一次';
-    document.getElementById('gate-lock-pw').value = '';
-    document.getElementById('gate-lock-pw').focus();
-  }
 }
 
 // ── D-ATIS ────────────────────────────────────────────────────────────────────
