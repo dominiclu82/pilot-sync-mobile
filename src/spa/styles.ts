@@ -345,6 +345,8 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
 .gi-refresh-btn{background:var(--accent);color:#fff;border:none;border-radius:8px;
   padding:8px 14px;font-size:.82em;font-weight:600;cursor:pointer;white-space:nowrap;-webkit-appearance:none}
 .gi-refresh-btn:active{opacity:.7}
+.gi-force-refresh{background:transparent;border:1px solid var(--dim);color:var(--muted);font-size:.72em;padding:6px 10px}
+.gi-force-refresh:disabled{opacity:.5;cursor:wait}
 .gi-search-bar{display:flex;align-items:center;gap:0;padding:10px 14px;
   border-bottom:1px solid rgba(148,163,184,.1);flex-shrink:0}
 .gi-search-prefix{font-weight:800;font-size:.95em;color:var(--accent-light);padding:7px 2px 7px 12px;

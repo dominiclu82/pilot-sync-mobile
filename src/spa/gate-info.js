@@ -241,69 +241,32 @@ function filterGateFlights() {
   if (gateFlightsList.length > 0) renderGateFlights();
 }
 
-function _giFetchONTDirect() {
-  var base = atob('aHR0cHM6Ly93d3cuZmx5b250YXJpby5jb20vYXBpL2pzb24vZmxpZ2h0cw==');
-  return Promise.all([
-    fetch(base + '/arrivals', { headers: { 'Accept': 'application/json' } }),
-    fetch(base + '/departures', { headers: { 'Accept': 'application/json' } })
-  ]).then(function(res) {
-    return Promise.all([
-      res[0].ok ? res[0].json() : [],
-      res[1].ok ? res[1].json() : []
-    ]);
-  }).then(function(data) {
-    var results = [];
-    var arrData = Array.isArray(data[0]) ? data[0] : (data[0].data || data[0].flights || []);
-    var depData = Array.isArray(data[1]) ? data[1] : (data[1].data || data[1].flights || []);
-    arrData.forEach(function(f) {
-      var fno = (f.flightno || '').replace(/\s/g, '').toUpperCase();
-      if (!fno.startsWith('JX') && !/STARLUX/i.test(f.airline_name || '')) return;
-      results.push({
-        airport: 'ONT', fno: fno, direction: 'A',
-        gate: f.gate || '', terminal: f.terminal || '', carousel: '',
-        origin: f.origin || '', dest: 'ONT'
-      });
-    });
-    depData.forEach(function(f) {
-      var fno = (f.flightno || '').replace(/\s/g, '').toUpperCase();
-      if (!fno.startsWith('JX') && !/STARLUX/i.test(f.airline_name || '')) return;
-      results.push({
-        airport: 'ONT', fno: fno, direction: 'D',
-        gate: f.gate || '', terminal: f.terminal || '', carousel: '',
-        origin: 'ONT', dest: f.origin || ''
-      });
-    });
-    return results;
-  }).catch(function() { return []; });
-}
-
 var _giTestRows = [];
 
-function _giMergeUS(map, usData) {
+function _giMergeFA(map, faData) {
   _giTestRows = [];
-  var allFlights = [].concat(
-    usData.sfo || [], usData.phx || [], usData.sea || [], usData.lax || [],
-    usData.ont || []
-  );
-  allFlights.forEach(function(f) {
-    var key = f.fno;
-    if (!key) return;
-    if (f._test) {
-      _giTestRows.push(f);
-      return;
+  var flights = faData.flights || {};
+  Object.keys(flights).forEach(function(key) {
+    var fa = flights[key];
+    if (!fa || !fa.fno) return;
+    var fno = fa.fno;
+    if (!/^JX/.test(fno)) return;
+    var m = map[fno];
+    if (!m) {
+      m = { fno: fno };
+      map[fno] = m;
     }
-    if (!map[key]) map[key] = { fno: key };
-    var m = map[key];
-    if (f.direction === 'D') {
-      if (!m.gate || m.gate === '—') m.gate = f.gate || m.gate;
-      if (!m.depTerminal) m.depTerminal = f.terminal || '';
-      if (!m.origin) m.origin = f.airport;
-      if (!m.originCode) m.originCode = f.airport;
-    } else {
-      if (!m.parking) m.parking = f.gate || '';
-      if (!m.carousel) m.carousel = f.carousel || '';
-      if (!m.arrTerminal) m.arrTerminal = f.terminal || '';
-      if (!m.dest && f.airport) { m.dest = f.airport; m.destCode = f.airport; }
+    // Origin is foreign airport → fill departure gate/terminal
+    if (fa.origin.iata && fa.origin.iata !== 'TPE') {
+      if (!m.gate || m.gate === '—') m.gate = fa.origin.gate || '';
+      if (!m.depTerminal) m.depTerminal = fa.origin.terminal || '';
+      if (!m.origin) { m.origin = fa.origin.iata; m.originCode = fa.origin.iata; }
+    }
+    // Destination is foreign airport → fill arrival gate/terminal
+    if (fa.destination.iata && fa.destination.iata !== 'TPE') {
+      if (!m.parking || m.parking === '—') m.parking = fa.destination.gate || '';
+      if (!m.arrTerminal) m.arrTerminal = fa.destination.terminal || '';
+      if (!m.dest) { m.dest = fa.destination.iata; m.destCode = fa.destination.iata; }
     }
   });
 }
@@ -333,31 +296,25 @@ function loadGateFlights() {
       return _giFetchDirect();
     });
 
-  var usPromise = fetch('/api/fids-us')
+  var faPromise = fetch('/api/fids-fa')
     .then(function(r) {
       if (!r.ok) throw new Error('HTTP ' + r.status);
       return r.json();
     })
     .catch(function() {
-      return { sfo: [], phx: [], sea: [], lax: [], ont: [] };
+      return { flights: {}, updatedAt: null, count: 0 };
     });
 
-  Promise.all([tpePromise, usPromise])
+  Promise.all([tpePromise, faPromise])
     .then(function(results) {
       var data = results[0];
-      var usData = results[1];
+      var faData = results[1];
 
-      // ONT client-side fallback if server returned empty
-      var ontFallback = (!usData.ont || usData.ont.length === 0)
-        ? _giFetchONTDirect() : Promise.resolve(null);
-      return ontFallback.then(function(ontDirect) {
-        if (ontDirect && ontDirect.length > 0) usData.ont = ontDirect;
-        return { data: data, usData: usData };
-      });
+      return { data: data, faData: faData };
     })
     .then(function(r) {
       var data = r.data;
-      var usData = r.usData;
+      var faData = r.faData;
 
       dateEl.textContent = data.date || '';
 
@@ -402,8 +359,8 @@ function loadGateFlights() {
         m.arrMemo = f.Memo || '';
       });
 
-      // Merge US airport data
-      _giMergeUS(map, usData);
+      // Merge foreign airport data from background cache
+      _giMergeFA(map, faData);
 
       var flights = Object.values(map);
       flights.sort(function(a, b) {
@@ -429,4 +386,32 @@ function loadGateFlights() {
 
 function refreshGateFlights() {
   loadGateFlights();
+}
+
+function forceRefreshGateFlights() {
+  var btn = document.getElementById('gi-force-refresh-btn');
+  var statusEl = document.getElementById('gate-status');
+  if (!btn) return;
+  btn.disabled = true;
+  btn.textContent = '⏳ 抓取中，請稍候...';
+  statusEl.textContent = '正在重新抓取外站資料，約需 30-60 秒...';
+  statusEl.style.display = 'block';
+
+  fetch('/api/fids-fa/refresh', { method: 'POST' })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      btn.disabled = false;
+      btn.textContent = '🔄 重新抓取外站 (約30-60秒)';
+      if (data.status === 'already_running') {
+        statusEl.textContent = '已有抓取作業進行中，請稍後再試';
+        setTimeout(function() { loadGateFlights(); }, 2000);
+      } else {
+        loadGateFlights();
+      }
+    })
+    .catch(function() {
+      btn.disabled = false;
+      btn.textContent = '🔄 重新抓取外站 (約30-60秒)';
+      statusEl.textContent = '抓取失敗，請稍後再試';
+    });
 }

@@ -578,7 +578,8 @@ export function getSpaHtmlBody(): string {
       </div>
       <div class="gi-header-btns">
         <button class="gi-time-btn" id="gi-time-btn" onclick="toggleGiTime()">⏱ 時間</button>
-        <button class="gi-refresh-btn" onclick="refreshGateFlights()">🔄 更新航班資訊</button>
+        <button class="gi-refresh-btn" onclick="refreshGateFlights()">🔄 更新</button>
+        <button class="gi-refresh-btn gi-force-refresh" id="gi-force-refresh-btn" onclick="forceRefreshGateFlights()">🔄 重新抓取外站 (約30-60秒)</button>
       </div>
     </div>
     <div class="gi-search-bar">
@@ -646,7 +647,7 @@ export function getSpaHtmlBody(): string {
         <span>📲</span>安裝
       </button>
     </div>
-    <span style="font-size:.55em;color:var(--dim);line-height:1;opacity:.7">V4.019</span>
+    <span style="font-size:.55em;color:var(--dim);line-height:1;opacity:.7">V4.022</span>
   </div>
 </div>
 
