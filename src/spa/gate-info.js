@@ -107,12 +107,15 @@ function giMakeRow(f) {
 
 function toggleGiTime() {
   var table = document.getElementById('gi-table');
+  var pinnedTable = document.getElementById('gi-pinned-table');
   var btn = document.getElementById('gi-time-btn');
   if (table.classList.contains('gi-hide-time')) {
     table.classList.remove('gi-hide-time');
+    if (pinnedTable) pinnedTable.classList.remove('gi-hide-time');
     btn.classList.add('gi-time-btn-on');
   } else {
     table.classList.add('gi-hide-time');
+    if (pinnedTable) pinnedTable.classList.add('gi-hide-time');
     btn.classList.remove('gi-time-btn-on');
   }
 }
@@ -225,59 +228,43 @@ function renderGateFlights() {
     others = sorted;
   }
 
-  // Pinned search result header + rows
-  if (pinned.length > 0) {
-    var hdrTr = document.createElement('tr');
-    hdrTr.className = 'gi-search-header';
-    var hdrTd = document.createElement('td');
-    hdrTd.colSpan = 13;
-    hdrTd.textContent = '搜尋結果（' + pinned.length + ' 筆）';
-    hdrTr.appendChild(hdrTd);
-    tableBody.appendChild(hdrTr);
-  }
-  pinned.forEach(function(f, i) {
-    var tr = giMakeRow(f);
-    tr.classList.add('gi-pinned-row');
-    if (i === pinned.length - 1 && others.length > 0) tr.classList.add('gi-pinned-last');
-    tableBody.appendChild(tr);
-  });
+  // Pinned search results → separate container
+  var pinnedWrap = document.getElementById('gi-pinned-wrap');
+  var pinnedBody = document.getElementById('gi-pinned-tbody');
+  var pinnedHeader = document.getElementById('gi-pinned-header');
+  pinnedBody.innerHTML = '';
 
+  if (pinned.length > 0) {
+    pinnedHeader.textContent = '搜尋結果（' + pinned.length + ' 筆）';
+    pinned.forEach(function(f) {
+      pinnedBody.appendChild(giMakeRow(f));
+    });
+    pinnedWrap.style.display = '';
+    // Scroll main table to top-left
+    var wrap = document.getElementById('gate-table-wrap');
+    if (wrap) { wrap.scrollLeft = 0; wrap.scrollTop = 0; }
+    _giSetupScrollSync();
+  } else {
+    pinnedWrap.style.display = 'none';
+  }
+
+  // Other flights → main table
   others.forEach(function(f) {
     tableBody.appendChild(giMakeRow(f));
   });
+}
 
-  // Apply sticky positioning to pinned rows
-  if (pinned.length > 0) {
-    // Scroll back to top-left so pinned rows are fully visible
-    var wrap = document.getElementById('gate-table-wrap');
-    if (wrap) { wrap.scrollLeft = 0; wrap.scrollTop = 0; }
-
-    var theadH = document.querySelector('#gi-table thead').getBoundingClientRect().height;
-    var offset = theadH;
-
-    // Make search header sticky
-    var searchHdr = tableBody.querySelector('.gi-search-header');
-    if (searchHdr) {
-      var hdrTd = searchHdr.querySelector('td');
-      if (hdrTd) {
-        hdrTd.style.position = 'sticky';
-        hdrTd.style.top = offset + 'px';
-        hdrTd.style.zIndex = '4';
-      }
-      offset += searchHdr.getBoundingClientRect().height;
-    }
-
-    var pinnedTrs = tableBody.querySelectorAll('.gi-pinned-row');
-    pinnedTrs.forEach(function(tr) {
-      var cells = tr.querySelectorAll('td');
-      cells.forEach(function(td) {
-        td.style.position = 'sticky';
-        td.style.top = offset + 'px';
-        td.style.zIndex = '4';
-      });
-      offset += tr.getBoundingClientRect().height;
-    });
-  }
+var _giScrollSyncing = false;
+function _giSetupScrollSync() {
+  var pw = document.getElementById('gi-pinned-wrap');
+  var tw = document.getElementById('gate-table-wrap');
+  if (!pw || !tw) return;
+  pw.onscroll = function() {
+    if (!_giScrollSyncing) { _giScrollSyncing = true; tw.scrollLeft = pw.scrollLeft; _giScrollSyncing = false; }
+  };
+  tw.onscroll = function() {
+    if (!_giScrollSyncing) { _giScrollSyncing = true; pw.scrollLeft = tw.scrollLeft; _giScrollSyncing = false; }
+  };
 }
 
 function _giGetSortVal(f, key) {

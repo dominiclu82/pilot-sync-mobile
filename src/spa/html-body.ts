@@ -573,8 +573,31 @@ export function getSpaHtmlBody(): string {
       </div>
     </div>
     <div class="gi-search-bar">
-      <input type="text" id="gate-search" class="gi-search-input" placeholder="航班號碼 / 機場代碼 / 城市" oninput="filterGateFlights()">
-      <span class="gi-dev-note">外站資訊持續開發中 ｜ Outstation Gate Info In Progress</span>
+      <span class="gi-search-label">輸入航班號數字 / 機場代碼 / 機場名搜尋</span>
+      <input type="text" id="gate-search" class="gi-search-input" placeholder="搜尋..." oninput="filterGateFlights()">
+    </div>
+    <div id="gi-pinned-wrap" class="gi-pinned-wrap" style="display:none">
+      <div id="gi-pinned-header" class="gi-pinned-header-bar"></div>
+      <table class="gi-table gi-hide-time" id="gi-pinned-table">
+        <thead>
+          <tr>
+            <th class="gi-sticky-col">航班</th>
+            <th>出發地</th>
+            <th>Terminal</th>
+            <th>Check-in</th>
+            <th>Gate</th>
+            <th class="gi-time-col">STD</th>
+            <th class="gi-time-col">ATD</th>
+            <th>目的地</th>
+            <th>Terminal</th>
+            <th>Parking</th>
+            <th>轉盤</th>
+            <th class="gi-time-col">STA</th>
+            <th class="gi-time-col">ATA</th>
+          </tr>
+        </thead>
+        <tbody id="gi-pinned-tbody"></tbody>
+      </table>
     </div>
     <div id="gate-status" class="gi-status">按下「更新航班資訊」載入今日航班</div>
     <div id="gate-table-wrap" class="gi-table-wrap" style="display:none">
@@ -636,7 +659,7 @@ export function getSpaHtmlBody(): string {
         <span>📲</span>安裝
       </button>
     </div>
-    <span style="font-size:.55em;color:var(--dim);line-height:1;opacity:.7">V4.031</span>
+    <span style="font-size:.55em;color:var(--dim);line-height:1;opacity:.7">V4.032</span>
   </div>
 </div>
 
