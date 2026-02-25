@@ -13,7 +13,7 @@ function giFmtTime(t) {
 var _giCityNames = {
   SFO:'舊金山',LAX:'洛杉磯',SEA:'西雅圖',PHX:'鳳凰城',ONT:'安大略',
   NRT:'成田',KIX:'關西',FUK:'福岡',CTS:'札幌',OKA:'沖繩',KMJ:'熊本',
-  NGO:'名古屋',SDJ:'仙台',KOJ:'鹿兒島',AOJ:'青森',
+  NGO:'名古屋',SDJ:'仙台',KOJ:'鹿兒島',AOJ:'青森',TAK:'高松',UKB:'神戶',RMQ:'台中',
   ICN:'仁川',PUS:'釜山',
   HKG:'香港',MFM:'澳門',
   SIN:'新加坡',BKK:'曼谷',SGN:'胡志明',HAN:'河內',PNH:'金邊',
@@ -216,9 +216,11 @@ function _giSortList(list) {
     var va = _giGetSortVal(a, giSortKey);
     var vb = _giGetSortVal(b, giSortKey);
     if (giSortKey === 'origin' || giSortKey === 'dest') {
-      var aTPE = /TPE|桃園/.test(va) ? 0 : 1;
-      var bTPE = /TPE|桃園/.test(vb) ? 0 : 1;
-      if (aTPE !== bTPE) return giSortAsc ? aTPE - bTPE : bTPE - aTPE;
+      var twAirports = /TPE|桃園/;
+      var twOther = /RMQ|台中|KHH|高雄|TSA|松山/;
+      var aRank = twAirports.test(va) ? 0 : twOther.test(va) ? 1 : 2;
+      var bRank = twAirports.test(vb) ? 0 : twOther.test(vb) ? 1 : 2;
+      if (aRank !== bRank) return giSortAsc ? aRank - bRank : bRank - aRank;
     }
     if (giSortKey === 'fno') {
       var cmp = va.localeCompare(vb, undefined, { numeric: true });
@@ -256,6 +258,15 @@ function filterGateFlights() {
 
 var _giTestRows = [];
 
+function _giFaTime(isoStr) {
+  if (!isoStr) return '';
+  var d = new Date(isoStr);
+  if (isNaN(d.getTime())) return '';
+  // Convert to Taiwan time (UTC+8)
+  var tw = new Date(d.getTime() + 8 * 60 * 60 * 1000);
+  return String(tw.getUTCHours()).padStart(2, '0') + ':' + String(tw.getUTCMinutes()).padStart(2, '0');
+}
+
 function _giMergeFA(map, faData) {
   _giTestRows = [];
   var flights = faData.flights || {};
@@ -264,22 +275,41 @@ function _giMergeFA(map, faData) {
     if (!fa || !fa.fno) return;
     var fno = fa.fno;
     if (!/^JX/.test(fno)) return;
+    var isNew = !map[fno];
     var m = map[fno];
     if (!m) {
       m = { fno: fno };
       map[fno] = m;
     }
-    // Origin is foreign airport → fill departure gate/terminal
-    if (fa.origin.iata && fa.origin.iata !== 'TPE') {
-      if (!m.gate || m.gate === '—') m.gate = fa.origin.gate || '';
-      if (!m.depTerminal) m.depTerminal = fa.origin.terminal || '';
-      if (!m.origin) { m.origin = fa.origin.iata; m.originCode = fa.origin.iata; }
-    }
-    // Destination is foreign airport → fill arrival gate/terminal
-    if (fa.destination.iata && fa.destination.iata !== 'TPE') {
-      if (!m.parking || m.parking === '—') m.parking = fa.destination.gate || '';
-      if (!m.arrTerminal) m.arrTerminal = fa.destination.terminal || '';
-      if (!m.dest) { m.dest = fa.destination.iata; m.destCode = fa.destination.iata; }
+
+    // New flight not in TPE FIDS → fill all fields from FA
+    if (isNew) {
+      var oIata = (fa.origin && fa.origin.iata) || '';
+      var dIata = (fa.destination && fa.destination.iata) || '';
+      m.origin = oIata;
+      m.originCode = oIata;
+      m.originName = _giCityNames[oIata] || '';
+      m.dest = dIata;
+      m.destCode = dIata;
+      m.destName = _giCityNames[dIata] || '';
+      m.gate = (fa.origin && fa.origin.gate) || '';
+      m.depTerminal = (fa.origin && fa.origin.terminal) || '';
+      m.parking = (fa.destination && fa.destination.gate) || '';
+      m.arrTerminal = (fa.destination && fa.destination.terminal) || '';
+      m.std = _giFaTime(fa.scheduledDep);
+      m.atd = _giFaTime(fa.actualDep);
+      m.sta = _giFaTime(fa.scheduledArr);
+      m.ata = _giFaTime(fa.actualArr);
+    } else {
+      // Existing flight from TPE FIDS → only supplement non-TPE gate/terminal
+      if (fa.origin && fa.origin.iata && fa.origin.iata !== 'TPE') {
+        if (!m.gate || m.gate === '—') m.gate = fa.origin.gate || '';
+        if (!m.depTerminal) m.depTerminal = fa.origin.terminal || '';
+      }
+      if (fa.destination && fa.destination.iata && fa.destination.iata !== 'TPE') {
+        if (!m.parking || m.parking === '—') m.parking = fa.destination.gate || '';
+        if (!m.arrTerminal) m.arrTerminal = fa.destination.terminal || '';
+      }
     }
   });
 }

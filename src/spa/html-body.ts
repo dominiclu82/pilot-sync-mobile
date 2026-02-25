@@ -584,7 +584,6 @@ export function getSpaHtmlBody(): string {
       <div class="gi-header-btns">
         <button class="gi-time-btn" id="gi-time-btn" onclick="toggleGiTime()">⏱ 時間</button>
         <button class="gi-refresh-btn" onclick="refreshGateFlights()">🔄 更新</button>
-        <button class="gi-refresh-btn gi-force-refresh" id="gi-force-refresh-btn" onclick="forceRefreshGateFlights()">🔄 重新抓取外站 (約30-60秒)</button>
       </div>
     </div>
     <div class="gi-search-bar">
@@ -615,7 +614,10 @@ export function getSpaHtmlBody(): string {
         <tbody id="gate-tbody"></tbody>
       </table>
     </div>
-    <div class="gi-notice">⚠ Non-operational reference only</div>
+    <div class="gi-notice">
+      <span>⚠ Non-operational reference only</span>
+      <button class="gi-force-refresh" id="gi-force-refresh-btn" onclick="forceRefreshGateFlights()">🔄 重新抓取外站 (約30-60秒)</button>
+    </div>
   </div>
 
 </div><!-- end tab-gate -->
@@ -652,7 +654,7 @@ export function getSpaHtmlBody(): string {
         <span>📲</span>安裝
       </button>
     </div>
-    <span style="font-size:.55em;color:var(--dim);line-height:1;opacity:.7">V4.023</span>
+    <span style="font-size:.55em;color:var(--dim);line-height:1;opacity:.7">V4.024</span>
   </div>
 </div>
 
