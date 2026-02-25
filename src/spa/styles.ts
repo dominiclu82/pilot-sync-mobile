@@ -369,7 +369,6 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
   border-bottom:2px solid var(--accent);overscroll-behavior:none}
 .gi-pinned-header-bar{background:rgba(59,130,246,.15);color:var(--accent-light);font-size:.72em;font-weight:700;
   text-align:center;padding:5px 6px;position:sticky;left:0;min-width:900px}
-.gi-pinned-wrap .gi-table thead{position:sticky;top:0;z-index:5;background:var(--surface)}
 .gi-pinned-wrap .gi-table td{background:rgba(59,130,246,.06);border-bottom:1px solid rgba(148,163,184,.15)}
 .gi-pinned-wrap .gi-sticky-col{background:rgba(59,130,246,.06)}
 .gi-sortable{cursor:pointer;user-select:none}

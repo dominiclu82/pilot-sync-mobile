@@ -579,23 +579,6 @@ export function getSpaHtmlBody(): string {
     <div id="gi-pinned-wrap" class="gi-pinned-wrap" style="display:none">
       <div id="gi-pinned-header" class="gi-pinned-header-bar"></div>
       <table class="gi-table gi-hide-time" id="gi-pinned-table">
-        <thead>
-          <tr>
-            <th class="gi-sticky-col">航班</th>
-            <th>出發地</th>
-            <th>Terminal</th>
-            <th>Check-in</th>
-            <th>Gate</th>
-            <th class="gi-time-col">STD</th>
-            <th class="gi-time-col">ATD</th>
-            <th>目的地</th>
-            <th>Terminal</th>
-            <th>Parking</th>
-            <th>轉盤</th>
-            <th class="gi-time-col">STA</th>
-            <th class="gi-time-col">ATA</th>
-          </tr>
-        </thead>
         <tbody id="gi-pinned-tbody"></tbody>
       </table>
     </div>
@@ -659,7 +642,7 @@ export function getSpaHtmlBody(): string {
         <span>📲</span>安裝
       </button>
     </div>
-    <span style="font-size:.55em;color:var(--dim);line-height:1;opacity:.7">V4.032</span>
+    <span style="font-size:.55em;color:var(--dim);line-height:1;opacity:.7">V4.033</span>
   </div>
 </div>
 
