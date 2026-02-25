@@ -234,18 +234,25 @@ function renderGateFlights() {
   var pinnedHeader = document.getElementById('gi-pinned-header');
   pinnedBody.innerHTML = '';
 
+  var mainThead = document.querySelector('#gi-table thead');
+  var pinnedThead = document.querySelector('#gi-pinned-table thead');
+
   if (pinned.length > 0) {
     pinnedHeader.textContent = '搜尋結果（' + pinned.length + ' 筆）';
     pinned.forEach(function(f) {
       pinnedBody.appendChild(giMakeRow(f));
     });
     pinnedWrap.style.display = '';
+    if (pinnedThead) pinnedThead.style.display = '';
+    if (mainThead) mainThead.style.display = 'none';
     // Scroll main table to top-left
     var wrap = document.getElementById('gate-table-wrap');
     if (wrap) { wrap.scrollLeft = 0; wrap.scrollTop = 0; }
     _giSetupScrollSync();
   } else {
     pinnedWrap.style.display = 'none';
+    if (pinnedThead) pinnedThead.style.display = 'none';
+    if (mainThead) mainThead.style.display = '';
   }
 
   // Other flights → main table

@@ -360,13 +360,13 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
 .gi-search-input::placeholder{color:var(--dim);font-weight:400;font-size:.85em}
 .gi-search-input:focus{border-color:var(--accent)}
 .gi-status{text-align:center;padding:32px 16px;color:var(--muted);font-size:.88em}
-.gi-table-wrap{flex:1;overflow:auto;-webkit-overflow-scrolling:touch;min-height:0;overscroll-behavior:none;padding-bottom:24px}
+.gi-table-wrap{flex:1;overflow:auto;-webkit-overflow-scrolling:touch;min-height:0;overscroll-behavior:none}
 .gi-table{table-layout:fixed;border-collapse:collapse;font-size:.75em;width:100%;min-width:900px}
 .gi-table thead{position:sticky;top:0;z-index:5;background:var(--surface)}
 .gi-table th{background:var(--surface);color:var(--muted);font-weight:700;padding:8px 6px;
   text-align:center;border-bottom:2px solid var(--dim);white-space:nowrap;font-size:.85em}
 .gi-pinned-wrap{flex-shrink:0;overflow-x:auto;-webkit-overflow-scrolling:touch;max-height:35vh;overflow-y:auto;
-  border-bottom:2px solid var(--accent);overscroll-behavior:none}
+  border-bottom:3px solid var(--accent);overscroll-behavior:none}
 .gi-pinned-header-bar{background:rgba(59,130,246,.15);color:var(--accent-light);font-size:.72em;font-weight:700;
   text-align:center;padding:5px 6px;position:sticky;left:0;min-width:900px}
 .gi-pinned-wrap .gi-table td{background:rgba(59,130,246,.06);border-bottom:1px solid rgba(148,163,184,.15)}
@@ -391,7 +391,6 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
 .gi-time-btn{background:none;color:var(--muted);border:1.5px solid var(--dim);border-radius:8px;
   padding:8px 12px;font-size:.82em;font-weight:600;cursor:pointer;white-space:nowrap;-webkit-appearance:none}
 .gi-time-btn-on{border-color:var(--accent);color:var(--accent)}
-.gi-notice{position:absolute;bottom:0;left:0;right:0;font-size:.65em;color:var(--dim);text-align:center;padding:5px 0;background:rgba(10,14,26,.85);z-index:10}
-[data-theme="light"] .gi-notice{background:rgba(241,245,249,.85)}
+.gi-notice-inline{font-size:.62em;color:var(--dim);margin-top:1px}
 `;
 }
