@@ -4,6 +4,7 @@ var gateFlightsList = [];
 var giSortKey = 'dest';
 var giSortAsc = true;
 var _giSelectedDate = null; // null = today, 'YYYY/MM/DD' = specific date
+var _giFirstScrollDone = false;
 
 function giFmtTime(t) {
   if (!t) return '';
@@ -259,6 +260,18 @@ function renderGateFlights() {
   others.forEach(function(f) {
     tableBody.appendChild(giMakeRow(f));
   });
+
+  // Auto-scroll to destination column on portrait mobile (first load only)
+  if (!_giFirstScrollDone && window.innerHeight > window.innerWidth && window.innerWidth < 768) {
+    var destTh = document.querySelector('#gi-table thead th.gi-sortable[onclick*="dest"]');
+    var wrap = document.getElementById('gate-table-wrap');
+    if (destTh && wrap) {
+      var stickyCol = document.querySelector('#gi-table thead th.gi-sticky-col');
+      var offset = stickyCol ? stickyCol.offsetWidth : 0;
+      wrap.scrollLeft = destTh.offsetLeft - offset;
+      _giFirstScrollDone = true;
+    }
+  }
 }
 
 var _giScrollSyncing = false;

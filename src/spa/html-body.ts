@@ -661,7 +661,7 @@ export function getSpaHtmlBody(): string {
       <button class="tab-util-btn tab-install-btn" id="tab-install-btn" onclick="showInstallGuide()" style="display:none">
         <span>📲</span>安裝
       </button>
-      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V4.058</span>
+      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V4.059</span>
     </div>
   </div>
 </div>
@@ -691,15 +691,15 @@ export function getSpaHtmlBody(): string {
       <div style="margin-bottom:4px">📱 建議使用 <b>iPad 橫向</b>操作以獲得最佳體驗</div>
       <div style="color:var(--muted)">Best experience on iPad in landscape mode</div>
     </div>
-    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V4.058</div>
+    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V4.059</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
+      <div>手機直向首次載入自動捲動至目的地欄位</div>
+      <div style="opacity:.7">Auto-scroll to destination column on first load (portrait mobile)</div>
+    </div>
+    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V4.058</div>
+    <div style="font-size:.72em;color:var(--muted);margin-bottom:14px;line-height:1.5;text-align:left">
       <div>Tab 圖示更新、安裝說明加英文對照</div>
       <div style="opacity:.7">Updated tab icons; install guide with bilingual instructions</div>
-    </div>
-    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V4.057</div>
-    <div style="font-size:.72em;color:var(--muted);margin-bottom:14px;line-height:1.5;text-align:left">
-      <div>About card 改版、版號位置調整</div>
-      <div style="opacity:.7">Redesigned about card; version number repositioned</div>
     </div>
     <button class="install-close-btn" onclick="closeAbout()">關閉</button>
   </div>
