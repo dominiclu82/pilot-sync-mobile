@@ -215,7 +215,7 @@ html:has(#tab-briefing.tab-active #briefing-coldtemp.active) #tab-briefing.tab-a
   height:100%;width:100%;gap:1px;background:var(--dim);min-width:unset}
 .ct-table thead,.ct-table tbody,.ct-table tr{display:contents}
 .ct-table th,.ct-table td{border:none}
-.ct-table th:first-child,.ct-table td:first-child{width:auto}
+.ct-table-wrap .ct-table th:first-child,.ct-table-wrap .ct-table td:first-child{width:auto}
 .ct-table td{background:var(--card)}
 }
 .ct-inputs{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px}
@@ -352,7 +352,7 @@ html:has(#tab-briefing.tab-active #briefing-coldtemp.active) #tab-briefing.tab-a
 .wx-loading-msg{text-align:center;padding:24px;color:var(--muted);font-size:.88em}
 .metar-mode-btn{background:none;border:1px solid var(--dim);color:var(--muted);font-size:.72em;padding:2px 8px;border-radius:6px;cursor:pointer;-webkit-appearance:none}
 .metar-mode-btn.active{background:var(--accent);border-color:var(--accent);color:#fff}
-.wx-flt-def{margin:0 10px 8px;font-size:.71em}
+.wx-flt-def{margin:0 10px 8px;font-size:.71em;padding-bottom:calc(56px + env(safe-area-inset-bottom,0px))}
 .wx-flt-def>summary{cursor:pointer;padding:3px 0;color:var(--accent);font-weight:600;user-select:none;list-style:none;-webkit-appearance:none}
 .wx-flt-def>summary::-webkit-details-marker{display:none}
 .wx-flt-def-body{margin-top:6px;display:flex;flex-direction:column;gap:5px;color:var(--muted);padding-bottom:2px}

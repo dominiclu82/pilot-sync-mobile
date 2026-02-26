@@ -660,7 +660,7 @@ export function getSpaHtmlBody(): string {
         <span>📲</span>安裝
       </button>
     </div>
-    <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7">V4.052</span>
+    <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V4.053</span>
   </div>
 </div>
 
@@ -675,6 +675,20 @@ export function getSpaHtmlBody(): string {
       3. 右上角點「<b>新增</b>」
     </div>
     <button class="install-close-btn" onclick="closeInstallGuide()">知道了</button>
+  </div>
+</div>
+
+<!-- 關於 -->
+<div id="about-overlay" class="install-overlay" style="display:none" onclick="if(event.target===this)closeAbout()">
+  <div class="install-card">
+    <div style="font-size:2em;margin-bottom:6px">✈️</div>
+    <div style="font-weight:700;font-size:1.1em;margin-bottom:4px">CrewSync</div>
+    <div style="font-size:.78em;color:var(--muted);margin-bottom:14px" id="about-version">V4.053</div>
+    <div style="font-size:.82em;color:var(--text);line-height:1.7;margin-bottom:18px;text-align:left">
+      <div style="margin-bottom:8px">📱 建議使用 <b>iPad 橫向</b>操作以獲得最佳體驗</div>
+      <div style="color:var(--muted)">Best experience on iPad in landscape mode</div>
+    </div>
+    <button class="install-close-btn" onclick="closeAbout()">關閉</button>
   </div>
 </div>
 

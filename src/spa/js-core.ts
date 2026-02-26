@@ -544,6 +544,14 @@ function closeInstallGuide() {
   document.getElementById('install-overlay').style.display = 'none';
 }
 
+// ── About ────────────────────────────────────────────────────────────────────
+function showAbout() {
+  document.getElementById('about-overlay').style.display = 'flex';
+}
+function closeAbout() {
+  document.getElementById('about-overlay').style.display = 'none';
+}
+
 // ── Privacy Q&A ──────────────────────────────────────────────────────────────
 function showPrivacy() {
   document.getElementById('privacy-overlay').style.display = 'flex';
