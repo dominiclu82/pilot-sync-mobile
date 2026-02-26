@@ -643,10 +643,10 @@ export function getSpaHtmlBody(): string {
 <!-- ══ Tab Bar ═══════════════════════════════════════════════════════ -->
 <div class="tab-bar">
   <button class="tab-btn" id="tabBtn-sync" onclick="switchTab('sync',this)">
-    <span class="tab-btn-icon">✈️</span>班表同步
+    <span class="tab-btn-icon">🔄</span>班表同步
   </button>
   <button class="tab-btn tab-active" id="tabBtn-briefing" onclick="switchTab('briefing',this)">
-    <span class="tab-btn-icon">📦</span>A350簡報箱
+    <span class="tab-btn-icon">💼</span>A350簡報箱
   </button>
   <button class="tab-btn" id="tabBtn-gate" onclick="switchTab('gate',this)">
     <span class="tab-btn-icon">🌏</span>Gate Info
@@ -661,7 +661,7 @@ export function getSpaHtmlBody(): string {
       <button class="tab-util-btn tab-install-btn" id="tab-install-btn" onclick="showInstallGuide()" style="display:none">
         <span>📲</span>安裝
       </button>
-      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V4.057</span>
+      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V4.058</span>
     </div>
   </div>
 </div>
@@ -670,13 +670,17 @@ export function getSpaHtmlBody(): string {
 <div id="install-overlay" class="install-overlay" style="display:none" onclick="if(event.target===this)closeInstallGuide()">
   <div class="install-card">
     <div style="font-size:2em;margin-bottom:8px">📲</div>
-    <div style="font-weight:700;font-size:1em;margin-bottom:12px">加入主畫面</div>
+    <div style="font-weight:700;font-size:1em;margin-bottom:4px">加入主畫面</div>
+    <div style="font-size:.82em;color:var(--muted);margin-bottom:12px">Add to Home Screen</div>
     <div class="install-steps">
       1. 點 Safari 底部的 <b>分享按鈕</b>（⬆️ 方框加箭頭）<br>
+      <span style="color:var(--muted);font-size:.9em">Tap the <b>Share</b> button at the bottom of Safari (⬆️)</span><br><br>
       2. 向下滑，點「<b>加入主畫面</b>」<br>
-      3. 右上角點「<b>新增</b>」
+      <span style="color:var(--muted);font-size:.9em">Scroll down, tap "<b>Add to Home Screen</b>"</span><br><br>
+      3. 右上角點「<b>新增</b>」<br>
+      <span style="color:var(--muted);font-size:.9em">Tap "<b>Add</b>" in the top right</span>
     </div>
-    <button class="install-close-btn" onclick="closeInstallGuide()">知道了</button>
+    <button class="install-close-btn" onclick="closeInstallGuide()">知道了 Got it</button>
   </div>
 </div>
 
@@ -687,15 +691,15 @@ export function getSpaHtmlBody(): string {
       <div style="margin-bottom:4px">📱 建議使用 <b>iPad 橫向</b>操作以獲得最佳體驗</div>
       <div style="color:var(--muted)">Best experience on iPad in landscape mode</div>
     </div>
-    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V4.057</div>
+    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V4.058</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
+      <div>Tab 圖示更新、安裝說明加英文對照</div>
+      <div style="opacity:.7">Updated tab icons; install guide with bilingual instructions</div>
+    </div>
+    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V4.057</div>
+    <div style="font-size:.72em;color:var(--muted);margin-bottom:14px;line-height:1.5;text-align:left">
       <div>About card 改版、版號位置調整</div>
       <div style="opacity:.7">Redesigned about card; version number repositioned</div>
-    </div>
-    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V4.056</div>
-    <div style="font-size:.72em;color:var(--muted);margin-bottom:14px;line-height:1.5;text-align:left">
-      <div>Gate Info 預設目的地台北排序、地區按鈕加英文代碼</div>
-      <div style="opacity:.7">Default sort by destination TPE; region buttons with English codes</div>
     </div>
     <button class="install-close-btn" onclick="closeAbout()">關閉</button>
   </div>
