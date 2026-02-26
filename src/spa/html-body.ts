@@ -401,7 +401,7 @@ export function getSpaHtmlBody(): string {
 
         <!-- FDP End -->
         <div class="dt-field">
-          <div class="dt-field-label">FDP End (UTC) — Block In / Release <span style="color:var(--dim);font-size:.85em">（選填，用於檢查實際 FDP）</span></div>
+          <div class="dt-field-label">FDP End (UTC) — Block In / Release <span style="color:var(--muted);font-size:.85em">（選填，用於檢查實際 FDP）</span></div>
           <div class="dt-time-row">
             <input class="dt-date-box" type="text" id="dt-e-day" placeholder="DD" maxlength="2" inputmode="numeric">
             <span class="dt-sep">/</span>
@@ -544,7 +544,7 @@ export function getSpaHtmlBody(): string {
       </div>
 
       <!-- Placeholder before calc -->
-      <div id="dt-placeholder" style="padding:32px 14px;text-align:center;color:var(--dim);font-size:.82em">
+      <div id="dt-placeholder" style="padding:32px 14px;text-align:center;color:var(--muted);font-size:.82em">
         選好人數並輸入 FDP Start，按「計算」即可查看最大限制時間
       </div>
 
@@ -660,7 +660,7 @@ export function getSpaHtmlBody(): string {
         <span>📲</span>安裝
       </button>
     </div>
-    <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7">V4.041</span>
+    <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7">V4.042</span>
   </div>
 </div>
 
@@ -686,19 +686,19 @@ export function getSpaHtmlBody(): string {
     <div class="privacy-body">
       <div class="privacy-q">你的帳號密碼安全嗎？/ Are My Credentials Safe?</div>
       <div class="privacy-a">安全。你輸入的員工編號和密碼只會在同步的那幾秒鐘內使用，用來登入班表系統擷取資料。同步完成後，伺服器立即丟棄，不留任何紀錄。你的員工編號會存在你自己的瀏覽器裡（方便下次自動填入），密碼則完全不儲存，由瀏覽器的密碼管理器自行處理。</div>
-      <div class="privacy-a" style="color:var(--dim)">Yes. Your employee ID and password are only used for a few seconds during sync to log into the roster system. Once complete, the server discards them immediately. Your employee ID is stored locally in your browser for convenience; your password is never stored.</div>
+      <div class="privacy-a" style="color:var(--muted)">Yes. Your employee ID and password are only used for a few seconds during sync to log into the roster system. Once complete, the server discards them immediately. Your employee ID is stored locally in your browser for convenience; your password is never stored.</div>
 
       <div class="privacy-q">Google 日曆授權做了什麼？/ What Does Google Authorization Do?</div>
       <div class="privacy-a">只做一件事：把你的班表寫進你的 Google 日曆。我們不會讀取、修改或分享你日曆裡的任何現有資料。授權產生的令牌只存在你自己的瀏覽器裡，不會上傳到伺服器。</div>
-      <div class="privacy-a" style="color:var(--dim)">One thing only: writing your roster into your Google Calendar. We do not read, modify, or share any existing data in your calendar. The authorization token is stored only in your browser and is never uploaded to the server.</div>
+      <div class="privacy-a" style="color:var(--muted)">One thing only: writing your roster into your Google Calendar. We do not read, modify, or share any existing data in your calendar. The authorization token is stored only in your browser and is never uploaded to the server.</div>
 
       <div class="privacy-q">這個工具收費嗎？/ Is This Tool Free?</div>
       <div class="privacy-a">完全免費。本工具由個人開發者獨立開發，純粹為了方便機組人員同步班表，沒有任何商業目的。</div>
-      <div class="privacy-a" style="color:var(--dim)">Completely free. This tool is independently developed solely to help crew members sync their roster — no commercial purpose whatsoever.</div>
+      <div class="privacy-a" style="color:var(--muted)">Completely free. This tool is independently developed solely to help crew members sync their roster — no commercial purpose whatsoever.</div>
 
       <div class="privacy-q">免責聲明 / Disclaimer</div>
       <div class="privacy-a">開發者已盡合理努力確保資料安全，但本工具並非公司官方應用程式。使用前請自行評估風險；若對隱私有任何疑慮，請勿使用。</div>
-      <div class="privacy-a" style="color:var(--dim)">The developer has taken reasonable measures to ensure data security. However, this is not an official company application. Please assess the risks before use; if you have any privacy concerns, do not use this tool.</div>
+      <div class="privacy-a" style="color:var(--muted)">The developer has taken reasonable measures to ensure data security. However, this is not an official company application. Please assess the risks before use; if you have any privacy concerns, do not use this tool.</div>
     </div>
     <button class="install-close-btn" onclick="closePrivacy()">關閉</button>
   </div>

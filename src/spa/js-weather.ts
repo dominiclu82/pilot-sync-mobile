@@ -155,7 +155,7 @@ function loadWxRegion(region) {
 }
 
 function renderWxList(airports, region) {
-  var ts = wxCacheTime ? new Date(wxCacheTime).toLocaleTimeString('zh-TW', {hour:'2-digit', minute:'2-digit'}) : '—';
+  var ts = wxCacheTime ? (function(d){ return String(d.getUTCHours()).padStart(2,'0') + ':' + String(d.getUTCMinutes()).padStart(2,'0') + 'Z'; })(new Date(wxCacheTime)) : '—';
   var cacheAge = wxCacheTime ? Math.round((Date.now() - wxCacheTime) / 60000) : null;
   var cacheNote = cacheAge !== null && cacheAge > 5 ? ' <span style="color:#f59e0b;font-size:.85em">(' + cacheAge + 'm ago)</span>' : '';
   var hdr = '<div class="wx-list-hdr"><span class="wx-list-ts">METAR ' + ts + cacheNote + '</span>'
