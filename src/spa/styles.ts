@@ -197,22 +197,16 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
 @media(orientation:landscape) and (min-width:640px){
 .ct-panel{display:flex;gap:12px;align-items:stretch;padding:8px 12px;
   height:calc(100dvh - 56px - env(safe-area-inset-bottom,0px) - 40px);overflow:hidden}
-.ct-form{flex:0 0 38%;min-width:0;margin-bottom:0;
-  display:flex;flex-direction:column;overflow:hidden}
+.ct-form{flex:0 0 30%;min-width:0;margin-bottom:0;
+  display:flex;flex-direction:column;justify-content:space-evenly;overflow:hidden}
 .ct-form .ct-inputs{flex-shrink:0}
-.ct-form .ct-grid{flex:1;display:grid;grid-template-columns:repeat(3,1fr);grid-template-rows:1fr 1fr;gap:6px;margin-bottom:8px}
+.ct-form .ct-grid{display:grid;grid-template-columns:repeat(2,1fr);grid-template-rows:repeat(3,auto);
+  grid-auto-flow:column;gap:6px;margin-bottom:8px}
 .ct-form .ct-calc-btn{flex-shrink:0}
 .ct-table-wrap{flex:1;min-width:0;margin-bottom:0;
   display:flex;flex-direction:column;overflow:hidden}
 .ct-table-wrap h3{flex-shrink:0}
-.ct-table{flex:1;height:0}
-.ct-table tbody{display:flex;flex-direction:column;height:100%}
-.ct-table tbody tr{flex:1;display:flex}
-.ct-table tbody td{flex:1;display:flex;align-items:center;justify-content:flex-end}
-.ct-table tbody td:first-child{justify-content:flex-start}
-.ct-table thead tr{display:flex}
-.ct-table thead th{flex:1;display:flex;align-items:center;justify-content:flex-end}
-.ct-table thead th:first-child{justify-content:flex-start}
+.ct-table{flex:1;height:100%}
 }
 .ct-inputs{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px}
 .ct-input-group label{font-size:.72em;color:var(--muted);font-weight:600;display:block;margin-bottom:3px}
