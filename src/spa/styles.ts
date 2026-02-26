@@ -200,8 +200,7 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
 .ct-form{flex:0 0 auto;min-width:0;margin-bottom:0;
   display:flex;flex-direction:column;overflow:hidden}
 .ct-form .ct-inputs{flex-shrink:0}
-.ct-form .ct-grid{flex:1;display:flex;flex-direction:column;gap:6px;margin-bottom:8px}
-.ct-form .ct-grid .ct-card{flex:1;display:flex;flex-direction:column;justify-content:center}
+.ct-form .ct-grid{flex:1;display:grid;grid-template-columns:repeat(3,1fr);grid-template-rows:1fr 1fr;gap:6px;margin-bottom:8px}
 .ct-form .ct-calc-btn{flex-shrink:0}
 .ct-table-wrap{flex:1;min-width:0;margin-bottom:0;
   display:flex;flex-direction:column;overflow:hidden}
