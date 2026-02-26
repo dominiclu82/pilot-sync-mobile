@@ -197,7 +197,7 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
 @media(orientation:landscape) and (min-width:640px){
 .ct-panel{display:flex;gap:12px;align-items:stretch;padding:8px 12px;
   height:calc(100dvh - 56px - env(safe-area-inset-bottom,0px) - 40px);overflow:hidden}
-.ct-form{flex:0 0 auto;min-width:0;margin-bottom:0;
+.ct-form{flex:0 0 38%;min-width:0;margin-bottom:0;
   display:flex;flex-direction:column;overflow:hidden}
 .ct-form .ct-inputs{flex-shrink:0}
 .ct-form .ct-grid{flex:1;display:grid;grid-template-columns:repeat(3,1fr);grid-template-rows:1fr 1fr;gap:6px;margin-bottom:8px}
@@ -205,7 +205,7 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
 .ct-table-wrap{flex:1;min-width:0;margin-bottom:0;
   display:flex;flex-direction:column;overflow:hidden}
 .ct-table-wrap h3{flex-shrink:0}
-.ct-table{flex:1}
+.ct-table{flex:1;height:0}
 .ct-table tbody{display:flex;flex-direction:column;height:100%}
 .ct-table tbody tr{flex:1;display:flex}
 .ct-table tbody td{flex:1;display:flex;align-items:center;justify-content:flex-end}
