@@ -660,7 +660,7 @@ export function getSpaHtmlBody(): string {
         <span>📲</span>安裝
       </button>
     </div>
-    <span style="font-size:.55em;color:var(--dim);line-height:1;opacity:.7">V4.039</span>
+    <span style="font-size:.55em;color:var(--dim);line-height:1;opacity:.7">V4.040</span>
   </div>
 </div>
 
