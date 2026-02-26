@@ -341,7 +341,7 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
   border-bottom:1px solid var(--dim);background:var(--bg);flex-shrink:0}
 .gi-header-left{display:flex;flex-direction:column;gap:2px}
 .gi-title{font-weight:700;font-size:.95em;color:var(--text)}
-.gi-date{font-size:.72em;color:var(--dim)}
+.gi-date{font-size:.72em;color:var(--muted)}
 .gi-date-nav{display:flex;align-items:center;gap:6px}
 .gi-nav-btn{background:none;border:1px solid var(--dim);color:var(--muted);border-radius:6px;
   padding:2px 8px;font-size:.72em;cursor:pointer;-webkit-appearance:none;line-height:1.4}
@@ -353,7 +353,7 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
 .gi-refresh-btn:active{opacity:.7}
 .gi-search-bar{display:flex;align-items:center;gap:0;padding:10px 14px;
   border-bottom:1px solid rgba(148,163,184,.1);flex-shrink:0}
-.gi-search-label{font-size:.65em;color:var(--dim);margin-right:8px;white-space:nowrap}
+.gi-search-label{font-size:.65em;color:var(--muted);margin-right:8px;white-space:nowrap}
 .gi-search-input{flex:0;width:120px;padding:7px 12px;background:var(--surface);border:1.5px solid var(--dim);
   border-radius:8px;color:var(--text);font-size:.88em;outline:none;
   font-weight:600;-webkit-appearance:none}
@@ -391,7 +391,7 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
 .gi-time-btn{background:none;color:var(--muted);border:1.5px solid var(--dim);border-radius:8px;
   padding:8px 12px;font-size:.82em;font-weight:600;cursor:pointer;white-space:nowrap;-webkit-appearance:none}
 .gi-time-btn-on{border-color:var(--accent);color:var(--accent)}
-.gi-notice-inline{font-size:.62em;color:var(--dim);margin-top:1px}
+.gi-notice-inline{font-size:.62em;color:var(--muted);margin-top:1px}
 .privacy-card{background:var(--card);border-radius:16px;padding:24px 20px;width:100%;
   max-width:400px;text-align:center;box-shadow:0 4px 24px rgba(0,0,0,.25);max-height:85vh;display:flex;flex-direction:column}
 .privacy-body{text-align:left;overflow-y:auto;margin-bottom:14px;flex:1;min-height:0}

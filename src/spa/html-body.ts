@@ -567,10 +567,10 @@ export function getSpaHtmlBody(): string {
           <button class="gi-nav-btn gi-today-btn" id="gi-today-btn" onclick="giToday()" style="display:none">今天</button>
           <button class="gi-nav-btn" id="gi-next-day" onclick="giNextDay()">▶</button>
         </div>
-        <div style="font-size:.62em;color:var(--dim);margin-top:1px">跨午夜抵達航班請切換至次日查詢 / For post-midnight arrivals, switch to the next day</div>
+        <div style="font-size:.62em;color:var(--muted);margin-top:1px">跨午夜抵達航班請切換至次日查詢 / For post-midnight arrivals, switch to the next day</div>
       </div>
       <div class="gi-header-btns">
-        <button class="gi-time-btn" id="gi-time-btn" onclick="toggleGiTime()">⏱ 時間</button>
+        <button class="gi-time-btn" id="gi-time-btn" onclick="toggleGiTime()">⏱ STD/STA</button>
         <button class="gi-refresh-btn" onclick="refreshGateFlights()">🔄 更新</button>
       </div>
     </div>
@@ -660,7 +660,7 @@ export function getSpaHtmlBody(): string {
         <span>📲</span>安裝
       </button>
     </div>
-    <span style="font-size:.55em;color:var(--dim);line-height:1;opacity:.7">V4.038</span>
+    <span style="font-size:.55em;color:var(--dim);line-height:1;opacity:.7">V4.039</span>
   </div>
 </div>
 
