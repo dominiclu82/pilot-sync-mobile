@@ -8,7 +8,6 @@ export function getSpaHtmlBody(): string {
 <!-- ══ Main（含帳號 + 月份，一個畫面搞定）══════════════════════════════ -->
 <div id="screen-main" class="screen active">
   <div class="logo">
-    <span class="logo-icon">✈️</span>
     <div class="logo-title">CrewSync</div>
     <div class="logo-sub">Crew Roster → Google Calendar</div>
   </div>
@@ -72,7 +71,6 @@ export function getSpaHtmlBody(): string {
 <!-- ══ Syncing ════════════════════════════════════════════════════════════ -->
 <div id="screen-syncing" class="screen">
   <div class="logo">
-    <span class="logo-icon">✈️</span>
     <div class="logo-title">CrewSync</div>
   </div>
   <div class="card">
@@ -87,14 +85,16 @@ export function getSpaHtmlBody(): string {
 <!-- ══ Done ══════════════════════════════════════════════════════════════ -->
 <div id="screen-done" class="screen">
   <div class="logo">
-    <span class="logo-icon">✈️</span>
     <div class="logo-title">CrewSync</div>
   </div>
   <div class="card">
     <div id="done-title" style="font-weight:700;font-size:1.1em;text-align:center"></div>
     <div id="done-stats" class="stats"></div>
     <div id="done-log" class="log-box" style="max-height:25vh"></div>
-    <button class="btn btn-secondary" onclick="showMain()">← 返回</button>
+    <div style="display:flex;gap:10px">
+      <button class="btn btn-secondary" onclick="showMain()" style="flex:1">← 返回</button>
+      <button class="btn btn-secondary" id="copy-log-btn" onclick="copyLog()" style="flex:1">📋 複製紀錄</button>
+    </div>
   </div>
 </div>
 
@@ -567,6 +567,7 @@ export function getSpaHtmlBody(): string {
           <button class="gi-nav-btn gi-today-btn" id="gi-today-btn" onclick="giToday()" style="display:none">今天</button>
           <button class="gi-nav-btn" id="gi-next-day" onclick="giNextDay()">▶</button>
         </div>
+        <div style="font-size:.62em;color:var(--dim);margin-top:1px">跨午夜抵達航班請切換至次日查詢 / For post-midnight arrivals, switch to the next day</div>
       </div>
       <div class="gi-header-btns">
         <button class="gi-time-btn" id="gi-time-btn" onclick="toggleGiTime()">⏱ 時間</button>
@@ -659,7 +660,7 @@ export function getSpaHtmlBody(): string {
         <span>📲</span>安裝
       </button>
     </div>
-    <span style="font-size:.55em;color:var(--dim);line-height:1;opacity:.7">V4.037</span>
+    <span style="font-size:.55em;color:var(--dim);line-height:1;opacity:.7">V4.038</span>
   </div>
 </div>
 

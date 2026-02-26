@@ -541,6 +541,27 @@ function showPrivacy() {
 function closePrivacy() {
   document.getElementById('privacy-overlay').style.display = 'none';
 }
+function copyLog() {
+  var log = document.getElementById('done-log');
+  var text = log ? log.innerText : '';
+  var btn = document.getElementById('copy-log-btn');
+  navigator.clipboard.writeText(text).then(function() {
+    btn.textContent = '✅ 已複製';
+    setTimeout(function() { btn.textContent = '📋 複製紀錄'; }, 2000);
+  }).catch(function() {
+    // fallback for older browsers
+    var ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+    btn.textContent = '✅ 已複製';
+    setTimeout(function() { btn.textContent = '📋 複製紀錄'; }, 2000);
+  });
+}
 (function() {
   var isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
     (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
