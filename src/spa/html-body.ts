@@ -227,18 +227,18 @@ export function getSpaHtmlBody(): string {
   <div id="briefing-datis" class="briefing-panel active">
     <div class="wx-fixed-header">
       <div class="wx-routes">
-        <button class="wx-route-btn active" onclick="selectWxRegion('taiwan',this)">台灣</button>
-        <button class="wx-route-btn" onclick="selectWxRegion('hkmacao',this)">港澳</button>
-        <button class="wx-route-btn" onclick="selectWxRegion('japan',this)">日本</button>
-        <button class="wx-route-btn" onclick="selectWxRegion('korea',this)">韓國</button>
-        <button class="wx-route-btn" onclick="selectWxRegion('philippines',this)">菲律賓</button>
-        <button class="wx-route-btn" onclick="selectWxRegion('thailand',this)">泰國</button>
-        <button class="wx-route-btn" onclick="selectWxRegion('vietnam',this)">越南柬埔寨</button>
-        <button class="wx-route-btn" onclick="selectWxRegion('seasia',this)">星馬印</button>
-        <button class="wx-route-btn" onclick="selectWxRegion('usa',this)">美國</button>
-        <button class="wx-route-btn" onclick="selectWxRegion('pacific',this)">阿拉斯加太平洋</button>
-        <button class="wx-route-btn" onclick="selectWxRegion('canada',this)">加拿大</button>
-        <button class="wx-route-btn" onclick="selectWxRegion('europe',this)">歐洲</button>
+        <button class="wx-route-btn active" onclick="selectWxRegion('taiwan',this)">台灣 TW</button>
+        <button class="wx-route-btn" onclick="selectWxRegion('hkmacao',this)">港澳 HK/MO</button>
+        <button class="wx-route-btn" onclick="selectWxRegion('japan',this)">日本 JP</button>
+        <button class="wx-route-btn" onclick="selectWxRegion('korea',this)">韓國 KR</button>
+        <button class="wx-route-btn" onclick="selectWxRegion('philippines',this)">菲律賓 PH</button>
+        <button class="wx-route-btn" onclick="selectWxRegion('thailand',this)">泰國 TH</button>
+        <button class="wx-route-btn" onclick="selectWxRegion('vietnam',this)">越柬 VN/KH</button>
+        <button class="wx-route-btn" onclick="selectWxRegion('seasia',this)">星馬印 SG/MY/ID</button>
+        <button class="wx-route-btn" onclick="selectWxRegion('usa',this)">美國 US</button>
+        <button class="wx-route-btn" onclick="selectWxRegion('pacific',this)">阿拉斯加太平洋 AK/PAC</button>
+        <button class="wx-route-btn" onclick="selectWxRegion('canada',this)">加拿大 CA</button>
+        <button class="wx-route-btn" onclick="selectWxRegion('europe',this)">歐洲 EU</button>
       </div>
       <div style="background:rgba(245,158,11,.08);border-bottom:1px solid rgba(245,158,11,.25);padding:5px 14px;font-size:.72em;color:#f59e0b;display:flex;align-items:center;gap:6px">
         <span>⚠</span><span>Non-operational use only. Data may not reflect current conditions.</span>
