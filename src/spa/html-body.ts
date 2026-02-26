@@ -166,11 +166,11 @@ export function getSpaHtmlBody(): string {
         <!-- 機場標高 + OAT -->
         <div class="ct-inputs">
           <div class="ct-input-group">
-            <label>機場標高 Airport Elevation (ft)</label>
+            <label>機場標高<br>Airport Elevation (ft)</label>
             <input type="text" id="ct-elev" placeholder="e.g. 108" inputmode="text">
           </div>
           <div class="ct-input-group">
-            <label>OAT (°C)</label>
+            <label>外氣溫度<br>OAT (°C)</label>
             <input type="text" id="ct-oat" placeholder="e.g. −20" inputmode="text">
           </div>
         </div>
@@ -192,17 +192,17 @@ export function getSpaHtmlBody(): string {
             <div class="ct-card-result empty" id="ct-r2">—</div>
           </div>
           <div class="ct-card">
-            <input class="ct-label-inp" type="text" id="ct-l3" placeholder="自訂名稱">
+            <input class="ct-label-inp" type="text" id="ct-l3" placeholder="自訂 / Custom (optional)">
             <input class="ct-card-input" type="number" id="ct-a3" inputmode="numeric" placeholder="ft">
             <div class="ct-card-result empty" id="ct-r3">—</div>
           </div>
           <div class="ct-card">
-            <input class="ct-label-inp" type="text" id="ct-l4" placeholder="自訂名稱">
+            <input class="ct-label-inp" type="text" id="ct-l4" placeholder="自訂 / Custom (optional)">
             <input class="ct-card-input" type="number" id="ct-a4" inputmode="numeric" placeholder="ft">
             <div class="ct-card-result empty" id="ct-r4">—</div>
           </div>
           <div class="ct-card">
-            <input class="ct-label-inp" type="text" id="ct-l5" placeholder="自訂名稱">
+            <input class="ct-label-inp" type="text" id="ct-l5" placeholder="自訂 / Custom (optional)">
             <input class="ct-card-input" type="number" id="ct-a5" inputmode="numeric" placeholder="ft">
             <div class="ct-card-result empty" id="ct-r5">—</div>
           </div>
