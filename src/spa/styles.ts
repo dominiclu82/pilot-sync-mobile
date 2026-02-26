@@ -195,9 +195,16 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
 .ct-panel{padding:16px;overflow-y:auto}
 .ct-form{background:var(--card);border-radius:var(--radius);padding:16px;margin-bottom:16px}
 @media(orientation:landscape) and (min-width:640px){
-.ct-panel{display:flex;gap:16px;align-items:flex-start}
-.ct-form{flex:1;min-width:0;margin-bottom:0}
-.ct-table-wrap{flex:1;min-width:0;margin-bottom:0}
+.ct-panel{display:flex;gap:12px;align-items:flex-start;padding:10px 12px;
+  height:calc(100dvh - 56px - env(safe-area-inset-bottom,0px) - 40px);overflow:hidden}
+.ct-form{flex:0 0 320px;min-width:0;margin-bottom:0;padding:12px;overflow-y:auto;max-height:100%}
+.ct-form .ct-grid{grid-template-columns:repeat(2,1fr);gap:6px;margin-bottom:8px}
+.ct-form .ct-inputs{gap:6px;margin-bottom:8px}
+.ct-form .ct-calc-btn{padding:10px;font-size:.9em;margin:4px 0 0}
+.ct-table-wrap{flex:1;min-width:0;margin-bottom:0;padding:10px 12px;overflow-y:auto;max-height:100%}
+.ct-table-wrap h3{font-size:.78em;margin-bottom:6px}
+.ct-table{font-size:.68em}
+.ct-table th,.ct-table td{padding:2px 6px}
 }
 .ct-inputs{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px}
 .ct-input-group label{font-size:.72em;color:var(--muted);font-weight:600;display:block;margin-bottom:3px}

@@ -1,5 +1,15 @@
 export function getSpaCoreJs(): string {
   return `
+// ── Auto-reload on idle ──────────────────────────────────────────────────────
+var _hiddenAt = 0;
+document.addEventListener('visibilitychange', function() {
+  if (document.visibilityState === 'hidden') {
+    _hiddenAt = Date.now();
+  } else if (_hiddenAt && Date.now() - _hiddenAt > 30 * 60 * 1000) {
+    location.reload();
+  }
+});
+
 // ── State ────────────────────────────────────────────────────────────────────
 let refreshToken = localStorage.getItem('crewsync_rt') || '';
 let currentJobId = null;
