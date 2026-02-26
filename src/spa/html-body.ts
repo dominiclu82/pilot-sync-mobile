@@ -651,16 +651,18 @@ export function getSpaHtmlBody(): string {
   <button class="tab-btn" id="tabBtn-gate" onclick="switchTab('gate',this)">
     <span class="tab-btn-icon">🌏</span>Gate Info
   </button>
-  <div class="tab-btn tab-util">
-    <div class="tab-util-row">
+  <div class="tab-btn tab-util" style="flex-direction:row;gap:0">
+    <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center">
       <button class="tab-util-btn" onclick="toggleTheme()" id="tabBtn-theme">
         <span id="theme-icon">☀️</span><span id="theme-label">日間</span>
       </button>
+    </div>
+    <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px">
       <button class="tab-util-btn tab-install-btn" id="tab-install-btn" onclick="showInstallGuide()" style="display:none">
         <span>📲</span>安裝
       </button>
+      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V4.057</span>
     </div>
-    <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer;margin-top:4px" onclick="showAbout()">V4.056</span>
   </div>
 </div>
 
@@ -681,16 +683,19 @@ export function getSpaHtmlBody(): string {
 <!-- 關於 -->
 <div id="about-overlay" class="install-overlay" style="display:none" onclick="if(event.target===this)closeAbout()">
   <div class="install-card">
-    <div style="font-size:2em;margin-bottom:6px">✈️</div>
-    <div style="font-weight:700;font-size:1.1em;margin-bottom:4px">CrewSync</div>
-    <div style="font-size:.78em;color:var(--muted);margin-bottom:6px" id="about-version">V4.056</div>
+    <div style="font-size:.82em;color:var(--text);line-height:1.7;margin-bottom:14px;text-align:left">
+      <div style="margin-bottom:4px">📱 建議使用 <b>iPad 橫向</b>操作以獲得最佳體驗</div>
+      <div style="color:var(--muted)">Best experience on iPad in landscape mode</div>
+    </div>
+    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V4.057</div>
+    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
+      <div>About card 改版、版號位置調整</div>
+      <div style="opacity:.7">Redesigned about card; version number repositioned</div>
+    </div>
+    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V4.056</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:14px;line-height:1.5;text-align:left">
       <div>Gate Info 預設目的地台北排序、地區按鈕加英文代碼</div>
       <div style="opacity:.7">Default sort by destination TPE; region buttons with English codes</div>
-    </div>
-    <div style="font-size:.82em;color:var(--text);line-height:1.7;margin-bottom:18px;text-align:left">
-      <div style="margin-bottom:8px">📱 建議使用 <b>iPad 橫向</b>操作以獲得最佳體驗</div>
-      <div style="color:var(--muted)">Best experience on iPad in landscape mode</div>
     </div>
     <button class="install-close-btn" onclick="closeAbout()">關閉</button>
   </div>
