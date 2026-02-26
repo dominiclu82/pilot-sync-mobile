@@ -209,7 +209,9 @@ html:has(#tab-briefing.tab-active #briefing-coldtemp.active) #tab-briefing.tab-a
 .ct-form .ct-grid{display:grid;grid-template-columns:repeat(2,1fr);grid-template-rows:repeat(3,auto);
   grid-auto-flow:column;gap:6px;margin-bottom:8px}
 .ct-form .ct-calc-btn{flex-shrink:0}
-.ct-table-wrap{flex:1;min-width:0;min-height:0;margin-bottom:0;overflow-y:auto}
+.ct-table-wrap{flex:1;min-width:0;min-height:0;margin-bottom:0;overflow:hidden}
+.ct-table-wrap h3{display:none}
+.ct-table{height:100%}
 }
 .ct-inputs{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px}
 .ct-input-group label{font-size:.72em;color:var(--muted);font-weight:600;display:block;margin-bottom:3px}
