@@ -194,6 +194,11 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
 #hf-panel-iframe{flex:1;min-height:0}
 .ct-panel{padding:16px;overflow-y:auto}
 .ct-form{background:var(--card);border-radius:var(--radius);padding:16px;margin-bottom:16px}
+@media(orientation:landscape) and (min-width:640px){
+.ct-panel{display:flex;gap:16px;align-items:flex-start}
+.ct-form{flex:1;min-width:0;margin-bottom:0}
+.ct-table-wrap{flex:1;min-width:0;margin-bottom:0}
+}
 .ct-inputs{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px}
 .ct-input-group label{font-size:.72em;color:var(--muted);font-weight:600;display:block;margin-bottom:3px}
 .ct-input-group input{width:100%;padding:7px 10px;background:var(--surface);border:1.5px solid var(--dim);
