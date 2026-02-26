@@ -1,7 +1,7 @@
 // ── Gate Info ──────────────────────────────────────────────────────────────────
 var gateFlightsLoaded = false;
 var gateFlightsList = [];
-var giSortKey = 'origin';
+var giSortKey = 'dest';
 var giSortAsc = true;
 var _giSelectedDate = null; // null = today, 'YYYY/MM/DD' = specific date
 

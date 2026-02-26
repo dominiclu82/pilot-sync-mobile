@@ -660,7 +660,7 @@ export function getSpaHtmlBody(): string {
         <span>📲</span>安裝
       </button>
     </div>
-    <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V4.053</span>
+    <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V4.054</span>
   </div>
 </div>
 
@@ -683,7 +683,7 @@ export function getSpaHtmlBody(): string {
   <div class="install-card">
     <div style="font-size:2em;margin-bottom:6px">✈️</div>
     <div style="font-weight:700;font-size:1.1em;margin-bottom:4px">CrewSync</div>
-    <div style="font-size:.78em;color:var(--muted);margin-bottom:14px" id="about-version">V4.053</div>
+    <div style="font-size:.78em;color:var(--muted);margin-bottom:14px" id="about-version">V4.054</div>
     <div style="font-size:.82em;color:var(--text);line-height:1.7;margin-bottom:18px;text-align:left">
       <div style="margin-bottom:8px">📱 建議使用 <b>iPad 橫向</b>操作以獲得最佳體驗</div>
       <div style="color:var(--muted)">Best experience on iPad in landscape mode</div>
