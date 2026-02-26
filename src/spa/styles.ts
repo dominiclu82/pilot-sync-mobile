@@ -209,12 +209,13 @@ html:has(#tab-briefing.tab-active #briefing-coldtemp.active) #tab-briefing.tab-a
 .ct-form .ct-grid{display:grid;grid-template-columns:repeat(2,1fr);grid-template-rows:repeat(3,auto);
   grid-auto-flow:column;gap:6px;margin-bottom:8px}
 .ct-form .ct-calc-btn{flex-shrink:0}
-.ct-table-wrap{flex:1;min-width:0;min-height:0;margin-bottom:0;overflow:hidden}
+.ct-table-wrap{flex:1;min-width:0;min-height:0;margin-bottom:0;overflow:hidden;padding:0}
 .ct-table-wrap h3{display:none}
-.ct-table{display:grid;grid-template-columns:auto repeat(6,1fr);grid-auto-rows:1fr;
+.ct-table{display:grid;grid-template-columns:auto repeat(6,1fr);grid-auto-rows:minmax(0,1fr);
   height:100%;width:100%;gap:1px;background:var(--dim);min-width:unset}
 .ct-table thead,.ct-table tbody,.ct-table tr{display:contents}
 .ct-table th,.ct-table td{border:none}
+.ct-table th:first-child,.ct-table td:first-child{width:auto}
 .ct-table td{background:var(--card)}
 }
 .ct-inputs{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px}
