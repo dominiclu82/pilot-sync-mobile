@@ -62,10 +62,10 @@ export function getSpaHtmlBody(): string {
       <div style="height:4px"></div>
       <button type="submit" class="btn btn-primary">🚀 開始同步</button>
     </form>
-  </div>
-
-  <div style="text-align:center">
-    <button class="link-btn" onclick="showSettings()">⚙️ 設定</button>
+    <div style="display:flex;justify-content:center;gap:16px;margin-top:10px">
+      <button class="link-btn" onclick="showSettings()">⚙️ 設定</button>
+      <button class="link-btn" onclick="showPrivacy()">🔒 隱私與安全</button>
+    </div>
   </div>
 </div>
 
@@ -648,7 +648,7 @@ export function getSpaHtmlBody(): string {
     <span class="tab-btn-icon">📦</span>A350簡報箱
   </button>
   <button class="tab-btn" id="tabBtn-gate" onclick="switchTab('gate',this)">
-    <span class="tab-btn-icon">🚪</span>Gate Info
+    <span class="tab-btn-icon">🌏</span>Gate Info
   </button>
   <div class="tab-btn tab-util">
     <div class="tab-util-row">
@@ -659,7 +659,7 @@ export function getSpaHtmlBody(): string {
         <span>📲</span>安裝
       </button>
     </div>
-    <span style="font-size:.55em;color:var(--dim);line-height:1;opacity:.7">V4.036</span>
+    <span style="font-size:.55em;color:var(--dim);line-height:1;opacity:.7">V4.037</span>
   </div>
 </div>
 
@@ -674,6 +674,32 @@ export function getSpaHtmlBody(): string {
       3. 右上角點「<b>新增</b>」
     </div>
     <button class="install-close-btn" onclick="closeInstallGuide()">知道了</button>
+  </div>
+</div>
+
+<!-- 隱私與安全 Q&A -->
+<div id="privacy-overlay" class="install-overlay" style="display:none" onclick="if(event.target===this)closePrivacy()">
+  <div class="privacy-card">
+    <div style="font-size:1.5em;margin-bottom:6px">🔒</div>
+    <div style="font-weight:700;font-size:1em;margin-bottom:14px">隱私與安全 Q&A / Privacy & Security FAQ</div>
+    <div class="privacy-body">
+      <div class="privacy-q">你的帳號密碼安全嗎？/ Are My Credentials Safe?</div>
+      <div class="privacy-a">安全。你輸入的員工編號和密碼只會在同步的那幾秒鐘內使用，用來登入班表系統擷取資料。同步完成後，伺服器立即丟棄，不留任何紀錄。你的員工編號會存在你自己的瀏覽器裡（方便下次自動填入），密碼則完全不儲存，由瀏覽器的密碼管理器自行處理。</div>
+      <div class="privacy-a" style="color:var(--dim)">Yes. Your employee ID and password are only used for a few seconds during sync to log into the roster system. Once complete, the server discards them immediately. Your employee ID is stored locally in your browser for convenience; your password is never stored.</div>
+
+      <div class="privacy-q">Google 日曆授權做了什麼？/ What Does Google Authorization Do?</div>
+      <div class="privacy-a">只做一件事：把你的班表寫進你的 Google 日曆。我們不會讀取、修改或分享你日曆裡的任何現有資料。授權產生的令牌只存在你自己的瀏覽器裡，不會上傳到伺服器。</div>
+      <div class="privacy-a" style="color:var(--dim)">One thing only: writing your roster into your Google Calendar. We do not read, modify, or share any existing data in your calendar. The authorization token is stored only in your browser and is never uploaded to the server.</div>
+
+      <div class="privacy-q">這個工具收費嗎？/ Is This Tool Free?</div>
+      <div class="privacy-a">完全免費。本工具由個人開發者獨立開發，純粹為了方便機組人員同步班表，沒有任何商業目的。</div>
+      <div class="privacy-a" style="color:var(--dim)">Completely free. This tool is independently developed solely to help crew members sync their roster — no commercial purpose whatsoever.</div>
+
+      <div class="privacy-q">免責聲明 / Disclaimer</div>
+      <div class="privacy-a">開發者已盡合理努力確保資料安全，但本工具並非公司官方應用程式。使用前請自行評估風險；若對隱私有任何疑慮，請勿使用。</div>
+      <div class="privacy-a" style="color:var(--dim)">The developer has taken reasonable measures to ensure data security. However, this is not an official company application. Please assess the risks before use; if you have any privacy concerns, do not use this tool.</div>
+    </div>
+    <button class="install-close-btn" onclick="closePrivacy()">關閉</button>
   </div>
 </div>
 

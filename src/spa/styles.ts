@@ -392,5 +392,11 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
   padding:8px 12px;font-size:.82em;font-weight:600;cursor:pointer;white-space:nowrap;-webkit-appearance:none}
 .gi-time-btn-on{border-color:var(--accent);color:var(--accent)}
 .gi-notice-inline{font-size:.62em;color:var(--dim);margin-top:1px}
+.privacy-card{background:var(--card);border-radius:16px;padding:24px 20px;width:100%;
+  max-width:400px;text-align:center;box-shadow:0 4px 24px rgba(0,0,0,.25);max-height:85vh;display:flex;flex-direction:column}
+.privacy-body{text-align:left;overflow-y:auto;margin-bottom:14px;flex:1;min-height:0}
+.privacy-q{font-weight:700;font-size:.85em;color:var(--accent-light);margin:14px 0 6px;line-height:1.4}
+.privacy-q:first-child{margin-top:0}
+.privacy-a{font-size:.78em;color:var(--text);line-height:1.65;margin-bottom:4px}
 `;
 }

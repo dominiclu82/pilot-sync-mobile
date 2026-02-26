@@ -533,6 +533,14 @@ function showInstallGuide() {
 function closeInstallGuide() {
   document.getElementById('install-overlay').style.display = 'none';
 }
+
+// ── Privacy Q&A ──────────────────────────────────────────────────────────────
+function showPrivacy() {
+  document.getElementById('privacy-overlay').style.display = 'flex';
+}
+function closePrivacy() {
+  document.getElementById('privacy-overlay').style.display = 'none';
+}
 (function() {
   var isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
     (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
