@@ -439,6 +439,7 @@ html:has(#tab-briefing.tab-active #briefing-coldtemp.active) #tab-briefing.tab-a
   -webkit-appearance:none;appearance:none}
 .pa-temp-field input:focus{border-color:var(--accent);outline:none}
 .pa-temp-arrow{font-size:1.1em;color:var(--muted);flex-shrink:0}
+.pa-temp-hint{font-size:.68em;color:var(--accent);margin-top:6px;line-height:1.5}
 .pa-tz-list{display:flex;flex-direction:column;gap:1px}
 .pa-tz-row{display:flex;align-items:center;padding:5px 8px;border-radius:6px;font-size:.78em;font-weight:500}
 .pa-tz-row:nth-child(odd){background:var(--surface)}
