@@ -448,6 +448,13 @@ html:has(#tab-briefing.tab-active #briefing-coldtemp.active) #tab-briefing.tab-a
 .pa-tz-dst{color:#f59e0b;font-size:.85em}
 .pa-tz-row.pa-tz-utc-row{background:var(--dim);font-weight:700}
 .pa-tz-row.pa-tz-utc-row .pa-tz-stations{color:var(--accent)}
+.pa-tz-hint{font-size:.68em;color:var(--muted);padding:2px 0 6px;line-height:1.5}
+.pa-tz-link{cursor:pointer;border-bottom:1px dashed var(--muted);transition:color .15s;padding:4px 6px;display:inline-block;border-radius:4px}
+.pa-tz-link:hover{color:var(--accent);background:rgba(59,130,246,.08)}
+.pa-tz-link.pa-tz-selected{color:var(--accent);border-bottom-color:var(--accent);border-bottom-style:solid;background:rgba(59,130,246,.1)}
+.pa-flt-input{width:100%;padding:8px 10px;border:1.5px solid var(--dim);border-radius:8px;background:var(--surface);color:var(--text);font-size:.9em;font-weight:600;-webkit-appearance:none;appearance:none}
+.pa-flt-input:focus{border-color:var(--accent);outline:none}
+.pa-flt-input::placeholder{color:var(--dim);font-weight:400}
 .pa-cat-btns{display:flex;flex-wrap:wrap;gap:6px;padding:10px 14px;border-bottom:1px solid var(--dim);flex-shrink:0}
 .pa-cat-btn{padding:6px 12px;border:1.5px solid var(--dim);border-radius:8px;background:none;
   color:var(--muted);font-size:.75em;font-weight:600;cursor:pointer;white-space:nowrap;-webkit-appearance:none}

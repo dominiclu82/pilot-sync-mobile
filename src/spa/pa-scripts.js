@@ -1,10 +1,15 @@
 // ── PA 工具 ──────────────────────────────────────────────────────────────────
 
 // ── 全域狀態 ─────────────────────────────────────────────────────────────────
-var _paGlobalDest = 'LAX';
+var _paGlobalDest = '';
+var _paGlobalFlt = '';
 var _paGlobalTempC = '';
 var _paGlobalTempF = '';
+var _paSelectedStation = '';
 var _paListenersReady = false;
+var _paFidsCache = null;
+var _paFidsCacheTime = 0;
+var _paFltTimer = null;
 
 // ── 溫度換算 ─────────────────────────────────────────────────────────────────
 function paConvertTemp(from) {
@@ -41,10 +46,10 @@ var _paTzZones = [
   { stations: 'TPE', offset: 8, dst: false },
   { stations: 'LAX / SFO / SEA', offset: -8, dst: true, dstOffset: -7, dstLabel: 'PDT' },
   { stations: 'PHX', offset: -7, dst: false },
-  { stations: 'PRG', offset: 1, dst: true, dstOffset: 2, dstLabel: 'CEST' },
   { stations: 'BKK / SGN / CGK', offset: 7, dst: false },
   { stations: 'HKG / MFM / SIN', offset: 8, dst: false },
-  { stations: 'NRT / ICN', offset: 9, dst: false }
+  { stations: 'NRT / ICN', offset: 9, dst: false },
+  { stations: 'PRG', offset: 1, dst: true, dstOffset: 2, dstLabel: 'CEST' }
 ];
 
 function _paIsDST_US() {
@@ -99,8 +104,12 @@ function paUpdateTzList() {
     var utcStr = 'UTC' + (off >= 0 ? '+' : '') + off;
     var dstStr = isDst ? ' <span class="pa-tz-dst">DST</span>' : '';
     var rowClass = z.stations === 'UTC' ? 'pa-tz-row pa-tz-utc-row' : 'pa-tz-row';
+    var stationsHtml = z.stations === 'UTC' ? z.stations : z.stations.split(' / ').map(function(s) {
+      var cls = 'pa-tz-link' + (s === _paSelectedStation ? ' pa-tz-selected' : '');
+      return '<span class="' + cls + '" onclick="_paTzSelectStation(\'' + s + '\')">' + s + '</span>';
+    }).join(' / ');
     html += '<div class="' + rowClass + '">' +
-      '<span class="pa-tz-stations">' + z.stations + '</span>' +
+      '<span class="pa-tz-stations">' + stationsHtml + '</span>' +
       '<span class="pa-tz-date">' + mm + '/' + dd + ' ' + day + '</span>' +
       '<span class="pa-tz-time">' + hh + ':' + mi + '</span>' +
       '<span class="pa-tz-utc">' + utcStr + dstStr + '</span>' +
@@ -176,15 +185,98 @@ function _paCalcLocalTime(tz) {
   };
 }
 
+// ── 時區點選 ─────────────────────────────────────────────────────────────────
+function _paTzSelectStation(code) {
+  _paSelectedStation = code;
+  _paGlobalDest = code;
+  var el = document.getElementById('pa-content');
+  if (el) {
+    el.querySelectorAll('[data-pa="dest"]').forEach(function(inp) { inp.value = code; });
+  }
+  if (_paCurrentCat === 'descent') _paFillDescentTime();
+  document.querySelectorAll('.pa-tz-link').forEach(function(l) {
+    l.classList.toggle('pa-tz-selected', l.textContent === code);
+  });
+}
+
+// ── 航班號查詢 ─────────────────────────────────────────────────────────────────
+function _paNormalizeFlt(val) {
+  var s = val.trim().toUpperCase();
+  s = s.replace(/^SJX/, '').replace(/^JX/, '');
+  return s.replace(/\s/g, '');
+}
+
+function _paOnFltInput(val) {
+  _paGlobalFlt = val;
+  // Sync across all data-pa="flt" fields in PA content
+  var el = document.getElementById('pa-content');
+  if (el) {
+    el.querySelectorAll('[data-pa="flt"]').forEach(function(inp) {
+      if (document.activeElement !== inp) inp.value = val;
+    });
+  }
+  // Sync to left panel
+  var leftFlt = document.getElementById('pa-flt');
+  if (leftFlt && document.activeElement !== leftFlt) leftFlt.value = val;
+  // Debounced FIDS lookup
+  if (_paFltTimer) clearTimeout(_paFltTimer);
+  var num = _paNormalizeFlt(val);
+  if (num && /^\d+$/.test(num)) {
+    _paFltTimer = setTimeout(function() { _paFltLookup(num); }, 500);
+  }
+}
+
+function _paFltLookup(num) {
+  var now = Date.now();
+  if (_paFidsCache && now - _paFidsCacheTime < 120000) {
+    _paMatchFlight(num);
+    return;
+  }
+  fetch('/api/fids').then(function(r) { return r.json(); }).then(function(data) {
+    _paFidsCache = data;
+    _paFidsCacheTime = Date.now();
+    _paMatchFlight(num);
+  }).catch(function() {});
+}
+
+function _paMatchFlight(num) {
+  var data = _paFidsCache;
+  if (!data) return;
+  var dep = (data.dep || []).filter(function(f) { return f.ACode && f.ACode.trim() === 'JX'; });
+  var arr = (data.arr || []).filter(function(f) { return f.ACode && f.ACode.trim() === 'JX'; });
+  var dest = '';
+  for (var i = 0; i < dep.length; i++) {
+    if (dep[i].FlightNo && dep[i].FlightNo.replace(/\s/g, '') === num) {
+      dest = dep[i].CityCode || '';
+      break;
+    }
+  }
+  if (!dest) {
+    for (var j = 0; j < arr.length; j++) {
+      if (arr[j].FlightNo && arr[j].FlightNo.replace(/\s/g, '') === num) {
+        dest = 'TPE';
+        break;
+      }
+    }
+  }
+  if (dest) {
+    _paOnDestInput(dest);
+  }
+}
+
 // ── 自動同步邏輯 ─────────────────────────────────────────────────────────────
 function _paOnDestInput(val) {
   _paGlobalDest = val;
+  _paSelectedStation = val.toUpperCase().trim();
   var el = document.getElementById('pa-content');
   if (!el) return;
   el.querySelectorAll('[data-pa="dest"]').forEach(function(inp) {
     if (document.activeElement !== inp) inp.value = val;
   });
   if (_paCurrentCat === 'descent') _paFillDescentTime();
+  document.querySelectorAll('.pa-tz-link').forEach(function(l) {
+    l.classList.toggle('pa-tz-selected', l.textContent === _paSelectedStation);
+  });
 }
 
 function _paFillDescentTime() {
@@ -226,6 +318,7 @@ function _paInitListeners() {
     var attr = e.target.getAttribute('data-pa');
     if (!attr) return;
     if (attr === 'dest') _paOnDestInput(e.target.value);
+    else if (attr === 'flt') _paOnFltInput(e.target.value);
     else if (attr === 'temp-c') _paOnTempInput('c', e.target.value);
     else if (attr === 'temp-f') _paOnTempInput('f', e.target.value);
   });
@@ -235,10 +328,15 @@ function _paInitListeners() {
 function _paRestoreValues() {
   var el = document.getElementById('pa-content');
   if (!el) return;
-  el.querySelectorAll('[data-pa="dest"]').forEach(function(inp) { inp.value = _paGlobalDest; });
+  if (_paGlobalFlt) {
+    el.querySelectorAll('[data-pa="flt"]').forEach(function(inp) { inp.value = _paGlobalFlt; });
+  }
+  if (_paGlobalDest) {
+    el.querySelectorAll('[data-pa="dest"]').forEach(function(inp) { inp.value = _paGlobalDest; });
+  }
   if (_paCurrentCat === 'descent') {
     _paSyncTempToContent();
-    _paFillDescentTime();
+    if (_paGlobalDest) _paFillDescentTime();
   }
 }
 
@@ -248,9 +346,9 @@ var _paScripts = {};
 
 _paScripts.welcome = '<div class="pa-note">When all passengers are boarded, the CIC will inform the PIC to make a brief welcome PA.</div>' +
   '<div class="pa-lang">English</div>' +
-  '<div>"Hello everyone, this is Captain <input class="pa-input" placeholder="Full Name"> speaking. On behalf of <span class="pa-choice">[the cockpit crew / all the crew]</span>, welcome onboard STARLUX flight number <input class="pa-input" placeholder="FLT No."> to <input class="pa-input" data-pa="dest" placeholder="Destination">. We should be ready for departure in <input class="pa-input pa-input-num" inputmode="numeric"> minutes. Our flight time is <input class="pa-input pa-input-num" inputmode="numeric"> hours and <input class="pa-input pa-input-num" inputmode="numeric"> minutes, with an initial cruising altitude of <input class="pa-input" inputmode="numeric" style="min-width:70px" placeholder="XX,XXX"> feet. Once again, please make yourself comfortable and enjoy the flight with us. Thank you."</div>' +
+  '<div>"Hello everyone, this is Captain <input class="pa-input" placeholder="Full Name"> speaking. On behalf of <span class="pa-choice">[the cockpit crew / all the crew]</span>, welcome onboard STARLUX flight number <input class="pa-input" data-pa="flt" placeholder="e.g. JX800"> to <input class="pa-input" data-pa="dest" placeholder="e.g. LAX">. We should be ready for departure in <input class="pa-input pa-input-num" inputmode="numeric"> minutes. Our flight time is <input class="pa-input pa-input-num" inputmode="numeric"> hours and <input class="pa-input pa-input-num" inputmode="numeric"> minutes, with an initial cruising altitude of <input class="pa-input" inputmode="numeric" style="min-width:70px" placeholder="XX,XXX"> feet. Once again, please make yourself comfortable and enjoy the flight with us. Thank you."</div>' +
   '<div class="pa-lang">中文</div>' +
-  '<div>「各位旅客大家好，我是機長 <input class="pa-input" placeholder="姓名">。代表<span class="pa-choice">[駕駛艙組員 / 全體組員]</span>，歡迎搭乘星宇航空 <input class="pa-input" placeholder="航班號"> 班機前往 <input class="pa-input" data-pa="dest" placeholder="目的地">。我們預計在 <input class="pa-input pa-input-num" inputmode="numeric"> 分鐘後出發。飛行時間約 <input class="pa-input pa-input-num" inputmode="numeric"> 小時 <input class="pa-input pa-input-num" inputmode="numeric"> 分鐘，初始巡航高度 <input class="pa-input" inputmode="numeric" style="min-width:70px"> 呎。再次祝您旅途愉快，謝謝。」</div>';
+  '<div>「各位旅客大家好，我是機長 <input class="pa-input" placeholder="姓名">。代表<span class="pa-choice">[駕駛艙組員 / 全體組員]</span>，歡迎搭乘星宇航空 <input class="pa-input" data-pa="flt" placeholder="e.g. JX800"> 班機前往 <input class="pa-input" data-pa="dest" placeholder="e.g. LAX">。我們預計在 <input class="pa-input pa-input-num" inputmode="numeric"> 分鐘後出發。飛行時間約 <input class="pa-input pa-input-num" inputmode="numeric"> 小時 <input class="pa-input pa-input-num" inputmode="numeric"> 分鐘，初始巡航高度 <input class="pa-input" inputmode="numeric" style="min-width:70px"> 呎。再次祝您旅途愉快，謝謝。」</div>';
 
 _paScripts.delay = '<div class="pa-note">If ground delay is expected to be more than 15 minutes before pushback, a ground delay PA should be delivered.</div>' +
   '<div class="pa-lang">English</div>' +
@@ -260,9 +358,9 @@ _paScripts.delay = '<div class="pa-note">If ground delay is expected to be more 
 
 _paScripts.descent = '<div class="pa-note">The PA shall be given around 10 minutes before top of descent.</div>' +
   '<div class="pa-lang">English</div>' +
-  '<div>"Hello everyone, this is your captain speaking. We are approaching <input class="pa-input" data-pa="dest" placeholder="Destination"> and expect to start our descent in 10 minutes. We estimate landing at <input class="pa-input pa-input-num" inputmode="numeric" style="min-width:50px" placeholder="HH:MM"> <span class="pa-choice">[a.m. / p.m.]</span>. The current local time in <input class="pa-input" data-pa="dest" placeholder="Destination"> is <input class="pa-input pa-input-num" data-pa="local-time" inputmode="numeric" style="min-width:50px" placeholder="HH:MM"> <span class="pa-choice" data-pa="ampm-local">[a.m. / p.m.]</span> on <input class="pa-input" data-pa="local-day" placeholder="Day and Date">. The present weather at the airport is <input class="pa-input" placeholder="Weather Condition"> with a temperature of <input class="pa-input pa-input-num" data-pa="temp-c" inputmode="numeric"> degree Celsius, which is <input class="pa-input pa-input-num" data-pa="temp-f" inputmode="numeric"> degree Fahrenheit. We certainly hope that you have enjoyed the flight with us, and we look forward to having you onboard another STARLUX flight again very soon. Thank you, and we wish you all a very pleasant journey."</div>' +
+  '<div>"Hello everyone, this is your captain speaking. We are approaching <input class="pa-input" data-pa="dest" placeholder="e.g. LAX"> and expect to start our descent in 10 minutes. We estimate landing at <input class="pa-input pa-input-num" inputmode="numeric" style="min-width:50px" placeholder="HH:MM"> <span class="pa-choice">[a.m. / p.m.]</span>. The current local time in <input class="pa-input" data-pa="dest" placeholder="e.g. LAX"> is <input class="pa-input pa-input-num" data-pa="local-time" inputmode="numeric" style="min-width:50px" placeholder="HH:MM"> <span class="pa-choice" data-pa="ampm-local">[a.m. / p.m.]</span> on <input class="pa-input" data-pa="local-day" placeholder="Day and Date">. The present weather at the airport is <input class="pa-input" placeholder="Weather Condition"> with a temperature of <input class="pa-input pa-input-num" data-pa="temp-c" inputmode="numeric"> degree Celsius, which is <input class="pa-input pa-input-num" data-pa="temp-f" inputmode="numeric"> degree Fahrenheit. We certainly hope that you have enjoyed the flight with us, and we look forward to having you onboard another STARLUX flight again very soon. Thank you, and we wish you all a very pleasant journey."</div>' +
   '<div class="pa-lang">中文</div>' +
-  '<div>「各位旅客大家好，這裡是機長廣播。我們即將接近 <input class="pa-input" data-pa="dest" placeholder="目的地">，預計在 10 分鐘後開始下降。預計落地時間為 <span class="pa-choice">[上午 / 下午]</span> <input class="pa-input pa-input-num" inputmode="numeric" style="min-width:50px" placeholder="HH:MM">。<input class="pa-input" data-pa="dest" placeholder="目的地"> 當地時間為 <input class="pa-input" data-pa="local-day-cn" placeholder="星期與日期"> <span class="pa-choice" data-pa="ampm-local-cn">[上午 / 下午]</span> <input class="pa-input pa-input-num" data-pa="local-time-cn" inputmode="numeric" style="min-width:50px" placeholder="HH:MM">。目前機場天氣為 <input class="pa-input" placeholder="天氣狀況">，氣溫攝氏 <input class="pa-input pa-input-num" data-pa="temp-c" inputmode="numeric"> 度，華氏 <input class="pa-input pa-input-num" data-pa="temp-f" inputmode="numeric"> 度。非常感謝各位搭乘星宇航空，期待再次為您服務。祝各位旅途愉快。」</div>';
+  '<div>「各位旅客大家好，這裡是機長廣播。我們即將接近 <input class="pa-input" data-pa="dest" placeholder="e.g. LAX">，預計在 10 分鐘後開始下降。預計落地時間為 <span class="pa-choice">[上午 / 下午]</span> <input class="pa-input pa-input-num" inputmode="numeric" style="min-width:50px" placeholder="HH:MM">。<input class="pa-input" data-pa="dest" placeholder="e.g. LAX"> 當地時間為 <input class="pa-input" data-pa="local-day-cn" placeholder="星期與日期"> <span class="pa-choice" data-pa="ampm-local-cn">[上午 / 下午]</span> <input class="pa-input pa-input-num" data-pa="local-time-cn" inputmode="numeric" style="min-width:50px" placeholder="HH:MM">。目前機場天氣為 <input class="pa-input" placeholder="天氣狀況">，氣溫攝氏 <input class="pa-input pa-input-num" data-pa="temp-c" inputmode="numeric"> 度，華氏 <input class="pa-input pa-input-num" data-pa="temp-f" inputmode="numeric"> 度。非常感謝各位搭乘星宇航空，期待再次為您服務。祝各位旅途愉快。」</div>';
 
 _paScripts.turbulence = '<div class="pa-sub">i. Approaching an Area of Known or Forecast Turbulence</div>' +
   '<div class="pa-lang">English</div>' +
@@ -273,12 +371,7 @@ _paScripts.turbulence = '<div class="pa-sub">i. Approaching an Area of Known or 
   '<div class="pa-lang">English</div>' +
   '<div>"For the safety of the cabin crew, I have asked them to stop the inflight service, take their seats, and remain seated, until we have passed through this area. We apologize for any inconvenience. The inflight service will resume as soon as flight conditions permit. We expect that these conditions to last for approximately <input class="pa-input pa-input-num" inputmode="numeric"> minutes. <span class="pa-choice">(If estimate of the period of turbulence is known)</span> Your cooperation and understanding are always appreciated. Thank you."</div>' +
   '<div class="pa-lang">中文</div>' +
-  '<div>「為了組員的安全，我已請空服員暫停機上服務並回座就位，待我們通過此區域後再恢復。造成不便敬請見諒，機上服務將在飛行條件允許時盡快恢復。預計此狀況將持續約 <input class="pa-input pa-input-num" inputmode="numeric"> 分鐘。<span class="pa-choice">（如已知亂流持續時間）</span>感謝您的配合與理解。」</div>' +
-  '<div class="pa-sub">iii. If more turbulence is forecast</div>' +
-  '<div class="pa-lang">English</div>' +
-  '<div>"However, it is possible that we may experience some light turbulence <span class="pa-choice">[later / during descent]</span>. I will provide you with an update before we start our descent. We invite you to relax and enjoy the remainder of the flight to <input class="pa-input" data-pa="dest" placeholder="Destination">. Thank you."</div>' +
-  '<div class="pa-lang">中文</div>' +
-  '<div>「不過，<span class="pa-choice">[稍後 / 下降過程中]</span> 可能還會遇到輕微亂流。在開始下降前我會再向各位報告。請放鬆心情，享受飛往 <input class="pa-input" data-pa="dest" placeholder="目的地"> 的剩餘旅程。謝謝。」</div>';
+  '<div>「為了組員的安全，我已請空服員暫停機上服務並回座就位，待我們通過此區域後再恢復。造成不便敬請見諒，機上服務將在飛行條件允許時盡快恢復。預計此狀況將持續約 <input class="pa-input pa-input-num" inputmode="numeric"> 分鐘。<span class="pa-choice">（如已知亂流持續時間）</span>感謝您的配合與理解。」</div>';
 
 _paScripts.deice = '<div class="pa-lang">English</div>' +
   '<div>"Hello everyone, welcome on board. This is your Captain speaking. Today we must complete a procedure to protect the aircraft against the build-up of ice. And we will be on ground for <input class="pa-input pa-input-num" inputmode="numeric"> minutes. <span class="pa-choice">(If delay)</span> This will involve the spraying of a fluid on the aircraft; there may be some noise during this process and, possibly, a slightly unusual smell inside of the cabin. The procedure is routine and should be completed in a few minutes. Thank you for your attention."</div>' +
@@ -287,14 +380,14 @@ _paScripts.deice = '<div class="pa-lang">English</div>' +
 
 _paScripts.missedappr = '<div class="pa-note">The PA should be done after the aircraft has leveled at missed approach altitude with completion of the After Takeoff Checklist, and before the start of next approach.</div>' +
   '<div class="pa-lang">English</div>' +
-  '<div>"May we have your attention. This is your Captain speaking. We were unable to complete our approach to landing at <input class="pa-input" data-pa="dest" placeholder="Airport">. We have just completed a routine go-around procedure and, shortly, we shall be starting another approach to land. We will be landing in <input class="pa-input pa-input-num" inputmode="numeric"> minutes. Thank you for your attention."</div>' +
+  '<div>"May we have your attention. This is your Captain speaking. We were unable to complete our approach to landing at <input class="pa-input" data-pa="dest" placeholder="e.g. LAX">. We have just completed a routine go-around procedure and, shortly, we shall be starting another approach to land. We will be landing in <input class="pa-input pa-input-num" inputmode="numeric"> minutes. Thank you for your attention."</div>' +
   '<div class="pa-lang">中文</div>' +
-  '<div>「各位旅客請注意。這裡是機長廣播。我們無法完成在 <input class="pa-input" data-pa="dest" placeholder="機場"> 的進場降落。我們剛剛已完成例行的重飛程序，稍後將再次進場降落。預計在 <input class="pa-input pa-input-num" inputmode="numeric"> 分鐘後落地。感謝您的配合。」</div>';
+  '<div>「各位旅客請注意。這裡是機長廣播。我們無法完成在 <input class="pa-input" data-pa="dest" placeholder="e.g. LAX"> 的進場降落。我們剛剛已完成例行的重飛程序，稍後將再次進場降落。預計在 <input class="pa-input pa-input-num" inputmode="numeric"> 分鐘後落地。感謝您的配合。」</div>';
 
 _paScripts.diversion = '<div class="pa-lang">English</div>' +
-  '<div>"May we have your attention. This is your Captain speaking. The weather at <input class="pa-input" data-pa="dest" placeholder="Destination"> airport is below landing minimum, we are unable to land at this moment. We shall divert to <input class="pa-input" placeholder="Alternate"> airport, and we can wait for the weather at <input class="pa-input" data-pa="dest" placeholder="Destination"> airport to improve."</div>' +
+  '<div>"May we have your attention. This is your Captain speaking. The weather at <input class="pa-input" data-pa="dest" placeholder="e.g. LAX"> airport is below landing minimum, we are unable to land at this moment. We shall divert to <input class="pa-input" placeholder="Alternate"> airport, and we can wait for the weather at <input class="pa-input" data-pa="dest" placeholder="e.g. LAX"> airport to improve."</div>' +
   '<div class="pa-lang">中文</div>' +
-  '<div>「各位旅客請注意。這裡是機長廣播。<input class="pa-input" data-pa="dest" placeholder="目的地"> 機場天氣低於降落標準，目前無法降落。我們將轉降至 <input class="pa-input" placeholder="備降機場">，等待 <input class="pa-input" data-pa="dest" placeholder="目的地"> 機場天氣改善。」</div>';
+  '<div>「各位旅客請注意。這裡是機長廣播。<input class="pa-input" data-pa="dest" placeholder="e.g. LAX"> 機場天氣低於降落標準，目前無法降落。我們將轉降至 <input class="pa-input" placeholder="備降機場">，等待 <input class="pa-input" data-pa="dest" placeholder="e.g. LAX"> 機場天氣改善。」</div>';
 
 _paScripts.modsevcat = '<div class="pa-sub">i. Normal</div>' +
   '<div class="pa-lang">English</div>' +
@@ -305,7 +398,12 @@ _paScripts.modsevcat = '<div class="pa-sub">i. Normal</div>' +
   '<div class="pa-lang">English</div>' +
   '<div>"The cabin crew are now making every effort to safeguard the condition of everyone onboard. If you need assistance, the crew will help you as soon as possible. We appreciate your cooperation to stay in your seats until the seatbelt sign is turned off. After an assessment of conditions onboard are completed, I will provide you with more information regarding the status of the flight. Your cooperation and understanding are appreciated to ensure the safety of all onboard. Thank you."</div>' +
   '<div class="pa-lang">中文</div>' +
-  '<div>「空服員正全力確保機上每位旅客的狀況。如果您需要協助，組員會盡快前來幫忙。請您配合留在座位上，直到安全帶指示燈熄滅為止。在完成機上狀況評估後，我會再向各位報告航班最新資訊。感謝您的配合與理解，以確保機上所有人員的安全。謝謝。」</div>';
+  '<div>「空服員正全力確保機上每位旅客的狀況。如果您需要協助，組員會盡快前來幫忙。請您配合留在座位上，直到安全帶指示燈熄滅為止。在完成機上狀況評估後，我會再向各位報告航班最新資訊。感謝您的配合與理解，以確保機上所有人員的安全。謝謝。」</div>' +
+  '<div class="pa-sub">iii. If more turbulence is forecast</div>' +
+  '<div class="pa-lang">English</div>' +
+  '<div>"However, it is possible that we may experience some light turbulence <span class="pa-choice">[later / during descent]</span>. I will provide you with an update before we start our descent. We invite you to relax and enjoy the remainder of the flight to <input class="pa-input" data-pa="dest" placeholder="e.g. LAX">. Thank you."</div>' +
+  '<div class="pa-lang">中文</div>' +
+  '<div>「不過，<span class="pa-choice">[稍後 / 下降過程中]</span> 可能還會遇到輕微亂流。在開始下降前我會再向各位報告。請放鬆心情，享受飛往 <input class="pa-input" data-pa="dest" placeholder="e.g. LAX"> 的剩餘旅程。謝謝。」</div>';
 
 _paScripts.unrulypax = '<div class="pa-lang">English</div>' +
   '<div>"This is your captain speaking. The passenger at <input class="pa-input" placeholder="Seat Number">, we have already warned you about your unacceptable behavior and requested you to moderate it. This is the FINAL WARNING that your unruly behavior has violated the above laws and regulations. If the unruly behavior remains, it may be committed a criminal offence, and you may be restrained and handed over to the aviation security authorities. Punishment may be imposed against you, including but not limited to imprisonment, detention or monetary fine. If there is any diversion, stop over or delay caused by your unruly behavior, STARLUX Airlines shall be entitled to request you for any and all losses, expenses and damages incurred from such circumstances. PLEASE NOW COOPERATE WITH OUR CREW MEMBERS IN AN AMICABLE WAY."</div>' +
