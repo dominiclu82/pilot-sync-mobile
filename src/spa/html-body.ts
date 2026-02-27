@@ -289,6 +289,10 @@ export function getSpaHtmlBody(): string {
         <!-- 時區列表 -->
         <div class="pa-section pa-tz-section">
           <div class="pa-section-title">🕐 Local Time</div>
+          <div class="pa-lt-search">
+            <input class="pa-input" id="pa-lt-input" placeholder="IATA / ICAO / 中文" oninput="_paLookupLocalTime(this.value)">
+          </div>
+          <div id="pa-localtime-result"></div>
           <div class="pa-tz-hint">👇 點選場站可帶入廣播詞目的地<br>Tap a station to set PA destination</div>
           <div class="pa-tz-list" id="pa-tz-list"></div>
         </div>
@@ -721,7 +725,7 @@ export function getSpaHtmlBody(): string {
       <button class="tab-util-btn tab-install-btn" id="tab-install-btn" onclick="showInstallGuide()" style="display:none">
         <span>📲</span>安裝
       </button>
-      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V5.007</span>
+      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V5.008</span>
     </div>
   </div>
 </div>
@@ -751,15 +755,15 @@ export function getSpaHtmlBody(): string {
       <div style="margin-bottom:4px">📱 建議使用 <b>iPad 橫向</b>操作以獲得最佳體驗</div>
       <div style="color:var(--muted)">Best experience on iPad in landscape mode</div>
     </div>
-    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V5.007</div>
+    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V5.008</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
-      <div>PA 工具時區機場擴充至 60+ 個航點（含 ICAO 代碼支援）、修正查無時區時殘留舊時間、航班查詢加入備援連線</div>
-      <div style="opacity:.7">Expanded PA timezone map to 60+ airports with ICAO code support; fixed stale local time display; added fallback connection for flight lookup</div>
+      <div>PA 廣播詞英中數字欄位自動連動、左面板新增 Local Time 查詢（支援 IATA/ICAO/中文，含日出日落）</div>
+      <div style="opacity:.7">PA script English/Chinese numeric fields now auto-sync; added Local Time lookup in left panel (IATA/ICAO/Chinese input, with sunrise/sunset)</div>
     </div>
-    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V5.006</div>
+    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V5.007</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:14px;line-height:1.5;text-align:left">
-      <div>搜尋提示改用醒目色、PA 航班查詢錯誤訊息優化</div>
-      <div style="opacity:.7">Search hint in accent color; improved PA flight lookup error messages</div>
+      <div>PA 時區機場擴充至 60+ 航點（含 ICAO 代碼支援）、修正查無時區時殘留舊時間、航班查詢備援連線</div>
+      <div style="opacity:.7">Expanded PA timezone map to 60+ airports with ICAO support; fixed stale local time; added fallback connection for flight lookup</div>
     </div>
     <button class="install-close-btn" onclick="closeAbout()">關閉</button>
   </div>
