@@ -271,14 +271,9 @@ export function getSpaHtmlBody(): string {
     <div class="pa-split">
       <!-- 左側：航班號 + 溫度換算 + 時區列表 -->
       <div class="pa-left">
-        <!-- 航班號 -->
-        <div class="pa-section">
-          <div class="pa-section-title">✈️ Flight No.</div>
-          <input type="text" id="pa-flt" class="pa-flt-input" placeholder="e.g. JX800 / 800" oninput="_paOnFltInput(this.value)">
-        </div>
         <!-- 溫度換算 -->
         <div class="pa-section">
-          <div class="pa-section-title">🌡️ Temperature</div>
+          <div class="pa-section-title">🌡️ 溫度換算 Temp Converter</div>
           <div class="pa-temp-row">
             <div class="pa-temp-field">
               <label>°C</label>
@@ -294,7 +289,7 @@ export function getSpaHtmlBody(): string {
         <!-- 時區列表 -->
         <div class="pa-section pa-tz-section">
           <div class="pa-section-title">🕐 Local Time</div>
-          <div class="pa-tz-hint">👆 點選場站可帶入廣播詞目的地<br>Tap a station to set PA destination</div>
+          <div class="pa-tz-hint">👇 點選場站可帶入廣播詞目的地<br>Tap a station to set PA destination</div>
           <div class="pa-tz-list" id="pa-tz-list"></div>
         </div>
       </div>
@@ -725,7 +720,7 @@ export function getSpaHtmlBody(): string {
       <button class="tab-util-btn tab-install-btn" id="tab-install-btn" onclick="showInstallGuide()" style="display:none">
         <span>📲</span>安裝
       </button>
-      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V5.003</span>
+      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V5.004</span>
     </div>
   </div>
 </div>
@@ -755,7 +750,12 @@ export function getSpaHtmlBody(): string {
       <div style="margin-bottom:4px">📱 建議使用 <b>iPad 橫向</b>操作以獲得最佳體驗</div>
       <div style="color:var(--muted)">Best experience on iPad in landscape mode</div>
     </div>
-    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V5.003</div>
+    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V5.004</div>
+    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
+      <div>航班號查詢加狀態回饋與錯誤提示、移除左側航班號欄位、左面板加寬、溫度標題修正</div>
+      <div style="opacity:.7">Flight lookup status feedback &amp; error handling; removed left panel flight input; wider left panel; temp section title fix</div>
+    </div>
+    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V5.003</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
       <div>航班號查詢自動帶入目的地、時區場站可點選、觸控區域加大</div>
       <div style="opacity:.7">Flight number lookup auto-fills destination; clickable timezone stations; larger touch targets</div>

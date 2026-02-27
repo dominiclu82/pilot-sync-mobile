@@ -206,6 +206,13 @@ function _paNormalizeFlt(val) {
   return s.replace(/\s/g, '');
 }
 
+function _paFltStatus(msg, type) {
+  var el = document.getElementById('pa-flt-status');
+  if (!el) return;
+  el.textContent = msg;
+  el.className = 'pa-flt-status' + (type ? ' pa-flt-' + type : '');
+}
+
 function _paOnFltInput(val) {
   _paGlobalFlt = val;
   // Sync across all data-pa="flt" fields in PA content
@@ -215,52 +222,71 @@ function _paOnFltInput(val) {
       if (document.activeElement !== inp) inp.value = val;
     });
   }
-  // Sync to left panel
-  var leftFlt = document.getElementById('pa-flt');
-  if (leftFlt && document.activeElement !== leftFlt) leftFlt.value = val;
   // Debounced FIDS lookup
   if (_paFltTimer) clearTimeout(_paFltTimer);
   var num = _paNormalizeFlt(val);
   if (num && /^\d+$/.test(num)) {
+    _paFltStatus('查詢中...', 'loading');
     _paFltTimer = setTimeout(function() { _paFltLookup(num); }, 500);
+  } else {
+    _paFltStatus('', '');
   }
 }
 
 function _paFltLookup(num) {
   var now = Date.now();
   if (_paFidsCache && now - _paFidsCacheTime < 120000) {
+    console.log('[PA-FLT] Using cache, dep=' + (_paFidsCache.dep || []).length + ' arr=' + (_paFidsCache.arr || []).length);
     _paMatchFlight(num);
     return;
   }
-  fetch('/api/fids').then(function(r) { return r.json(); }).then(function(data) {
+  console.log('[PA-FLT] Fetching /api/fids ...');
+  fetch('/api/fids').then(function(r) {
+    console.log('[PA-FLT] Response status=' + r.status);
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    return r.json();
+  }).then(function(data) {
+    console.log('[PA-FLT] Data received: dep=' + (data.dep || []).length + ' arr=' + (data.arr || []).length);
     _paFidsCache = data;
     _paFidsCacheTime = Date.now();
     _paMatchFlight(num);
-  }).catch(function() {});
+  }).catch(function(err) {
+    console.error('[PA-FLT] Fetch error:', err);
+    _paFltStatus('連線失敗', 'error');
+  });
 }
 
 function _paMatchFlight(num) {
   var data = _paFidsCache;
-  if (!data) return;
+  if (!data) { _paFltStatus('無資料', 'error'); return; }
   var dep = (data.dep || []).filter(function(f) { return f.ACode && f.ACode.trim() === 'JX'; });
   var arr = (data.arr || []).filter(function(f) { return f.ACode && f.ACode.trim() === 'JX'; });
+  console.log('[PA-FLT] Matching JX' + num + ' in dep=' + dep.length + ' arr=' + arr.length);
   var dest = '';
   for (var i = 0; i < dep.length; i++) {
-    if (dep[i].FlightNo && dep[i].FlightNo.replace(/\s/g, '') === num) {
+    var dFlt = dep[i].FlightNo ? dep[i].FlightNo.replace(/\s/g, '') : '';
+    if (dFlt === num) {
       dest = dep[i].CityCode || '';
+      console.log('[PA-FLT] Matched dep: FlightNo=' + dep[i].FlightNo + ' CityCode=' + dest);
       break;
     }
   }
   if (!dest) {
     for (var j = 0; j < arr.length; j++) {
-      if (arr[j].FlightNo && arr[j].FlightNo.replace(/\s/g, '') === num) {
+      var aFlt = arr[j].FlightNo ? arr[j].FlightNo.replace(/\s/g, '') : '';
+      if (aFlt === num) {
         dest = 'TPE';
+        console.log('[PA-FLT] Matched arr: FlightNo=' + arr[j].FlightNo);
         break;
       }
     }
   }
   if (dest) {
+    _paFltStatus('→ ' + dest, 'ok');
     _paOnDestInput(dest);
+  } else {
+    console.log('[PA-FLT] No match for JX' + num);
+    _paFltStatus('查無 JX' + num, 'warn');
   }
 }
 
@@ -346,7 +372,7 @@ var _paScripts = {};
 
 _paScripts.welcome = '<div class="pa-note">When all passengers are boarded, the CIC will inform the PIC to make a brief welcome PA.</div>' +
   '<div class="pa-lang">English</div>' +
-  '<div>"Hello everyone, this is Captain <input class="pa-input" placeholder="Full Name"> speaking. On behalf of <span class="pa-choice">[the cockpit crew / all the crew]</span>, welcome onboard STARLUX flight number <input class="pa-input" data-pa="flt" placeholder="e.g. JX800"> to <input class="pa-input" data-pa="dest" placeholder="e.g. LAX">. We should be ready for departure in <input class="pa-input pa-input-num" inputmode="numeric"> minutes. Our flight time is <input class="pa-input pa-input-num" inputmode="numeric"> hours and <input class="pa-input pa-input-num" inputmode="numeric"> minutes, with an initial cruising altitude of <input class="pa-input" inputmode="numeric" style="min-width:70px" placeholder="XX,XXX"> feet. Once again, please make yourself comfortable and enjoy the flight with us. Thank you."</div>' +
+  '<div>"Hello everyone, this is Captain <input class="pa-input" placeholder="Full Name"> speaking. On behalf of <span class="pa-choice">[the cockpit crew / all the crew]</span>, welcome onboard STARLUX flight number <input class="pa-input" data-pa="flt" placeholder="e.g. JX800"> <span id="pa-flt-status" class="pa-flt-status"></span> to <input class="pa-input" data-pa="dest" placeholder="e.g. LAX">. We should be ready for departure in <input class="pa-input pa-input-num" inputmode="numeric"> minutes. Our flight time is <input class="pa-input pa-input-num" inputmode="numeric"> hours and <input class="pa-input pa-input-num" inputmode="numeric"> minutes, with an initial cruising altitude of <input class="pa-input" inputmode="numeric" style="min-width:70px" placeholder="XX,XXX"> feet. Once again, please make yourself comfortable and enjoy the flight with us. Thank you."</div>' +
   '<div class="pa-lang">中文</div>' +
   '<div>「各位旅客大家好，我是機長 <input class="pa-input" placeholder="姓名">。代表<span class="pa-choice">[駕駛艙組員 / 全體組員]</span>，歡迎搭乘星宇航空 <input class="pa-input" data-pa="flt" placeholder="e.g. JX800"> 班機前往 <input class="pa-input" data-pa="dest" placeholder="e.g. LAX">。我們預計在 <input class="pa-input pa-input-num" inputmode="numeric"> 分鐘後出發。飛行時間約 <input class="pa-input pa-input-num" inputmode="numeric"> 小時 <input class="pa-input pa-input-num" inputmode="numeric"> 分鐘，初始巡航高度 <input class="pa-input" inputmode="numeric" style="min-width:70px"> 呎。再次祝您旅途愉快，謝謝。」</div>';
 

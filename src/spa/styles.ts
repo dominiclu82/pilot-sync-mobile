@@ -455,6 +455,11 @@ html:has(#tab-briefing.tab-active #briefing-coldtemp.active) #tab-briefing.tab-a
 .pa-flt-input{width:100%;padding:8px 10px;border:1.5px solid var(--dim);border-radius:8px;background:var(--surface);color:var(--text);font-size:.9em;font-weight:600;-webkit-appearance:none;appearance:none}
 .pa-flt-input:focus{border-color:var(--accent);outline:none}
 .pa-flt-input::placeholder{color:var(--dim);font-weight:400}
+.pa-flt-status{font-size:.72em;min-height:1.2em;margin-top:4px;transition:color .2s}
+.pa-flt-loading{color:var(--muted)}
+.pa-flt-ok{color:#22c55e;font-weight:600}
+.pa-flt-warn{color:#f59e0b}
+.pa-flt-error{color:#ef4444}
 .pa-cat-btns{display:flex;flex-wrap:wrap;gap:6px;padding:10px 14px;border-bottom:1px solid var(--dim);flex-shrink:0}
 .pa-cat-btn{padding:6px 12px;border:1.5px solid var(--dim);border-radius:8px;background:none;
   color:var(--muted);font-size:.75em;font-weight:600;cursor:pointer;white-space:nowrap;-webkit-appearance:none}
@@ -475,7 +480,7 @@ html:has(#tab-briefing.tab-active #briefing-coldtemp.active) #tab-briefing.tab-a
 .pa-input-num{min-width:30px;max-width:50px}
 @media(orientation:landscape) and (min-width:768px){
 .pa-split{flex-direction:row}
-.pa-left{width:340px;flex-shrink:0;border-bottom:none;border-right:1px solid var(--dim);max-height:none;overflow-y:auto}
+.pa-left{width:420px;flex-shrink:0;border-bottom:none;border-right:1px solid var(--dim);max-height:none;overflow-y:auto}
 .pa-right{flex:1}
 }
 `;
