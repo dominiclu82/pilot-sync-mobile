@@ -468,7 +468,7 @@ html:has(#tab-briefing.tab-active #briefing-coldtemp.active) #tab-briefing.tab-a
 .pa-input-num{min-width:30px;max-width:50px}
 @media(orientation:landscape) and (min-width:768px){
 .pa-split{flex-direction:row}
-.pa-left{width:280px;flex-shrink:0;border-bottom:none;border-right:1px solid var(--dim);max-height:none;overflow-y:auto}
+.pa-left{width:340px;flex-shrink:0;border-bottom:none;border-right:1px solid var(--dim);max-height:none;overflow-y:auto}
 .pa-right{flex:1}
 }
 `;

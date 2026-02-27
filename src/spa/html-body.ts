@@ -719,7 +719,7 @@ export function getSpaHtmlBody(): string {
       <button class="tab-util-btn tab-install-btn" id="tab-install-btn" onclick="showInstallGuide()" style="display:none">
         <span>📲</span>安裝
       </button>
-      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V5.001</span>
+      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V5.002</span>
     </div>
   </div>
 </div>
@@ -749,15 +749,15 @@ export function getSpaHtmlBody(): string {
       <div style="margin-bottom:4px">📱 建議使用 <b>iPad 橫向</b>操作以獲得最佳體驗</div>
       <div style="color:var(--muted)">Best experience on iPad in landscape mode</div>
     </div>
-    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V5.001</div>
+    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V5.002</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
+      <div>PA 廣播詞自動帶入（目的地/當地時間/溫度全面連動）、左側面板加寬</div>
+      <div style="opacity:.7">PA auto-fill (destination/local time/temperature sync across scripts); widened left panel</div>
+    </div>
+    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V5.001</div>
+    <div style="font-size:.72em;color:var(--muted);margin-bottom:14px;line-height:1.5;text-align:left">
       <div>新增 PA 工具（溫度換算、時區列表、9 類廣播詞範本）、簡報箱子頁籤重新排序</div>
       <div style="opacity:.7">Added PA Tools (temp converter, timezone list, 9 PA script categories); briefing sub-tab reordered</div>
-    </div>
-    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V4.059</div>
-    <div style="font-size:.72em;color:var(--muted);margin-bottom:14px;line-height:1.5;text-align:left">
-      <div>手機直向首次載入自動捲動至目的地欄位</div>
-      <div style="opacity:.7">Auto-scroll to destination column on first load (portrait mobile)</div>
     </div>
     <button class="install-close-btn" onclick="closeAbout()">關閉</button>
   </div>
