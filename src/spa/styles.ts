@@ -450,8 +450,9 @@ html:has(#tab-briefing.tab-active #briefing-coldtemp.active) #tab-briefing.tab-a
 .pa-tz-dst{color:#f59e0b;font-size:.85em}
 .pa-tz-row.pa-tz-utc-row{background:var(--dim);font-weight:700}
 .pa-tz-row.pa-tz-utc-row .pa-tz-stations{color:var(--accent)}
-.pa-lt-search{margin-bottom:6px}
-.pa-lt-search input{width:100%;padding:6px 10px;border:1.5px solid var(--dim);border-radius:8px;background:var(--surface);color:var(--text);font-size:.82em;-webkit-appearance:none;appearance:none;box-sizing:border-box}
+.pa-lt-search{margin-bottom:6px;position:relative}
+.pa-lt-search input{width:100%;padding:6px 70px 6px 10px;border:1.5px solid var(--dim);border-radius:8px;background:var(--surface);color:var(--text);font-size:.82em;-webkit-appearance:none;appearance:none;box-sizing:border-box}
+#pa-lt-status{position:absolute;right:10px;top:50%;transform:translateY(-50%);font-size:.75em;pointer-events:none}
 .pa-lt-search input:focus{border-color:var(--accent);outline:none}
 .pa-lt-search input::placeholder{color:var(--dim)}
 #pa-localtime-result{min-height:0}

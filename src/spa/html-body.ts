@@ -716,7 +716,7 @@ export function getSpaHtmlBody(): string {
       <button class="tab-util-btn tab-install-btn" id="tab-install-btn" onclick="showInstallGuide()" style="display:none">
         <span>📲</span>安裝
       </button>
-      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V5.013</span>
+      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V5.014</span>
     </div>
   </div>
 </div>
@@ -746,7 +746,12 @@ export function getSpaHtmlBody(): string {
       <div style="margin-bottom:4px">📱 建議使用 <b>iPad 橫向</b>操作以獲得最佳體驗</div>
       <div style="color:var(--muted)">Best experience on iPad in landscape mode</div>
     </div>
-    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V5.013</div>
+    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V5.014</div>
+    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
+      <div>查詢格航班狀態顯示移至輸入框內右側</div>
+      <div style="opacity:.7">Moved flight lookup status display inside query input field (right-aligned)</div>
+    </div>
+    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V5.013</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
       <div>修正 Local Time 查詢刪除航班號時殘留帶入廣播詞的問題；查無航班時清除目的地欄位；查詢格新增航班查詢狀態顯示</div>
       <div style="opacity:.7">Fixed Local Time query bug where deleting flight number re-triggered PA script fill; clear destination when flight not found; added flight lookup status display in query field</div>
