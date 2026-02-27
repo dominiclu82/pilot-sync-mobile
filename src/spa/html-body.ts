@@ -721,7 +721,7 @@ export function getSpaHtmlBody(): string {
       <button class="tab-util-btn tab-install-btn" id="tab-install-btn" onclick="showInstallGuide()" style="display:none">
         <span>📲</span>安裝
       </button>
-      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V5.006</span>
+      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V5.007</span>
     </div>
   </div>
 </div>
@@ -751,25 +751,15 @@ export function getSpaHtmlBody(): string {
       <div style="margin-bottom:4px">📱 建議使用 <b>iPad 橫向</b>操作以獲得最佳體驗</div>
       <div style="color:var(--muted)">Best experience on iPad in landscape mode</div>
     </div>
-    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V5.006</div>
+    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V5.007</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
-      <div>修復搜尋後排序按鈕消失、加排序提示、時區場站欄允許換行</div>
-      <div style="opacity:.7">Fixed sort buttons missing after search; added sort hint; timezone stations wrap when needed</div>
+      <div>PA 工具時區機場擴充至 60+ 個航點（含 ICAO 代碼支援）、修正查無時區時殘留舊時間、航班查詢加入備援連線</div>
+      <div style="opacity:.7">Expanded PA timezone map to 60+ airports with ICAO code support; fixed stale local time display; added fallback connection for flight lookup</div>
     </div>
-    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V5.004</div>
-    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
-      <div>航班號查詢加狀態回饋與錯誤提示、移除左側航班號欄位、左面板加寬、溫度標題修正</div>
-      <div style="opacity:.7">Flight lookup status feedback &amp; error handling; removed left panel flight input; wider left panel; temp section title fix</div>
-    </div>
-    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V5.003</div>
-    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
-      <div>航班號查詢自動帶入目的地、時區場站可點選、觸控區域加大</div>
-      <div style="opacity:.7">Flight number lookup auto-fills destination; clickable timezone stations; larger touch targets</div>
-    </div>
-    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V5.001</div>
+    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V5.006</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:14px;line-height:1.5;text-align:left">
-      <div>新增 PA 工具（溫度換算、時區列表、9 類廣播詞範本）、簡報箱子頁籤重新排序</div>
-      <div style="opacity:.7">Added PA Tools (temp converter, timezone list, 9 PA script categories); briefing sub-tab reordered</div>
+      <div>搜尋提示改用醒目色、PA 航班查詢錯誤訊息優化</div>
+      <div style="opacity:.7">Search hint in accent color; improved PA flight lookup error messages</div>
     </div>
     <button class="install-close-btn" onclick="closeAbout()">關閉</button>
   </div>

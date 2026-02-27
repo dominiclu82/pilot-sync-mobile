@@ -131,31 +131,113 @@ function paStartTzTimer() {
 
 // ── 目的地時區對應 ───────────────────────────────────────────────────────────
 var _paTzMap = {
+  // 台灣 UTC+8
   'TPE': { offset: 8, dst: false },
-  'LAX': { offset: -8, dst: true, dstOffset: -7, dstLabel: 'PDT' },
-  'SFO': { offset: -8, dst: true, dstOffset: -7, dstLabel: 'PDT' },
-  'SEA': { offset: -8, dst: true, dstOffset: -7, dstLabel: 'PDT' },
-  'PHX': { offset: -7, dst: false },
-  'DEN': { offset: -7, dst: true, dstOffset: -6, dstLabel: 'MDT' },
-  'PRG': { offset: 1, dst: true, dstOffset: 2, dstLabel: 'CEST' },
-  'BKK': { offset: 7, dst: false },
-  'SGN': { offset: 7, dst: false },
-  'CGK': { offset: 7, dst: false },
+  'KHH': { offset: 8, dst: false },
+  'TSA': { offset: 8, dst: false },
+  'RMQ': { offset: 8, dst: false },
+  // 港澳 UTC+8
   'HKG': { offset: 8, dst: false },
   'MFM': { offset: 8, dst: false },
-  'SIN': { offset: 8, dst: false },
+  // 日本 UTC+9
   'NRT': { offset: 9, dst: false },
+  'HND': { offset: 9, dst: false },
   'KIX': { offset: 9, dst: false },
   'CTS': { offset: 9, dst: false },
   'FUK': { offset: 9, dst: false },
-  'ICN': { offset: 9, dst: false }
+  'SDJ': { offset: 9, dst: false },
+  'OKA': { offset: 9, dst: false },
+  'KMJ': { offset: 9, dst: false },
+  'NGO': { offset: 9, dst: false },
+  'KOJ': { offset: 9, dst: false },
+  'AOJ': { offset: 9, dst: false },
+  'TAK': { offset: 9, dst: false },
+  'UKB': { offset: 9, dst: false },
+  // 韓國 UTC+9
+  'ICN': { offset: 9, dst: false },
+  'PUS': { offset: 9, dst: false },
+  'CJU': { offset: 9, dst: false },
+  // 菲律賓 UTC+8
+  'CRK': { offset: 8, dst: false },
+  'MNL': { offset: 8, dst: false },
+  'CEB': { offset: 8, dst: false },
+  // 泰國 UTC+7
+  'BKK': { offset: 7, dst: false },
+  'DMK': { offset: 7, dst: false },
+  'UTP': { offset: 7, dst: false },
+  'CNX': { offset: 7, dst: false },
+  // 越柬 UTC+7
+  'SGN': { offset: 7, dst: false },
+  'HAN': { offset: 7, dst: false },
+  'PQC': { offset: 7, dst: false },
+  'PNH': { offset: 7, dst: false },
+  'CXR': { offset: 7, dst: false },
+  'DAD': { offset: 7, dst: false },
+  // 印尼（雅加達/峇里島/泗水）
+  'CGK': { offset: 7, dst: false },
+  'DPS': { offset: 8, dst: false },
+  'SUB': { offset: 7, dst: false },
+  // 馬來西亞 UTC+8
+  'KUL': { offset: 8, dst: false },
+  'PEN': { offset: 8, dst: false },
+  'KCH': { offset: 8, dst: false },
+  // 新加坡 UTC+8
+  'SIN': { offset: 8, dst: false },
+  // 美國西岸 UTC-8 (DST: -7)
+  'LAX': { offset: -8, dst: true, dstOffset: -7, dstLabel: 'PDT' },
+  'SFO': { offset: -8, dst: true, dstOffset: -7, dstLabel: 'PDT' },
+  'SEA': { offset: -8, dst: true, dstOffset: -7, dstLabel: 'PDT' },
+  'ONT': { offset: -8, dst: true, dstOffset: -7, dstLabel: 'PDT' },
+  'OAK': { offset: -8, dst: true, dstOffset: -7, dstLabel: 'PDT' },
+  'PDX': { offset: -8, dst: true, dstOffset: -7, dstLabel: 'PDT' },
+  'SMF': { offset: -8, dst: true, dstOffset: -7, dstLabel: 'PDT' },
+  // 美國山區 UTC-7 (DST: -6)
+  'DEN': { offset: -7, dst: true, dstOffset: -6, dstLabel: 'MDT' },
+  'TUS': { offset: -7, dst: false },
+  'PHX': { offset: -7, dst: false },
+  'LAS': { offset: -8, dst: true, dstOffset: -7, dstLabel: 'PDT' },
+  // 阿拉斯加 UTC-9 (DST: -8)
+  'ANC': { offset: -9, dst: true, dstOffset: -8, dstLabel: 'AKDT' },
+  // 夏威夷 UTC-10
+  'HNL': { offset: -10, dst: false },
+  // 關島/塞班 UTC+10
+  'GUM': { offset: 10, dst: false },
+  'SPN': { offset: 10, dst: false },
+  // 加拿大 UTC-8 (DST: -7)
+  'YVR': { offset: -8, dst: true, dstOffset: -7, dstLabel: 'PDT' },
+  // 歐洲 CET UTC+1 (DST: +2)
+  'PRG': { offset: 1, dst: true, dstOffset: 2, dstLabel: 'CEST' },
+  'BER': { offset: 1, dst: true, dstOffset: 2, dstLabel: 'CEST' },
+  'MUC': { offset: 1, dst: true, dstOffset: 2, dstLabel: 'CEST' },
+  'WAW': { offset: 1, dst: true, dstOffset: 2, dstLabel: 'CEST' },
+  'LNZ': { offset: 1, dst: true, dstOffset: 2, dstLabel: 'CEST' },
+  'VIE': { offset: 1, dst: true, dstOffset: 2, dstLabel: 'CEST' }
+};
+
+var _paIcaoToIata = {
+  RCTP:'TPE',RCKH:'KHH',RCSS:'TSA',RCMQ:'RMQ',
+  VHHH:'HKG',VMMC:'MFM',
+  RJAA:'NRT',RJTT:'HND',RJBB:'KIX',RJCC:'CTS',RJFF:'FUK',RJSS:'SDJ',ROAH:'OKA',
+  RJFT:'KMJ',RJGG:'NGO',RJFK:'KOJ',RJSA:'AOJ',RJOT:'TAK',RJBE:'UKB',
+  RKSI:'ICN',RKPK:'PUS',RKPC:'CJU',
+  RPLC:'CRK',RPLL:'MNL',RPVM:'CEB',
+  VTBS:'BKK',VTBD:'DMK',VTBU:'UTP',VTCC:'CNX',
+  VVTS:'SGN',VVNB:'HAN',VVPQ:'PQC',VDPP:'PNH',VVCR:'CXR',VVDN:'DAD',
+  WIII:'CGK',WADD:'DPS',WARR:'SUB',WBGG:'KCH',WMKK:'KUL',WMKP:'PEN',
+  WSSS:'SIN',
+  KLAX:'LAX',KSFO:'SFO',KSEA:'SEA',KONT:'ONT',KOAK:'OAK',KPDX:'PDX',KSMF:'SMF',
+  KDEN:'DEN',KTUS:'TUS',KPHX:'PHX',KLAS:'LAS',
+  PANC:'ANC',PHNL:'HNL',PGUM:'GUM',PGSN:'SPN',
+  CYVR:'YVR',
+  LKPR:'PRG',EDDB:'BER',EDDM:'MUC',EPWA:'WAW',LOWL:'LNZ',LOWW:'VIE'
 };
 
 function _paGetDestTz(dest) {
   var upper = dest.toUpperCase().trim();
-  if (_paTzMap[upper]) return _paTzMap[upper];
+  var iata = _paIcaoToIata[upper] || upper;
+  if (_paTzMap[iata]) return _paTzMap[iata];
   for (var code in _paTzMap) {
-    if (upper.indexOf(code) !== -1) return _paTzMap[code];
+    if (iata.indexOf(code) !== -1) return _paTzMap[code];
   }
   return null;
 }
@@ -164,7 +246,7 @@ function _paCalcLocalTime(tz) {
   var now = new Date();
   var off = tz.offset;
   if (tz.dst) {
-    var isUS = (tz.dstLabel === 'PDT' || tz.dstLabel === 'MDT');
+    var isUS = (tz.dstLabel === 'PDT' || tz.dstLabel === 'MDT' || tz.dstLabel === 'AKDT');
     if (isUS && _paIsDST_US()) off = tz.dstOffset;
     if (tz.dstLabel === 'CEST' && _paIsDST_EU()) off = tz.dstOffset;
   }
@@ -233,6 +315,29 @@ function _paOnFltInput(val) {
   }
 }
 
+function _paFetchDirect() {
+  var ep = atob('aHR0cHM6Ly93d3cudGFveXVhbi1haXJwb3J0LmNvbS9hcGkvYXBpL2ZsaWdodC9hX2ZsaWdodA==');
+  var now = new Date();
+  var tw = new Date(now.getTime() + 8 * 3600000);
+  var odate = tw.getUTCFullYear() + '/' +
+    String(tw.getUTCMonth() + 1).padStart(2, '0') + '/' +
+    String(tw.getUTCDate()).padStart(2, '0');
+  var base = {
+    ODate: odate, OTimeOpen: null, OTimeClose: null,
+    BNO: null, AState: '', language: 'ch', keyword: ''
+  };
+  var hdrs = { 'Content-Type': 'application/json', 'Accept': 'application/json, text/plain, */*' };
+  return Promise.all([
+    fetch(ep, { method: 'POST', headers: hdrs, body: JSON.stringify(Object.assign({}, base, { AState: 'D' })) }),
+    fetch(ep, { method: 'POST', headers: hdrs, body: JSON.stringify(Object.assign({}, base, { AState: 'A' })) })
+  ]).then(function(res) {
+    if (!res[0].ok || !res[1].ok) throw new Error('HTTP ' + res[0].status + '/' + res[1].status);
+    return Promise.all([res[0].json(), res[1].json()]);
+  }).then(function(data) {
+    return { dep: data[0], arr: data[1], date: odate };
+  });
+}
+
 function _paFltLookup(num) {
   var now = Date.now();
   if (_paFidsCache && now - _paFidsCacheTime < 120000) {
@@ -251,8 +356,16 @@ function _paFltLookup(num) {
     _paFidsCacheTime = Date.now();
     _paMatchFlight(num);
   }).catch(function(err) {
-    console.error('[PA-FLT] Fetch error:', err);
-    _paFltStatus('連線失敗: ' + (err.message || err), 'error');
+    console.warn('[PA-FLT] Proxy failed, trying direct...', err);
+    _paFetchDirect().then(function(data) {
+      console.log('[PA-FLT] Direct OK: dep=' + (data.dep || []).length + ' arr=' + (data.arr || []).length);
+      _paFidsCache = data;
+      _paFidsCacheTime = Date.now();
+      _paMatchFlight(num);
+    }).catch(function(err2) {
+      console.error('[PA-FLT] Direct also failed:', err2);
+      _paFltStatus('連線失敗: ' + (err2.message || err2), 'error');
+    });
   });
 }
 
@@ -307,11 +420,19 @@ function _paOnDestInput(val) {
 
 function _paFillDescentTime() {
   var tz = _paGetDestTz(_paGlobalDest);
-  if (!tz) return;
-  var t = _paCalcLocalTime(tz);
   var el = document.getElementById('pa-content');
   if (!el) return;
   var q = function(s) { return el.querySelector('[data-pa="' + s + '"]'); };
+  if (!tz) {
+    var lt = q('local-time'); if (lt) lt.value = '';
+    var ltCn = q('local-time-cn'); if (ltCn) ltCn.value = '';
+    var ap = q('ampm-local'); if (ap) ap.textContent = '';
+    var apCn = q('ampm-local-cn'); if (apCn) apCn.textContent = '';
+    var dy = q('local-day'); if (dy) dy.value = '';
+    var dyCn = q('local-day-cn'); if (dyCn) dyCn.value = '';
+    return;
+  }
+  var t = _paCalcLocalTime(tz);
   var lt = q('local-time'); if (lt) lt.value = t.time12;
   var ltCn = q('local-time-cn'); if (ltCn) ltCn.value = t.time12;
   var ap = q('ampm-local'); if (ap) ap.textContent = t.ampm;
