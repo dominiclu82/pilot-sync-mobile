@@ -636,20 +636,21 @@ export function getSpaHtmlBody(): string {
     <div class="gi-search-bar">
       <span class="gi-search-label">輸入航班號 / 機場代碼 / 機場名搜尋</span>
       <input type="text" id="gate-search" class="gi-search-input" placeholder="搜尋..." oninput="filterGateFlights()">
+      <span class="gi-search-hint">點選「航班 / 出發地 / 目的地」欄位可排序</span>
     </div>
     <div id="gi-pinned-wrap" class="gi-pinned-wrap" style="display:none">
       <div id="gi-pinned-header" class="gi-pinned-header-bar"></div>
       <table class="gi-table gi-hide-time" id="gi-pinned-table">
         <thead>
           <tr>
-            <th class="gi-sticky-col">航班</th>
-            <th>出發地</th>
+            <th class="gi-sticky-col gi-sortable" onclick="giSort('fno')">航班</th>
+            <th class="gi-sortable" onclick="giSort('origin')">出發地</th>
             <th>Terminal</th>
             <th>Check-in</th>
             <th>Gate</th>
             <th class="gi-time-col">STD</th>
             <th class="gi-time-col">ATD</th>
-            <th>目的地</th>
+            <th class="gi-sortable" onclick="giSort('dest')">目的地</th>
             <th>Terminal</th>
             <th>Parking</th>
             <th>轉盤</th>
@@ -720,7 +721,7 @@ export function getSpaHtmlBody(): string {
       <button class="tab-util-btn tab-install-btn" id="tab-install-btn" onclick="showInstallGuide()" style="display:none">
         <span>📲</span>安裝
       </button>
-      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V5.004</span>
+      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V5.005</span>
     </div>
   </div>
 </div>
@@ -750,7 +751,12 @@ export function getSpaHtmlBody(): string {
       <div style="margin-bottom:4px">📱 建議使用 <b>iPad 橫向</b>操作以獲得最佳體驗</div>
       <div style="color:var(--muted)">Best experience on iPad in landscape mode</div>
     </div>
-    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V5.004</div>
+    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V5.005</div>
+    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
+      <div>修復搜尋後排序按鈕消失、加排序提示、時區場站欄允許換行</div>
+      <div style="opacity:.7">Fixed sort buttons missing after search; added sort hint; timezone stations wrap when needed</div>
+    </div>
+    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V5.004</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
       <div>航班號查詢加狀態回饋與錯誤提示、移除左側航班號欄位、左面板加寬、溫度標題修正</div>
       <div style="opacity:.7">Flight lookup status feedback &amp; error handling; removed left panel flight input; wider left panel; temp section title fix</div>

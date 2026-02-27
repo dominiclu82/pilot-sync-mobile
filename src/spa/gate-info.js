@@ -323,16 +323,18 @@ function giSort(key) {
     giSortKey = key;
     giSortAsc = true;
   }
-  // Update header indicators
-  var ths = document.querySelectorAll('#gi-table thead th.gi-sortable');
-  ths.forEach(function(th) {
+  // Update header indicators on both tables
+  var allThs = document.querySelectorAll('#gi-table thead th.gi-sortable, #gi-pinned-table thead th.gi-sortable');
+  allThs.forEach(function(th) {
     th.classList.remove('gi-sort-asc', 'gi-sort-desc');
   });
-  var labels = { fno: 0, origin: 1, dest: 2 };
-  var idx = labels[key];
-  if (idx !== undefined && ths[idx]) {
-    ths[idx].classList.add(giSortAsc ? 'gi-sort-asc' : 'gi-sort-desc');
-  }
+  var cls = giSortAsc ? 'gi-sort-asc' : 'gi-sort-desc';
+  allThs.forEach(function(th) {
+    var onclick = th.getAttribute('onclick') || '';
+    if (onclick.indexOf("'" + key + "'") >= 0) {
+      th.classList.add(cls);
+    }
+  });
   renderGateFlights();
 }
 

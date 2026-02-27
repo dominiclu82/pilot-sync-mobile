@@ -384,6 +384,7 @@ html:has(#tab-briefing.tab-active #briefing-coldtemp.active) #tab-briefing.tab-a
   font-weight:600;-webkit-appearance:none}
 .gi-search-input::placeholder{color:var(--dim);font-weight:400;font-size:.85em}
 .gi-search-input:focus{border-color:var(--accent)}
+.gi-search-hint{font-size:.6em;color:var(--muted);opacity:.7;margin-left:8px;white-space:nowrap}
 .gi-status{text-align:center;padding:32px 16px;color:var(--muted);font-size:.88em}
 .gi-table-wrap{flex:1;overflow:auto;-webkit-overflow-scrolling:touch;min-height:0;overscroll-behavior:none}
 .gi-table{table-layout:fixed;border-collapse:collapse;font-size:.75em;width:100%;min-width:900px}
@@ -441,7 +442,7 @@ html:has(#tab-briefing.tab-active #briefing-coldtemp.active) #tab-briefing.tab-a
 .pa-tz-list{display:flex;flex-direction:column;gap:1px}
 .pa-tz-row{display:flex;align-items:center;padding:5px 8px;border-radius:6px;font-size:.78em;font-weight:500}
 .pa-tz-row:nth-child(odd){background:var(--surface)}
-.pa-tz-stations{flex:0 0 120px;color:var(--text);font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pa-tz-stations{flex:1;min-width:0;color:var(--text);font-weight:600}
 .pa-tz-date{flex:0 0 90px;color:var(--muted)}
 .pa-tz-time{flex:0 0 50px;color:var(--accent);font-weight:700;font-variant-numeric:tabular-nums}
 .pa-tz-utc{flex:0 0 55px;color:var(--muted);font-size:.9em}
