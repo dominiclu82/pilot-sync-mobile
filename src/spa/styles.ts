@@ -384,7 +384,7 @@ html:has(#tab-briefing.tab-active #briefing-coldtemp.active) #tab-briefing.tab-a
   font-weight:600;-webkit-appearance:none}
 .gi-search-input::placeholder{color:var(--dim);font-weight:400;font-size:.85em}
 .gi-search-input:focus{border-color:var(--accent)}
-.gi-search-hint{font-size:.6em;color:var(--muted);opacity:.7;margin-left:8px;white-space:nowrap}
+.gi-search-hint{font-size:.6em;color:var(--accent);margin-left:8px;white-space:nowrap}
 .gi-status{text-align:center;padding:32px 16px;color:var(--muted);font-size:.88em}
 .gi-table-wrap{flex:1;overflow:auto;-webkit-overflow-scrolling:touch;min-height:0;overscroll-behavior:none}
 .gi-table{table-layout:fixed;border-collapse:collapse;font-size:.75em;width:100%;min-width:900px}

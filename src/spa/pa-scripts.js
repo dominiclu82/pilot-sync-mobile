@@ -252,7 +252,7 @@ function _paFltLookup(num) {
     _paMatchFlight(num);
   }).catch(function(err) {
     console.error('[PA-FLT] Fetch error:', err);
-    _paFltStatus('連線失敗', 'error');
+    _paFltStatus('連線失敗: ' + (err.message || err), 'error');
   });
 }
 
