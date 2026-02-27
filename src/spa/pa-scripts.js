@@ -301,12 +301,77 @@ function _paSunTimes(lat, lon, utcOffset) {
 
 // ── Local Time 查詢 ──────────────────────────────────────────────────────────
 var _paLocalTimeTimer = null;
+function _paFltToDest(num) {
+  if (!_paFidsCache) return null;
+  var dep = (_paFidsCache.dep || []).filter(function(f) { return f.ACode && f.ACode.trim() === 'JX'; });
+  var arr = (_paFidsCache.arr || []).filter(function(f) { return f.ACode && f.ACode.trim() === 'JX'; });
+  for (var i = 0; i < dep.length; i++) {
+    var dFlt = dep[i].FlightNo ? dep[i].FlightNo.replace(/\s/g, '') : '';
+    if (dFlt === num) return dep[i].CityCode || null;
+  }
+  for (var j = 0; j < arr.length; j++) {
+    var aFlt = arr[j].FlightNo ? arr[j].FlightNo.replace(/\s/g, '') : '';
+    if (aFlt === num) return 'TPE';
+  }
+  return null;
+}
+
 function _paLookupLocalTime(input) {
-  var code = _paResolveAirport(input);
   var resultEl = document.getElementById('pa-localtime-result');
   if (!resultEl) return;
-  if (!code) { resultEl.innerHTML = ''; return; }
+  if (!input.trim()) { resultEl.innerHTML = ''; return; }
+  // 先嘗試機場查詢
+  var code = _paResolveAirport(input);
+  if (code && _paTzMap[code]) {
+    _paOnDestInput(code);
+    _paShowLocalTime(code);
+    return;
+  }
+  // 嘗試航班號查詢
+  var num = _paNormalizeFlt(input);
+  if (num && /^\d+$/.test(num)) {
+    _paOnFltInput('JX' + num);
+    // 有快取就直接查
+    if (_paFidsCache) {
+      var dest = _paFltToDest(num);
+      if (dest) { _paOnDestInput(dest); _paShowLocalTime(dest); return; }
+    }
+    // 沒快取就 fetch
+    resultEl.innerHTML = '<div class="pa-lt-loading">查詢中...</div>';
+    _paFltLookupForLT(num);
+    return;
+  }
+  resultEl.innerHTML = '';
+}
+
+function _paFltLookupForLT(num) {
+  var doMatch = function() {
+    var dest = _paFltToDest(num);
+    var resultEl = document.getElementById('pa-localtime-result');
+    if (!resultEl) return;
+    if (dest) { _paOnDestInput(dest); _paShowLocalTime(dest); }
+    else { resultEl.innerHTML = '<div class="pa-lt-loading">查無 JX' + num + '</div>'; }
+  };
+  if (_paFidsCache && Date.now() - _paFidsCacheTime < 120000) { doMatch(); return; }
+  fetch('/api/fids').then(function(r) {
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    return r.json();
+  }).then(function(data) {
+    _paFidsCache = data; _paFidsCacheTime = Date.now(); doMatch();
+  }).catch(function() {
+    _paFetchDirect().then(function(data) {
+      _paFidsCache = data; _paFidsCacheTime = Date.now(); doMatch();
+    }).catch(function() {
+      var resultEl = document.getElementById('pa-localtime-result');
+      if (resultEl) resultEl.innerHTML = '<div class="pa-lt-loading">連線失敗</div>';
+    });
+  });
+}
+
+function _paShowLocalTime(code) {
   var tz = _paTzMap[code];
+  var resultEl = document.getElementById('pa-localtime-result');
+  if (!resultEl) return;
   if (!tz) { resultEl.innerHTML = ''; return; }
   _paUpdateLocalTimeDisplay(code, tz);
   if (_paLocalTimeTimer) clearInterval(_paLocalTimeTimer);
@@ -473,35 +538,12 @@ function _paFltLookup(num) {
 }
 
 function _paMatchFlight(num) {
-  var data = _paFidsCache;
-  if (!data) { _paFltStatus('無資料', 'error'); return; }
-  var dep = (data.dep || []).filter(function(f) { return f.ACode && f.ACode.trim() === 'JX'; });
-  var arr = (data.arr || []).filter(function(f) { return f.ACode && f.ACode.trim() === 'JX'; });
-  console.log('[PA-FLT] Matching JX' + num + ' in dep=' + dep.length + ' arr=' + arr.length);
-  var dest = '';
-  for (var i = 0; i < dep.length; i++) {
-    var dFlt = dep[i].FlightNo ? dep[i].FlightNo.replace(/\s/g, '') : '';
-    if (dFlt === num) {
-      dest = dep[i].CityCode || '';
-      console.log('[PA-FLT] Matched dep: FlightNo=' + dep[i].FlightNo + ' CityCode=' + dest);
-      break;
-    }
-  }
-  if (!dest) {
-    for (var j = 0; j < arr.length; j++) {
-      var aFlt = arr[j].FlightNo ? arr[j].FlightNo.replace(/\s/g, '') : '';
-      if (aFlt === num) {
-        dest = 'TPE';
-        console.log('[PA-FLT] Matched arr: FlightNo=' + arr[j].FlightNo);
-        break;
-      }
-    }
-  }
+  if (!_paFidsCache) { _paFltStatus('無資料', 'error'); return; }
+  var dest = _paFltToDest(num);
   if (dest) {
     _paFltStatus('→ ' + dest, 'ok');
     _paOnDestInput(dest);
   } else {
-    console.log('[PA-FLT] No match for JX' + num);
     _paFltStatus('查無 JX' + num, 'warn');
   }
 }

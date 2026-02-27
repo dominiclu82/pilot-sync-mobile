@@ -457,6 +457,7 @@ html:has(#tab-briefing.tab-active #briefing-coldtemp.active) #tab-briefing.tab-a
 #pa-localtime-result{min-height:0}
 .pa-lt-row{background:var(--dim);margin-bottom:4px}
 .pa-lt-sun{font-size:.85em}
+.pa-lt-loading{font-size:.75em;color:var(--muted);padding:4px 0}
 .pa-tz-hint{font-size:.68em;color:var(--accent);padding:12px 0;line-height:1.5}
 .pa-tz-link{cursor:pointer;border-bottom:1px dashed var(--muted);transition:color .15s;padding:4px 6px;display:inline-block;border-radius:4px}
 .pa-tz-link:hover{color:var(--accent);background:rgba(59,130,246,.08)}

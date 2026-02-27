@@ -263,6 +263,7 @@ export function getSpaHtmlBody(): string {
         <!-- 溫度換算 -->
         <div class="pa-section">
           <div class="pa-section-title">🌡️ 溫度換算 Temp Converter</div>
+          <div class="pa-temp-hint">輸入溫度自動換算並帶入廣播詞<br>Auto-converts and fills into PA script</div>
           <div class="pa-temp-row">
             <div class="pa-temp-field">
               <label>°C</label>
@@ -274,16 +275,15 @@ export function getSpaHtmlBody(): string {
               <input type="number" id="pa-temp-f" inputmode="decimal" placeholder="—" oninput="paConvertTemp('f')">
             </div>
           </div>
-          <div class="pa-temp-hint">輸入溫度自動換算並帶入廣播詞<br>Auto-converts and fills into PA script</div>
         </div>
         <!-- 時區列表 -->
         <div class="pa-section pa-tz-section">
-          <div class="pa-section-title">🕐 Local Time</div>
+          <div class="pa-section-title">🕐 Local Time Query</div>
+          <div class="pa-tz-hint">👇 輸入航班號或點選場站，自動帶入目的地及當地時間<br>Enter flight number or tap a station to auto-fill destination &amp; local time</div>
           <div class="pa-lt-search">
-            <input class="pa-input" id="pa-lt-input" placeholder="IATA / ICAO / 中文" oninput="_paLookupLocalTime(this.value)">
+            <input class="pa-input" id="pa-lt-input" placeholder="e.g. JX012 / LAX / KLAX / 洛杉磯" oninput="_paLookupLocalTime(this.value)">
           </div>
           <div id="pa-localtime-result"></div>
-          <div class="pa-tz-hint">👇 點選場站或輸入航班號，自動帶入目的地及當地時間<br>Tap a station or enter flight number to auto-fill destination &amp; local time</div>
           <div class="pa-tz-list" id="pa-tz-list"></div>
         </div>
       </div>
@@ -715,7 +715,7 @@ export function getSpaHtmlBody(): string {
       <button class="tab-util-btn tab-install-btn" id="tab-install-btn" onclick="showInstallGuide()" style="display:none">
         <span>📲</span>安裝
       </button>
-      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V5.011</span>
+      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V5.012</span>
     </div>
   </div>
 </div>
@@ -745,15 +745,15 @@ export function getSpaHtmlBody(): string {
       <div style="margin-bottom:4px">📱 建議使用 <b>iPad 橫向</b>操作以獲得最佳體驗</div>
       <div style="color:var(--muted)">Best experience on iPad in landscape mode</div>
     </div>
-    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V5.011</div>
+    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V5.012</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
+      <div>Local Time 查詢支援航班號輸入，自動帶入廣播詞目的地及航班號</div>
+      <div style="opacity:.7">Local Time Query now supports flight number input; auto-fills PA destination &amp; flight number</div>
+    </div>
+    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V5.010</div>
+    <div style="font-size:.72em;color:var(--muted);margin-bottom:14px;line-height:1.5;text-align:left">
       <div>PA 工具開放使用（移除密碼鎖）、修正航班號前導零比對、上方 Tab 列固定不可拖動</div>
       <div style="opacity:.7">PA Tools now open (removed password lock); fixed flight number leading zero matching; locked tab bar from dragging</div>
-    </div>
-    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V5.009</div>
-    <div style="font-size:.72em;color:var(--muted);margin-bottom:14px;line-height:1.5;text-align:left">
-      <div>Local Time 查詢結果對齊時區列表格式、提示文字更新、左面板間距優化</div>
-      <div style="opacity:.7">Local Time result aligned with timezone list layout; updated hint text; improved left panel spacing</div>
     </div>
     <button class="install-close-btn" onclick="closeAbout()">關閉</button>
   </div>
