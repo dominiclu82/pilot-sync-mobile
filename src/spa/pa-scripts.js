@@ -313,27 +313,35 @@ function _paLookupLocalTime(input) {
   _paLocalTimeTimer = setInterval(function() { _paUpdateLocalTimeDisplay(code, tz); }, 30000);
 }
 
-function _paUpdateLocalTimeDisplay(code, tz) {
+function _paUpdateLocalTimeDisplay(_, tz) {
   var resultEl = document.getElementById('pa-localtime-result');
   if (!resultEl) return;
-  var t = _paCalcLocalTime(tz);
+  var now = new Date();
   var off = tz.offset;
   if (tz.dst) {
     var isUS = (tz.dstLabel === 'PDT' || tz.dstLabel === 'MDT' || tz.dstLabel === 'AKDT');
     if (isUS && _paIsDST_US()) off = tz.dstOffset;
     if (tz.dstLabel === 'CEST' && _paIsDST_EU()) off = tz.dstOffset;
   }
+  var local = new Date(now.getTime() + off * 3600000);
+  var days = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  var mm = String(local.getUTCMonth() + 1).padStart(2, '0');
+  var dd = String(local.getUTCDate()).padStart(2, '0');
+  var day = days[local.getUTCDay()];
+  var hh = String(local.getUTCHours()).padStart(2, '0');
+  var mi = String(local.getUTCMinutes()).padStart(2, '0');
   var utcStr = 'UTC' + (off >= 0 ? '+' : '') + off;
-  var html = '<div class="pa-lt-code">' + code + ' <span class="pa-lt-utc">' + utcStr + '</span></div>';
-  html += '<div class="pa-lt-time">' + t.ampmCn + ' ' + t.time12 + '</div>';
-  html += '<div class="pa-lt-day">' + t.dayCn + '</div>';
+  var sunHtml = '';
   if (tz.lat !== undefined) {
     var sun = _paSunTimes(tz.lat, tz.lon, off);
-    if (sun) {
-      html += '<div class="pa-lt-sun">☀️ ' + sun.rise + ' 🌙 ' + sun.set + '</div>';
-    }
+    if (sun) sunHtml = '☀️' + sun.rise + ' 🌙' + sun.set;
   }
-  resultEl.innerHTML = html;
+  resultEl.innerHTML = '<div class="pa-tz-row pa-lt-row">' +
+    '<span class="pa-tz-stations pa-lt-sun">' + sunHtml + '</span>' +
+    '<span class="pa-tz-date">' + mm + '/' + dd + ' ' + day + '</span>' +
+    '<span class="pa-tz-time">' + hh + ':' + mi + '</span>' +
+    '<span class="pa-tz-utc">' + utcStr + '</span>' +
+    '</div>';
 }
 
 function _paCalcLocalTime(tz) {

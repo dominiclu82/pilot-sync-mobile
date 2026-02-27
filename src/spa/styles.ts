@@ -428,7 +428,7 @@ html:has(#tab-briefing.tab-active #briefing-coldtemp.active) #tab-briefing.tab-a
 .pa-split{display:flex;flex-direction:column;height:100%;overflow:hidden}
 .pa-left{padding:12px 14px;border-bottom:1px solid var(--dim);flex-shrink:0;overflow-y:auto;max-height:45%}
 .pa-right{flex:1;display:flex;flex-direction:column;min-height:0;overflow:hidden}
-.pa-section{margin-bottom:12px}
+.pa-section{margin-bottom:20px}
 .pa-section:last-child{margin-bottom:0}
 .pa-section-title{font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:8px}
 .pa-temp-row{display:flex;align-items:center;gap:10px}
@@ -449,17 +449,14 @@ html:has(#tab-briefing.tab-active #briefing-coldtemp.active) #tab-briefing.tab-a
 .pa-tz-dst{color:#f59e0b;font-size:.85em}
 .pa-tz-row.pa-tz-utc-row{background:var(--dim);font-weight:700}
 .pa-tz-row.pa-tz-utc-row .pa-tz-stations{color:var(--accent)}
-.pa-lt-search{margin-bottom:8px}
+.pa-lt-search{margin-bottom:6px}
 .pa-lt-search input{width:100%;padding:6px 10px;border:1.5px solid var(--dim);border-radius:8px;background:var(--surface);color:var(--text);font-size:.82em;-webkit-appearance:none;appearance:none;box-sizing:border-box}
 .pa-lt-search input:focus{border-color:var(--accent);outline:none}
 .pa-lt-search input::placeholder{color:var(--dim)}
-#pa-localtime-result{margin-bottom:8px;min-height:0}
-.pa-lt-code{font-size:.82em;font-weight:700;color:var(--text)}
-.pa-lt-utc{font-weight:400;color:var(--muted);font-size:.9em}
-.pa-lt-time{font-size:1.3em;font-weight:700;color:var(--accent);line-height:1.4}
-.pa-lt-day{font-size:.72em;color:var(--muted);margin-bottom:2px}
-.pa-lt-sun{font-size:.72em;color:var(--muted)}
-.pa-tz-hint{font-size:.68em;color:var(--muted);padding:2px 0 6px;line-height:1.5}
+#pa-localtime-result{min-height:0}
+.pa-lt-row{background:var(--dim);margin-bottom:4px}
+.pa-lt-sun{font-size:.85em}
+.pa-tz-hint{font-size:.68em;color:var(--accent);padding:12px 0;line-height:1.5}
 .pa-tz-link{cursor:pointer;border-bottom:1px dashed var(--muted);transition:color .15s;padding:4px 6px;display:inline-block;border-radius:4px}
 .pa-tz-link:hover{color:var(--accent);background:rgba(59,130,246,.08)}
 .pa-tz-link.pa-tz-selected{color:var(--accent);border-bottom-color:var(--accent);border-bottom-style:solid;background:rgba(59,130,246,.1)}
