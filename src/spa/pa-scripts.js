@@ -10,6 +10,7 @@ var _paListenersReady = false;
 var _paFidsCache = null;
 var _paFidsCacheTime = 0;
 var _paFltTimer = null;
+var _paLtTimer = null;
 
 // ── 溫度換算 ─────────────────────────────────────────────────────────────────
 function paConvertTemp(from) {
@@ -316,32 +317,51 @@ function _paFltToDest(num) {
   return null;
 }
 
+function _paLtStatus(msg, type) {
+  var el = document.getElementById('pa-lt-status');
+  if (!el) return;
+  el.textContent = msg;
+  el.className = 'pa-flt-status' + (type ? ' pa-flt-' + type : '');
+}
+
 function _paLookupLocalTime(input) {
+  if (_paLtTimer) clearTimeout(_paLtTimer);
   var resultEl = document.getElementById('pa-localtime-result');
   if (!resultEl) return;
-  if (!input.trim()) { resultEl.innerHTML = ''; return; }
-  // 先嘗試機場查詢
+  // 清空時：清除 PA 欄位 + 結果 + 狀態
+  if (!input.trim()) {
+    resultEl.innerHTML = '';
+    _paOnFltInput('');
+    _paOnDestInput('');
+    _paFltStatus('', '');
+    _paLtStatus('', '');
+    return;
+  }
+  // 先嘗試機場查詢（不需 debounce，即時回應）
   var code = _paResolveAirport(input);
   if (code && _paTzMap[code]) {
+    _paLtStatus('', '');
     _paOnDestInput(code);
     _paShowLocalTime(code);
     return;
   }
-  // 嘗試航班號查詢
-  var num = _paNormalizeFlt(input);
-  if (num && /^\d+$/.test(num)) {
-    _paOnFltInput('JX' + num);
-    // 有快取就直接查
-    if (_paFidsCache) {
-      var dest = _paFltToDest(num);
-      if (dest) { _paOnDestInput(dest); _paShowLocalTime(dest); return; }
+  // 航班號查詢用 debounce，避免刪除過程中逐字觸發
+  _paLtTimer = setTimeout(function() {
+    var num = _paNormalizeFlt(input);
+    if (num && /^\d+$/.test(num)) {
+      _paOnFltInput('JX' + num);
+      _paLtStatus('查詢中...', 'loading');
+      if (_paFidsCache) {
+        var dest = _paFltToDest(num);
+        if (dest) { _paLtStatus('→ ' + dest, 'ok'); _paOnDestInput(dest); _paShowLocalTime(dest); return; }
+      }
+      resultEl.innerHTML = '<div class="pa-lt-loading">查詢中...</div>';
+      _paFltLookupForLT(num);
+    } else {
+      resultEl.innerHTML = '';
+      _paLtStatus('', '');
     }
-    // 沒快取就 fetch
-    resultEl.innerHTML = '<div class="pa-lt-loading">查詢中...</div>';
-    _paFltLookupForLT(num);
-    return;
-  }
-  resultEl.innerHTML = '';
+  }, 300);
 }
 
 function _paFltLookupForLT(num) {
@@ -349,8 +369,8 @@ function _paFltLookupForLT(num) {
     var dest = _paFltToDest(num);
     var resultEl = document.getElementById('pa-localtime-result');
     if (!resultEl) return;
-    if (dest) { _paOnDestInput(dest); _paShowLocalTime(dest); }
-    else { resultEl.innerHTML = '<div class="pa-lt-loading">查無 JX' + num + '</div>'; }
+    if (dest) { _paLtStatus('→ ' + dest, 'ok'); _paOnDestInput(dest); _paShowLocalTime(dest); }
+    else { _paLtStatus('查無 JX' + num, 'warn'); resultEl.innerHTML = ''; _paOnDestInput(''); }
   };
   if (_paFidsCache && Date.now() - _paFidsCacheTime < 120000) { doMatch(); return; }
   fetch('/api/fids').then(function(r) {
@@ -362,8 +382,7 @@ function _paFltLookupForLT(num) {
     _paFetchDirect().then(function(data) {
       _paFidsCache = data; _paFidsCacheTime = Date.now(); doMatch();
     }).catch(function() {
-      var resultEl = document.getElementById('pa-localtime-result');
-      if (resultEl) resultEl.innerHTML = '<div class="pa-lt-loading">連線失敗</div>';
+      _paLtStatus('連線失敗', 'error');
     });
   });
 }
@@ -451,8 +470,10 @@ function _paTzSelectStation(code) {
 // ── 航班號查詢 ─────────────────────────────────────────────────────────────────
 function _paNormalizeFlt(val) {
   var s = val.trim().toUpperCase();
+  if (!s) return '';
   s = s.replace(/^SJX/, '').replace(/^JX/, '');
   s = s.replace(/\s/g, '');
+  if (!s) return '';
   return s.replace(/^0+/, '') || '0';
 }
 
@@ -545,6 +566,7 @@ function _paMatchFlight(num) {
     _paOnDestInput(dest);
   } else {
     _paFltStatus('查無 JX' + num, 'warn');
+    _paOnDestInput('');
   }
 }
 

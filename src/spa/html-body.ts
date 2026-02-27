@@ -282,6 +282,7 @@ export function getSpaHtmlBody(): string {
           <div class="pa-tz-hint">👇 輸入航班號或點選場站，自動帶入目的地及當地時間<br>Enter flight number or tap a station to auto-fill destination &amp; local time</div>
           <div class="pa-lt-search">
             <input class="pa-input" id="pa-lt-input" placeholder="e.g. JX2 / SJX002 / 002 / LAX / KLAX / 洛杉磯" oninput="_paLookupLocalTime(this.value)">
+            <span id="pa-lt-status" class="pa-flt-status"></span>
           </div>
           <div id="pa-localtime-result"></div>
           <div class="pa-tz-list" id="pa-tz-list"></div>
@@ -715,7 +716,7 @@ export function getSpaHtmlBody(): string {
       <button class="tab-util-btn tab-install-btn" id="tab-install-btn" onclick="showInstallGuide()" style="display:none">
         <span>📲</span>安裝
       </button>
-      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V5.012</span>
+      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V5.013</span>
     </div>
   </div>
 </div>
@@ -745,7 +746,12 @@ export function getSpaHtmlBody(): string {
       <div style="margin-bottom:4px">📱 建議使用 <b>iPad 橫向</b>操作以獲得最佳體驗</div>
       <div style="color:var(--muted)">Best experience on iPad in landscape mode</div>
     </div>
-    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V5.012</div>
+    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V5.013</div>
+    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
+      <div>修正 Local Time 查詢刪除航班號時殘留帶入廣播詞的問題；查無航班時清除目的地欄位；查詢格新增航班查詢狀態顯示</div>
+      <div style="opacity:.7">Fixed Local Time query bug where deleting flight number re-triggered PA script fill; clear destination when flight not found; added flight lookup status display in query field</div>
+    </div>
+    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V5.012</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
       <div>Local Time 查詢支援航班號輸入，自動帶入廣播詞目的地及航班號</div>
       <div style="opacity:.7">Local Time Query now supports flight number input; auto-fills PA destination &amp; flight number</div>
