@@ -257,17 +257,6 @@ export function getSpaHtmlBody(): string {
 
   <!-- ── 🎙️ PA 工具 panel ── -->
   <div id="briefing-pa" class="briefing-panel" style="position:relative">
-    <div class="dt-lock-overlay" id="pa-lock-overlay">
-      <div class="dt-lock-card">
-        <div class="dt-lock-icon">🔒</div>
-        <div class="dt-lock-title">PA Tools</div>
-        <div class="dt-lock-sub">請輸入密碼以繼續</div>
-        <input class="dt-lock-input" type="password" id="pa-lock-pw" placeholder="••••••••" maxlength="16"
-          onkeydown="if(event.key==='Enter')paUnlock()">
-        <button class="dt-lock-btn" onclick="paUnlock()">解鎖</button>
-        <div class="dt-lock-err" id="pa-lock-err"></div>
-      </div>
-    </div>
     <div class="pa-split">
       <!-- 左側：航班號 + 溫度換算 + 時區列表 -->
       <div class="pa-left">
@@ -725,7 +714,7 @@ export function getSpaHtmlBody(): string {
       <button class="tab-util-btn tab-install-btn" id="tab-install-btn" onclick="showInstallGuide()" style="display:none">
         <span>📲</span>安裝
       </button>
-      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V5.009</span>
+      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V5.010</span>
     </div>
   </div>
 </div>
@@ -755,15 +744,15 @@ export function getSpaHtmlBody(): string {
       <div style="margin-bottom:4px">📱 建議使用 <b>iPad 橫向</b>操作以獲得最佳體驗</div>
       <div style="color:var(--muted)">Best experience on iPad in landscape mode</div>
     </div>
-    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V5.009</div>
+    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V5.010</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
-      <div>Local Time 查詢結果改為與時區列表同格式排列、提示文字更新、左面板間距優化</div>
-      <div style="opacity:.7">Local Time result aligned with timezone list layout; updated hint text; improved left panel spacing</div>
+      <div>PA 工具開放使用（移除密碼鎖）、修正航班號前導零比對、上方 Tab 列固定不可拖動</div>
+      <div style="opacity:.7">PA Tools now open (removed password lock); fixed flight number leading zero matching; locked tab bar from dragging</div>
     </div>
-    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V5.008</div>
+    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V5.009</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:14px;line-height:1.5;text-align:left">
-      <div>PA 廣播詞英中數字欄位自動連動、左面板新增 Local Time 查詢（含日出日落）</div>
-      <div style="opacity:.7">PA script English/Chinese numeric fields now auto-sync; added Local Time lookup with sunrise/sunset</div>
+      <div>Local Time 查詢結果對齊時區列表格式、提示文字更新、左面板間距優化</div>
+      <div style="opacity:.7">Local Time result aligned with timezone list layout; updated hint text; improved left panel spacing</div>
     </div>
     <button class="install-close-btn" onclick="closeAbout()">關閉</button>
   </div>

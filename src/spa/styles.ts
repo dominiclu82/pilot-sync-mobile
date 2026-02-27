@@ -129,7 +129,7 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
   --success:#15803d;--error:#dc2626;--sort:#16a34a
 }
 .briefing-subtabs{position:sticky;top:env(safe-area-inset-top,0px);z-index:100;background:var(--bg);display:flex;border-bottom:1.5px solid var(--dim);padding:0 8px;margin-bottom:0;
-  overflow-x:auto;-webkit-overflow-scrolling:touch}
+  overflow-x:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:none;touch-action:manipulation}
 .briefing-subtabs::-webkit-scrollbar{display:none}
 .briefing-subtab{flex-shrink:0;padding:10px 12px;font-size:.84em;font-weight:700;background:none;
   border:none;border-bottom:2.5px solid transparent;color:var(--muted);cursor:pointer;

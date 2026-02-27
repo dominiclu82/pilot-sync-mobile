@@ -387,7 +387,8 @@ function _paTzSelectStation(code) {
 function _paNormalizeFlt(val) {
   var s = val.trim().toUpperCase();
   s = s.replace(/^SJX/, '').replace(/^JX/, '');
-  return s.replace(/\s/g, '');
+  s = s.replace(/\s/g, '');
+  return s.replace(/^0+/, '') || '0';
 }
 
 function _paFltStatus(msg, type) {

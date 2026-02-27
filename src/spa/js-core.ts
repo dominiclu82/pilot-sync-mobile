@@ -489,27 +489,7 @@ function switchBriefingTab(panel, btn) {
     setTimeout(function(){ document.getElementById('dt-lock-pw').focus(); }, 100);
   }
   if (panel === 'pa') {
-    if (!paUnlocked) {
-      document.getElementById('pa-lock-overlay').style.display = 'flex';
-      setTimeout(function(){ document.getElementById('pa-lock-pw').focus(); }, 100);
-    }
     paStartTzTimer();
-  }
-}
-
-// ── PA 密碼鎖 ────────────────────────────────────────────────────────────────
-var paUnlocked = false;
-function paUnlock() {
-  var pw = document.getElementById('pa-lock-pw').value;
-  if (pw === 'qwertyui') {
-    paUnlocked = true;
-    document.getElementById('pa-lock-overlay').style.display = 'none';
-    document.getElementById('pa-lock-pw').value = '';
-    document.getElementById('pa-lock-err').textContent = '';
-  } else {
-    document.getElementById('pa-lock-err').textContent = '密碼錯誤，請再試一次';
-    document.getElementById('pa-lock-pw').value = '';
-    document.getElementById('pa-lock-pw').focus();
   }
 }
 
