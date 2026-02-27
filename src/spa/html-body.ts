@@ -281,7 +281,7 @@ export function getSpaHtmlBody(): string {
           <div class="pa-section-title">🕐 Local Time Query</div>
           <div class="pa-tz-hint">👇 輸入航班號或點選場站，自動帶入目的地及當地時間<br>Enter flight number or tap a station to auto-fill destination &amp; local time</div>
           <div class="pa-lt-search">
-            <input class="pa-input" id="pa-lt-input" placeholder="e.g. JX012 / LAX / KLAX / 洛杉磯" oninput="_paLookupLocalTime(this.value)">
+            <input class="pa-input" id="pa-lt-input" placeholder="e.g. JX2 / SJX002 / 002 / LAX / KLAX / 洛杉磯" oninput="_paLookupLocalTime(this.value)">
           </div>
           <div id="pa-localtime-result"></div>
           <div class="pa-tz-list" id="pa-tz-list"></div>
