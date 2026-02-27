@@ -125,10 +125,11 @@ export function getSpaHtmlBody(): string {
 
   <!-- 子 Tab Bar -->
   <div class="briefing-subtabs">
-    <button class="briefing-subtab" id="subtabBtn-tools" onclick="switchBriefingTab('tools',this)">🗺️ 工具連結</button>
     <button class="briefing-subtab active" id="subtabBtn-datis" onclick="switchBriefingTab('datis',this)">⛅ Airport WX</button>
+    <button class="briefing-subtab" id="subtabBtn-pa" onclick="switchBriefingTab('pa',this)">🎙️ PA工具</button>
     <button class="briefing-subtab" id="subtabBtn-hf" onclick="switchBriefingTab('hf',this)">📻 Pacific HF</button>
     <button class="briefing-subtab" id="subtabBtn-coldtemp" onclick="switchBriefingTab('coldtemp',this)">❄️ 低溫修正</button>
+    <button class="briefing-subtab" id="subtabBtn-tools" onclick="switchBriefingTab('tools',this)">🗺️ 工具連結</button>
     <button class="briefing-subtab" id="subtabBtn-duty" onclick="switchBriefingTab('duty',this)">⏱️ Duty Time</button>
   </div>
 
@@ -250,6 +251,63 @@ export function getSpaHtmlBody(): string {
       </div>
       <div class="wx-detail-pane" id="wx-detail-pane">
         <div class="wx-empty"><span class="wx-hint-desktop">← 點選左側機場</span><span class="wx-hint-mobile">↑ 點選上方機場</span><br>查看 METAR · TAF · ATIS</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── 🎙️ PA 工具 panel ── -->
+  <div id="briefing-pa" class="briefing-panel" style="position:relative">
+    <div class="dt-lock-overlay" id="pa-lock-overlay">
+      <div class="dt-lock-card">
+        <div class="dt-lock-icon">🔒</div>
+        <div class="dt-lock-title">PA Tools</div>
+        <div class="dt-lock-sub">請輸入密碼以繼續</div>
+        <input class="dt-lock-input" type="password" id="pa-lock-pw" placeholder="••••••••" maxlength="16"
+          onkeydown="if(event.key==='Enter')paUnlock()">
+        <button class="dt-lock-btn" onclick="paUnlock()">解鎖</button>
+        <div class="dt-lock-err" id="pa-lock-err"></div>
+      </div>
+    </div>
+    <div class="pa-split">
+      <!-- 左側：溫度換算 + 時區列表 -->
+      <div class="pa-left">
+        <!-- 溫度換算 -->
+        <div class="pa-section">
+          <div class="pa-section-title">🌡️ Temperature</div>
+          <div class="pa-temp-row">
+            <div class="pa-temp-field">
+              <label>°C</label>
+              <input type="number" id="pa-temp-c" inputmode="decimal" placeholder="—" oninput="paConvertTemp('c')">
+            </div>
+            <span class="pa-temp-arrow">⇄</span>
+            <div class="pa-temp-field">
+              <label>°F</label>
+              <input type="number" id="pa-temp-f" inputmode="decimal" placeholder="—" oninput="paConvertTemp('f')">
+            </div>
+          </div>
+        </div>
+        <!-- 時區列表 -->
+        <div class="pa-section pa-tz-section">
+          <div class="pa-section-title">🕐 Local Time</div>
+          <div class="pa-tz-list" id="pa-tz-list"></div>
+        </div>
+      </div>
+      <!-- 右側：PA 分類按鈕 + 內容 -->
+      <div class="pa-right">
+        <div class="pa-cat-btns">
+          <button class="pa-cat-btn active" onclick="paSwitchCat('welcome',this)">Welcome</button>
+          <button class="pa-cat-btn" onclick="paSwitchCat('delay',this)">Ground Delay</button>
+          <button class="pa-cat-btn" onclick="paSwitchCat('descent',this)">Descent</button>
+          <button class="pa-cat-btn" onclick="paSwitchCat('turbulence',this)">Turbulence</button>
+          <button class="pa-cat-btn" onclick="paSwitchCat('deice',this)">De/Anti-ice</button>
+          <button class="pa-cat-btn" onclick="paSwitchCat('missedappr',this)">Missed Approach</button>
+          <button class="pa-cat-btn" onclick="paSwitchCat('diversion',this)">Diversion</button>
+          <button class="pa-cat-btn" onclick="paSwitchCat('modsevcat',this)">MOD SEV CAT</button>
+          <button class="pa-cat-btn" onclick="paSwitchCat('unrulypax',this)">Unruly Pax</button>
+        </div>
+        <div class="pa-content" id="pa-content">
+          <div class="pa-placeholder">選擇分類以查看廣播詞範本<br>Select a category to view PA scripts</div>
+        </div>
       </div>
     </div>
   </div>
@@ -661,7 +719,7 @@ export function getSpaHtmlBody(): string {
       <button class="tab-util-btn tab-install-btn" id="tab-install-btn" onclick="showInstallGuide()" style="display:none">
         <span>📲</span>安裝
       </button>
-      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V4.059</span>
+      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V5.001</span>
     </div>
   </div>
 </div>
@@ -691,15 +749,15 @@ export function getSpaHtmlBody(): string {
       <div style="margin-bottom:4px">📱 建議使用 <b>iPad 橫向</b>操作以獲得最佳體驗</div>
       <div style="color:var(--muted)">Best experience on iPad in landscape mode</div>
     </div>
-    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V4.059</div>
+    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V5.001</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
+      <div>新增 PA 工具（溫度換算、時區列表、9 類廣播詞範本）、簡報箱子頁籤重新排序</div>
+      <div style="opacity:.7">Added PA Tools (temp converter, timezone list, 9 PA script categories); briefing sub-tab reordered</div>
+    </div>
+    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V4.059</div>
+    <div style="font-size:.72em;color:var(--muted);margin-bottom:14px;line-height:1.5;text-align:left">
       <div>手機直向首次載入自動捲動至目的地欄位</div>
       <div style="opacity:.7">Auto-scroll to destination column on first load (portrait mobile)</div>
-    </div>
-    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V4.058</div>
-    <div style="font-size:.72em;color:var(--muted);margin-bottom:14px;line-height:1.5;text-align:left">
-      <div>Tab 圖示更新、安裝說明加英文對照</div>
-      <div style="opacity:.7">Updated tab icons; install guide with bilingual instructions</div>
     </div>
     <button class="install-close-btn" onclick="closeAbout()">關閉</button>
   </div>

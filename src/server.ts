@@ -13,6 +13,7 @@ import { getSpaCoreJs } from './spa/js-core.js';
 import { getSpaWeatherJs } from './spa/js-weather.js';
 import { getSpaDutyTimeJs } from './spa/js-duty-time.js';
 import { getSpaGateInfoJs } from './spa/js-gate-info.js';
+import { getSpaPaJs } from './spa/js-pa.js';
 
 
 config({ path: path.join(ROOT, '.env') });
@@ -500,6 +501,7 @@ ${getSpaCoreJs()}
 ${getSpaWeatherJs()}
 ${getSpaDutyTimeJs()}
 ${getSpaGateInfoJs()}
+${getSpaPaJs()}
 </script>
 </body>
 </html>`;
