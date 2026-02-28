@@ -345,6 +345,10 @@ function _paLookupLocalTime(input) {
     _paShowLocalTime(code);
     return;
   }
+  // 航班號輸入變動 → 立刻清舊資料
+  _paOnDestInput('');
+  _paLtStatus('', '');
+  resultEl.innerHTML = '';
   // 航班號查詢用 debounce，避免刪除過程中逐字觸發
   _paLtTimer = setTimeout(function() {
     var num = _paNormalizeFlt(input);
@@ -493,6 +497,8 @@ function _paOnFltInput(val) {
       if (document.activeElement !== inp) inp.value = val;
     });
   }
+  // 航班號變動 → 立刻清除舊目的地
+  _paOnDestInput('');
   // Debounced FIDS lookup
   if (_paFltTimer) clearTimeout(_paFltTimer);
   var num = _paNormalizeFlt(val);
@@ -669,9 +675,9 @@ var _paScripts = {};
 
 _paScripts.welcome = '<div class="pa-note">When all passengers are boarded, the CIC will inform the PIC to make a brief welcome PA.</div>' +
   '<div class="pa-lang">English</div>' +
-  '<div>"Hello everyone, this is Captain <input class="pa-input" placeholder="Full Name"> speaking. On behalf of <span class="pa-choice">[the cockpit crew / all the crew]</span>, welcome onboard STARLUX flight number <input class="pa-input" data-pa="flt" placeholder="e.g. JX800"> <span id="pa-flt-status" class="pa-flt-status"></span> to <input class="pa-input" data-pa="dest" placeholder="e.g. LAX">. We should be ready for departure in <input class="pa-input pa-input-num" data-pa="dep-min" inputmode="numeric"> minutes. Our flight time is <input class="pa-input pa-input-num" data-pa="flt-hr" inputmode="numeric"> hours and <input class="pa-input pa-input-num" data-pa="flt-min" inputmode="numeric"> minutes, with an initial cruising altitude of <input class="pa-input" data-pa="altitude" inputmode="numeric" style="min-width:70px" placeholder="XX,XXX"> feet. Once again, please make yourself comfortable and enjoy the flight with us. Thank you."</div>' +
+  '<div>"Hello everyone, this is Captain <input class="pa-input" placeholder="Full Name"> speaking. On behalf of <span class="pa-choice">[the cockpit crew / all the crew]</span>, welcome onboard STARLUX flight number <input class="pa-input" data-pa="flt" placeholder="e.g. JX2"> <span id="pa-flt-status" class="pa-flt-status"></span> to <input class="pa-input" data-pa="dest" placeholder="e.g. LAX">. We should be ready for departure in <input class="pa-input pa-input-num" data-pa="dep-min" inputmode="numeric"> minutes. Our flight time is <input class="pa-input pa-input-num" data-pa="flt-hr" inputmode="numeric"> hours and <input class="pa-input pa-input-num" data-pa="flt-min" inputmode="numeric"> minutes, with an initial cruising altitude of <input class="pa-input" data-pa="altitude" inputmode="numeric" style="min-width:70px" placeholder="XX,XXX"> feet. Once again, please make yourself comfortable and enjoy the flight with us. Thank you."</div>' +
   '<div class="pa-lang">中文</div>' +
-  '<div>「各位旅客大家好，我是機長 <input class="pa-input" placeholder="姓名">。代表<span class="pa-choice">[駕駛艙組員 / 全體組員]</span>，歡迎搭乘星宇航空 <input class="pa-input" data-pa="flt" placeholder="e.g. JX800"> 班機前往 <input class="pa-input" data-pa="dest" placeholder="e.g. LAX">。我們預計在 <input class="pa-input pa-input-num" data-pa="dep-min" inputmode="numeric"> 分鐘後出發。飛行時間約 <input class="pa-input pa-input-num" data-pa="flt-hr" inputmode="numeric"> 小時 <input class="pa-input pa-input-num" data-pa="flt-min" inputmode="numeric"> 分鐘，初始巡航高度 <input class="pa-input" data-pa="altitude" inputmode="numeric" style="min-width:70px"> 呎。再次祝您旅途愉快，謝謝。」</div>';
+  '<div>「各位旅客大家好，我是機長 <input class="pa-input" placeholder="姓名">。代表<span class="pa-choice">[駕駛艙組員 / 全體組員]</span>，歡迎搭乘星宇航空 <input class="pa-input" data-pa="flt" placeholder="e.g. JX2"> 班機前往 <input class="pa-input" data-pa="dest" placeholder="e.g. LAX">。我們預計在 <input class="pa-input pa-input-num" data-pa="dep-min" inputmode="numeric"> 分鐘後出發。飛行時間約 <input class="pa-input pa-input-num" data-pa="flt-hr" inputmode="numeric"> 小時 <input class="pa-input pa-input-num" data-pa="flt-min" inputmode="numeric"> 分鐘，初始巡航高度 <input class="pa-input" data-pa="altitude" inputmode="numeric" style="min-width:70px"> 呎。再次祝您旅途愉快，謝謝。」</div>';
 
 _paScripts.delay = '<div class="pa-note">If ground delay is expected to be more than 15 minutes before pushback, a ground delay PA should be delivered.</div>' +
   '<div class="pa-lang">English</div>' +
