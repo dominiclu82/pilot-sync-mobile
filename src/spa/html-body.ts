@@ -241,6 +241,15 @@ export function getSpaHtmlBody(): string {
         <button class="wx-route-btn" onclick="selectWxRegion('canada',this)">加拿大 CA</button>
         <button class="wx-route-btn" onclick="selectWxRegion('europe',this)">歐洲 EU</button>
       </div>
+      <div class="wx-fleet-bar">
+        <label class="wx-fleet-label">Fleet</label>
+        <select class="wx-fleet-select" id="wx-fleet-select" onchange="wxSwitchFleet(this)">
+          <option value="A321">A321</option>
+          <option value="A330">A330</option>
+          <option value="A350-900" selected>A350-900</option>
+          <option value="A350-1000">A350-1000</option>
+        </select>
+      </div>
       <div style="background:rgba(245,158,11,.08);border-bottom:1px solid rgba(245,158,11,.25);padding:5px 14px;font-size:.72em;color:#f59e0b;display:flex;align-items:center;gap:6px">
         <span>⚠</span><span>Non-operational use only. Data may not reflect current conditions.</span>
       </div>
@@ -701,7 +710,7 @@ export function getSpaHtmlBody(): string {
     <span class="tab-btn-icon">🔄</span>班表同步
   </button>
   <button class="tab-btn tab-active" id="tabBtn-briefing" onclick="switchTab('briefing',this)">
-    <span class="tab-btn-icon">💼</span>A350簡報箱
+    <span class="tab-btn-icon">💼</span>簡報箱
   </button>
   <button class="tab-btn" id="tabBtn-gate" onclick="switchTab('gate',this)">
     <span class="tab-btn-icon">🌏</span>Gate Info
@@ -716,7 +725,7 @@ export function getSpaHtmlBody(): string {
       <button class="tab-util-btn tab-install-btn" id="tab-install-btn" onclick="showInstallGuide()" style="display:none">
         <span>📲</span>安裝
       </button>
-      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V5.016</span>
+      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V5.100</span>
     </div>
   </div>
 </div>
@@ -746,7 +755,12 @@ export function getSpaHtmlBody(): string {
       <div style="margin-bottom:4px">📱 建議使用 <b>iPad 橫向</b>操作以獲得最佳體驗</div>
       <div style="color:var(--muted)">Best experience on iPad in landscape mode</div>
     </div>
-    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V5.016</div>
+    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V5.100</div>
+    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
+      <div>Airport WX 新增機隊選擇器（A321/A330/A350-900/A350-1000），依據 Ops Spec. C-6 官方清單分類機場；機隊選擇會記住上次設定；底部 Tab 改名「簡報箱」</div>
+      <div style="opacity:.7">Added fleet selector for Airport WX (A321/A330/A350-900/A350-1000) based on Ops Spec. C-6 authorized airport list; fleet selection persists across sessions; renamed bottom tab to "簡報箱"</div>
+    </div>
+    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V5.016</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
       <div>中文廣播詞目的地自動顯示中文名稱（如 LAX → 洛杉磯），支援多中文名以斜線分隔</div>
       <div style="opacity:.7">Chinese PA scripts now auto-fill destination with Chinese airport names (e.g. LAX → 洛杉磯); multiple names separated by slash</div>

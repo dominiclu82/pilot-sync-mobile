@@ -1,21 +1,8 @@
 export function getSpaWeatherJs(): string {
   return `
 // ── 航路氣象 ──────────────────────────────────────────────────────────────────
-var WX_AIRPORTS = {
-  taiwan:      [{icao:'RCTP',name:'桃園',cls:'r'},{icao:'RCKH',name:'高雄',cls:'as'},{icao:'RCSS',name:'松山',cls:'as'}],
-  hkmacao:     [{icao:'VHHH',name:'香港',cls:'rs'},{icao:'VMMC',name:'澳門',cls:'r'}],
-  japan:       [{icao:'RJAA',name:'成田',cls:'r'},{icao:'RJBB',name:'關西',cls:'r'},{icao:'RJCC',name:'新千歲',cls:'r'},{icao:'RJFF',name:'福岡',cls:'rs'},{icao:'RJSS',name:'仙台',cls:'r'},{icao:'ROAH',name:'那霸',cls:'r'},{icao:'RJTT',name:'羽田',cls:'a'}],
-  korea:       [{icao:'RKPC',name:'濟州',cls:'a'},{icao:'RKPK',name:'釜山',cls:'as'},{icao:'RKSI',name:'仁川',cls:'a'}],
-  philippines: [{icao:'RPLC',name:'克拉克',cls:'r'},{icao:'RPLL',name:'馬尼拉',cls:'r'},{icao:'RPVM',name:'宿霧',cls:'r'}],
-  thailand:    [{icao:'VTBS',name:'素萬那普',cls:'r'},{icao:'VTBD',name:'廊曼',cls:'a'},{icao:'VTBU',name:'芭達雅',cls:'a'},{icao:'VTCC',name:'清邁',cls:'a'}],
-  vietnam:     [{icao:'VVNB',name:'河內',cls:'r'},{icao:'VVPQ',name:'富國',cls:'r'},{icao:'VVTS',name:'胡志明',cls:'r'},{icao:'VDPP',name:'金邊',cls:'a'},{icao:'VVCR',name:'芽莊',cls:'a'},{icao:'VVDN',name:'峴港',cls:'a'}],
-  seasia:      [{icao:'WIII',name:'雅加達',cls:'r'},{icao:'WSSS',name:'新加坡',cls:'r'},{icao:'WADD',name:'峇里島',cls:'a'},{icao:'WARR',name:'泗水',cls:'a'},{icao:'WBGG',name:'古晉',cls:'a'},{icao:'WMKK',name:'吉隆坡',cls:'a'},{icao:'WMKP',name:'檳城',cls:'a'}],
-  usa:         [{icao:'KLAX',name:'洛杉磯',cls:'r'},{icao:'KONT',name:'安大略',cls:'rs'},{icao:'KPHX',name:'鳳凰城',cls:'r'},{icao:'KSEA',name:'西雅圖',cls:'r'},{icao:'KSFO',name:'舊金山',cls:'rs'},{icao:'KLAS',name:'拉斯維加斯',cls:'a'},{icao:'KOAK',name:'奧克蘭',cls:'a'},{icao:'KPDX',name:'波特蘭',cls:'a'},{icao:'KSMF',name:'沙加緬度',cls:'a'},{icao:'KTUS',name:'土森',cls:'a'}],
-  pacific:     [{icao:'PACD',name:'Cold Bay',cls:'a'},{icao:'PAFA',name:'費爾班克斯',cls:'a'},{icao:'PAKN',name:'King Salmon',cls:'a'},{icao:'PANC',name:'安克拉治',cls:'a'},{icao:'PASY',name:'Shemya',cls:'a'},{icao:'PGSN',name:'塞班',cls:'a'},{icao:'PGUM',name:'關島',cls:'a'},{icao:'PHNL',name:'檀香山',cls:'a'},{icao:'PMDY',name:'中途島',cls:'a'},{icao:'PWAK',name:'威克島',cls:'a'}],
-  canada:      [{icao:'CYVR',name:'溫哥華',cls:'a'}],
-  europe:      [{icao:'LKPR',name:'布拉格',cls:'r'},{icao:'EDDB',name:'柏林',cls:'a'},{icao:'EDDM',name:'慕尼黑',cls:'a'},{icao:'EPWA',name:'華沙',cls:'a'},{icao:'LOWL',name:'林茲',cls:'a'},{icao:'LOWW',name:'維也納',cls:'a'}],
-};
-
+// WX_AIRPORTS 由 _wxFleetData 動態取得（資料定義在 airport-data.js）
+var wxCurrentFleet = (function() { try { var f = localStorage.getItem('crewsync_fleet'); if (f && _wxFleetData[f]) return f; } catch(e) {} return 'A350-900'; })();
 var wxCurrentRegion = 'taiwan';
 var wxMetarMap = {};      // icao -> parsed metar object (cleared when region changes)
 var wxCacheTime = null;   // timestamp of last successful fetch (ms)
@@ -25,6 +12,20 @@ var wxDetailCache = {};   // icao -> rendered HTML string (persists across airpo
 var wxSelectedIcao = '';
 var wxSelectedName = '';
 var wxLoaded = false;
+
+function wxGetAirports(region) {
+  return ((_wxFleetData[wxCurrentFleet] || {})[region]) || [];
+}
+
+function wxSwitchFleet(sel) {
+  wxCurrentFleet = sel.value;
+  try { localStorage.setItem('crewsync_fleet', wxCurrentFleet); } catch(e) {}
+  wxSelectedIcao = '';
+  wxSelectedName = '';
+  wxDetailCache = {};
+  document.getElementById('wx-detail-pane').innerHTML = '<div class="wx-empty"><span class="wx-hint-desktop">\\u2190 點選左側機場</span><span class="wx-hint-mobile">\\u2191 點選上方機場</span><br>查看 METAR \\u00b7 TAF \\u00b7 ATIS</div>';
+  loadWxRegion(wxCurrentRegion);
+}
 
 function wxCalcCat(m) {
   if (!m) return 'UNKN';
@@ -124,7 +125,7 @@ function wxMinsAgo(m) {
 }
 
 function loadWxRegion(region) {
-  var airports = WX_AIRPORTS[region] || [];
+  var airports = wxGetAirports(region);
   // 嘗試從 localStorage 讀取快取
   try {
     var cached = localStorage.getItem('crewsync_metar_' + region);
@@ -135,6 +136,7 @@ function loadWxRegion(region) {
     } else { wxMetarMap = {}; wxCacheTime = null; }
   } catch(e) { wxMetarMap = {}; wxCacheTime = null; }
   renderWxList(airports, region);
+  if (airports.length === 0) return;
   var icaos = airports.map(function(a) { return a.icao; }).join(',');
   fetch('/api/metar?ids=' + icaos + '&hours=1')
     .then(function(r) { return r.ok ? r.text() : Promise.reject(); })
@@ -155,6 +157,11 @@ function loadWxRegion(region) {
 }
 
 function renderWxList(airports, region) {
+  if (!airports || airports.length === 0) {
+    document.getElementById('wx-list-pane').innerHTML = '<div class="wx-empty" style="padding:24px 16px;font-size:.82em;line-height:1.8">'
+      + '目前在 Ops Spec. 裡無符合機場<br><span style="color:var(--dim)">No authorized airports in current Ops Spec.</span></div>';
+    return;
+  }
   var ts = wxCacheTime ? (function(d){ return String(d.getUTCHours()).padStart(2,'0') + ':' + String(d.getUTCMinutes()).padStart(2,'0') + 'Z'; })(new Date(wxCacheTime)) : '—';
   var cacheAge = wxCacheTime ? Math.round((Date.now() - wxCacheTime) / 60000) : null;
   var cacheNote = cacheAge !== null && cacheAge > 5 ? ' <span style="color:#f59e0b;font-size:.85em">(' + cacheAge + 'm ago)</span>' : '';

@@ -14,6 +14,7 @@ import { getSpaWeatherJs } from './spa/js-weather.js';
 import { getSpaDutyTimeJs } from './spa/js-duty-time.js';
 import { getSpaGateInfoJs } from './spa/js-gate-info.js';
 import { getSpaPaJs } from './spa/js-pa.js';
+import { getSpaAirportDataJs } from './spa/js-airport-data.js';
 
 
 config({ path: path.join(ROOT, '.env') });
@@ -498,6 +499,7 @@ ${getSpaStyles()}
 ${getSpaHtmlBody()}
 <script>
 ${getSpaCoreJs()}
+${getSpaAirportDataJs()}
 ${getSpaWeatherJs()}
 ${getSpaDutyTimeJs()}
 ${getSpaGateInfoJs()}

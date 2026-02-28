@@ -302,7 +302,7 @@ function dtCalculate() {
 // ── Boot ─────────────────────────────────────────────────────────────────────
 showMain();
 // 預設顯示簡報箱 datis 分頁 → 立即載入初始天氣資料
-wxLoaded = true; loadWxRegion(wxCurrentRegion);
+wxLoaded = true; (function(){ var fsel = document.getElementById('wx-fleet-select'); if (fsel) fsel.value = wxCurrentFleet; })(); loadWxRegion(wxCurrentRegion);
 // ── Service Worker 註冊 ───────────────────────────────────────────────────────
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('/sw.js').catch(function(){});

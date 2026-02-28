@@ -479,7 +479,7 @@ function switchBriefingTab(panel, btn) {
   document.querySelectorAll('.briefing-panel').forEach(p => p.classList.remove('active'));
   btn.classList.add('active');
   document.getElementById('briefing-' + panel).classList.add('active');
-  if (panel === 'datis' && !wxLoaded) { wxLoaded = true; loadWxRegion(wxCurrentRegion); }
+  if (panel === 'datis' && !wxLoaded) { wxLoaded = true; var fsel = document.getElementById('wx-fleet-select'); if (fsel) fsel.value = wxCurrentFleet; loadWxRegion(wxCurrentRegion); }
   if (panel === 'hf') {
     var ifr = document.getElementById('hf-panel-iframe');
     if (ifr && !ifr.getAttribute('src')) ifr.src = '/api/pacific-hf';
