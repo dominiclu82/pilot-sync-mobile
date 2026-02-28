@@ -724,7 +724,7 @@ export function getSpaHtmlBody(): string {
       <button class="tab-util-btn tab-install-btn" id="tab-install-btn" onclick="showInstallGuide()" style="display:none">
         <span>📲</span>安裝
       </button>
-      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V5.103</span>
+      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V5.104</span>
     </div>
   </div>
 </div>
@@ -754,12 +754,12 @@ export function getSpaHtmlBody(): string {
       <div style="margin-bottom:4px">📱 建議使用 <b>iPad 橫向</b>操作以獲得最佳體驗</div>
       <div style="color:var(--muted)">Best experience on iPad in landscape mode</div>
     </div>
-    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V5.103</div>
+    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V5.104</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
-      <div>縮小子分頁按鈕點擊區域，避免選擇機隊時誤觸</div>
-      <div style="opacity:.7">Reduced subtab button tap area to prevent accidental taps when selecting fleet</div>
+      <div>縮小子分頁按鈕點擊區域至文字範圍，避免選擇機隊時誤觸</div>
+      <div style="opacity:.7">Reduced subtab button tap area to text only, preventing accidental taps when selecting fleet</div>
     </div>
-    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V5.102</div>
+    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V5.103</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
       <div>切換機隊時自動跳轉至 Airport WX 分頁</div>
       <div style="opacity:.7">Switching fleet automatically navigates to Airport WX tab</div>
