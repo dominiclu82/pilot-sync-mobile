@@ -24,6 +24,7 @@ function wxSwitchFleet(sel) {
   wxSelectedName = '';
   wxDetailCache = {};
   document.getElementById('wx-detail-pane').innerHTML = '<div class="wx-empty"><span class="wx-hint-desktop">\\u2190 點選左側機場</span><span class="wx-hint-mobile">\\u2191 點選上方機場</span><br>查看 METAR \\u00b7 TAF \\u00b7 ATIS</div>';
+  if (typeof switchBriefingTab === 'function') { switchBriefingTab('datis', document.getElementById('subtabBtn-datis')); }
   loadWxRegion(wxCurrentRegion);
 }
 

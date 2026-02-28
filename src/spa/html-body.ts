@@ -724,7 +724,7 @@ export function getSpaHtmlBody(): string {
       <button class="tab-util-btn tab-install-btn" id="tab-install-btn" onclick="showInstallGuide()" style="display:none">
         <span>📲</span>安裝
       </button>
-      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V5.101</span>
+      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V5.102</span>
     </div>
   </div>
 </div>
@@ -754,14 +754,14 @@ export function getSpaHtmlBody(): string {
       <div style="margin-bottom:4px">📱 建議使用 <b>iPad 橫向</b>操作以獲得最佳體驗</div>
       <div style="color:var(--muted)">Best experience on iPad in landscape mode</div>
     </div>
-    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V5.101</div>
+    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V5.102</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
-      <div>Fleet 選擇器移至 Airport WX 按鈕下方，與子分頁列整合</div>
-      <div style="opacity:.7">Moved fleet selector below Airport WX button, integrated into subtab bar</div>
+      <div>切換機隊時自動跳轉至 Airport WX 分頁</div>
+      <div style="opacity:.7">Switching fleet automatically navigates to Airport WX tab</div>
     </div>
-    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V5.100</div>
+    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V5.101</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
-      <div>Airport WX 新增機隊選擇器（A321/A330/A350-900/A350-1000），依據 Ops Spec. C-6 官方清單分類機場；機隊選擇會記住上次設定；底部 Tab 改名「簡報箱」</div>
+      <div>Fleet 選擇器移至 Airport WX 按鈕下方；About card 只保留最新兩版摘要</div>
       <div style="opacity:.7">Added fleet selector for Airport WX (A321/A330/A350-900/A350-1000) based on Ops Spec. C-6 authorized airport list; fleet selection persists across sessions; renamed bottom tab to "簡報箱"</div>
     </div>
     <button class="install-close-btn" onclick="closeAbout()">關閉</button>
