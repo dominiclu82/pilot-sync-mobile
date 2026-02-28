@@ -134,6 +134,7 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
 .briefing-subtab{flex-shrink:0;padding:10px 12px;font-size:.84em;font-weight:700;background:none;
   border:none;border-bottom:2.5px solid transparent;color:var(--muted);cursor:pointer;
   transition:color .2s,border-color .2s;margin-bottom:-1.5px;-webkit-appearance:none;white-space:nowrap}
+.subtab-slot{display:flex;justify-content:center;align-items:center}
 .briefing-subtab.active{color:var(--accent);border-bottom-color:var(--accent)}
 .briefing-panel{display:none}
 .briefing-panel.active{display:block;padding:16px 16px 0}
@@ -168,7 +169,7 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
 @media(min-width:640px){
   /* ── 預設：可捲動 ── */
   .briefing-subtabs{position:sticky;top:0;z-index:100;flex-shrink:0}
-  .briefing-subtab{flex:1}
+  .subtab-slot{flex:1}
   .briefing-panel.active{padding:0}
   /* ── 需要固定高度的 tab：datis 分割面板、HF iframe ── */
   html:has(#tab-briefing.tab-active #briefing-datis.active),html:has(#tab-briefing.tab-active #briefing-hf.active),
