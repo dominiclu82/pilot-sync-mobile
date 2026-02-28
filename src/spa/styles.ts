@@ -128,7 +128,7 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
   --text:#1e293b;--muted:#64748b;--dim:#cbd5e1;
   --success:#15803d;--error:#dc2626;--sort:#16a34a
 }
-.briefing-subtabs{position:sticky;top:env(safe-area-inset-top,0px);z-index:100;background:var(--bg);display:flex;border-bottom:1.5px solid var(--dim);padding:0 8px;margin-bottom:0;
+.briefing-subtabs{position:sticky;top:env(safe-area-inset-top,0px);z-index:100;background:var(--bg);display:flex;align-items:center;border-bottom:1.5px solid var(--dim);padding:0 8px;margin-bottom:0;
   overflow-x:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:none;touch-action:manipulation}
 .briefing-subtabs::-webkit-scrollbar{display:none}
 .briefing-subtab{flex-shrink:0;padding:10px 12px;font-size:.84em;font-weight:700;background:none;
@@ -144,15 +144,15 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
   transition:opacity .15s;line-height:1.3}
 .tool-link-btn:active{opacity:.7}
 /* ── 航路氣象 ────────────────────────────────────────────────────── */
-.wx-fleet-bar{display:flex;align-items:center;gap:8px;padding:6px 14px;border-bottom:1px solid var(--dim);background:var(--surface)}
-.wx-fleet-label{font-size:.72em;font-weight:700;color:var(--muted);margin-bottom:0;flex-shrink:0}
-.wx-fleet-select{background:var(--bg);border:1.5px solid var(--accent);border-radius:8px;color:var(--accent);font-size:.78em;font-weight:700;padding:4px 8px;-webkit-appearance:none;appearance:none;cursor:pointer;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%233b82f6'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 6px center;padding-right:20px}
+.subtab-wx-wrap{display:flex;flex-direction:column;align-items:stretch;flex-shrink:0}
+.subtab-wx-wrap .briefing-subtab{width:100%}
+.wx-fleet-select{background:var(--bg);border:1px solid var(--dim);border-radius:6px;color:var(--accent);font-size:.7em;font-weight:700;padding:2px 18px 2px 6px;margin:0 8px 6px;-webkit-appearance:none;appearance:none;cursor:pointer;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%233b82f6'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 5px center}
 .wx-routes{display:flex;flex-wrap:wrap;gap:6px;padding:10px 14px 8px;border-bottom:1px solid var(--dim)}
 .wx-route-btn{padding:4px 10px;font-size:.76em;background:none;border:1.5px solid var(--dim);
   border-radius:14px;color:var(--muted);font-weight:500;cursor:pointer;transition:all .2s;margin:0;-webkit-appearance:none}
 .wx-route-btn.active{background:var(--accent);color:#fff;border-color:var(--accent)}
 #briefing-datis.active{display:flex!important;flex-direction:column;padding:0!important}
-.wx-fixed-header{position:sticky;top:calc(env(safe-area-inset-top,0px) + 38px);z-index:90;background:var(--bg);flex-shrink:0}
+.wx-fixed-header{position:sticky;top:calc(env(safe-area-inset-top,0px) + 60px);z-index:90;background:var(--bg);flex-shrink:0}
 .wx-split{display:flex;flex-direction:column;flex:1}
 .wx-list-pane{border-bottom:1px solid var(--dim)}
 .wx-detail-pane{padding:16px}

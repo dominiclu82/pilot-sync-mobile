@@ -125,7 +125,15 @@ export function getSpaHtmlBody(): string {
 
   <!-- 子 Tab Bar -->
   <div class="briefing-subtabs">
-    <button class="briefing-subtab active" id="subtabBtn-datis" onclick="switchBriefingTab('datis',this)">⛅ Airport WX</button>
+    <div class="subtab-wx-wrap">
+      <button class="briefing-subtab active" id="subtabBtn-datis" onclick="switchBriefingTab('datis',this)">⛅ Airport WX</button>
+      <select class="wx-fleet-select" id="wx-fleet-select" onchange="wxSwitchFleet(this)">
+        <option value="A321">A321</option>
+        <option value="A330">A330</option>
+        <option value="A350-900" selected>A350-900</option>
+        <option value="A350-1000">A350-1000</option>
+      </select>
+    </div>
     <button class="briefing-subtab" id="subtabBtn-pa" onclick="switchBriefingTab('pa',this)">🎙️ PA工具</button>
     <button class="briefing-subtab" id="subtabBtn-hf" onclick="switchBriefingTab('hf',this)">📻 Pacific HF</button>
     <button class="briefing-subtab" id="subtabBtn-coldtemp" onclick="switchBriefingTab('coldtemp',this)">❄️ 低溫修正</button>
@@ -240,15 +248,6 @@ export function getSpaHtmlBody(): string {
         <button class="wx-route-btn" onclick="selectWxRegion('pacific',this)">阿拉斯加太平洋 AK/PAC</button>
         <button class="wx-route-btn" onclick="selectWxRegion('canada',this)">加拿大 CA</button>
         <button class="wx-route-btn" onclick="selectWxRegion('europe',this)">歐洲 EU</button>
-      </div>
-      <div class="wx-fleet-bar">
-        <label class="wx-fleet-label">Fleet</label>
-        <select class="wx-fleet-select" id="wx-fleet-select" onchange="wxSwitchFleet(this)">
-          <option value="A321">A321</option>
-          <option value="A330">A330</option>
-          <option value="A350-900" selected>A350-900</option>
-          <option value="A350-1000">A350-1000</option>
-        </select>
       </div>
       <div style="background:rgba(245,158,11,.08);border-bottom:1px solid rgba(245,158,11,.25);padding:5px 14px;font-size:.72em;color:#f59e0b;display:flex;align-items:center;gap:6px">
         <span>⚠</span><span>Non-operational use only. Data may not reflect current conditions.</span>
@@ -725,7 +724,7 @@ export function getSpaHtmlBody(): string {
       <button class="tab-util-btn tab-install-btn" id="tab-install-btn" onclick="showInstallGuide()" style="display:none">
         <span>📲</span>安裝
       </button>
-      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V5.100</span>
+      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V5.101</span>
     </div>
   </div>
 </div>
@@ -755,40 +754,15 @@ export function getSpaHtmlBody(): string {
       <div style="margin-bottom:4px">📱 建議使用 <b>iPad 橫向</b>操作以獲得最佳體驗</div>
       <div style="color:var(--muted)">Best experience on iPad in landscape mode</div>
     </div>
-    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V5.100</div>
+    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V5.101</div>
+    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
+      <div>Fleet 選擇器移至 Airport WX 按鈕下方，與子分頁列整合</div>
+      <div style="opacity:.7">Moved fleet selector below Airport WX button, integrated into subtab bar</div>
+    </div>
+    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V5.100</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
       <div>Airport WX 新增機隊選擇器（A321/A330/A350-900/A350-1000），依據 Ops Spec. C-6 官方清單分類機場；機隊選擇會記住上次設定；底部 Tab 改名「簡報箱」</div>
       <div style="opacity:.7">Added fleet selector for Airport WX (A321/A330/A350-900/A350-1000) based on Ops Spec. C-6 authorized airport list; fleet selection persists across sessions; renamed bottom tab to "簡報箱"</div>
-    </div>
-    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V5.016</div>
-    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
-      <div>中文廣播詞目的地自動顯示中文名稱（如 LAX → 洛杉磯），支援多中文名以斜線分隔</div>
-      <div style="opacity:.7">Chinese PA scripts now auto-fill destination with Chinese airport names (e.g. LAX → 洛杉磯); multiple names separated by slash</div>
-    </div>
-    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V5.015</div>
-    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
-      <div>航班號變動時立刻清除舊目的地，避免查詢中顯示錯誤資訊；Welcome PA 航班提示改為 JX2</div>
-      <div style="opacity:.7">Clear destination immediately when flight number changes to prevent stale data during lookup; updated Welcome PA flight placeholder to JX2</div>
-    </div>
-    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V5.014</div>
-    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
-      <div>查詢格航班狀態顯示移至輸入框內右側</div>
-      <div style="opacity:.7">Moved flight lookup status display inside query input field (right-aligned)</div>
-    </div>
-    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V5.013</div>
-    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
-      <div>修正 Local Time 查詢刪除航班號時殘留帶入廣播詞的問題；查無航班時清除目的地欄位；查詢格新增航班查詢狀態顯示</div>
-      <div style="opacity:.7">Fixed Local Time query bug where deleting flight number re-triggered PA script fill; clear destination when flight not found; added flight lookup status display in query field</div>
-    </div>
-    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V5.012</div>
-    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
-      <div>Local Time 查詢支援航班號輸入，自動帶入廣播詞目的地及航班號</div>
-      <div style="opacity:.7">Local Time Query now supports flight number input; auto-fills PA destination &amp; flight number</div>
-    </div>
-    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V5.010</div>
-    <div style="font-size:.72em;color:var(--muted);margin-bottom:14px;line-height:1.5;text-align:left">
-      <div>PA 工具開放使用（移除密碼鎖）、修正航班號前導零比對、上方 Tab 列固定不可拖動</div>
-      <div style="opacity:.7">PA Tools now open (removed password lock); fixed flight number leading zero matching; locked tab bar from dragging</div>
     </div>
     <button class="install-close-btn" onclick="closeAbout()">關閉</button>
   </div>
