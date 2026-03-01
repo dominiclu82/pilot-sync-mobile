@@ -655,6 +655,7 @@ export function getSpaHtmlBody(): string {
         </div>
         <input type="text" id="gate-search" class="gi-search-input" placeholder="搜尋..." oninput="filterGateFlights()">
       </div>
+      <div class="gi-search-hint">Search by flight no. / airport code / city name ｜ Tap <span style="color:var(--sort)">green headers</span> to sort</div>
       <div class="gi-time-bar">
         <button class="gi-time-slot" data-slot="all" onclick="giSetTimeSlot('all')">全日</button>
         <button class="gi-time-slot" data-slot="00-06" onclick="giSetTimeSlot('00-06')">00-06</button>
@@ -669,17 +670,17 @@ export function getSpaHtmlBody(): string {
       <table class="gi-table" id="gi-pinned-table">
         <thead>
           <tr>
-            <th class="gi-sticky-col gi-sortable" onclick="giSort('fno')">航班</th>
-            <th class="gi-sortable" onclick="giSort('origin')">出發地</th>
+            <th class="gi-sticky-col gi-sortable" onclick="giSort('fno')">Flight</th>
+            <th class="gi-sortable" onclick="giSort('origin')">Origin</th>
             <th>Terminal</th>
             <th>Check-in</th>
             <th>Gate</th>
             <th class="gi-time-col gi-sortable" onclick="giSort('std')">STD</th>
             <th class="gi-time-col gi-sortable" onclick="giSort('atd')">ATD</th>
-            <th class="gi-sortable" onclick="giSort('dest')">目的地</th>
+            <th class="gi-sortable" onclick="giSort('dest')">Dest</th>
             <th>Terminal</th>
             <th>Parking</th>
-            <th>轉盤</th>
+            <th>Belt</th>
             <th class="gi-time-col gi-sortable" onclick="giSort('sta')">STA</th>
             <th class="gi-time-col gi-sortable" onclick="giSort('ata')">ATA</th>
           </tr>
@@ -692,17 +693,17 @@ export function getSpaHtmlBody(): string {
       <table class="gi-table" id="gi-table">
         <thead>
           <tr>
-            <th class="gi-sticky-col gi-sortable" onclick="giSort('fno')">航班</th>
-            <th class="gi-sortable" onclick="giSort('origin')">出發地</th>
+            <th class="gi-sticky-col gi-sortable" onclick="giSort('fno')">Flight</th>
+            <th class="gi-sortable" onclick="giSort('origin')">Origin</th>
             <th>Terminal</th>
             <th>Check-in</th>
             <th>Gate</th>
             <th class="gi-time-col gi-sortable" onclick="giSort('std')">STD</th>
             <th class="gi-time-col gi-sortable" onclick="giSort('atd')">ATD</th>
-            <th class="gi-sortable" onclick="giSort('dest')">目的地</th>
+            <th class="gi-sortable" onclick="giSort('dest')">Dest</th>
             <th>Terminal</th>
             <th>Parking</th>
-            <th>轉盤</th>
+            <th>Belt</th>
             <th class="gi-time-col gi-sortable" onclick="giSort('sta')">STA</th>
             <th class="gi-time-col gi-sortable" onclick="giSort('ata')">ATA</th>
           </tr>
@@ -753,7 +754,7 @@ export function getSpaHtmlBody(): string {
       <button class="tab-util-btn tab-install-btn" id="tab-install-btn" onclick="showInstallGuide()" style="display:none">
         <span>📲</span>安裝
       </button>
-      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V5.106</span>
+      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V5.107</span>
     </div>
   </div>
 </div>
@@ -783,7 +784,12 @@ export function getSpaHtmlBody(): string {
       <div style="margin-bottom:4px">📱 建議使用 <b>iPad 橫向</b>操作以獲得最佳體驗</div>
       <div style="color:var(--muted)">Best experience on iPad in landscape mode</div>
     </div>
-    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V5.106</div>
+    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V5.107</div>
+    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
+      <div>Gate Info 表頭改英文（Flight/Origin/Dest/Belt）；可排序欄位以綠色標示；搜尋與排序提示文字；現在時段指示改為橘色小圓點；密碼小眼睛透明度提高</div>
+      <div style="opacity:.7">Gate Info headers switched to English; sortable columns highlighted in green; search & sort hints added; current time slot indicator changed to orange dot; password eye icon opacity increased</div>
+    </div>
+    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V5.106</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
       <div>Gate Info 大改版：新增航司切換（JX / BR / CI / ALL）、時段篩選（全日 / 00-06 / 06-12 / 12-18 / 18-24 / ±2hr）、7 欄可排序（含 STD/ATD/STA/ATA）、預設 STA 升序；密碼小眼睛改為純文字符號；首次授權警告加英文對照</div>
       <div style="opacity:.7">Gate Info overhaul: airline selector (JX / BR / CI / ALL), time slot filter, 7-column sorting (incl. STD/ATD/STA/ATA), default STA ascending; password eye icon changed to text symbol; first-time auth warning with English translation</div>
