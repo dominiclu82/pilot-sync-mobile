@@ -441,7 +441,7 @@ html:has(#tab-briefing.tab-active #briefing-coldtemp.active) #tab-briefing.tab-a
 .gi-test-row{background:#f59e0b11}
 .gi-test-row td{color:#f59e0b;font-size:.82em}
 .gi-hide-time .gi-time-col{display:none}
-@media(min-width:1024px){.gi-view-btn{display:none!important}}
+@media(min-width:768px){.gi-view-btn{display:none!important}}
 .gi-header-btns{display:flex;gap:8px;align-items:center}
 .gi-view-btn{background:none;color:var(--muted);border:1.5px solid var(--dim);border-radius:8px;
   padding:8px 12px;font-size:.82em;font-weight:600;cursor:pointer;white-space:nowrap;-webkit-appearance:none}
