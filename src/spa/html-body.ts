@@ -189,11 +189,11 @@ export function getSpaHtmlBody(): string {
         <!-- 機場標高 + OAT -->
         <div class="ct-inputs">
           <div class="ct-input-group">
-            <label>機場標高<br>Airport Elevation (ft)</label>
+            <label>Airport Elevation (ft)</label>
             <input type="text" id="ct-elev" placeholder="e.g. 108" inputmode="text">
           </div>
           <div class="ct-input-group">
-            <label>外氣溫度<br>OAT (°C)</label>
+            <label>OAT (°C)</label>
             <input type="text" id="ct-oat" placeholder="e.g. −20" inputmode="text">
           </div>
         </div>
@@ -665,12 +665,12 @@ export function getSpaHtmlBody(): string {
       </div>
       <div class="gi-search-hint">Search by flight no. / airport code / city name ｜ Tap <span style="color:var(--sort)">green headers</span> to sort</div>
       <div class="gi-time-bar">
-        <button class="gi-time-slot" data-slot="all" onclick="giSetTimeSlot('all')">All</button>
+        <button class="gi-time-slot" data-slot="±2hr" onclick="giSetTimeSlot('±2hr')">±2hr</button>
         <button class="gi-time-slot" data-slot="00-06" onclick="giSetTimeSlot('00-06')">00-06</button>
         <button class="gi-time-slot" data-slot="06-12" onclick="giSetTimeSlot('06-12')">06-12</button>
         <button class="gi-time-slot" data-slot="12-18" onclick="giSetTimeSlot('12-18')">12-18</button>
         <button class="gi-time-slot" data-slot="18-24" onclick="giSetTimeSlot('18-24')">18-24</button>
-        <button class="gi-time-slot" data-slot="±2hr" onclick="giSetTimeSlot('±2hr')">±2hr</button>
+        <button class="gi-time-slot" data-slot="all" onclick="giSetTimeSlot('all')">All</button>
       </div>
     </div>
     <div id="gi-pinned-wrap" class="gi-pinned-wrap" style="display:none">
@@ -738,7 +738,7 @@ export function getSpaHtmlBody(): string {
 <!-- ══ Tab Bar ═══════════════════════════════════════════════════════ -->
 <div class="tab-bar">
   <button class="tab-btn" id="tabBtn-sync" onclick="switchTab('sync',this)">
-    <span class="tab-btn-icon">🔄</span>班表同步
+    <span class="tab-btn-icon">⇄</span>班表同步
   </button>
   <button class="tab-btn tab-active" id="tabBtn-briefing" onclick="switchTab('briefing',this)">
     <span class="tab-btn-icon">💼</span>簡報箱
@@ -760,7 +760,7 @@ export function getSpaHtmlBody(): string {
       <button class="tab-util-btn tab-install-btn" id="tab-install-btn" onclick="showInstallGuide()" style="display:none">
         <span>📲</span>安裝
       </button>
-      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V5.206</span>
+      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V5.207</span>
     </div>
   </div>
 </div>
@@ -790,15 +790,15 @@ export function getSpaHtmlBody(): string {
       <div style="margin-bottom:4px">📱 建議使用 <b>iPad 橫向</b>操作以獲得最佳體驗</div>
       <div style="color:var(--muted)">Best experience on iPad in landscape mode</div>
     </div>
-    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V5.206</div>
+    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V5.207</div>
+    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
+      <div>Gate Info 時段順序調整（±2hr 在前、All 在後）；班表同步圖示改 ⇄；低溫修正左欄標籤精簡、間距優化</div>
+      <div style="opacity:.7">Gate Info time slot reorder (±2hr first, All last); Sync tab icon changed to ⇄; Cold Temp form labels simplified & spacing optimized</div>
+    </div>
+    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V5.206</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
       <div>Gate Info「全日」改「All」；Orig 切換鈕僅手機顯示；密碼顯示鈕加大加深；班表同步頁面平板/筆電雙欄排版</div>
       <div style="opacity:.7">Gate Info: "全日" → "All"; Orig toggle phone-only; password eye button enlarged; Sync page responsive two-column layout for tablet/laptop</div>
-    </div>
-    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V5.205</div>
-    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
-      <div>Gate Info 時段按鈕「全日」改為「All」；Orig 切換鈕僅手機顯示（平板以上隱藏）</div>
-      <div style="opacity:.7">Gate Info: "全日" renamed to "All"; Orig toggle button now hidden on tablet and above</div>
     </div>
     <button class="install-close-btn" onclick="closeAbout()">關閉</button>
   </div>
