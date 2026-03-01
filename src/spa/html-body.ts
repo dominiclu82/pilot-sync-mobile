@@ -494,8 +494,10 @@ export function getSpaHtmlBody(): string {
         <div class="dt-field">
           <div class="dt-field-label">FDP Start (UTC) — Report Time</div>
           <div class="dt-time-row">
-            <input type="date" id="dt-s-day" class="dt-date-hidden">
-            <button type="button" class="dt-date-box" onclick="dtOpenDate('dt-s-day',this)" id="dt-s-day-btn">--/--</button>
+            <div class="dt-date-wrap">
+              <input type="date" id="dt-s-day" class="dt-date-input" onchange="dtDateChanged(this)">
+              <span class="dt-date-display" id="dt-s-day-btn">--/--</span>
+            </div>
             <span class="dt-sep">/</span>
             <input class="dt-time-box" type="text" id="dt-s-h" placeholder="HH" maxlength="2" inputmode="numeric">
             <span class="dt-sep">:</span>
@@ -508,8 +510,10 @@ export function getSpaHtmlBody(): string {
         <div class="dt-field">
           <div class="dt-field-label">FDP End (UTC) — Block In / Release <span style="color:var(--muted);font-size:.85em">（選填，用於檢查實際 FDP）</span></div>
           <div class="dt-time-row">
-            <input type="date" id="dt-e-day" class="dt-date-hidden">
-            <button type="button" class="dt-date-box" onclick="dtOpenDate('dt-e-day',this)" id="dt-e-day-btn">--/--</button>
+            <div class="dt-date-wrap">
+              <input type="date" id="dt-e-day" class="dt-date-input" onchange="dtDateChanged(this)">
+              <span class="dt-date-display" id="dt-e-day-btn">--/--</span>
+            </div>
             <span class="dt-sep">/</span>
             <input class="dt-time-box" type="text" id="dt-e-h" placeholder="HH" maxlength="2" inputmode="numeric">
             <span class="dt-sep">:</span>
@@ -532,8 +536,10 @@ export function getSpaHtmlBody(): string {
         <div class="dt-field" id="dt-next-section">
           <div class="dt-field-label">Next Duty Report (UTC) — 選填</div>
           <div class="dt-time-row">
-            <input type="date" id="dt-n-day" class="dt-date-hidden">
-            <button type="button" class="dt-date-box" onclick="dtOpenDate('dt-n-day',this)" id="dt-n-day-btn">--/--</button>
+            <div class="dt-date-wrap">
+              <input type="date" id="dt-n-day" class="dt-date-input" onchange="dtDateChanged(this)">
+              <span class="dt-date-display" id="dt-n-day-btn">--/--</span>
+            </div>
             <span class="dt-sep">/</span>
             <input class="dt-time-box" type="text" id="dt-n-h" placeholder="HH" maxlength="2" inputmode="numeric">
             <span class="dt-sep">:</span>
@@ -546,8 +552,10 @@ export function getSpaHtmlBody(): string {
         <div class="dt-field" id="dt-hotel-section" style="display:none">
           <div class="dt-field-label">Hotel Check-in (UTC)</div>
           <div class="dt-time-row">
-            <input type="date" id="dt-ci-day" class="dt-date-hidden">
-            <button type="button" class="dt-date-box" onclick="dtOpenDate('dt-ci-day',this)" id="dt-ci-day-btn">--/--</button>
+            <div class="dt-date-wrap">
+              <input type="date" id="dt-ci-day" class="dt-date-input" onchange="dtDateChanged(this)">
+              <span class="dt-date-display" id="dt-ci-day-btn">--/--</span>
+            </div>
             <span class="dt-sep">/</span>
             <input class="dt-time-box" type="text" id="dt-ci-h" placeholder="HH" maxlength="2" inputmode="numeric">
             <span class="dt-sep">:</span>
@@ -556,8 +564,10 @@ export function getSpaHtmlBody(): string {
           </div>
           <div class="dt-field-label" style="margin-top:8px">Hotel Check-out (UTC)</div>
           <div class="dt-time-row">
-            <input type="date" id="dt-co-day" class="dt-date-hidden">
-            <button type="button" class="dt-date-box" onclick="dtOpenDate('dt-co-day',this)" id="dt-co-day-btn">--/--</button>
+            <div class="dt-date-wrap">
+              <input type="date" id="dt-co-day" class="dt-date-input" onchange="dtDateChanged(this)">
+              <span class="dt-date-display" id="dt-co-day-btn">--/--</span>
+            </div>
             <span class="dt-sep">/</span>
             <input class="dt-time-box" type="text" id="dt-co-h" placeholder="HH" maxlength="2" inputmode="numeric">
             <span class="dt-sep">:</span>
@@ -566,7 +576,7 @@ export function getSpaHtmlBody(): string {
           </div>
         </div>
 
-        <button class="dt-calc-btn" onclick="dtCalculate()">計算</button>
+        <button class="dt-calc-btn" onclick="dtCalculate()">Calculate</button>
       </div>
 
       <!-- Results -->
@@ -593,18 +603,21 @@ export function getSpaHtmlBody(): string {
             <div class="dt-tl2-title">Visual Timeline</div>
             <div id="dt-tl2-bars" style="position:relative;width:100%;height:156px">
               <!-- WOCL overlay -->
-              <div id="dt-bar-wocl" style="position:absolute;top:0;bottom:0;background:rgba(251,191,36,.18);border-radius:4px;display:none;z-index:1"></div>
+              <div id="dt-bar-wocl" style="position:absolute;top:0;bottom:0;background:rgba(239,68,68,.15);border-radius:4px;display:none;z-index:1"></div>
               <!-- Bars (z-index:2) -->
-              <div id="dt-bar-fdp" style="position:absolute;top:0;height:28px;background:#0ea5e9;border-radius:4px;display:flex;align-items:center;overflow:hidden;z-index:2">
+              <div id="dt-bar-fdp" style="position:absolute;top:0;height:28px;background:#10b981;border-radius:4px;display:flex;align-items:center;overflow:hidden;z-index:2">
                 <span id="dt-lbl-fdp" style="font-size:.65em;font-weight:700;color:#fff;white-space:nowrap;padding:0 6px"></span>
               </div>
-              <div id="dt-bar-maxfdp" style="position:absolute;top:34px;height:28px;background:repeating-linear-gradient(-45deg,#a855f7 0,#a855f7 7px,#c084fc 7px,#c084fc 14px);border-radius:4px;display:flex;align-items:center;overflow:hidden;z-index:2">
+              <div id="dt-bar-maxfdp" style="position:absolute;top:34px;height:28px;background:repeating-linear-gradient(-45deg,#3b82f6 0,#3b82f6 7px,#60a5fa 7px,#60a5fa 14px);border-radius:4px;display:flex;align-items:center;overflow:hidden;z-index:2">
                 <span id="dt-lbl-maxfdp" style="font-size:.65em;font-weight:700;color:#fff;white-space:nowrap;padding:0 6px"></span>
               </div>
-              <div id="dt-bar-minrest" style="position:absolute;top:68px;height:28px;background:repeating-linear-gradient(-45deg,#f97316 0,#f97316 7px,#fdba74 7px,#fdba74 14px);border-radius:4px;display:flex;align-items:center;overflow:hidden;z-index:2">
+              <div id="dt-bar-ext" style="position:absolute;top:34px;height:28px;background:repeating-linear-gradient(-45deg,#e11d48 0,#e11d48 7px,#f43f5e 7px,#f43f5e 14px);border-radius:4px;display:flex;align-items:center;overflow:hidden;display:none;z-index:2">
+                <span id="dt-lbl-ext" style="font-size:.65em;font-weight:700;color:#fff;white-space:nowrap;padding:0 6px"></span>
+              </div>
+              <div id="dt-bar-minrest" style="position:absolute;top:68px;height:28px;background:repeating-linear-gradient(-45deg,#d97706 0,#d97706 7px,#f59e0b 7px,#f59e0b 14px);border-radius:4px;display:flex;align-items:center;overflow:hidden;z-index:2">
                 <span id="dt-lbl-minrest" style="font-size:.65em;font-weight:700;color:#fff;white-space:nowrap;padding:0 6px"></span>
               </div>
-              <div id="dt-bar-rest" style="position:absolute;top:102px;height:28px;background:#64748b;border-radius:4px;display:flex;align-items:center;overflow:hidden;display:none;z-index:2">
+              <div id="dt-bar-rest" style="position:absolute;top:102px;height:28px;background:#475569;border-radius:4px;display:flex;align-items:center;overflow:hidden;display:none;z-index:2">
                 <span id="dt-lbl-rest" style="font-size:.65em;font-weight:700;color:#fff;white-space:nowrap;padding:0 6px"></span>
               </div>
               <!-- Vertical lines (z-index:3) -->
@@ -615,11 +628,12 @@ export function getSpaHtmlBody(): string {
             <!-- Tick labels (positioned absolutely inside relative container) -->
             <div id="dt-tl2-ticks" style="position:relative;height:40px;margin-top:4px"></div>
             <div class="dt-legend">
-              <div class="dt-leg-item"><div class="dt-leg-box" style="background:#0ea5e9"></div>FDP</div>
-              <div class="dt-leg-item"><div class="dt-leg-box" style="background:rgba(251,191,36,.35)"></div>WOCL (02-05)</div>
-              <div class="dt-leg-item"><div class="dt-leg-box" style="background:repeating-linear-gradient(-45deg,#a855f7 0,#a855f7 4px,#c084fc 4px,#c084fc 8px)"></div>Max FDP</div>
-              <div class="dt-leg-item"><div class="dt-leg-box" style="background:repeating-linear-gradient(-45deg,#f97316 0,#f97316 4px,#fdba74 4px,#fdba74 8px)"></div>Min Rest</div>
-              <div class="dt-leg-item"><div class="dt-leg-box" style="background:#64748b"></div>Rest</div>
+              <div class="dt-leg-item"><div class="dt-leg-box" style="background:#10b981"></div>FDP</div>
+              <div class="dt-leg-item"><div class="dt-leg-box" style="background:rgba(239,68,68,.25)"></div>WOCL (02-05)</div>
+              <div class="dt-leg-item"><div class="dt-leg-box" style="background:repeating-linear-gradient(-45deg,#3b82f6 0,#3b82f6 4px,#60a5fa 4px,#60a5fa 8px)"></div>Max FDP</div>
+              <div class="dt-leg-item"><div class="dt-leg-box" style="background:repeating-linear-gradient(-45deg,#e11d48 0,#e11d48 4px,#f43f5e 4px,#f43f5e 8px)"></div>Ext</div>
+              <div class="dt-leg-item"><div class="dt-leg-box" style="background:repeating-linear-gradient(-45deg,#d97706 0,#d97706 4px,#f59e0b 4px,#f59e0b 8px)"></div>Min Rest</div>
+              <div class="dt-leg-item"><div class="dt-leg-box" style="background:#475569"></div>Rest</div>
             </div>
           </div>
 
@@ -654,7 +668,7 @@ export function getSpaHtmlBody(): string {
 
       <!-- Placeholder before calc -->
       <div id="dt-placeholder" style="padding:32px 14px;text-align:center;color:var(--muted);font-size:.82em">
-        選好人數並輸入 FDP Start，按「計算」即可查看最大限制時間
+        選好人數並輸入 FDP Start，按「Calculate」即可查看最大限制時間
       </div>
 
 
@@ -794,7 +808,7 @@ export function getSpaHtmlBody(): string {
       <button class="tab-util-btn tab-install-btn" id="tab-install-btn" onclick="showInstallGuide()" style="display:none">
         <span>📲</span>安裝
       </button>
-      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V5.216</span>
+      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V5.217</span>
     </div>
   </div>
 </div>
@@ -824,15 +838,15 @@ export function getSpaHtmlBody(): string {
       <div style="margin-bottom:4px">📱 建議使用 <b>iPad 橫向</b>操作以獲得最佳體驗</div>
       <div style="color:var(--muted)">Best experience on iPad in landscape mode</div>
     </div>
-    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V5.216</div>
+    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V5.217</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
-      <div>CAR 參考面板改為中英對照（①–⑨）；刪除 PIC Discretion requires report；Outstation 圖示改 🛏️；移除底部邏輯說明區塊</div>
-      <div style="opacity:.7">CAR ref panel bilingual notes (①–⑨ EN + ZH); remove PIC Discretion "requires report"; Outstation icon to 🛏️; remove logic note section</div>
+      <div>Timeline 全新配色 + 新增 Ext bar（PIC +2h）；日期選擇器修復 iPad 相容性；計算按鈕改英文</div>
+      <div style="opacity:.7">Timeline new color scheme + Ext bar (PIC +2h); fix date picker for iPad; Calculate button in English</div>
     </div>
-    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V5.215</div>
+    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V5.216</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
-      <div>新增 Time Diff ≥ 6h checkbox；日期改為日曆選擇器（顯示 MM/DD）；CAR 參考面板新增其他重要休時與派遣規定（⑤–⑨）</div>
-      <div style="opacity:.7">Add Time Diff ≥ 6h checkbox; date picker with MM/DD display; add rest &amp; dispatch rules (⑤–⑨) to CAR ref panel</div>
+      <div>CAR 參考面板改為中英對照（①–⑨）；刪除 PIC Discretion requires report；移除底部邏輯說明區塊</div>
+      <div style="opacity:.7">CAR ref panel bilingual notes (①–⑨ EN + ZH); remove PIC Discretion "requires report"; remove logic note section</div>
     </div>
     <button class="install-close-btn" onclick="closeAbout()">關閉</button>
   </div>

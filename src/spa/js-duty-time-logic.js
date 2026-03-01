@@ -19,18 +19,14 @@ function dtInitDates() {
   });
 }
 
-function dtOpenDate(inputId, btn) {
-  var inp = document.getElementById(inputId);
-  inp.onchange = function() {
-    if (inp.value) {
-      var parts = inp.value.split('-');
-      btn.textContent = parts[1]+'/'+parts[2];
-    } else {
-      btn.textContent = '--/--';
-    }
-  };
-  if (inp.showPicker) { inp.showPicker(); }
-  else { inp.focus(); inp.click(); }
+function dtDateChanged(inp) {
+  var btn = document.getElementById(inp.id+'-btn');
+  if (inp.value) {
+    var parts = inp.value.split('-');
+    btn.textContent = parts[1]+'/'+parts[2];
+  } else {
+    btn.textContent = '--/--';
+  }
 }
 
 function dtGetTzOffset(tzId) {
@@ -56,9 +52,10 @@ function dtFmtH(m) { // "HH:MM" for timeline labels
   return h+':'+(mm<10?'0':'')+mm;
 }
 
-function dtRenderTimeline(startMin, endMin, maxFdp, restStart, restEnd, minRest, tz) {
+function dtRenderTimeline(startMin, endMin, maxFdp, restStart, restEnd, minRest, tz, disc) {
   try {
   var actFdp = endMin - startMin;
+  var baseFdp = disc ? maxFdp - 2*60 : maxFdp;
   var spanEnd = restEnd !== null
     ? Math.max(startMin + maxFdp, restEnd) + 60
     : startMin + maxFdp + minRest + 60;
@@ -74,8 +71,18 @@ function dtRenderTimeline(startMin, endMin, maxFdp, restStart, restEnd, minRest,
   // Bars
   setBar('dt-bar-fdp', 0, actFdp);
   document.getElementById('dt-lbl-fdp').textContent = 'Actual FDP ' + dtFmtH(actFdp);
-  setBar('dt-bar-maxfdp', 0, maxFdp);
-  document.getElementById('dt-lbl-maxfdp').textContent = 'Max ' + dtFmtH(maxFdp);
+  setBar('dt-bar-maxfdp', 0, disc ? baseFdp : maxFdp);
+  document.getElementById('dt-lbl-maxfdp').textContent = 'Max ' + dtFmtH(disc ? baseFdp : maxFdp);
+
+  // Ext bar (PIC Discretion +2h)
+  var extEl = document.getElementById('dt-bar-ext');
+  if (disc) {
+    extEl.style.display = 'flex';
+    setBar('dt-bar-ext', baseFdp, 2*60);
+    document.getElementById('dt-lbl-ext').textContent = 'PIC +2h';
+  } else {
+    extEl.style.display = 'none';
+  }
   setBar('dt-bar-minrest', actFdp, minRest);
   document.getElementById('dt-lbl-minrest').textContent = 'Min Req ' + dtFmtH(minRest);
 
@@ -333,7 +340,7 @@ function dtCalculate() {
   }
 
   // CSS percentages recalculate on reflow, no timing hacks needed
-  dtRenderTimeline(startMin, endMin, maxFdp, restStart, restEnd, minRest, tz);
+  dtRenderTimeline(startMin, endMin, maxFdp, restStart, restEnd, minRest, tz, disc);
 }
 
 // ── Boot ─────────────────────────────────────────────────────────────────────
