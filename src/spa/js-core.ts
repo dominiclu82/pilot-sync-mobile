@@ -30,9 +30,11 @@ function togglePwVisibility() {
   if (!inp) return;
   if (inp.type === 'password') {
     inp.type = 'text';
+    btn.textContent = '\u25CE';
     btn.style.opacity = '1';
   } else {
     inp.type = 'password';
+    btn.textContent = '\u25C9';
     btn.style.opacity = '.5';
   }
 }
@@ -376,16 +378,15 @@ function parseAtisHtml(html) {
 function toggleTheme() {
   const html = document.documentElement;
   const icon = document.getElementById('theme-icon');
-  const label = document.getElementById('theme-label');
   if (html.dataset.theme === 'light') {
     // 目前日間 → 切換回夜間
     delete html.dataset.theme;
-    icon.textContent = '☀️'; label.textContent = '日間';  // 夜間模式下顯示「切到日間」
+    icon.textContent = '☀️';
     localStorage.setItem('crewsync_theme', 'dark');
   } else {
     // 目前夜間 → 切換到日間
     html.dataset.theme = 'light';
-    icon.textContent = '🌙'; label.textContent = '夜間';  // 日間模式下顯示「切到夜間」
+    icon.textContent = '🌙';
     localStorage.setItem('crewsync_theme', 'light');
   }
 }
@@ -393,9 +394,7 @@ function toggleTheme() {
   if (localStorage.getItem('crewsync_theme') === 'light') {
     document.documentElement.dataset.theme = 'light';
     document.getElementById('theme-icon').textContent = '🌙';
-    document.getElementById('theme-label').textContent = '夜間';
   }
-  // 預設夜間模式 → 初始 HTML 已顯示 ☀️ 日間，不需額外處理
 })();
 
 // ── Cold Temperature Altitude Correction ──────────────────────────────────────

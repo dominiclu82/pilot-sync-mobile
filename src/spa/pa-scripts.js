@@ -788,4 +788,64 @@ function paSwitchCat(cat, btn) {
   }
   _paInitListeners();
   _paRestoreValues();
+  _paInjectNotes(cat);
+}
+
+function _paInjectNotes(cat) {
+  var script = document.querySelector('#pa-content .pa-script');
+  if (!script) return;
+  var langs = script.querySelectorAll('.pa-lang');
+  var lastEn = null, lastZh = null;
+  langs.forEach(function(el) {
+    var txt = el.textContent.trim();
+    if (txt === 'English') lastEn = el;
+    else if (txt === '中文') lastZh = el;
+  });
+  // Find the content div after each last pa-lang
+  var enContent = lastEn ? _paFindContent(lastEn) : null;
+  var zhContent = lastZh ? _paFindContent(lastZh) : null;
+  if (enContent) enContent.after(_paBuildNoteBlock(cat, 'en', '📝 My notes', 'Write your own version here...'));
+  if (zhContent) zhContent.after(_paBuildNoteBlock(cat, 'zh', '📝 我的筆記', '寫下你自己的版本...'));
+}
+
+function _paFindContent(langEl) {
+  // Find the next sibling that is a content div (not pa-lang, not pa-sub, not pa-note)
+  var el = langEl.nextElementSibling;
+  var last = null;
+  while (el) {
+    if (el.classList.contains('pa-lang') || el.classList.contains('pa-sub')) break;
+    if (!el.classList.contains('pa-note') && !el.classList.contains('pa-note-block')) last = el;
+    el = el.nextElementSibling;
+  }
+  return last;
+}
+
+function _paBuildNoteBlock(cat, lang, label, placeholder) {
+  var key = 'crewsync_pa_note_' + cat + '_' + lang;
+  var saved = '';
+  try { saved = localStorage.getItem(key) || ''; } catch(e){}
+  var block = document.createElement('div');
+  block.className = 'pa-note-block';
+  var btn = document.createElement('button');
+  btn.className = 'pa-note-toggle';
+  btn.textContent = label;
+  var ta = document.createElement('textarea');
+  ta.className = 'pa-note-area';
+  ta.placeholder = placeholder;
+  ta.value = saved;
+  if (saved) {
+    ta.style.display = 'block';
+  } else {
+    ta.style.display = 'none';
+  }
+  btn.addEventListener('click', function() {
+    ta.style.display = ta.style.display === 'none' ? 'block' : 'none';
+    if (ta.style.display === 'block') ta.focus();
+  });
+  ta.addEventListener('input', function() {
+    try { localStorage.setItem(key, ta.value); } catch(e){}
+  });
+  block.appendChild(btn);
+  block.appendChild(ta);
+  return block;
 }

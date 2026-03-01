@@ -1,7 +1,7 @@
 // ── Gate Info ──────────────────────────────────────────────────────────────────
 var gateFlightsLoaded = false;
 var gateFlightsList = [];
-var giSortKey = 'sta';
+var giSortKey = 'dest';
 var giSortAsc = true;
 var _giSelectedDate = null; // null = today, 'YYYY/MM/DD' = specific date
 var _giFirstScrollDone = false;
@@ -108,6 +108,20 @@ function giMakeRow(f) {
   });
 
   return tr;
+}
+
+function toggleGiView() {
+  var tab = document.getElementById('tab-gate');
+  var btn = document.getElementById('gi-view-btn');
+  if (tab.classList.contains('gi-view-dest')) {
+    tab.classList.remove('gi-view-dest');
+    tab.classList.add('gi-view-orig');
+    btn.textContent = '🛬 Dest';
+  } else {
+    tab.classList.remove('gi-view-orig');
+    tab.classList.add('gi-view-dest');
+    btn.textContent = '🛫 Orig';
+  }
 }
 
 function toggleGiTime() {
@@ -712,7 +726,7 @@ function _giHighlightCurrentSlot() {
   var allThs = document.querySelectorAll('#gi-table thead th.gi-sortable, #gi-pinned-table thead th.gi-sortable');
   allThs.forEach(function(th) {
     var onclick = th.getAttribute('onclick') || '';
-    if (onclick.indexOf("'sta'") >= 0) {
+    if (onclick.indexOf("'dest'") >= 0) {
       th.classList.add('gi-sort-asc');
     }
   });

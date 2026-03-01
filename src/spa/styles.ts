@@ -31,6 +31,8 @@ body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSy
 .tab-util-btn{background:none;border:none;color:var(--muted);font-size:1em;font-weight:600;
   cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:1px;padding:0;-webkit-appearance:none}
 .tab-util-btn span{font-size:1.3em;line-height:1}
+.font-size-wrap{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px}
+@media(min-width:500px){.font-size-wrap{flex-direction:row;gap:4px}}
 .font-size-btn{font-weight:700;padding:2px 6px;border:1px solid var(--dim)!important;border-radius:4px}
 .font-size-btn-sm{font-size:.7em!important}
 .font-size-btn-lg{font-size:1em!important}
@@ -439,7 +441,28 @@ html:has(#tab-briefing.tab-active #briefing-coldtemp.active) #tab-briefing.tab-a
 .gi-test-row{background:#f59e0b11}
 .gi-test-row td{color:#f59e0b;font-size:.82em}
 .gi-hide-time .gi-time-col{display:none}
+.gi-view-dest .gi-table :is(th,td):nth-child(2),
+.gi-view-dest .gi-table :is(th,td):nth-child(3),
+.gi-view-dest .gi-table :is(th,td):nth-child(4),
+.gi-view-dest .gi-table :is(th,td):nth-child(5){display:none}
+.gi-view-orig .gi-table :is(th,td):nth-child(8),
+.gi-view-orig .gi-table :is(th,td):nth-child(9),
+.gi-view-orig .gi-table :is(th,td):nth-child(10),
+.gi-view-orig .gi-table :is(th,td):nth-child(11){display:none}
+@media(min-width:1024px){
+.gi-view-dest .gi-table :is(th,td):nth-child(2),
+.gi-view-dest .gi-table :is(th,td):nth-child(3),
+.gi-view-dest .gi-table :is(th,td):nth-child(4),
+.gi-view-dest .gi-table :is(th,td):nth-child(5),
+.gi-view-orig .gi-table :is(th,td):nth-child(8),
+.gi-view-orig .gi-table :is(th,td):nth-child(9),
+.gi-view-orig .gi-table :is(th,td):nth-child(10),
+.gi-view-orig .gi-table :is(th,td):nth-child(11){display:table-cell}
+.gi-view-btn{display:none!important}
+}
 .gi-header-btns{display:flex;gap:8px;align-items:center}
+.gi-view-btn{background:none;color:var(--muted);border:1.5px solid var(--dim);border-radius:8px;
+  padding:8px 12px;font-size:.82em;font-weight:600;cursor:pointer;white-space:nowrap;-webkit-appearance:none}
 .gi-time-btn{background:none;color:var(--muted);border:1.5px solid var(--dim);border-radius:8px;
   padding:8px 12px;font-size:.82em;font-weight:600;cursor:pointer;white-space:nowrap;-webkit-appearance:none}
 .gi-time-btn-on{border-color:var(--accent);color:var(--accent)}
@@ -509,6 +532,15 @@ html:has(#tab-briefing.tab-active #briefing-coldtemp.active) #tab-briefing.tab-a
 .pa-script .pa-note{font-size:.82em;color:var(--muted);font-style:italic;margin-bottom:10px;line-height:1.5}
 .pa-script .pa-sub{font-weight:600;color:var(--muted);margin:12px 0 4px;font-size:.9em}
 .pa-script .pa-choice{color:var(--muted);font-style:italic}
+.pa-note-block{margin-top:10px;padding-top:8px;border-top:1px dashed var(--dim)}
+.pa-note-toggle{background:none;border:none;color:var(--muted);font-size:.78em;
+  cursor:pointer;padding:4px 0;-webkit-appearance:none}
+.pa-note-toggle:active{opacity:.6}
+.pa-note-area{width:100%;min-height:60px;padding:8px;margin-top:4px;box-sizing:border-box;
+  background:var(--surface);border:1px solid var(--dim);border-radius:6px;
+  color:var(--text);font-size:.82em;line-height:1.5;resize:vertical;
+  font-family:inherit;-webkit-appearance:none}
+.pa-note-area::placeholder{color:var(--dim)}
 .pa-input{border:none;border-bottom:1.5px dashed var(--accent);background:transparent;color:var(--accent);
   font-size:1em;font-weight:600;text-align:center;padding:0 4px;min-width:60px;width:auto;
   font-family:inherit;line-height:inherit;-webkit-appearance:none}
@@ -517,7 +549,7 @@ html:has(#tab-briefing.tab-active #briefing-coldtemp.active) #tab-briefing.tab-a
 .pa-input-num{min-width:30px;max-width:50px}
 @media(orientation:landscape) and (min-width:768px){
 .pa-split{flex-direction:row}
-.pa-left{width:420px;flex-shrink:0;border-bottom:none;border-right:1px solid var(--dim);max-height:none;overflow-y:auto}
+.pa-left{width:400px;flex-shrink:0;border-bottom:none;border-right:1px solid var(--dim);max-height:none;overflow-y:auto}
 .pa-right{flex:1}
 }
 `;
