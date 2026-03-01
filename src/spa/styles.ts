@@ -424,7 +424,7 @@ input[type=radio]{width:15px;height:15px;aspect-ratio:1;accent-color:var(--accen
   font-size:.68em;color:var(--muted);cursor:pointer;-webkit-appearance:none;white-space:nowrap}
 .gi-time-slot:active{opacity:.6}
 .gi-time-active{background:var(--accent);color:#fff;border-color:var(--accent)}
-.gi-time-current{border-color:#4ade80!important}
+.gi-time-current{border-color:#3b82f6!important;border-width:2px}
 .gi-status{text-align:center;padding:32px 16px;color:var(--muted);font-size:.88em}
 .gi-table-wrap{flex:1;overflow:auto;-webkit-overflow-scrolling:touch;min-height:0;overscroll-behavior:none}
 .gi-table{table-layout:fixed;border-collapse:collapse;font-size:.75em;width:100%;min-width:900px}

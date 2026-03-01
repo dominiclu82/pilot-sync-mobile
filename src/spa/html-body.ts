@@ -383,22 +383,22 @@ export function getSpaHtmlBody(): string {
           <label class="dt-chk-label">
             <input type="checkbox" id="dt-accom" onchange="dtToggleAccom()">
           </label>
-          <span style="font-size:.72em;color:var(--dim);flex-shrink:0">Rest at an Appropriate Accommodation</span>
+          <span style="font-size:.78em;color:var(--text);flex-shrink:0">Rest at an Appropriate Accommodation</span>
           <input class="dt-time-box" type="text" id="dt-accom-h" placeholder="H" maxlength="2" inputmode="numeric" style="width:36px" oninput="dtUpdateAccomHint()">
           <span class="dt-sep">hr</span>
           <input class="dt-time-box" type="text" id="dt-accom-m" placeholder="MM" maxlength="2" inputmode="numeric" style="width:36px" oninput="dtUpdateAccomHint()">
           <span class="dt-sep">min</span>
         </div>
         <div id="dt-accom-detail" style="display:none;padding:0 4px;margin-bottom:4px">
-          <div style="display:flex;gap:12px;font-size:.75em;color:var(--text)">
+          <div style="display:flex;gap:12px;font-size:.78em;color:var(--text)">
             <label><input type="radio" name="dt-accom-type" value="notstart" checked onchange="dtUpdateAccomHint()"> First Sector Not Start</label>
             <label><input type="radio" name="dt-accom-type" value="start" onchange="dtUpdateAccomHint()"> First Sector Start</label>
           </div>
-          <div id="dt-accom-hint" style="font-size:.68em;color:var(--muted);margin-top:4px">* Actual FDP deducted by rest duration</div>
+          <div id="dt-accom-hint" style="font-size:.75em;color:var(--text);margin-top:4px">* Actual FDP deducted by rest duration</div>
         </div>
-        <div id="dt-accom-err" style="display:none;font-size:.72em;color:#ef4444;padding:0 4px;margin-bottom:4px"></div>
+        <div id="dt-accom-err" style="display:none;font-size:.78em;color:#ef4444;padding:0 4px;margin-bottom:4px"></div>
         <div class="dt-opt-row" style="margin-bottom:4px">
-          <span style="font-size:.72em;color:var(--dim);flex-shrink:0">時區</span>
+          <span style="font-size:.78em;color:var(--text);flex-shrink:0">時區</span>
           <select class="dt-tz-select" id="dt-tz">
             <option value="taipei" selected>台北 UTC+8</option>
             <option value="tokyo">東京 UTC+9</option>
@@ -542,7 +542,7 @@ export function getSpaHtmlBody(): string {
               <div id="dt-bar-maxfdp" style="position:absolute;top:34px;height:28px;background:repeating-linear-gradient(-45deg,#3b82f6 0,#3b82f6 7px,#60a5fa 7px,#60a5fa 14px);border-radius:4px;display:flex;align-items:center;overflow:hidden;z-index:2">
                 <span id="dt-lbl-maxfdp" style="font-size:.65em;font-weight:700;color:#fff;white-space:nowrap;padding:0 6px"></span>
               </div>
-              <div id="dt-bar-ext" style="position:absolute;top:34px;height:28px;background:repeating-linear-gradient(-45deg,#e11d48 0,#e11d48 7px,#f43f5e 7px,#f43f5e 14px);border-radius:4px;display:flex;align-items:center;overflow:hidden;display:none;z-index:2">
+              <div id="dt-bar-ext" style="position:absolute;top:34px;height:28px;background:repeating-linear-gradient(-45deg,#e11d48 0,#e11d48 7px,#f43f5e 7px,#f43f5e 14px);border-radius:4px;display:flex;align-items:center;overflow:visible;display:none;z-index:2">
                 <span id="dt-lbl-ext" style="font-size:.65em;font-weight:700;color:#fff;white-space:nowrap;padding:0 6px"></span>
               </div>
               <div id="dt-bar-minrest" style="position:absolute;top:68px;height:28px;background:repeating-linear-gradient(-45deg,#d97706 0,#d97706 7px,#f59e0b 7px,#f59e0b 14px);border-radius:4px;display:flex;align-items:center;overflow:hidden;z-index:2">
@@ -828,7 +828,7 @@ export function getSpaHtmlBody(): string {
       <button class="tab-util-btn tab-install-btn" id="tab-install-btn" onclick="showInstallGuide()" style="display:none">
         <span>📲</span>安裝
       </button>
-      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V5.223</span>
+      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V5.224</span>
     </div>
   </div>
 </div>
@@ -858,15 +858,15 @@ export function getSpaHtmlBody(): string {
       <div style="margin-bottom:4px">📱 建議使用 <b>iPad 橫向</b>操作以獲得最佳體驗</div>
       <div style="color:var(--muted)">Best experience on iPad in landscape mode</div>
     </div>
-    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V5.223</div>
+    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V5.224</div>
+    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
+      <div>統一 Accommodation 區域字體大小與顏色；Ext bar 文字不再截斷；Gate Info 時間區間改藍色框</div>
+      <div style="opacity:.7">Unify font size/color in Accommodation area; fix Ext bar label truncation; change Gate Info current time slot to blue border</div>
+    </div>
+    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V5.223</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
       <div>修正 Duty Time 頁面捲動橡皮筋回彈問題</div>
       <div style="opacity:.7">Fix rubber-band overscroll bounce on Duty Time panel</div>
-    </div>
-    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V5.222</div>
-    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
-      <div>Accommodation hint 動態顯示計算數值（切換 radio / 改時間即時更新）；Rest Duration ≤ 3h 即時紅字提示</div>
-      <div style="opacity:.7">Dynamic Accommodation hint showing calculated values on radio/time change; real-time red text warning when Rest Duration ≤ 3h</div>
     </div>
     <button class="install-close-btn" onclick="closeAbout()">關閉</button>
   </div>
