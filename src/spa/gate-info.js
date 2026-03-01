@@ -110,16 +110,33 @@ function giMakeRow(f) {
   return tr;
 }
 
+var _giViewMode = 'dest';
 function toggleGiView() {
-  var tab = document.getElementById('tab-gate');
+  var wrap = document.getElementById('gate-table-wrap');
+  var pw = document.getElementById('gi-pinned-wrap');
   var btn = document.getElementById('gi-view-btn');
-  if (tab.classList.contains('gi-view-dest')) {
-    tab.classList.remove('gi-view-dest');
-    tab.classList.add('gi-view-orig');
+  if (!wrap) return;
+  var stickyCol = document.querySelector('#gi-table thead th.gi-sticky-col');
+  var offset = stickyCol ? stickyCol.offsetWidth : 0;
+  if (_giViewMode === 'dest') {
+    // Scroll to origin columns
+    var origTh = document.querySelector('#gi-table thead th.gi-sortable[onclick*="origin"]');
+    if (origTh) {
+      var pos = origTh.offsetLeft - offset;
+      wrap.scrollLeft = pos;
+      if (pw && pw.style.display !== 'none') pw.scrollLeft = pos;
+    }
+    _giViewMode = 'orig';
     btn.textContent = '🛬 Dest';
   } else {
-    tab.classList.remove('gi-view-orig');
-    tab.classList.add('gi-view-dest');
+    // Scroll to dest columns
+    var destTh = document.querySelector('#gi-table thead th.gi-sortable[onclick*="dest"]');
+    if (destTh) {
+      var pos = destTh.offsetLeft - offset;
+      wrap.scrollLeft = pos;
+      if (pw && pw.style.display !== 'none') pw.scrollLeft = pos;
+    }
+    _giViewMode = 'dest';
     btn.textContent = '🛫 Orig';
   }
 }

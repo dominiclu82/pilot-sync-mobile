@@ -801,51 +801,41 @@ function _paInjectNotes(cat) {
     if (txt === 'English') lastEn = el;
     else if (txt === '中文') lastZh = el;
   });
-  // Find the content div after each last pa-lang
-  var enContent = lastEn ? _paFindContent(lastEn) : null;
-  var zhContent = lastZh ? _paFindContent(lastZh) : null;
-  if (enContent) enContent.after(_paBuildNoteBlock(cat, 'en', '📝 My notes', 'Write your own version here...'));
-  if (zhContent) zhContent.after(_paBuildNoteBlock(cat, 'zh', '📝 我的筆記', '寫下你自己的版本...'));
+  if (lastEn) _paAttachNote(lastEn, cat, 'en', '📝', 'Write your own version here...');
+  if (lastZh) _paAttachNote(lastZh, cat, 'zh', '📝', '寫下你自己的版本...');
 }
 
-function _paFindContent(langEl) {
-  // Find the next sibling that is a content div (not pa-lang, not pa-sub, not pa-note)
-  var el = langEl.nextElementSibling;
-  var last = null;
-  while (el) {
-    if (el.classList.contains('pa-lang') || el.classList.contains('pa-sub')) break;
-    if (!el.classList.contains('pa-note') && !el.classList.contains('pa-note-block')) last = el;
-    el = el.nextElementSibling;
-  }
-  return last;
-}
-
-function _paBuildNoteBlock(cat, lang, label, placeholder) {
+function _paAttachNote(langEl, cat, lang, label, placeholder) {
   var key = 'crewsync_pa_note_' + cat + '_' + lang;
   var saved = '';
   try { saved = localStorage.getItem(key) || ''; } catch(e){}
-  var block = document.createElement('div');
-  block.className = 'pa-note-block';
+  // Button next to language label
   var btn = document.createElement('button');
   btn.className = 'pa-note-toggle';
   btn.textContent = label;
+  langEl.appendChild(btn);
+  // Textarea right after the language label (before content)
   var ta = document.createElement('textarea');
   ta.className = 'pa-note-area';
   ta.placeholder = placeholder;
   ta.value = saved;
-  if (saved) {
-    ta.style.display = 'block';
-  } else {
-    ta.style.display = 'none';
-  }
+  ta.style.display = saved ? 'block' : 'none';
   btn.addEventListener('click', function() {
     ta.style.display = ta.style.display === 'none' ? 'block' : 'none';
-    if (ta.style.display === 'block') ta.focus();
   });
   ta.addEventListener('input', function() {
     try { localStorage.setItem(key, ta.value); } catch(e){}
   });
-  block.appendChild(btn);
-  block.appendChild(ta);
-  return block;
+  langEl.after(ta);
+}
+
+function _paFindContent(langEl) {
+  var el = langEl.nextElementSibling;
+  var last = null;
+  while (el) {
+    if (el.classList.contains('pa-lang') || el.classList.contains('pa-sub')) break;
+    if (el.tagName !== 'TEXTAREA' && !el.classList.contains('pa-note-block')) last = el;
+    el = el.nextElementSibling;
+  }
+  return last;
 }

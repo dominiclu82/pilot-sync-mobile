@@ -625,7 +625,7 @@ export function getSpaHtmlBody(): string {
 </div><!-- end tab-briefing -->
 
 <!-- ══ Tab: Gate Info ═══════════════════════════════════════════════ -->
-<div id="tab-gate" class="gi-view-dest" style="display:none">
+<div id="tab-gate" style="display:none">
 
   <div id="gate-content" style="display:flex;flex-direction:column">
     <div class="gi-header">
@@ -641,8 +641,10 @@ export function getSpaHtmlBody(): string {
         <div style="font-size:.62em;color:var(--muted);margin-top:1px">跨午夜抵達航班請切換至次日查詢 / For post-midnight arrivals, switch to the next day</div>
       </div>
       <div class="gi-header-btns">
-        <button class="gi-view-btn" id="gi-view-btn" onclick="toggleGiView()">🛫 Orig</button>
-        <button class="gi-time-btn" id="gi-time-btn" onclick="toggleGiTime()">⏱ STD/STA</button>
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <button class="gi-time-btn" id="gi-time-btn" onclick="toggleGiTime()">⏱ STD/STA</button>
+          <button class="gi-view-btn" id="gi-view-btn" onclick="toggleGiView()">🛫 Orig</button>
+        </div>
         <button class="gi-refresh-btn" onclick="refreshGateFlights()">🔄 更新</button>
       </div>
     </div>
@@ -753,7 +755,7 @@ export function getSpaHtmlBody(): string {
       <button class="tab-util-btn tab-install-btn" id="tab-install-btn" onclick="showInstallGuide()" style="display:none">
         <span>📲</span>安裝
       </button>
-      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V5.202</span>
+      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V5.203</span>
     </div>
   </div>
 </div>
@@ -783,25 +785,15 @@ export function getSpaHtmlBody(): string {
       <div style="margin-bottom:4px">📱 建議使用 <b>iPad 橫向</b>操作以獲得最佳體驗</div>
       <div style="color:var(--muted)">Best experience on iPad in landscape mode</div>
     </div>
-    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V5.202</div>
+    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V5.203</div>
+    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
+      <div>Gate Info Orig/Dest 按鈕改為捲動切換（不隱藏欄位）；按鈕移至 STD/STA 下方；PA 筆記按鈕移至語言標籤旁；展開不自動跳鍵盤；底部捲動修正</div>
+      <div style="opacity:.7">Gate Info Orig/Dest button scrolls instead of hiding columns; button moved below STD/STA; PA note button moved next to language label; no auto-focus on expand; bottom scroll fix</div>
+    </div>
+    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V5.202</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
       <div>PA 筆記功能（英文/中文各一區，localStorage 持久化）；PA 左欄寬度微調；Gate Info 預設排序改回目的地；時間欄預設隱藏；手機 Orig/Dest 切換按鈕（🛫/🛬）；A+/A- 手機直向上下排列；日夜間按鈕移除中文標籤</div>
       <div style="opacity:.7">PA notes per template (EN/ZH, localStorage persistent); PA left panel width adjusted; Gate Info default sort: destination; time columns hidden by default; mobile Orig/Dest column toggle; A+/A- stacked vertically on portrait; theme toggle: removed Chinese label</div>
-    </div>
-    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V5.106</div>
-    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
-      <div>Gate Info 大改版：新增航司切換（JX / BR / CI / ALL）、時段篩選（全日 / 00-06 / 06-12 / 12-18 / 18-24 / ±2hr）、7 欄可排序（含 STD/ATD/STA/ATA）、預設 STA 升序；密碼小眼睛改為純文字符號；首次授權警告加英文對照</div>
-      <div style="opacity:.7">Gate Info overhaul: airline selector (JX / BR / CI / ALL), time slot filter, 7-column sorting (incl. STD/ATD/STA/ATA), default STA ascending; password eye icon changed to text symbol; first-time auth warning with English translation</div>
-    </div>
-    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V5.105</div>
-    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
-      <div>PA工具/Duty Time subtab bar 固定不捲動；PA 左右面板獨立捲動；Local Time Query 空白移除；航班查詢擴展至前後日；新增 A+/A- 字型大小調整；班表密碼欄新增顯示/隱藏切換</div>
-      <div style="opacity:.7">Fixed subtab bar for PA/Duty Time tabs; independent scrolling for PA split panes; removed Local Time Query spacing; flight lookup now searches today/tomorrow/yesterday; added A+/A- font size controls; added password visibility toggle</div>
-    </div>
-    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V5.104</div>
-    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
-      <div>縮小子分頁按鈕點擊區域至文字範圍，避免選擇機隊時誤觸</div>
-      <div style="opacity:.7">Switching fleet automatically navigates to Airport WX tab</div>
     </div>
     <button class="install-close-btn" onclick="closeAbout()">關閉</button>
   </div>

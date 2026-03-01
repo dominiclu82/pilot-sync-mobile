@@ -441,25 +441,7 @@ html:has(#tab-briefing.tab-active #briefing-coldtemp.active) #tab-briefing.tab-a
 .gi-test-row{background:#f59e0b11}
 .gi-test-row td{color:#f59e0b;font-size:.82em}
 .gi-hide-time .gi-time-col{display:none}
-.gi-view-dest .gi-table :is(th,td):nth-child(2),
-.gi-view-dest .gi-table :is(th,td):nth-child(3),
-.gi-view-dest .gi-table :is(th,td):nth-child(4),
-.gi-view-dest .gi-table :is(th,td):nth-child(5){display:none}
-.gi-view-orig .gi-table :is(th,td):nth-child(8),
-.gi-view-orig .gi-table :is(th,td):nth-child(9),
-.gi-view-orig .gi-table :is(th,td):nth-child(10),
-.gi-view-orig .gi-table :is(th,td):nth-child(11){display:none}
-@media(min-width:1024px){
-.gi-view-dest .gi-table :is(th,td):nth-child(2),
-.gi-view-dest .gi-table :is(th,td):nth-child(3),
-.gi-view-dest .gi-table :is(th,td):nth-child(4),
-.gi-view-dest .gi-table :is(th,td):nth-child(5),
-.gi-view-orig .gi-table :is(th,td):nth-child(8),
-.gi-view-orig .gi-table :is(th,td):nth-child(9),
-.gi-view-orig .gi-table :is(th,td):nth-child(10),
-.gi-view-orig .gi-table :is(th,td):nth-child(11){display:table-cell}
-.gi-view-btn{display:none!important}
-}
+@media(min-width:1024px){.gi-view-btn{display:none!important}}
 .gi-header-btns{display:flex;gap:8px;align-items:center}
 .gi-view-btn{background:none;color:var(--muted);border:1.5px solid var(--dim);border-radius:8px;
   padding:8px 12px;font-size:.82em;font-weight:600;cursor:pointer;white-space:nowrap;-webkit-appearance:none}
@@ -524,7 +506,7 @@ html:has(#tab-briefing.tab-active #briefing-coldtemp.active) #tab-briefing.tab-a
 .pa-cat-btn{padding:6px 12px;border:1.5px solid var(--dim);border-radius:8px;background:none;
   color:var(--muted);font-size:.75em;font-weight:600;cursor:pointer;white-space:nowrap;-webkit-appearance:none}
 .pa-cat-btn.active{border-color:var(--accent);color:var(--accent);background:rgba(99,102,241,.08)}
-.pa-content{flex:1;overflow-y:auto;padding:14px;min-height:0}
+.pa-content{flex:1;overflow-y:auto;padding:14px 14px 40px;min-height:0}
 .pa-placeholder{text-align:center;color:var(--muted);font-size:.85em;padding:40px 20px;line-height:1.8}
 .pa-script{font-size:.85em;line-height:2;color:var(--text)}
 .pa-script .pa-lang{font-weight:700;color:var(--accent);margin:14px 0 6px;font-size:.9em}
@@ -532,10 +514,9 @@ html:has(#tab-briefing.tab-active #briefing-coldtemp.active) #tab-briefing.tab-a
 .pa-script .pa-note{font-size:.82em;color:var(--muted);font-style:italic;margin-bottom:10px;line-height:1.5}
 .pa-script .pa-sub{font-weight:600;color:var(--muted);margin:12px 0 4px;font-size:.9em}
 .pa-script .pa-choice{color:var(--muted);font-style:italic}
-.pa-note-block{margin-top:10px;padding-top:8px;border-top:1px dashed var(--dim)}
-.pa-note-toggle{background:none;border:none;color:var(--muted);font-size:.78em;
-  cursor:pointer;padding:4px 0;-webkit-appearance:none}
-.pa-note-toggle:active{opacity:.6}
+.pa-note-toggle{background:none;border:none;color:var(--muted);font-size:.7em;
+  cursor:pointer;padding:0 0 0 8px;-webkit-appearance:none;vertical-align:middle;opacity:.6}
+.pa-note-toggle:active{opacity:1}
 .pa-note-area{width:100%;min-height:60px;padding:8px;margin-top:4px;box-sizing:border-box;
   background:var(--surface);border:1px solid var(--dim);border-radius:6px;
   color:var(--text);font-size:.82em;line-height:1.5;resize:vertical;
