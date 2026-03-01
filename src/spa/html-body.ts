@@ -42,33 +42,38 @@ export function getSpaHtmlBody(): string {
     <div id="cred-error" class="alert alert-error" style="display:none"></div>
 
     <form id="cred-form" autocomplete="on" onsubmit="submitCredentials(event)">
-      <div class="field">
-        <label>班表帳號</label>
-        <input type="text" id="jx-user" name="username"
-          autocomplete="username" inputmode="numeric" placeholder="員工編號" required>
-      </div>
-      <div class="field" style="margin-top:10px">
-        <label>班表密碼</label>
-        <div class="pw-input-wrap">
-          <input type="password" id="jx-pass" name="password"
-            autocomplete="current-password" placeholder="班表登入密碼">
-          <button type="button" class="pw-eye-btn" id="pw-eye-btn" onclick="togglePwVisibility()">&#9673;</button>
+      <div class="sync-cred-row">
+        <div class="field">
+          <label>班表帳號</label>
+          <input type="text" id="jx-user" name="username"
+            autocomplete="username" inputmode="numeric" placeholder="員工編號" required>
+        </div>
+        <div class="field">
+          <label>班表密碼</label>
+          <div class="pw-input-wrap">
+            <input type="password" id="jx-pass" name="password"
+              autocomplete="current-password" placeholder="班表登入密碼">
+            <button type="button" class="pw-eye-btn" id="pw-eye-btn" onclick="togglePwVisibility()">&#9673;</button>
+          </div>
         </div>
       </div>
       <hr class="sep" style="margin:4px 0">
-      <div style="font-weight:600;font-size:.9em">同步月份</div>
-      <div class="month-row">
-        <div class="field">
-          <label>年</label>
-          <select id="sync-year"></select>
+      <div class="sync-month-row">
+        <div>
+          <div style="font-weight:600;font-size:.9em">同步月份</div>
+          <div class="month-row">
+            <div class="field">
+              <label>年</label>
+              <select id="sync-year"></select>
+            </div>
+            <div class="field">
+              <label>月</label>
+              <select id="sync-month"></select>
+            </div>
+          </div>
         </div>
-        <div class="field">
-          <label>月</label>
-          <select id="sync-month"></select>
-        </div>
+        <button type="submit" class="btn btn-primary sync-submit-btn">🚀 開始同步</button>
       </div>
-      <div style="height:4px"></div>
-      <button type="submit" class="btn btn-primary">🚀 開始同步</button>
     </form>
     <div style="display:flex;justify-content:center;gap:16px;margin-top:10px">
       <button class="link-btn" onclick="showSettings()">⚙️ 設定</button>
@@ -755,7 +760,7 @@ export function getSpaHtmlBody(): string {
       <button class="tab-util-btn tab-install-btn" id="tab-install-btn" onclick="showInstallGuide()" style="display:none">
         <span>📲</span>安裝
       </button>
-      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V5.205</span>
+      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V5.206</span>
     </div>
   </div>
 </div>
@@ -785,15 +790,15 @@ export function getSpaHtmlBody(): string {
       <div style="margin-bottom:4px">📱 建議使用 <b>iPad 橫向</b>操作以獲得最佳體驗</div>
       <div style="color:var(--muted)">Best experience on iPad in landscape mode</div>
     </div>
-    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V5.205</div>
+    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V5.206</div>
+    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
+      <div>Gate Info「全日」改「All」；Orig 切換鈕僅手機顯示；密碼顯示鈕加大加深；班表同步頁面平板/筆電雙欄排版</div>
+      <div style="opacity:.7">Gate Info: "全日" → "All"; Orig toggle phone-only; password eye button enlarged; Sync page responsive two-column layout for tablet/laptop</div>
+    </div>
+    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V5.205</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
       <div>Gate Info 時段按鈕「全日」改為「All」；Orig 切換鈕僅手機顯示（平板以上隱藏）</div>
       <div style="opacity:.7">Gate Info: "全日" renamed to "All"; Orig toggle button now hidden on tablet and above</div>
-    </div>
-    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V5.204</div>
-    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
-      <div>PA 左右面板防回彈（overscroll-behavior）；左欄寬度 380px；A+/A- iPad 順序修正（A+ 在右）</div>
-      <div style="opacity:.7">PA panels overscroll bounce fix; left panel width 380px; A+/A- iPad order fix (A+ on right)</div>
     </div>
     <button class="install-close-btn" onclick="closeAbout()">關閉</button>
   </div>
