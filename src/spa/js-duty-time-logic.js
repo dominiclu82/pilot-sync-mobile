@@ -251,9 +251,18 @@ function dtCalculate() {
   var td6   = document.getElementById('dt-td6').checked;
   var accom = document.getElementById('dt-accom').checked;
   var accomMin = 0, accomType = 'notstart';
+  var accomErr = document.getElementById('dt-accom-err');
+  if (accomErr) { accomErr.style.display = 'none'; accomErr.textContent = ''; }
   if (accom) {
     accomMin = (parseInt(document.getElementById('dt-accom-h').value)||0)*60 +
                (parseInt(document.getElementById('dt-accom-m').value)||0);
+    if (accomMin <= 180) {
+      if (accomErr) {
+        accomErr.textContent = '⚠ Rest Duration must be more than 3 hours to apply Accommodation rules.';
+        accomErr.style.display = 'block';
+      }
+      return;
+    }
     accomType = dtGetAccomType();
   }
   var tz    = dtGetTzOffset(document.getElementById('dt-tz').value);
