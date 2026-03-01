@@ -31,6 +31,9 @@ body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSy
 .tab-util-btn{background:none;border:none;color:var(--muted);font-size:1em;font-weight:600;
   cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:1px;padding:0;-webkit-appearance:none}
 .tab-util-btn span{font-size:1.3em;line-height:1}
+.font-size-btn{font-weight:700;padding:2px 6px;border:1px solid var(--dim)!important;border-radius:4px}
+.font-size-btn-sm{font-size:.7em!important}
+.font-size-btn-lg{font-size:1em!important}
 .install-overlay{position:fixed;inset:0;z-index:999;background:rgba(0,0,0,.6);
   display:flex;align-items:center;justify-content:center;padding:24px}
 .install-card{background:var(--card);border-radius:16px;padding:28px 24px;width:100%;
@@ -78,6 +81,10 @@ input,select{width:100%;background:var(--surface);border:1.5px solid var(--dim);
   -webkit-appearance:none;appearance:none}
 input:focus,select:focus{border-color:var(--accent)}
 .field{display:flex;flex-direction:column}
+.pw-input-wrap{position:relative;display:flex;align-items:center}
+.pw-input-wrap input{flex:1;padding-right:36px}
+.pw-eye-btn{position:absolute;right:6px;background:none;border:none;cursor:pointer;font-size:1em;padding:4px;opacity:.5;-webkit-appearance:none}
+.pw-eye-btn:active{opacity:1}
 .btn{display:flex;align-items:center;justify-content:center;gap:8px;
   width:100%;padding:14px;border:none;border-radius:10px;font-size:1em;font-weight:600;
   cursor:pointer;transition:opacity .15s,transform .1s;-webkit-appearance:none}
@@ -152,7 +159,7 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
 .wx-route-btn{padding:4px 10px;font-size:.76em;background:none;border:1.5px solid var(--dim);
   border-radius:14px;color:var(--muted);font-weight:500;cursor:pointer;transition:all .2s;margin:0;-webkit-appearance:none}
 .wx-route-btn.active{background:var(--accent);color:#fff;border-color:var(--accent)}
-#briefing-datis.active{display:flex!important;flex-direction:column;padding:0!important}
+#briefing-datis.active,#briefing-pa.active,#briefing-duty.active{display:flex!important;flex-direction:column;padding:0!important}
 .wx-fixed-header{position:sticky;top:calc(env(safe-area-inset-top,0px) + 60px);z-index:90;background:var(--bg);flex-shrink:0}
 .wx-split{display:flex;flex-direction:column;flex:1}
 .wx-list-pane{border-bottom:1px solid var(--dim)}
@@ -173,17 +180,21 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
   .briefing-panel.active{padding:0}
   /* ── 需要固定高度的 tab：datis 分割面板、HF iframe ── */
   html:has(#tab-briefing.tab-active #briefing-datis.active),html:has(#tab-briefing.tab-active #briefing-hf.active),
+  html:has(#tab-briefing.tab-active #briefing-pa.active),html:has(#tab-briefing.tab-active #briefing-duty.active),
   html:has(#tab-sync.tab-active),html:has(#tab-gate.tab-active){overflow:hidden;height:100dvh}
   html:has(#tab-briefing.tab-active #briefing-datis.active) body,html:has(#tab-briefing.tab-active #briefing-hf.active) body,
+  html:has(#tab-briefing.tab-active #briefing-pa.active) body,html:has(#tab-briefing.tab-active #briefing-duty.active) body,
   html:has(#tab-sync.tab-active) body,html:has(#tab-gate.tab-active) body{overflow:hidden;height:100dvh}
   html:has(#tab-briefing.tab-active #briefing-datis.active) #tab-briefing.tab-active,
-  html:has(#tab-briefing.tab-active #briefing-hf.active) #tab-briefing.tab-active{
+  html:has(#tab-briefing.tab-active #briefing-hf.active) #tab-briefing.tab-active,
+  html:has(#tab-briefing.tab-active #briefing-pa.active) #tab-briefing.tab-active,
+  html:has(#tab-briefing.tab-active #briefing-duty.active) #tab-briefing.tab-active{
     display:flex;flex-direction:column;
     height:calc(100dvh - calc(56px + env(safe-area-inset-bottom,0px)));
     min-height:unset;overflow:hidden;padding:0}
   #tab-sync.tab-active{height:calc(100dvh - calc(56px + env(safe-area-inset-bottom,0px)));
     min-height:unset;overflow-y:auto}
-  #briefing-datis.active{display:flex;flex-direction:column;flex:1;overflow:hidden}
+  #briefing-datis.active,#briefing-pa.active,#briefing-duty.active{display:flex;flex-direction:column;flex:1;overflow:hidden}
   #briefing-hf.active{display:flex;flex-direction:column;flex:1;overflow:hidden;padding:0}
   .wx-fixed-header{position:static;flex-shrink:0}
   .wx-split{flex-direction:row;overflow:hidden;flex:1}
@@ -251,7 +262,7 @@ html:has(#tab-briefing.tab-active #briefing-coldtemp.active) #tab-briefing.tab-a
 .ct-no-corr{background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.3);border-radius:10px;
   padding:12px 16px;color:#4ade80;font-size:.9em;font-weight:600;margin-top:12px;text-align:center}
 /* ── Duty Time ── */
-.dt-wrap{display:flex;flex-direction:column;overflow-y:auto;-webkit-overflow-scrolling:touch}
+.dt-wrap{display:flex;flex-direction:column;flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch}
 .dt-lock-overlay{position:absolute;inset:0;z-index:50;background:var(--bg);display:flex;align-items:center;justify-content:center;padding:24px}
 .dt-lock-card{background:var(--card);border-radius:16px;padding:28px 24px;width:100%;max-width:320px;text-align:center;box-shadow:0 4px 24px rgba(0,0,0,.25)}
 .dt-lock-icon{font-size:2.5em;margin-bottom:10px}
@@ -429,7 +440,7 @@ html:has(#tab-briefing.tab-active #briefing-coldtemp.active) #tab-briefing.tab-a
 .privacy-q:first-child{margin-top:0}
 .privacy-a{font-size:.78em;color:var(--text);line-height:1.65;margin-bottom:4px}
 /* ── PA 工具 ─────────────────────────────────────────── */
-.pa-split{display:flex;flex-direction:column;height:100%;overflow:hidden}
+.pa-split{display:flex;flex-direction:column;flex:1;min-height:0;overflow:hidden}
 .pa-left{padding:12px 14px;border-bottom:1px solid var(--dim);flex-shrink:0;overflow-y:auto;max-height:45%}
 .pa-right{flex:1;display:flex;flex-direction:column;min-height:0;overflow:hidden}
 .pa-section{margin-bottom:20px}
@@ -463,7 +474,7 @@ html:has(#tab-briefing.tab-active #briefing-coldtemp.active) #tab-briefing.tab-a
 .pa-lt-row{background:var(--dim);margin-bottom:4px}
 .pa-lt-sun{font-size:.85em}
 .pa-lt-loading{font-size:.75em;color:var(--muted);padding:4px 0}
-.pa-tz-hint{font-size:.68em;color:var(--accent);padding:12px 0;line-height:1.5}
+.pa-tz-hint{font-size:.68em;color:var(--accent);padding:2px 0 6px;line-height:1.5}
 .pa-tz-link{cursor:pointer;border-bottom:1px dashed var(--muted);transition:color .15s;padding:4px 6px;display:inline-block;border-radius:4px}
 .pa-tz-link:hover{color:var(--accent);background:rgba(59,130,246,.08)}
 .pa-tz-link.pa-tz-selected{color:var(--accent);border-bottom-color:var(--accent);border-bottom-style:solid;background:rgba(59,130,246,.1)}

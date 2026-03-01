@@ -43,8 +43,11 @@ export function getSpaHtmlBody(): string {
       </div>
       <div class="field" style="margin-top:10px">
         <label>班表密碼</label>
-        <input type="password" id="jx-pass" name="password"
-          autocomplete="current-password" placeholder="班表登入密碼">
+        <div class="pw-input-wrap">
+          <input type="password" id="jx-pass" name="password"
+            autocomplete="current-password" placeholder="班表登入密碼">
+          <button type="button" class="pw-eye-btn" id="pw-eye-btn" onclick="togglePwVisibility()">👁</button>
+        </div>
       </div>
       <hr class="sep" style="margin:4px 0">
       <div style="font-weight:600;font-size:.9em">同步月份</div>
@@ -720,11 +723,17 @@ export function getSpaHtmlBody(): string {
         <span id="theme-icon">☀️</span><span id="theme-label">日間</span>
       </button>
     </div>
+    <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center">
+      <div style="display:flex;gap:4px">
+        <button class="tab-util-btn font-size-btn font-size-btn-sm" onclick="adjustFontSize(-1)">A-</button>
+        <button class="tab-util-btn font-size-btn font-size-btn-lg" onclick="adjustFontSize(1)">A+</button>
+      </div>
+    </div>
     <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px">
       <button class="tab-util-btn tab-install-btn" id="tab-install-btn" onclick="showInstallGuide()" style="display:none">
         <span>📲</span>安裝
       </button>
-      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V5.104</span>
+      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V5.105</span>
     </div>
   </div>
 </div>
@@ -754,14 +763,14 @@ export function getSpaHtmlBody(): string {
       <div style="margin-bottom:4px">📱 建議使用 <b>iPad 橫向</b>操作以獲得最佳體驗</div>
       <div style="color:var(--muted)">Best experience on iPad in landscape mode</div>
     </div>
-    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V5.104</div>
+    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V5.105</div>
+    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
+      <div>PA工具/Duty Time subtab bar 固定不捲動；PA 左右面板獨立捲動；Local Time Query 空白移除；航班查詢擴展至前後日；新增 A+/A- 字型大小調整；班表密碼欄新增顯示/隱藏切換</div>
+      <div style="opacity:.7">Fixed subtab bar for PA/Duty Time tabs; independent scrolling for PA split panes; removed Local Time Query spacing; flight lookup now searches today/tomorrow/yesterday; added A+/A- font size controls; added password visibility toggle</div>
+    </div>
+    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V5.104</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
       <div>縮小子分頁按鈕點擊區域至文字範圍，避免選擇機隊時誤觸</div>
-      <div style="opacity:.7">Reduced subtab button tap area to text only, preventing accidental taps when selecting fleet</div>
-    </div>
-    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V5.103</div>
-    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
-      <div>切換機隊時自動跳轉至 Airport WX 分頁</div>
       <div style="opacity:.7">Switching fleet automatically navigates to Airport WX tab</div>
     </div>
     <button class="install-close-btn" onclick="closeAbout()">關閉</button>

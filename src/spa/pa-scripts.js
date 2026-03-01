@@ -377,27 +377,47 @@ function _paLookupLocalTime(input) {
   }, 300);
 }
 
-function _paFltLookupForLT(num) {
-  var doMatch = function() {
-    var dest = _paFltToDest(num);
-    var resultEl = document.getElementById('pa-localtime-result');
-    if (!resultEl) return;
-    if (dest) { _paLtStatus('→ ' + dest, 'ok'); _paOnDestInput(dest); _paShowLocalTime(dest); }
-    else { _paLtStatus('查無 JX' + num, 'warn'); resultEl.innerHTML = ''; _paOnDestInput(''); }
-  };
-  if (_paFidsCache && Date.now() - _paFidsCacheTime < 120000) { doMatch(); return; }
-  fetch('/api/fids').then(function(r) {
+function _paDateOffset(days) {
+  var now = new Date();
+  var tw = new Date(now.getTime() + 8 * 3600000 + days * 86400000);
+  return tw.getUTCFullYear() + '/' +
+    String(tw.getUTCMonth() + 1).padStart(2, '0') + '/' +
+    String(tw.getUTCDate()).padStart(2, '0');
+}
+
+function _paFetchByDate(dateStr) {
+  return fetch('/api/fids?date=' + encodeURIComponent(dateStr)).then(function(r) {
     if (!r.ok) throw new Error('HTTP ' + r.status);
     return r.json();
-  }).then(function(data) {
-    _paFidsCache = data; _paFidsCacheTime = Date.now(); doMatch();
-  }).catch(function() {
-    _paFetchDirect().then(function(data) {
-      _paFidsCache = data; _paFidsCacheTime = Date.now(); doMatch();
-    }).catch(function() {
-      _paLtStatus('連線失敗', 'error');
-    });
   });
+}
+
+function _paFltLookupForLT(num) {
+  if (_paFidsCache && Date.now() - _paFidsCacheTime < 120000) {
+    var dest = _paFltToDest(num);
+    if (dest) { _paLtStatus('→ ' + dest, 'ok'); _paOnDestInput(dest); _paShowLocalTime(dest); return; }
+  }
+  // 今天 → 明天 → 昨天
+  var tryDates = [0, 1, -1];
+  var idx = 0;
+  var tryNext = function() {
+    if (idx >= tryDates.length) {
+      _paLtStatus('查無 JX' + num, 'warn');
+      var resultEl = document.getElementById('pa-localtime-result');
+      if (resultEl) resultEl.innerHTML = '';
+      _paOnDestInput('');
+      return;
+    }
+    var dateStr = _paDateOffset(tryDates[idx]);
+    idx++;
+    _paFetchByDate(dateStr).then(function(data) {
+      _paFidsCache = data; _paFidsCacheTime = Date.now();
+      var dest = _paFltToDest(num);
+      if (dest) { _paLtStatus('→ ' + dest, 'ok'); _paOnDestInput(dest); _paShowLocalTime(dest); }
+      else { tryNext(); }
+    }).catch(function() { tryNext(); });
+  };
+  tryNext();
 }
 
 function _paShowLocalTime(code) {
