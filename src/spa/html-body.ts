@@ -769,7 +769,7 @@ export function getSpaHtmlBody(): string {
       <button class="tab-util-btn tab-install-btn" id="tab-install-btn" onclick="showInstallGuide()" style="display:none">
         <span>📲</span>安裝
       </button>
-      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V5.213</span>
+      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V5.214</span>
     </div>
   </div>
 </div>
@@ -799,15 +799,15 @@ export function getSpaHtmlBody(): string {
       <div style="margin-bottom:4px">📱 建議使用 <b>iPad 橫向</b>操作以獲得最佳體驗</div>
       <div style="color:var(--muted)">Best experience on iPad in landscape mode</div>
     </div>
-    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V5.213</div>
+    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V5.214</div>
+    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
+      <div>Duty Time CAR 參考面板展開不再被壓縮成一行</div>
+      <div style="opacity:.7">Fix CAR 07-02A ref panel being compressed to one line when expanded</div>
+    </div>
+    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V5.213</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
       <div>簡報箱所有子分頁統一固定上下 bar；Duty Time CAR 規定說明展開自動捲動至可見位置</div>
       <div style="opacity:.7">Fix all briefing subtabs to lock top/bottom bars; Duty Time CAR ref panel auto-scrolls into view on expand</div>
-    </div>
-    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V5.212</div>
-    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
-      <div>Duty Time CAR 規定說明展開修復（移除容器捲動限制）</div>
-      <div style="opacity:.7">Fix Duty Time CAR reference panel — remove scroll constraint on wrapper</div>
     </div>
     <button class="install-close-btn" onclick="closeAbout()">關閉</button>
   </div>
