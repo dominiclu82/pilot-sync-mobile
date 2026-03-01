@@ -402,16 +402,14 @@ html:has(#tab-briefing.tab-active #briefing-coldtemp.active) #tab-briefing.tab-a
   border-radius:8px;color:var(--text);font-size:.88em;outline:none;
   font-weight:600;-webkit-appearance:none}
 .gi-search-input::placeholder{color:var(--dim);font-weight:400;font-size:.85em}
-.gi-search-hint{font-size:.58em;color:var(--dim);padding:0 14px 2px;margin-top:-4px}
+.gi-search-hint{font-size:.58em;color:var(--muted);padding:0 14px 2px;margin-top:-4px}
 .gi-search-input:focus{border-color:var(--accent)}
 .gi-time-bar{display:flex;gap:4px;padding:4px 14px 8px;flex-wrap:wrap}
 .gi-time-slot{background:none;border:1px solid var(--dim);border-radius:14px;padding:3px 10px;
   font-size:.68em;color:var(--muted);cursor:pointer;-webkit-appearance:none;white-space:nowrap}
 .gi-time-slot:active{opacity:.6}
 .gi-time-active{background:var(--accent);color:#fff;border-color:var(--accent)}
-.gi-time-current{position:relative}
-.gi-time-current::after{content:'';position:absolute;bottom:-4px;left:50%;transform:translateX(-50%);
-  width:5px;height:5px;border-radius:50%;background:#f59e0b}
+.gi-time-current{border-color:#f59e0b!important}
 .gi-status{text-align:center;padding:32px 16px;color:var(--muted);font-size:.88em}
 .gi-table-wrap{flex:1;overflow:auto;-webkit-overflow-scrolling:touch;min-height:0;overscroll-behavior:none}
 .gi-table{table-layout:fixed;border-collapse:collapse;font-size:.75em;width:100%;min-width:900px}
@@ -428,8 +426,8 @@ html:has(#tab-briefing.tab-active #briefing-coldtemp.active) #tab-briefing.tab-a
 .gi-table th.gi-sortable{color:var(--sort)}
 .gi-sortable:hover{opacity:.8}
 .gi-sortable::after{content:'△▽';margin-left:3px;font-size:.55em;opacity:.7;letter-spacing:-2px}
-.gi-sort-asc::after{content:'▲▽';opacity:1;color:var(--accent-light)}
-.gi-sort-desc::after{content:'△▼';opacity:1;color:var(--accent-light)}
+.gi-sort-asc::after{content:'▲▽';opacity:1;color:var(--sort)}
+.gi-sort-desc::after{content:'△▼';opacity:1;color:var(--sort)}
 .gi-table td{padding:6px 6px;text-align:center;border-bottom:1px solid rgba(148,163,184,.15);
   white-space:nowrap;color:var(--text);overflow:hidden;text-overflow:ellipsis}
 .gi-table tbody tr:hover{background:rgba(59,130,246,.08)}

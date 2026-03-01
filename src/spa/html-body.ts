@@ -754,7 +754,7 @@ export function getSpaHtmlBody(): string {
       <button class="tab-util-btn tab-install-btn" id="tab-install-btn" onclick="showInstallGuide()" style="display:none">
         <span>📲</span>安裝
       </button>
-      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V5.107</span>
+      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V5.201</span>
     </div>
   </div>
 </div>
@@ -784,10 +784,10 @@ export function getSpaHtmlBody(): string {
       <div style="margin-bottom:4px">📱 建議使用 <b>iPad 橫向</b>操作以獲得最佳體驗</div>
       <div style="color:var(--muted)">Best experience on iPad in landscape mode</div>
     </div>
-    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V5.107</div>
+    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V5.201</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
-      <div>Gate Info 表頭改英文（Flight/Origin/Dest/Belt）；可排序欄位以綠色標示；搜尋與排序提示文字；現在時段指示改為橘色小圓點；密碼小眼睛透明度提高</div>
-      <div style="opacity:.7">Gate Info headers switched to English; sortable columns highlighted in green; search & sort hints added; current time slot indicator changed to orange dot; password eye icon opacity increased</div>
+      <div>搜尋提示改純英文；可排序表頭綠色修正；排序箭頭統一綠色；現在時段改橘色外框；預設時段 ±2hr；密碼小眼睛透明度提高</div>
+      <div style="opacity:.7">Search hint English only; sortable headers & arrows unified green; current time slot orange border; default ±2hr; password eye icon opacity increased</div>
     </div>
     <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V5.106</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">

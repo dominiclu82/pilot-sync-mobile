@@ -8,7 +8,7 @@ var _giFirstScrollDone = false;
 var _giRawDep = [];
 var _giRawArr = [];
 var _giAirline = (function(){ try { return localStorage.getItem('crewsync_gi_airline') || 'JX'; } catch(e){ return 'JX'; } })();
-var _giTimeSlot = 'all';
+var _giTimeSlot = '±2hr';
 
 function giFmtTime(t) {
   if (!t) return '';
