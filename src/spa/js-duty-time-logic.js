@@ -335,7 +335,6 @@ function dtCalculate() {
 
   // Show results
   document.getElementById('dt-results-area').style.display = 'block';
-  document.getElementById('dt-placeholder').style.display  = 'none';
 
   // ── If FDP End not provided, hide compliance cards and timeline ────────────
   if (endMin === null) {

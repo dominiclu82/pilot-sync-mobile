@@ -358,6 +358,11 @@ export function getSpaHtmlBody(): string {
 
     <div class="dt-wrap" style="flex:1">
 
+      <!-- Placeholder hint -->
+      <div id="dt-placeholder" style="padding:10px 14px 4px;text-align:center;color:var(--text);font-size:.82em">
+        選好人數並輸入 FDP Start，按「Calculate」即可查看最大限制時間
+      </div>
+
       <!-- Config -->
       <div class="dt-config">
         <div class="dt-section-title">機組配置</div>
@@ -597,11 +602,6 @@ export function getSpaHtmlBody(): string {
         </div>
       </div>
 
-      <!-- Placeholder before calc -->
-      <div id="dt-placeholder" style="padding:32px 14px;text-align:center;color:var(--muted);font-size:.82em">
-        選好人數並輸入 FDP Start，按「Calculate」即可查看最大限制時間
-      </div>
-
       <!-- Reference toggle -->
       <div class="dt-ref-toggle" onclick="dtToggleRef()">
         <span>📋 CAR 07-02A 規定說明</span><span id="dt-ref-arrow">▼</span>
@@ -829,7 +829,7 @@ export function getSpaHtmlBody(): string {
       <button class="tab-util-btn tab-install-btn" id="tab-install-btn" onclick="showInstallGuide()" style="display:none">
         <span>📲</span>安裝
       </button>
-      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V5.225</span>
+      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V5.226</span>
     </div>
   </div>
 </div>
@@ -859,15 +859,15 @@ export function getSpaHtmlBody(): string {
       <div style="margin-bottom:4px">📱 建議使用 <b>iPad 橫向</b>操作以獲得最佳體驗</div>
       <div style="color:var(--muted)">Best experience on iPad in landscape mode</div>
     </div>
-    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V5.225</div>
+    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V5.226</div>
+    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
+      <div>提示文字移至最上方並永遠顯示、顏色改為明顯色</div>
+      <div style="opacity:.7">Move hint text to top (always visible) with brighter color</div>
+    </div>
+    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V5.225</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
       <div>CAR 規定放回捲動區域內；修正 dt-wrap 捲動模式（對齊其他分頁 overscroll-behavior:none）</div>
       <div style="opacity:.7">Move CAR ref panel back into scroll area; fix dt-wrap scroll behavior (align with other tabs using overscroll-behavior:none)</div>
-    </div>
-    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V5.224</div>
-    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
-      <div>統一 Accommodation 區域字體大小與顏色；Ext bar 文字不再截斷；Gate Info 時間區間改藍色框</div>
-      <div style="opacity:.7">Unify font size/color in Accommodation area; fix Ext bar label truncation; change Gate Info current time slot to blue border</div>
     </div>
     <button class="install-close-btn" onclick="closeAbout()">關閉</button>
   </div>
