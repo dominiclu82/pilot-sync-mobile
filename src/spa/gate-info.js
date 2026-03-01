@@ -102,7 +102,13 @@ function giMakeRow(f) {
   cells.forEach(function(c, idx) {
     var td = document.createElement('td');
     td.textContent = c.val;
-    if (idx === 0) td.className = 'gi-fno gi-sticky-col';
+    if (idx === 0) {
+      td.className = 'gi-fno gi-sticky-col';
+      var fno = c.val || '';
+      if (fno.indexOf('JX') === 0) td.style.color = '#B8860B';
+      else if (fno.indexOf('BR') === 0) td.style.color = '#00A651';
+      else if (fno.indexOf('CI') === 0) td.style.color = '#E91E8C';
+    }
     if (timeCols[idx]) td.className = (td.className ? td.className + ' ' : '') + 'gi-time-col';
     tr.appendChild(td);
   });
@@ -119,25 +125,37 @@ function toggleGiView() {
   var stickyCol = document.querySelector('#gi-table thead th.gi-sticky-col');
   var offset = stickyCol ? stickyCol.offsetWidth : 0;
   if (_giViewMode === 'dest') {
-    // Scroll to origin columns
-    var origTh = document.querySelector('#gi-table thead th.gi-sortable[onclick*="origin"]');
-    if (origTh) {
-      var pos = origTh.offsetLeft - offset;
-      wrap.scrollLeft = pos;
-      if (pw && pw.style.display !== 'none') pw.scrollLeft = pos;
-    }
     _giViewMode = 'orig';
     btn.textContent = '🛬 Dest';
+    // Sort by origin (TPE first)
+    giSortKey = 'origin'; giSortAsc = true;
+    _giUpdateSortHeaders('origin');
+    renderGateFlights();
+    // Scroll to origin columns
+    setTimeout(function() {
+      var origTh = document.querySelector('#gi-table thead th.gi-sortable[onclick*="origin"]');
+      if (origTh) {
+        var pos = origTh.offsetLeft - offset;
+        wrap.scrollLeft = pos;
+        if (pw && pw.style.display !== 'none') pw.scrollLeft = pos;
+      }
+    }, 0);
   } else {
-    // Scroll to dest columns
-    var destTh = document.querySelector('#gi-table thead th.gi-sortable[onclick*="dest"]');
-    if (destTh) {
-      var pos = destTh.offsetLeft - offset;
-      wrap.scrollLeft = pos;
-      if (pw && pw.style.display !== 'none') pw.scrollLeft = pos;
-    }
     _giViewMode = 'dest';
     btn.textContent = '🛫 Orig';
+    // Sort by dest (TPE first)
+    giSortKey = 'dest'; giSortAsc = true;
+    _giUpdateSortHeaders('dest');
+    renderGateFlights();
+    // Scroll to dest columns
+    setTimeout(function() {
+      var destTh = document.querySelector('#gi-table thead th.gi-sortable[onclick*="dest"]');
+      if (destTh) {
+        var pos = destTh.offsetLeft - offset;
+        wrap.scrollLeft = pos;
+        if (pw && pw.style.display !== 'none') pw.scrollLeft = pos;
+      }
+    }, 0);
   }
 }
 
@@ -366,6 +384,16 @@ function _giSortList(list) {
   return sorted;
 }
 
+function _giUpdateSortHeaders(key) {
+  var allThs = document.querySelectorAll('#gi-table thead th.gi-sortable, #gi-pinned-table thead th.gi-sortable');
+  allThs.forEach(function(th) { th.classList.remove('gi-sort-asc', 'gi-sort-desc'); });
+  var cls = giSortAsc ? 'gi-sort-asc' : 'gi-sort-desc';
+  allThs.forEach(function(th) {
+    var onclick = th.getAttribute('onclick') || '';
+    if (onclick.indexOf("'" + key + "'") >= 0) th.classList.add(cls);
+  });
+}
+
 function giSort(key) {
   if (giSortKey === key) {
     giSortAsc = !giSortAsc;
@@ -373,18 +401,7 @@ function giSort(key) {
     giSortKey = key;
     giSortAsc = true;
   }
-  // Update header indicators on both tables
-  var allThs = document.querySelectorAll('#gi-table thead th.gi-sortable, #gi-pinned-table thead th.gi-sortable');
-  allThs.forEach(function(th) {
-    th.classList.remove('gi-sort-asc', 'gi-sort-desc');
-  });
-  var cls = giSortAsc ? 'gi-sort-asc' : 'gi-sort-desc';
-  allThs.forEach(function(th) {
-    var onclick = th.getAttribute('onclick') || '';
-    if (onclick.indexOf("'" + key + "'") >= 0) {
-      th.classList.add(cls);
-    }
-  });
+  _giUpdateSortHeaders(key);
   renderGateFlights();
 }
 
