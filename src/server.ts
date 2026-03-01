@@ -250,9 +250,15 @@ interface FaFlightData {
   status: string;
 }
 
-let _faCache: FaCacheEntry = { flights: {}, updatedAt: 0 };
+const _faAirlineConf: Record<string, { icao: string; iata: string }> = {
+  JX: { icao: 'SJX', iata: 'JX' },
+  BR: { icao: 'EVA', iata: 'BR' },
+  CI: { icao: 'CAL', iata: 'CI' }
+};
+const _faCaches: Record<string, FaCacheEntry> = {};
+const _faRefreshing: Record<string, boolean> = {};
 
-function _parseFaPage(html: string): FaFlightData[] {
+function _parseFaPage(html: string, icaoPrefix: string, iataPrefix: string): FaFlightData[] {
   const m = html.match(/trackpollBootstrap\s*=\s*(\{[\s\S]*?\});\s*(?:var\s|<\/script>)/);
   if (!m) return [];
   let data: any;
@@ -268,7 +274,7 @@ function _parseFaPage(html: string): FaFlightData[] {
       const iataDest = dest.iata || dest.altIdent || '';
       // Convert ICAO ident (SJX12) to IATA (JX12)
       const displayIdent = f.displayIdent || id.split('-')[0] || '';
-      const fno = displayIdent.replace(/^SJX/, 'JX');
+      const fno = displayIdent.replace(new RegExp('^' + icaoPrefix), iataPrefix);
       results.push({
         fno,
         origin: { iata: iataOrig, gate: orig.gate || '', terminal: orig.terminal || '' },
@@ -284,27 +290,33 @@ function _parseFaPage(html: string): FaFlightData[] {
   return results;
 }
 
-async function _faFetchFlight(icaoIdent: string): Promise<FaFlightData[]> {
+async function _faFetchFlight(icaoIdent: string, icaoPrefix: string, iataPrefix: string): Promise<FaFlightData[]> {
   try {
     const r = await fetch(_faBase + icaoIdent, { headers: _faHeaders });
     if (!r.ok) return [];
     const html = await r.text();
-    return _parseFaPage(html);
+    return _parseFaPage(html, icaoPrefix, iataPrefix);
   } catch { return []; }
 }
 
-async function _faRefreshCache(): Promise<void> {
-  console.log('[FA] Starting background refresh...');
+async function _faRefreshAirline(airline: string): Promise<void> {
+  const conf = _faAirlineConf[airline];
+  if (!conf) return;
+  if (_faRefreshing[airline]) return;
+  _faRefreshing[airline] = true;
+  console.log('[FA] Starting refresh for', airline, '...');
   try {
-    // Get JX fleet page for active flights
-    const fleetUrl = Buffer.from('aHR0cHM6Ly93d3cuZmxpZ2h0YXdhcmUuY29tL2xpdmUvZmxlZXQvU0pY', 'base64').toString();
+    // Get fleet page for active flights
+    const fleetBase = Buffer.from('aHR0cHM6Ly93d3cuZmxpZ2h0YXdhcmUuY29tL2xpdmUvZmxlZXQv', 'base64').toString();
+    const fleetUrl = fleetBase + conf.icao;
     const r = await fetch(fleetUrl, { headers: _faHeaders });
-    if (!r.ok) { console.error('[FA] Fleet page error:', r.status); return; }
+    if (!r.ok) { console.error('[FA]', airline, 'fleet page error:', r.status); return; }
     const html = await r.text();
 
-    // Extract SJX flight idents from fleet page
+    // Extract flight idents from fleet page
     const identSet = new Set<string>();
-    const identMatches = html.matchAll(/SJX\d+/g);
+    const identRe = new RegExp(conf.icao + '\\d+', 'g');
+    const identMatches = html.matchAll(identRe);
     for (const im of identMatches) identSet.add(im[0]);
 
     // Also add scheduled flights from TPE FIDS if available
@@ -329,60 +341,72 @@ async function _faRefreshCache(): Promise<void> {
         const dep = await dR.json();
         const arr = await aR.json();
         for (const f of [...(dep || []), ...(arr || [])]) {
-          if (f.ACode?.trim() === 'JX') {
+          if (f.ACode?.trim() === airline) {
             const num = (f.FlightNo || '').replace(/\s/g, '');
-            if (num) identSet.add('SJX' + num);
+            if (num) identSet.add(conf.icao + num);
           }
         }
       }
     } catch {}
 
-    console.log('[FA] Found', identSet.size, 'JX flights:', [...identSet].join(', '));
+    console.log('[FA]', airline, 'found', identSet.size, 'flights:', [...identSet].join(', '));
 
     // Today's date range (Taiwan time, with 6h buffer on each side)
     const now = Date.now();
     const tw = new Date(now + 8 * 60 * 60 * 1000);
     const todayStart = new Date(Date.UTC(tw.getUTCFullYear(), tw.getUTCMonth(), tw.getUTCDate()));
-    const rangeStart = todayStart.getTime() - 6 * 60 * 60 * 1000; // 6h before midnight TW
-    const rangeEnd = todayStart.getTime() + 30 * 60 * 60 * 1000;  // 6h after midnight+1 TW
+    const rangeStart = todayStart.getTime() - 6 * 60 * 60 * 1000;
+    const rangeEnd = todayStart.getTime() + 30 * 60 * 60 * 1000;
 
     // Fetch each flight page (with delay to avoid rate limiting)
     const newFlights: Record<string, FaFlightData> = {};
     for (const ident of identSet) {
-      const entries = await _faFetchFlight(ident);
+      const entries = await _faFetchFlight(ident, conf.icao, conf.iata);
       for (const entry of entries) {
         const key = entry.fno;
         if (!key) continue;
-        // Filter: only keep today's flights (by scheduled departure time)
         const depTime = entry.scheduledDep ? new Date(entry.scheduledDep).getTime() : 0;
         const arrTime = entry.scheduledArr ? new Date(entry.scheduledArr).getTime() : 0;
         const refTime = depTime || arrTime;
         if (refTime && (refTime < rangeStart || refTime > rangeEnd)) continue;
-        // Prefer entry with gate data
         if (!newFlights[key] || entry.origin.gate || entry.destination.gate) {
           newFlights[key] = entry;
         }
       }
-      // Small delay between requests
       await new Promise(ok => setTimeout(ok, 500));
     }
 
-    _faCache = { flights: newFlights, updatedAt: Date.now() };
-    console.log('[FA] Cache updated:', Object.keys(newFlights).length, 'flights');
+    _faCaches[airline] = { flights: newFlights, updatedAt: Date.now() };
+    console.log('[FA]', airline, 'cache updated:', Object.keys(newFlights).length, 'flights');
   } catch (e: any) {
-    console.error('[FA] Refresh error:', e.message);
+    console.error('[FA]', airline, 'refresh error:', e.message);
+  } finally {
+    _faRefreshing[airline] = false;
   }
 }
 
-// Start background refresh: immediately + every 5 minutes
-setTimeout(() => _faRefreshCache(), 5000);
-setInterval(() => _faRefreshCache(), 5 * 60 * 1000);
+// Background refresh: JX only, immediately + every 5 minutes
+setTimeout(() => _faRefreshAirline('JX'), 5000);
+setInterval(() => _faRefreshAirline('JX'), 5 * 60 * 1000);
 
-app.get('/api/fids-fa', (_req, res) => {
+app.get('/api/fids-fa', (req, res) => {
+  const airline = (typeof req.query.airline === 'string' ? req.query.airline : 'JX').toUpperCase();
+  if (!_faAirlineConf[airline]) {
+    return res.json({ flights: {}, updatedAt: null, count: 0 });
+  }
+  const cache = _faCaches[airline];
+  if (!cache || !cache.updatedAt) {
+    _faRefreshAirline(airline);
+    return res.json({ flights: {}, updatedAt: null, count: 0, refreshing: true });
+  }
+  // BR/CI: trigger background refresh if cache > 10 minutes old
+  if (airline !== 'JX' && Date.now() - cache.updatedAt > 10 * 60 * 1000) {
+    _faRefreshAirline(airline);
+  }
   res.json({
-    flights: _faCache.flights,
-    updatedAt: _faCache.updatedAt ? new Date(_faCache.updatedAt).toISOString() : null,
-    count: Object.keys(_faCache.flights).length
+    flights: cache.flights,
+    updatedAt: cache.updatedAt ? new Date(cache.updatedAt).toISOString() : null,
+    count: Object.keys(cache.flights).length
   });
 });
 

@@ -22,13 +22,19 @@ export function getSpaHtmlBody(): string {
           onclick="doGoogleAuth()" style="width:auto;padding:6px 12px;font-size:.82em">授權</button>
       </div>
       <details class="how-to" style="background:var(--surface);border-radius:8px">
-        <summary>🔐 首次授權出現警告？</summary>
+        <summary>🔐 首次授權出現警告？/ Warning on first authorization?</summary>
         <div class="how-to-body">
           <div class="how-to-os">
             Google 會顯示「這個應用程式未經驗證」的警告畫面，這是正常的：<br><br>
             1. 點左下角「<b>進階</b>」<br>
             2. 點「<b>前往 crew-sync.onrender.com（不安全）</b>」<br>
-            3. 點「<b>繼續</b>」完成授權
+            3. 點「<b>繼續</b>」完成授權<br><br>
+            <span style="color:var(--muted)">
+            Google may show a "Google hasn't verified this app" warning — this is normal:<br><br>
+            1. Click "<b>Advanced</b>" at bottom-left<br>
+            2. Click "<b>Go to crew-sync.onrender.com (unsafe)</b>"<br>
+            3. Click "<b>Continue</b>" to complete authorization
+            </span>
           </div>
         </div>
       </details>
@@ -46,7 +52,7 @@ export function getSpaHtmlBody(): string {
         <div class="pw-input-wrap">
           <input type="password" id="jx-pass" name="password"
             autocomplete="current-password" placeholder="班表登入密碼">
-          <button type="button" class="pw-eye-btn" id="pw-eye-btn" onclick="togglePwVisibility()">👁</button>
+          <button type="button" class="pw-eye-btn" id="pw-eye-btn" onclick="togglePwVisibility()">&#9673;</button>
         </div>
       </div>
       <hr class="sep" style="margin:4px 0">
@@ -635,18 +641,32 @@ export function getSpaHtmlBody(): string {
         <div style="font-size:.62em;color:var(--muted);margin-top:1px">跨午夜抵達航班請切換至次日查詢 / For post-midnight arrivals, switch to the next day</div>
       </div>
       <div class="gi-header-btns">
-        <button class="gi-time-btn" id="gi-time-btn" onclick="toggleGiTime()">⏱ STD/STA</button>
+        <button class="gi-time-btn gi-time-btn-on" id="gi-time-btn" onclick="toggleGiTime()">⏱ STD/STA</button>
         <button class="gi-refresh-btn" onclick="refreshGateFlights()">🔄 更新</button>
       </div>
     </div>
-    <div class="gi-search-bar">
-      <span class="gi-search-label">輸入航班號 / 機場代碼 / 機場名搜尋</span>
-      <input type="text" id="gate-search" class="gi-search-input" placeholder="搜尋..." oninput="filterGateFlights()">
-      <span class="gi-search-hint">點選「航班 / 出發地 / 目的地」欄位可排序</span>
+    <div class="gi-filter-bar">
+      <div class="gi-search-bar">
+        <div class="gi-airline-btns">
+          <button class="gi-airline-btn" data-airline="JX" onclick="giSetAirline('JX')" style="color:#B8860B">JX</button>
+          <button class="gi-airline-btn" data-airline="BR" onclick="giSetAirline('BR')" style="color:#00A651">BR</button>
+          <button class="gi-airline-btn" data-airline="CI" onclick="giSetAirline('CI')" style="color:#E91E8C">CI</button>
+          <button class="gi-airline-btn" data-airline="ALL" onclick="giSetAirline('ALL')" style="color:var(--muted)">ALL</button>
+        </div>
+        <input type="text" id="gate-search" class="gi-search-input" placeholder="搜尋..." oninput="filterGateFlights()">
+      </div>
+      <div class="gi-time-bar">
+        <button class="gi-time-slot" data-slot="all" onclick="giSetTimeSlot('all')">全日</button>
+        <button class="gi-time-slot" data-slot="00-06" onclick="giSetTimeSlot('00-06')">00-06</button>
+        <button class="gi-time-slot" data-slot="06-12" onclick="giSetTimeSlot('06-12')">06-12</button>
+        <button class="gi-time-slot" data-slot="12-18" onclick="giSetTimeSlot('12-18')">12-18</button>
+        <button class="gi-time-slot" data-slot="18-24" onclick="giSetTimeSlot('18-24')">18-24</button>
+        <button class="gi-time-slot" data-slot="±2hr" onclick="giSetTimeSlot('±2hr')">±2hr</button>
+      </div>
     </div>
     <div id="gi-pinned-wrap" class="gi-pinned-wrap" style="display:none">
       <div id="gi-pinned-header" class="gi-pinned-header-bar"></div>
-      <table class="gi-table gi-hide-time" id="gi-pinned-table">
+      <table class="gi-table" id="gi-pinned-table">
         <thead>
           <tr>
             <th class="gi-sticky-col gi-sortable" onclick="giSort('fno')">航班</th>
@@ -654,14 +674,14 @@ export function getSpaHtmlBody(): string {
             <th>Terminal</th>
             <th>Check-in</th>
             <th>Gate</th>
-            <th class="gi-time-col">STD</th>
-            <th class="gi-time-col">ATD</th>
+            <th class="gi-time-col gi-sortable" onclick="giSort('std')">STD</th>
+            <th class="gi-time-col gi-sortable" onclick="giSort('atd')">ATD</th>
             <th class="gi-sortable" onclick="giSort('dest')">目的地</th>
             <th>Terminal</th>
             <th>Parking</th>
             <th>轉盤</th>
-            <th class="gi-time-col">STA</th>
-            <th class="gi-time-col">ATA</th>
+            <th class="gi-time-col gi-sortable" onclick="giSort('sta')">STA</th>
+            <th class="gi-time-col gi-sortable" onclick="giSort('ata')">ATA</th>
           </tr>
         </thead>
         <tbody id="gi-pinned-tbody"></tbody>
@@ -669,7 +689,7 @@ export function getSpaHtmlBody(): string {
     </div>
     <div id="gate-status" class="gi-status">按下「更新航班資訊」載入今日航班</div>
     <div id="gate-table-wrap" class="gi-table-wrap" style="display:none">
-      <table class="gi-table gi-hide-time" id="gi-table">
+      <table class="gi-table" id="gi-table">
         <thead>
           <tr>
             <th class="gi-sticky-col gi-sortable" onclick="giSort('fno')">航班</th>
@@ -677,14 +697,14 @@ export function getSpaHtmlBody(): string {
             <th>Terminal</th>
             <th>Check-in</th>
             <th>Gate</th>
-            <th class="gi-time-col">STD</th>
-            <th class="gi-time-col">ATD</th>
+            <th class="gi-time-col gi-sortable" onclick="giSort('std')">STD</th>
+            <th class="gi-time-col gi-sortable" onclick="giSort('atd')">ATD</th>
             <th class="gi-sortable" onclick="giSort('dest')">目的地</th>
             <th>Terminal</th>
             <th>Parking</th>
             <th>轉盤</th>
-            <th class="gi-time-col">STA</th>
-            <th class="gi-time-col">ATA</th>
+            <th class="gi-time-col gi-sortable" onclick="giSort('sta')">STA</th>
+            <th class="gi-time-col gi-sortable" onclick="giSort('ata')">ATA</th>
           </tr>
         </thead>
         <tbody id="gate-tbody"></tbody>
@@ -733,7 +753,7 @@ export function getSpaHtmlBody(): string {
       <button class="tab-util-btn tab-install-btn" id="tab-install-btn" onclick="showInstallGuide()" style="display:none">
         <span>📲</span>安裝
       </button>
-      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V5.105</span>
+      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V5.106</span>
     </div>
   </div>
 </div>
@@ -763,7 +783,12 @@ export function getSpaHtmlBody(): string {
       <div style="margin-bottom:4px">📱 建議使用 <b>iPad 橫向</b>操作以獲得最佳體驗</div>
       <div style="color:var(--muted)">Best experience on iPad in landscape mode</div>
     </div>
-    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V5.105</div>
+    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V5.106</div>
+    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
+      <div>Gate Info 大改版：新增航司切換（JX / BR / CI / ALL）、時段篩選（全日 / 00-06 / 06-12 / 12-18 / 18-24 / ±2hr）、7 欄可排序（含 STD/ATD/STA/ATA）、預設 STA 升序；密碼小眼睛改為純文字符號；首次授權警告加英文對照</div>
+      <div style="opacity:.7">Gate Info overhaul: airline selector (JX / BR / CI / ALL), time slot filter, 7-column sorting (incl. STD/ATD/STA/ATA), default STA ascending; password eye icon changed to text symbol; first-time auth warning with English translation</div>
+    </div>
+    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V5.105</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
       <div>PA工具/Duty Time subtab bar 固定不捲動；PA 左右面板獨立捲動；Local Time Query 空白移除；航班查詢擴展至前後日；新增 A+/A- 字型大小調整；班表密碼欄新增顯示/隱藏切換</div>
       <div style="opacity:.7">Fixed subtab bar for PA/Duty Time tabs; independent scrolling for PA split panes; removed Local Time Query spacing; flight lookup now searches today/tomorrow/yesterday; added A+/A- font size controls; added password visibility toggle</div>

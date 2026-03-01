@@ -1,10 +1,14 @@
 // ── Gate Info ──────────────────────────────────────────────────────────────────
 var gateFlightsLoaded = false;
 var gateFlightsList = [];
-var giSortKey = 'dest';
+var giSortKey = 'sta';
 var giSortAsc = true;
 var _giSelectedDate = null; // null = today, 'YYYY/MM/DD' = specific date
 var _giFirstScrollDone = false;
+var _giRawDep = [];
+var _giRawArr = [];
+var _giAirline = (function(){ try { return localStorage.getItem('crewsync_gi_airline') || 'JX'; } catch(e){ return 'JX'; } })();
+var _giTimeSlot = 'all';
 
 function giFmtTime(t) {
   if (!t) return '';
@@ -186,6 +190,7 @@ function renderGateFlights() {
   var others = [];
 
   var sorted = _giSortList(gateFlightsList);
+  sorted = sorted.filter(_giTimeFilter);
 
   if (searchTerm) {
     var isNumeric = /^\d+$/.test(searchTerm);
@@ -197,7 +202,7 @@ function renderGateFlights() {
       var matched = false;
       if (isNumeric) {
         // Flight number search
-        var num = f.fno.replace(/^JX/, '');
+        var num = f.fno.replace(/^(JX|BR|CI)/, '');
         matched = (num === searchTerm || num.indexOf(searchTerm) === 0);
       } else {
         // Station search: IATA code, ICAO (via mapping), or city name
@@ -291,14 +296,28 @@ function _giGetSortVal(f, key) {
   if (key === 'fno') return f.fno || '';
   if (key === 'origin') return (f.originName || f.originCode || f.origin || '');
   if (key === 'dest') return (f.destName || f.destCode || f.dest || '');
+  if (key === 'std') return f.std || '';
+  if (key === 'atd') return f.atd || '';
+  if (key === 'sta') return f.sta || '';
+  if (key === 'ata') return f.ata || '';
   return '';
 }
 
 function _giSortList(list) {
   var sorted = list.slice();
+  var timeCols = { std:1, atd:1, sta:1, ata:1 };
   sorted.sort(function(a, b) {
     var va = _giGetSortVal(a, giSortKey);
     var vb = _giGetSortVal(b, giSortKey);
+    // Time columns: empty values always to end
+    if (timeCols[giSortKey]) {
+      var aEmpty = !va;
+      var bEmpty = !vb;
+      if (aEmpty !== bEmpty) return aEmpty ? 1 : -1;
+      if (aEmpty && bEmpty) return 0;
+      var cmp = va.localeCompare(vb);
+      return giSortAsc ? cmp : -cmp;
+    }
     if (giSortKey === 'origin' || giSortKey === 'dest') {
       var twAirports = /TPE|桃園/;
       var twOther = /RMQ|台中|KHH|高雄|TSA|松山/;
@@ -353,14 +372,16 @@ function _giFaTime(isoStr) {
   return String(tw.getUTCHours()).padStart(2, '0') + ':' + String(tw.getUTCMinutes()).padStart(2, '0');
 }
 
-function _giMergeFA(map, faData) {
+function _giMergeFA(map, faData, airline) {
   _giTestRows = [];
   var flights = faData.flights || {};
+  var prefix = airline || 'JX';
   Object.keys(flights).forEach(function(key) {
     var fa = flights[key];
     if (!fa || !fa.fno) return;
     var fno = fa.fno;
-    if (!/^JX/.test(fno)) return;
+    var re = new RegExp('^' + prefix);
+    if (!re.test(fno)) return;
     var isNew = !map[fno];
     var m = map[fno];
     if (!m) {
@@ -412,8 +433,7 @@ function loadGateFlights() {
   tableBody.innerHTML = '';
   gateFlightsList = [];
 
-  var isToday = !_giSelectedDate;
-  var fidsUrl = isToday ? '/api/fids' : '/api/fids?date=' + encodeURIComponent(_giSelectedDate);
+  var fidsUrl = _giSelectedDate ? '/api/fids?date=' + encodeURIComponent(_giSelectedDate) : '/api/fids';
 
   var tpePromise = fetch(fidsUrl)
     .then(function(r) {
@@ -428,94 +448,109 @@ function loadGateFlights() {
       return _giFetchDirect(_giSelectedDate);
     });
 
-  var faPromise = isToday
-    ? fetch('/api/fids-fa')
-        .then(function(r) {
-          if (!r.ok) throw new Error('HTTP ' + r.status);
-          return r.json();
-        })
-        .catch(function() {
-          return { flights: {}, updatedAt: null, count: 0 };
-        })
-    : Promise.resolve({ flights: {}, updatedAt: null, count: 0 });
+  tpePromise.then(function(data) {
+    dateEl.textContent = data.date || '';
+    _giRawDep = data.dep || [];
+    _giRawArr = data.arr || [];
+    _giProcessFlights();
+  }).catch(function(e) {
+    statusEl.textContent = '載入失敗：' + e.message;
+    statusEl.style.display = 'block';
+  });
+}
 
-  Promise.all([tpePromise, faPromise])
-    .then(function(results) {
-      var data = results[0];
-      var faData = results[1];
+function _giProcessFlights() {
+  var statusEl = document.getElementById('gate-status');
+  var wrapEl = document.getElementById('gate-table-wrap');
 
-      return { data: data, faData: faData };
-    })
-    .then(function(r) {
-      var data = r.data;
-      var faData = r.faData;
+  var airline = _giAirline;
+  var isAll = (airline === 'ALL');
 
-      dateEl.textContent = data.date || '';
+  // Filter TPE FIDS by airline
+  var dep = _giRawDep.filter(function(f) {
+    if (isAll) return f.ACode && /^(JX|BR|CI)$/.test(f.ACode.trim());
+    return f.ACode && f.ACode.trim() === airline;
+  });
+  var arr = _giRawArr.filter(function(f) {
+    if (isAll) return f.ACode && /^(JX|BR|CI)$/.test(f.ACode.trim());
+    return f.ACode && f.ACode.trim() === airline;
+  });
 
-      var dep = (data.dep || []).filter(function(f) { return f.ACode && f.ACode.trim() === 'JX'; });
-      var arr = (data.arr || []).filter(function(f) { return f.ACode && f.ACode.trim() === 'JX'; });
+  var map = {};
 
-      var map = {};
+  dep.forEach(function(f) {
+    var acode = f.ACode.trim();
+    var key = acode + f.FlightNo.replace(/\s/g, '');
+    if (!map[key]) map[key] = { fno: key };
+    var m = map[key];
+    m.origin = 'TPE';
+    m.originCode = 'TPE';
+    m.originName = '桃園';
+    m.dest = f.CityCode || '';
+    m.destCode = f.CityCode || '';
+    m.destName = f.CityName || f.CityCode || '';
+    m.checkin = f.CheckIn || '';
+    m.gate = f.Gate || '';
+    m.std = giFmtTime(f.OTime);
+    m.atd = giFmtTime(f.RTime);
+    m.depTerminal = f.BNO ? 'T' + f.BNO : '';
+    m.depMemo = f.Memo || '';
+  });
 
-      dep.forEach(function(f) {
-        var key = 'JX' + f.FlightNo.replace(/\s/g, '');
-        if (!map[key]) map[key] = { fno: key };
-        var m = map[key];
-        m.origin = 'TPE';
-        m.originCode = 'TPE';
-        m.originName = '桃園';
-        m.dest = f.CityCode || '';
-        m.destCode = f.CityCode || '';
-        m.destName = f.CityName || f.CityCode || '';
-        m.checkin = f.CheckIn || '';
-        m.gate = f.Gate || '';
-        m.std = giFmtTime(f.OTime);
-        m.atd = giFmtTime(f.RTime);
-        m.depTerminal = f.BNO ? 'T' + f.BNO : '';
-        m.depMemo = f.Memo || '';
-      });
+  arr.forEach(function(f) {
+    var acode = f.ACode.trim();
+    var key = acode + f.FlightNo.replace(/\s/g, '');
+    if (!map[key]) map[key] = { fno: key };
+    var m = map[key];
+    m.originCode = f.CityCode || '';
+    m.originName = f.CityName || f.CityCode || '';
+    if (!m.origin) m.origin = f.CityCode || '';
+    if (!m.dest) m.dest = 'TPE';
+    if (!m.destCode) m.destCode = 'TPE';
+    if (!m.destName) m.destName = '桃園';
+    m.parking = f.Gate || '';
+    m.carousel = f.StopCode || '';
+    m.sta = giFmtTime(f.OTime);
+    m.ata = giFmtTime(f.RTime);
+    m.arrTerminal = f.BNO ? 'T' + f.BNO : '';
+    m.arrMemo = f.Memo || '';
+  });
 
-      arr.forEach(function(f) {
-        var key = 'JX' + f.FlightNo.replace(/\s/g, '');
-        if (!map[key]) map[key] = { fno: key };
-        var m = map[key];
-        m.originCode = f.CityCode || '';
-        m.originName = f.CityName || f.CityCode || '';
-        if (!m.origin) m.origin = f.CityCode || '';
-        if (!m.dest) m.dest = 'TPE';
-        if (!m.destCode) m.destCode = 'TPE';
-        if (!m.destName) m.destName = '桃園';
-        m.parking = f.Gate || '';
-        m.carousel = f.StopCode || '';
-        m.sta = giFmtTime(f.OTime);
-        m.ata = giFmtTime(f.RTime);
-        m.arrTerminal = f.BNO ? 'T' + f.BNO : '';
-        m.arrMemo = f.Memo || '';
-      });
+  var flights = Object.values(map);
+  if (flights.length === 0) {
+    var label = isAll ? 'ALL' : airline;
+    statusEl.textContent = '今日無 ' + label + ' 航班資料';
+    statusEl.style.display = 'block';
+    wrapEl.style.display = 'none';
+    return;
+  }
 
-      // Merge foreign airport data from background cache
-      _giMergeFA(map, faData);
+  gateFlightsList = flights;
+  statusEl.style.display = 'none';
+  wrapEl.style.display = '';
+  renderGateFlights();
+  gateFlightsLoaded = true;
 
-      var flights = Object.values(map);
-      flights.sort(function(a, b) {
-        return a.fno.localeCompare(b.fno, undefined, { numeric: true });
-      });
-
-      if (flights.length === 0) {
-        statusEl.textContent = '今日無 JX 航班資料';
-        return;
-      }
-
-      gateFlightsList = flights;
-      statusEl.style.display = 'none';
-      wrapEl.style.display = '';
-      renderGateFlights();
-      gateFlightsLoaded = true;
-    })
-    .catch(function(e) {
-      statusEl.textContent = '載入失敗：' + e.message;
-      statusEl.style.display = 'block';
+  // Background fetch FA data (today only)
+  var isToday = !_giSelectedDate;
+  if (isToday) {
+    var currentAirline = _giAirline;
+    var airlines = isAll ? ['JX', 'BR', 'CI'] : [airline];
+    var faPromises = airlines.map(function(al) {
+      return fetch('/api/fids-fa?airline=' + al)
+        .then(function(r) { return r.ok ? r.json() : { flights: {} }; })
+        .catch(function() { return { flights: {} }; })
+        .then(function(data) { return { airline: al, data: data }; });
     });
+    Promise.all(faPromises).then(function(results) {
+      if (_giAirline !== currentAirline) return; // airline changed, ignore
+      results.forEach(function(r) {
+        _giMergeFA(map, r.data, r.airline);
+      });
+      gateFlightsList = Object.values(map);
+      renderGateFlights();
+    });
+  }
 }
 
 function refreshGateFlights() {
@@ -579,4 +614,107 @@ function giToday() {
   _giUpdateDateNav();
   loadGateFlights();
 }
+
+// ── Airline / Time Slot / Sort UI ─────────────────────────────────────────────
+
+function giSetAirline(al) {
+  _giAirline = al;
+  try { localStorage.setItem('crewsync_gi_airline', al); } catch(e){}
+  _giUpdateAirlineBtns();
+  var titleEl = document.querySelector('.gi-title');
+  if (titleEl) titleEl.textContent = (al === 'ALL' ? 'ALL' : al) + ' Flight Info';
+  if (_giRawDep.length > 0 || _giRawArr.length > 0) {
+    _giProcessFlights();
+  }
+}
+
+function giSetTimeSlot(slot) {
+  _giTimeSlot = slot;
+  _giUpdateTimeBtns();
+  if (gateFlightsList.length > 0) renderGateFlights();
+}
+
+function _giTimeFilter(f) {
+  if (_giTimeSlot === 'all') return true;
+  var t = f.std || f.sta || '';
+  if (!t) return true;
+  var parts = t.split(':');
+  var hh = parseInt(parts[0], 10);
+  if (isNaN(hh)) return true;
+  if (_giTimeSlot === '±2hr') {
+    var now = new Date();
+    var twNow = new Date(now.getTime() + 8 * 60 * 60 * 1000);
+    var nowMin = twNow.getUTCHours() * 60 + twNow.getUTCMinutes();
+    var mm = parseInt(parts[1], 10) || 0;
+    var fMin = hh * 60 + mm;
+    return Math.abs(fMin - nowMin) <= 120;
+  }
+  var range = _giTimeSlot.split('-');
+  var lo = parseInt(range[0], 10);
+  var hi = parseInt(range[1], 10);
+  return hh >= lo && hh < hi;
+}
+
+function _giUpdateAirlineBtns() {
+  var btns = document.querySelectorAll('.gi-airline-btn');
+  btns.forEach(function(btn) {
+    var al = btn.getAttribute('data-airline');
+    if (al === _giAirline) {
+      btn.classList.add('gi-airline-active');
+    } else {
+      btn.classList.remove('gi-airline-active');
+    }
+  });
+}
+
+function _giUpdateTimeBtns() {
+  var btns = document.querySelectorAll('.gi-time-slot');
+  btns.forEach(function(btn) {
+    var slot = btn.getAttribute('data-slot');
+    if (slot === _giTimeSlot) {
+      btn.classList.add('gi-time-active');
+    } else {
+      btn.classList.remove('gi-time-active');
+    }
+  });
+}
+
+function _giHighlightCurrentSlot() {
+  var now = new Date();
+  var tw = new Date(now.getTime() + 8 * 60 * 60 * 1000);
+  var hh = tw.getUTCHours();
+  var slot = '';
+  if (hh < 6) slot = '00-06';
+  else if (hh < 12) slot = '06-12';
+  else if (hh < 18) slot = '12-18';
+  else slot = '18-24';
+  var btns = document.querySelectorAll('.gi-time-slot');
+  btns.forEach(function(btn) {
+    var s = btn.getAttribute('data-slot');
+    if (s === slot) {
+      btn.classList.add('gi-time-current');
+    } else {
+      btn.classList.remove('gi-time-current');
+    }
+  });
+}
+
+// Initialize airline/time UI
+(function() {
+  _giUpdateAirlineBtns();
+  _giUpdateTimeBtns();
+  _giHighlightCurrentSlot();
+  var titleEl = document.querySelector('.gi-title');
+  if (titleEl && _giAirline !== 'JX') {
+    titleEl.textContent = (_giAirline === 'ALL' ? 'ALL' : _giAirline) + ' Flight Info';
+  }
+  // Set default sort header indicator
+  var allThs = document.querySelectorAll('#gi-table thead th.gi-sortable, #gi-pinned-table thead th.gi-sortable');
+  allThs.forEach(function(th) {
+    var onclick = th.getAttribute('onclick') || '';
+    if (onclick.indexOf("'sta'") >= 0) {
+      th.classList.add('gi-sort-asc');
+    }
+  });
+})();
 
