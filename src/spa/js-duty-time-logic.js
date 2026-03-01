@@ -32,6 +32,41 @@ function dtDateChanged(inp) {
 function dtToggleAccom() {
   var on = document.getElementById('dt-accom').checked;
   document.getElementById('dt-accom-detail').style.display = on ? 'block' : 'none';
+  if (on) dtUpdateAccomHint();
+}
+
+function dtUpdateAccomHint() {
+  var h = parseInt(document.getElementById('dt-accom-h').value) || 0;
+  var m = parseInt(document.getElementById('dt-accom-m').value) || 0;
+  var total = h * 60 + m;
+  var type = dtGetAccomType();
+  var hint = document.getElementById('dt-accom-hint');
+  var err = document.getElementById('dt-accom-err');
+  if (!hint) return;
+  // 即時驗證 > 3h
+  if (err) {
+    if (total > 0 && total <= 180) {
+      err.textContent = '⚠ Rest Duration must be more than 3 hours to apply Accommodation rules.';
+      err.style.display = 'block';
+    } else {
+      err.style.display = 'none';
+      err.textContent = '';
+    }
+  }
+  if (total <= 0) {
+    hint.textContent = type === 'notstart'
+      ? '* Mode: Deducting rest duration from Actual FDP'
+      : '* Mode: Max FDP increased by 50% of rest duration';
+    return;
+  }
+  if (type === 'notstart') {
+    hint.textContent = '* Mode: Deducting ' + h + ':' + ('0' + m).slice(-2) + ' from Actual FDP';
+  } else {
+    var ext = Math.floor(total * 0.5);
+    var eh = Math.floor(ext / 60);
+    var em = ext % 60;
+    hint.textContent = '* Mode: Max FDP increased by ' + eh + ':' + ('0' + em).slice(-2) + ' (50% Rest)';
+  }
 }
 
 function dtGetAccomType() {

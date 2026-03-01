@@ -384,15 +384,15 @@ export function getSpaHtmlBody(): string {
             <input type="checkbox" id="dt-accom" onchange="dtToggleAccom()">
           </label>
           <span style="font-size:.72em;color:var(--dim);flex-shrink:0">Rest at an Appropriate Accommodation</span>
-          <input class="dt-time-box" type="text" id="dt-accom-h" placeholder="H" maxlength="2" inputmode="numeric" style="width:36px">
+          <input class="dt-time-box" type="text" id="dt-accom-h" placeholder="H" maxlength="2" inputmode="numeric" style="width:36px" oninput="dtUpdateAccomHint()">
           <span class="dt-sep">hr</span>
-          <input class="dt-time-box" type="text" id="dt-accom-m" placeholder="MM" maxlength="2" inputmode="numeric" style="width:36px">
+          <input class="dt-time-box" type="text" id="dt-accom-m" placeholder="MM" maxlength="2" inputmode="numeric" style="width:36px" oninput="dtUpdateAccomHint()">
           <span class="dt-sep">min</span>
         </div>
         <div id="dt-accom-detail" style="display:none;padding:0 4px;margin-bottom:4px">
           <div style="display:flex;gap:12px;font-size:.75em;color:var(--text)">
-            <label><input type="radio" name="dt-accom-type" value="notstart" checked> First Sector Not Start</label>
-            <label><input type="radio" name="dt-accom-type" value="start"> First Sector Start</label>
+            <label><input type="radio" name="dt-accom-type" value="notstart" checked onchange="dtUpdateAccomHint()"> First Sector Not Start</label>
+            <label><input type="radio" name="dt-accom-type" value="start" onchange="dtUpdateAccomHint()"> First Sector Start</label>
           </div>
           <div id="dt-accom-hint" style="font-size:.68em;color:var(--muted);margin-top:4px">* Actual FDP deducted by rest duration</div>
         </div>
@@ -828,7 +828,7 @@ export function getSpaHtmlBody(): string {
       <button class="tab-util-btn tab-install-btn" id="tab-install-btn" onclick="showInstallGuide()" style="display:none">
         <span>📲</span>安裝
       </button>
-      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V5.221</span>
+      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V5.222</span>
     </div>
   </div>
 </div>
@@ -858,15 +858,15 @@ export function getSpaHtmlBody(): string {
       <div style="margin-bottom:4px">📱 建議使用 <b>iPad 橫向</b>操作以獲得最佳體驗</div>
       <div style="color:var(--muted)">Best experience on iPad in landscape mode</div>
     </div>
-    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V5.221</div>
+    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V5.222</div>
+    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
+      <div>Accommodation hint 動態顯示計算數值（切換 radio / 改時間即時更新）；Rest Duration ≤ 3h 即時紅字提示</div>
+      <div style="opacity:.7">Dynamic Accommodation hint showing calculated values on radio/time change; real-time red text warning when Rest Duration ≤ 3h</div>
+    </div>
+    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V5.221</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
       <div>Checkbox 移至文字前方、Radio button 修正為圓形正常尺寸</div>
       <div style="opacity:.7">Fix checkbox position (before label) and radio button rendering (square → circle)</div>
-    </div>
-    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V5.220</div>
-    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
-      <div>Accommodation 欄位整合為單排、checkbox 修正為正方形、Rest Duration > 3h 驗證（紅字提示）；CAR 規定移至頁面最底部（預設收合）；Accommodation label 改為 FOM 用語</div>
-      <div style="opacity:.7">Merge Accommodation into single row with square checkbox; add Rest Duration > 3h validation (red text); move CAR ref panel to bottom (collapsed by default); rename Accommodation label to match FOM wording</div>
     </div>
     <button class="install-close-btn" onclick="closeAbout()">關閉</button>
   </div>
