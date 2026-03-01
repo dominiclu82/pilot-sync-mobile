@@ -290,7 +290,7 @@ html:has(#tab-briefing.tab-active #briefing-coldtemp.active) #tab-briefing.tab-a
 .dt-crew-btn.active{border-color:var(--accent);background:var(--accent);color:#fff}
 .dt-opt-row{display:flex;align-items:center;gap:12px;margin-bottom:6px;flex-wrap:wrap}
 .dt-chk-label{display:flex;align-items:center;gap:5px;font-size:.78em;color:var(--text);cursor:pointer}
-.dt-chk-label input[type=checkbox]{width:15px;height:15px;accent-color:var(--accent);cursor:pointer;flex-shrink:0}
+.dt-chk-label input[type=checkbox]{width:15px;height:15px;accent-color:var(--accent);cursor:pointer;flex-shrink:0;-webkit-appearance:checkbox;appearance:auto}
 .dt-tz-select{background:var(--surface);border:1.5px solid var(--dim);border-radius:7px;color:var(--text);font-size:.78em;padding:4px 6px;max-width:160px}
 .dt-mode-row{display:flex;gap:0;margin-bottom:0;border-radius:8px;overflow:hidden;border:1.5px solid var(--dim)}
 .dt-mode-btn{flex:1;padding:7px;font-size:.8em;font-weight:700;border:none;background:none;color:var(--muted);cursor:pointer}
@@ -352,6 +352,9 @@ html:has(#tab-briefing.tab-active #briefing-coldtemp.active) #tab-briefing.tab-a
 .dt-leg-box{width:11px;height:9px;border-radius:2px;flex-shrink:0}
 .dt-ext-note{font-size:.72em;color:#a78bfa;margin-bottom:6px;padding:0 14px}
 .dt-notice{font-size:.65em;color:var(--muted);text-align:center;padding:6px 0 14px}
+.dt-logic-note{padding:14px;margin:0 14px 14px;background:var(--surface);border-radius:10px;
+  font-size:.72em;color:var(--muted);line-height:1.7}
+.dt-logic-title{font-weight:700;color:var(--text);margin-bottom:4px}
 .dt-ok{color:#22c55e}.dt-warn{color:#f59e0b}.dt-err{color:#ef4444}
 .wx-row{display:flex;align-items:center;padding:9px 12px;gap:9px}
 .wx-cat{font-size:.67em;font-weight:800;padding:2px 5px;border-radius:4px;

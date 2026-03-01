@@ -624,6 +624,15 @@ export function getSpaHtmlBody(): string {
         選好人數並輸入 FDP Start，按「計算」即可查看最大限制時間
       </div>
 
+      <div class="dt-logic-note">
+        <div class="dt-logic-title">📌 邏輯說明：</div>
+        <div>Commander's Discretion: 僅於組員為 3 人 (Multiple Crew) 時顯示，勾選後 Max FDP 自動增加 2 小時。</div>
+        <div>Accommodation (Not Start): Actual FDP 扣除休息時數 (無上限延長)。</div>
+        <div>Accommodation (Started): Max FDP 增加休息時數的 50% (上限 24h)。</div>
+        <div>Time Diff ≥ 6h: 若勾選，基地最小休息時間顯示為 "No FD at least 48hr"。</div>
+        <div>WOCL (02:00-05:00 LT): 依據所選 Base Timezone 計算夜間勤務。</div>
+      </div>
+
     </div>
   </div>
 
@@ -760,7 +769,7 @@ export function getSpaHtmlBody(): string {
       <button class="tab-util-btn tab-install-btn" id="tab-install-btn" onclick="showInstallGuide()" style="display:none">
         <span>📲</span>安裝
       </button>
-      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V5.207</span>
+      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V5.208</span>
     </div>
   </div>
 </div>
@@ -790,15 +799,15 @@ export function getSpaHtmlBody(): string {
       <div style="margin-bottom:4px">📱 建議使用 <b>iPad 橫向</b>操作以獲得最佳體驗</div>
       <div style="color:var(--muted)">Best experience on iPad in landscape mode</div>
     </div>
-    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V5.207</div>
+    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V5.208</div>
+    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
+      <div>Gate Info 時段順序調整；班表同步圖示改 ⇄；低溫修正標籤精簡；Duty Time 加邏輯說明、修復 checkbox 無法勾選</div>
+      <div style="opacity:.7">Gate Info time slot reorder; Sync icon ⇄; Cold Temp labels simplified; Duty Time logic notes added & checkbox fix</div>
+    </div>
+    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V5.207</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
       <div>Gate Info 時段順序調整（±2hr 在前、All 在後）；班表同步圖示改 ⇄；低溫修正左欄標籤精簡、間距優化</div>
       <div style="opacity:.7">Gate Info time slot reorder (±2hr first, All last); Sync tab icon changed to ⇄; Cold Temp form labels simplified & spacing optimized</div>
-    </div>
-    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V5.206</div>
-    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
-      <div>Gate Info「全日」改「All」；Orig 切換鈕僅手機顯示；密碼顯示鈕加大加深；班表同步頁面平板/筆電雙欄排版</div>
-      <div style="opacity:.7">Gate Info: "全日" → "All"; Orig toggle phone-only; password eye button enlarged; Sync page responsive two-column layout for tablet/laptop</div>
     </div>
     <button class="install-close-btn" onclick="closeAbout()">關閉</button>
   </div>
