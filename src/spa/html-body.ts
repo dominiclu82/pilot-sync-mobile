@@ -602,96 +602,97 @@ export function getSpaHtmlBody(): string {
         選好人數並輸入 FDP Start，按「Calculate」即可查看最大限制時間
       </div>
 
-      <!-- Reference toggle (bottom) -->
+      <!-- Reference toggle -->
       <div class="dt-ref-toggle" onclick="dtToggleRef()">
         <span>📋 CAR 07-02A 規定說明</span><span id="dt-ref-arrow">▼</span>
       </div>
       <div class="dt-ref-panel" id="dt-ref-panel">
-        <div class="dt-ref-title">4.7.5 STARLUX Airlines Flight Time Limitation</div>
-        <div class="dt-ref-sub">REF.: CAR 07-02A ART. 37/37-2/38/38-3/38-4/39/41/42/43/43-1</div>
-        <table class="dt-ref-table">
-          <thead>
-            <tr>
-              <th></th>
-              <th>Single<br>2P</th>
-              <th>Multiple<br>3P</th>
-              <th>Double<br>4P</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr>
-              <td class="dt-ref-lbl">Min Rest Before Duty</td>
-              <td>10h</td><td>10h</td><td>10h</td>
-            </tr>
-            <tr>
-              <td class="dt-ref-lbl">Min Rest After Duty</td>
-              <td>FT≤8: 10h<br>8&lt;FT≤10: 18h</td>
-              <td>FT≤8: 10h<br>8&lt;FT≤12: 18h<br>12&lt;FT≤16: 24h</td>
-              <td>FT≤8: 10h<br>8&lt;FT≤16: 18h<br>16&lt;FT≤18: 22h</td>
-            </tr>
-            <tr>
-              <td class="dt-ref-lbl">Max FDP</td>
-              <td>14h</td><td>18h</td><td>24h</td>
-            </tr>
-            <tr>
-              <td class="dt-ref-lbl">Max FT (No C1) ①</td>
-              <td>10h</td><td>12h</td><td>12h</td>
-            </tr>
-            <tr>
-              <td class="dt-ref-lbl">Max FT (With C1) ①</td>
-              <td>10h</td><td>16h</td><td>18h</td>
-            </tr>
-            <tr>
-              <td class="dt-ref-lbl">Min Rest in 7 Days</td>
-              <td>30h</td><td>30h</td><td>30h</td>
-            </tr>
-            <tr>
-              <td class="dt-ref-lbl">Max FT in 7 Days</td>
-              <td>32h</td><td>—</td><td>—</td>
-            </tr>
-            <tr>
-              <td class="dt-ref-lbl">Max DP in 30 Days ②</td>
-              <td>230h</td><td>230h</td><td>230h</td>
-            </tr>
-          </tbody>
-        </table>
-        <div class="dt-ref-note">
-          <b>NOTE</b><br>
-          ① Flight time within 24 hours.<br>
-          ② Duty period may be extended to 260h; standby &amp; deadhead up to 30h may be counted.<br>
-          ③ Before standby duty, pilot shall have 10 consecutive hours rest.<br>
-          ④ Domestic: FT ≤ 8h/24h, FDP ≤ 12h.<br>
-          ★ PIC Discretion: +2h to Max FDP (3P only).<br>
-          ⑤ Min rest before duty: at least 10 consecutive hours before any flight duty or standby.<br>
-          ⑥ 7-day rest: at least 30 consecutive hours within any 7 consecutive days.<br>
-          ⑦ Sector limits: max 4 sectors per FDP; up to 6 sectors in case of force majeure diversion.<br>
-          ⑧ Time zone adaptation: if stay &gt; 48h and time diff ≥ 6h, no flight duty within 48h after returning to base (DHD with min rest requirement permitted).<br>
-          ⑨ WOCL (Window of Circadian Low, local 02:00–05:00):<br>
-          &nbsp;&nbsp;• No more than 3 consecutive days of WOCL-infringing duty.<br>
-          &nbsp;&nbsp;• 2 consecutive WOCL days → min 34h rest after duty.<br>
-          &nbsp;&nbsp;• 3 consecutive WOCL days → min 54h rest after duty.<br>
-          &nbsp;&nbsp;• Exception: if ≥ 14h rest given after each WOCL duty, the 34/54h requirement is waived.<br>
-          ⑩ Accommodation (Not Start): Actual FDP deducted by rest duration (no upper limit on extension).<br>
-          ⑪ Accommodation (Started): Max FDP increased by 50% of rest duration (capped at 24h).<br><br>
-          ① 24 小時內之飛航時間。<br>
-          ② 執勤時間可延長至 260h；待命及乘客身分搭機最多 30h 可計入。<br>
-          ③ 待命勤務前，飛航組員須有連續 10 小時休息。<br>
-          ④ 國內航線：FT ≤ 8h/24h，FDP ≤ 12h。<br>
-          ★ 機長裁量權：Max FDP +2h（僅 3P）。<br>
-          ⑤ 執勤前基本休時：任何飛航任務或待命前，必須給予至少連續 10 小時的休息。<br>
-          ⑥ 7 日連續休時：在任何連續 7 天內，必須提供至少連續 30 小時的休息時間。<br>
-          ⑦ 起降航段限制：單一 FDP 內最多 4 個航段；遇不可抗力轉降最多可放寬至 6 個航段。<br>
-          ⑧ 時區差異適應：若外站停留 &gt; 48h 且時差 ≥ 6h，返回基地後 48 小時內不得指派飛航任務（可指派帶最低休時規定之 DHD）。<br>
-          ⑨ WOCL（生理時鐘低潮期，當地 02:00–05:00）：<br>
-          &nbsp;&nbsp;• 不得連續超過 3 天指派觸及 WOCL 之任務。<br>
-          &nbsp;&nbsp;• 連續 2 天觸及 WOCL → 任務後至少 34h 休息。<br>
-          &nbsp;&nbsp;• 連續 3 天觸及 WOCL → 任務後至少 54h 休息。<br>
-          &nbsp;&nbsp;• 例外：每次觸及 WOCL 後皆有 ≥ 14h 休息，則免除 34/54h 限制。<br>
-          ⑩ Accommodation（Not Start）：Actual FDP 扣除休息時數（無上限延長）。<br>
-          ⑪ Accommodation（Started）：Max FDP 增加休息時數的 50%（上限 24h）。
-        </div>
+      <div class="dt-ref-title">4.7.5 STARLUX Airlines Flight Time Limitation</div>
+      <div class="dt-ref-sub">REF.: CAR 07-02A ART. 37/37-2/38/38-3/38-4/39/41/42/43/43-1</div>
+      <table class="dt-ref-table">
+        <thead>
+          <tr>
+            <th></th>
+            <th>Single<br>2P</th>
+            <th>Multiple<br>3P</th>
+            <th>Double<br>4P</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="dt-ref-lbl">Min Rest Before Duty</td>
+            <td>10h</td><td>10h</td><td>10h</td>
+          </tr>
+          <tr>
+            <td class="dt-ref-lbl">Min Rest After Duty</td>
+            <td>FT≤8: 10h<br>8&lt;FT≤10: 18h</td>
+            <td>FT≤8: 10h<br>8&lt;FT≤12: 18h<br>12&lt;FT≤16: 24h</td>
+            <td>FT≤8: 10h<br>8&lt;FT≤16: 18h<br>16&lt;FT≤18: 22h</td>
+          </tr>
+          <tr>
+            <td class="dt-ref-lbl">Max FDP</td>
+            <td>14h</td><td>18h</td><td>24h</td>
+          </tr>
+          <tr>
+            <td class="dt-ref-lbl">Max FT (No C1) ①</td>
+            <td>10h</td><td>12h</td><td>12h</td>
+          </tr>
+          <tr>
+            <td class="dt-ref-lbl">Max FT (With C1) ①</td>
+            <td>10h</td><td>16h</td><td>18h</td>
+          </tr>
+          <tr>
+            <td class="dt-ref-lbl">Min Rest in 7 Days</td>
+            <td>30h</td><td>30h</td><td>30h</td>
+          </tr>
+          <tr>
+            <td class="dt-ref-lbl">Max FT in 7 Days</td>
+            <td>32h</td><td>—</td><td>—</td>
+          </tr>
+          <tr>
+            <td class="dt-ref-lbl">Max DP in 30 Days ②</td>
+            <td>230h</td><td>230h</td><td>230h</td>
+          </tr>
+        </tbody>
+      </table>
+      <div class="dt-ref-note">
+        <b>NOTE</b><br>
+        ① Flight time within 24 hours.<br>
+        ② Duty period may be extended to 260h; standby &amp; deadhead up to 30h may be counted.<br>
+        ③ Before standby duty, pilot shall have 10 consecutive hours rest.<br>
+        ④ Domestic: FT ≤ 8h/24h, FDP ≤ 12h.<br>
+        ★ PIC Discretion: +2h to Max FDP (3P only).<br>
+        ⑤ Min rest before duty: at least 10 consecutive hours before any flight duty or standby.<br>
+        ⑥ 7-day rest: at least 30 consecutive hours within any 7 consecutive days.<br>
+        ⑦ Sector limits: max 4 sectors per FDP; up to 6 sectors in case of force majeure diversion.<br>
+        ⑧ Time zone adaptation: if stay &gt; 48h and time diff ≥ 6h, no flight duty within 48h after returning to base (DHD with min rest requirement permitted).<br>
+        ⑨ WOCL (Window of Circadian Low, local 02:00–05:00):<br>
+        &nbsp;&nbsp;• No more than 3 consecutive days of WOCL-infringing duty.<br>
+        &nbsp;&nbsp;• 2 consecutive WOCL days → min 34h rest after duty.<br>
+        &nbsp;&nbsp;• 3 consecutive WOCL days → min 54h rest after duty.<br>
+        &nbsp;&nbsp;• Exception: if ≥ 14h rest given after each WOCL duty, the 34/54h requirement is waived.<br>
+        ⑩ Accommodation (Not Start): Actual FDP deducted by rest duration (no upper limit on extension).<br>
+        ⑪ Accommodation (Started): Max FDP increased by 50% of rest duration (capped at 24h).<br><br>
+        ① 24 小時內之飛航時間。<br>
+        ② 執勤時間可延長至 260h；待命及乘客身分搭機最多 30h 可計入。<br>
+        ③ 待命勤務前，飛航組員須有連續 10 小時休息。<br>
+        ④ 國內航線：FT ≤ 8h/24h，FDP ≤ 12h。<br>
+        ★ 機長裁量權：Max FDP +2h（僅 3P）。<br>
+        ⑤ 執勤前基本休時：任何飛航任務或待命前，必須給予至少連續 10 小時的休息。<br>
+        ⑥ 7 日連續休時：在任何連續 7 天內，必須提供至少連續 30 小時的休息時間。<br>
+        ⑦ 起降航段限制：單一 FDP 內最多 4 個航段；遇不可抗力轉降最多可放寬至 6 個航段。<br>
+        ⑧ 時區差異適應：若外站停留 &gt; 48h 且時差 ≥ 6h，返回基地後 48 小時內不得指派飛航任務（可指派帶最低休時規定之 DHD）。<br>
+        ⑨ WOCL（生理時鐘低潮期，當地 02:00–05:00）：<br>
+        &nbsp;&nbsp;• 不得連續超過 3 天指派觸及 WOCL 之任務。<br>
+        &nbsp;&nbsp;• 連續 2 天觸及 WOCL → 任務後至少 34h 休息。<br>
+        &nbsp;&nbsp;• 連續 3 天觸及 WOCL → 任務後至少 54h 休息。<br>
+        &nbsp;&nbsp;• 例外：每次觸及 WOCL 後皆有 ≥ 14h 休息，則免除 34/54h 限制。<br>
+        ⑩ Accommodation（Not Start）：Actual FDP 扣除休息時數（無上限延長）。<br>
+        ⑪ Accommodation（Started）：Max FDP 增加休息時數的 50%（上限 24h）。
+      </div>
       </div>
 
+      <div style="height:60px;flex-shrink:0"></div>
     </div>
   </div>
 
@@ -828,7 +829,7 @@ export function getSpaHtmlBody(): string {
       <button class="tab-util-btn tab-install-btn" id="tab-install-btn" onclick="showInstallGuide()" style="display:none">
         <span>📲</span>安裝
       </button>
-      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V5.224</span>
+      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V5.225</span>
     </div>
   </div>
 </div>
@@ -858,15 +859,15 @@ export function getSpaHtmlBody(): string {
       <div style="margin-bottom:4px">📱 建議使用 <b>iPad 橫向</b>操作以獲得最佳體驗</div>
       <div style="color:var(--muted)">Best experience on iPad in landscape mode</div>
     </div>
-    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V5.224</div>
+    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V5.225</div>
+    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
+      <div>CAR 規定放回捲動區域內；修正 dt-wrap 捲動模式（對齊其他分頁 overscroll-behavior:none）</div>
+      <div style="opacity:.7">Move CAR ref panel back into scroll area; fix dt-wrap scroll behavior (align with other tabs using overscroll-behavior:none)</div>
+    </div>
+    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V5.224</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
       <div>統一 Accommodation 區域字體大小與顏色；Ext bar 文字不再截斷；Gate Info 時間區間改藍色框</div>
       <div style="opacity:.7">Unify font size/color in Accommodation area; fix Ext bar label truncation; change Gate Info current time slot to blue border</div>
-    </div>
-    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V5.223</div>
-    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
-      <div>修正 Duty Time 頁面捲動橡皮筋回彈問題</div>
-      <div style="opacity:.7">Fix rubber-band overscroll bounce on Duty Time panel</div>
     </div>
     <button class="install-close-btn" onclick="closeAbout()">關閉</button>
   </div>
