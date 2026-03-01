@@ -828,7 +828,7 @@ export function getSpaHtmlBody(): string {
       <button class="tab-util-btn tab-install-btn" id="tab-install-btn" onclick="showInstallGuide()" style="display:none">
         <span>📲</span>安裝
       </button>
-      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V5.222</span>
+      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V5.223</span>
     </div>
   </div>
 </div>
@@ -858,15 +858,15 @@ export function getSpaHtmlBody(): string {
       <div style="margin-bottom:4px">📱 建議使用 <b>iPad 橫向</b>操作以獲得最佳體驗</div>
       <div style="color:var(--muted)">Best experience on iPad in landscape mode</div>
     </div>
-    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V5.222</div>
+    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V5.223</div>
+    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
+      <div>修正 Duty Time 頁面捲動橡皮筋回彈問題</div>
+      <div style="opacity:.7">Fix rubber-band overscroll bounce on Duty Time panel</div>
+    </div>
+    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V5.222</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
       <div>Accommodation hint 動態顯示計算數值（切換 radio / 改時間即時更新）；Rest Duration ≤ 3h 即時紅字提示</div>
       <div style="opacity:.7">Dynamic Accommodation hint showing calculated values on radio/time change; real-time red text warning when Rest Duration ≤ 3h</div>
-    </div>
-    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V5.221</div>
-    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
-      <div>Checkbox 移至文字前方、Radio button 修正為圓形正常尺寸</div>
-      <div style="opacity:.7">Fix checkbox position (before label) and radio button rendering (square → circle)</div>
     </div>
     <button class="install-close-btn" onclick="closeAbout()">關閉</button>
   </div>
