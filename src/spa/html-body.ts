@@ -479,7 +479,9 @@ export function getSpaHtmlBody(): string {
           &nbsp;&nbsp;• No more than 3 consecutive days of WOCL-infringing duty.<br>
           &nbsp;&nbsp;• 2 consecutive WOCL days → min 34h rest after duty.<br>
           &nbsp;&nbsp;• 3 consecutive WOCL days → min 54h rest after duty.<br>
-          &nbsp;&nbsp;• Exception: if ≥ 14h rest given after each WOCL duty, the 34/54h requirement is waived.<br><br>
+          &nbsp;&nbsp;• Exception: if ≥ 14h rest given after each WOCL duty, the 34/54h requirement is waived.<br>
+          ⑩ Accommodation (Not Start): Actual FDP deducted by rest duration (no upper limit on extension).<br>
+          ⑪ Accommodation (Started): Max FDP increased by 50% of rest duration (capped at 24h).<br><br>
           ① 24 小時內之飛航時間。<br>
           ② 執勤時間可延長至 260h；待命及乘客身分搭機最多 30h 可計入。<br>
           ③ 待命勤務前，飛航組員須有連續 10 小時休息。<br>
@@ -493,7 +495,9 @@ export function getSpaHtmlBody(): string {
           &nbsp;&nbsp;• 不得連續超過 3 天指派觸及 WOCL 之任務。<br>
           &nbsp;&nbsp;• 連續 2 天觸及 WOCL → 任務後至少 34h 休息。<br>
           &nbsp;&nbsp;• 連續 3 天觸及 WOCL → 任務後至少 54h 休息。<br>
-          &nbsp;&nbsp;• 例外：每次觸及 WOCL 後皆有 ≥ 14h 休息，則免除 34/54h 限制。
+          &nbsp;&nbsp;• 例外：每次觸及 WOCL 後皆有 ≥ 14h 休息，則免除 34/54h 限制。<br>
+          ⑩ Accommodation（Not Start）：Actual FDP 扣除休息時數（無上限延長）。<br>
+          ⑪ Accommodation（Started）：Max FDP 增加休息時數的 50%（上限 24h）。
         </div>
       </div>
 
@@ -827,7 +831,7 @@ export function getSpaHtmlBody(): string {
       <button class="tab-util-btn tab-install-btn" id="tab-install-btn" onclick="showInstallGuide()" style="display:none">
         <span>📲</span>安裝
       </button>
-      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V5.218</span>
+      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V5.219</span>
     </div>
   </div>
 </div>
@@ -857,15 +861,15 @@ export function getSpaHtmlBody(): string {
       <div style="margin-bottom:4px">📱 建議使用 <b>iPad 橫向</b>操作以獲得最佳體驗</div>
       <div style="color:var(--muted)">Best experience on iPad in landscape mode</div>
     </div>
-    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V5.218</div>
+    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V5.219</div>
+    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
+      <div>CAR 參考面板新增 ⑩⑪ Accommodation 規則說明（中英對照）</div>
+      <div style="opacity:.7">Add Accommodation rules (⑩⑪) to CAR ref panel (EN + ZH)</div>
+    </div>
+    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V5.218</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
       <div>新增 Rest in Appropriate Accommodation 功能（Not Start 扣除 FDP / Start 延長 Max FDP 50%）；Timeline Ext bar 整合顯示</div>
       <div style="opacity:.7">Add Accommodation rest feature (Not Start deducts FDP / Start extends Max FDP by 50%); Ext bar shows combined extensions</div>
-    </div>
-    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V5.217</div>
-    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
-      <div>Timeline 全新配色 + 新增 Ext bar（PIC +2h）；日期選擇器修復 iPad 相容性；計算按鈕改英文</div>
-      <div style="opacity:.7">Timeline new color scheme + Ext bar (PIC +2h); fix date picker for iPad; Calculate button in English</div>
     </div>
     <button class="install-close-btn" onclick="closeAbout()">關閉</button>
   </div>
