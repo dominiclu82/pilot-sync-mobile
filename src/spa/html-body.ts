@@ -769,7 +769,7 @@ export function getSpaHtmlBody(): string {
       <button class="tab-util-btn tab-install-btn" id="tab-install-btn" onclick="showInstallGuide()" style="display:none">
         <span>📲</span>安裝
       </button>
-      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V5.210</span>
+      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V5.211</span>
     </div>
   </div>
 </div>
@@ -799,15 +799,15 @@ export function getSpaHtmlBody(): string {
       <div style="margin-bottom:4px">📱 建議使用 <b>iPad 橫向</b>操作以獲得最佳體驗</div>
       <div style="color:var(--muted)">Best experience on iPad in landscape mode</div>
     </div>
-    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V5.210</div>
+    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V5.211</div>
+    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
+      <div>Duty Time CAR 規定說明展開修復，內容可完整顯示</div>
+      <div style="opacity:.7">Fix Duty Time CAR reference panel to fully expand inline</div>
+    </div>
+    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V5.210</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
       <div>修復航班號顏色未正確顯示的問題</div>
       <div style="opacity:.7">Fix flight number airline colors not displaying correctly</div>
-    </div>
-    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V5.209</div>
-    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
-      <div>Gate Info 航班號依航空公司顏色顯示（JX 金色、BR 綠色、CI 桃紅）；目前時段外框改亮綠色；可排序表頭改藍色；Orig/Dest 切換鈕同步排序</div>
-      <div style="opacity:.7">Gate Info: flight numbers colored by airline (JX gold, BR green, CI magenta); current time slot border changed to green; sortable headers changed to blue; Orig/Dest toggle now also sorts accordingly</div>
     </div>
     <button class="install-close-btn" onclick="closeAbout()">關閉</button>
   </div>

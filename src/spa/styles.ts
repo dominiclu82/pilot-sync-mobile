@@ -171,7 +171,7 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
 .wx-route-btn{padding:4px 10px;font-size:.76em;background:none;border:1.5px solid var(--dim);
   border-radius:14px;color:var(--muted);font-weight:500;cursor:pointer;transition:all .2s;margin:0;-webkit-appearance:none}
 .wx-route-btn.active{background:var(--accent);color:#fff;border-color:var(--accent)}
-#briefing-datis.active,#briefing-pa.active,#briefing-duty.active{display:flex!important;flex-direction:column;padding:0!important}
+#briefing-datis.active,#briefing-pa.active{display:flex!important;flex-direction:column;padding:0!important}
 .wx-fixed-header{position:sticky;top:calc(env(safe-area-inset-top,0px) + 60px);z-index:90;background:var(--bg);flex-shrink:0}
 .wx-split{display:flex;flex-direction:column;flex:1}
 .wx-list-pane{border-bottom:1px solid var(--dim)}
@@ -192,10 +192,10 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
   .briefing-panel.active{padding:0}
   /* ── 需要固定高度的 tab：datis 分割面板、HF iframe ── */
   html:has(#tab-briefing.tab-active #briefing-datis.active),html:has(#tab-briefing.tab-active #briefing-hf.active),
-  html:has(#tab-briefing.tab-active #briefing-pa.active),html:has(#tab-briefing.tab-active #briefing-duty.active),
+  html:has(#tab-briefing.tab-active #briefing-pa.active),
   html:has(#tab-sync.tab-active),html:has(#tab-gate.tab-active){overflow:hidden;height:100dvh}
   html:has(#tab-briefing.tab-active #briefing-datis.active) body,html:has(#tab-briefing.tab-active #briefing-hf.active) body,
-  html:has(#tab-briefing.tab-active #briefing-pa.active) body,html:has(#tab-briefing.tab-active #briefing-duty.active) body,
+  html:has(#tab-briefing.tab-active #briefing-pa.active) body,
   html:has(#tab-sync.tab-active) body,html:has(#tab-gate.tab-active) body{overflow:hidden;height:100dvh}
   html:has(#tab-briefing.tab-active #briefing-datis.active) #tab-briefing.tab-active,
   html:has(#tab-briefing.tab-active #briefing-hf.active) #tab-briefing.tab-active,
