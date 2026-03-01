@@ -451,19 +451,30 @@ export function getSpaHtmlBody(): string {
           ② Duty period may be extended to 260h; standby &amp; deadhead up to 30h may be counted.<br>
           ③ Before standby duty, pilot shall have 10 consecutive hours rest.<br>
           ④ Domestic: FT ≤ 8h/24h, FDP ≤ 12h.<br>
-          ★ PIC Discretion: +2h to Max FDP (3P only), requires report.
-        </div>
-        <div class="dt-ref-note" style="margin-top:10px">
-          <b>其他重要休時與派遣規定</b><br>
+          ★ PIC Discretion: +2h to Max FDP (3P only).<br>
+          ⑤ Min rest before duty: at least 10 consecutive hours before any flight duty or standby.<br>
+          ⑥ 7-day rest: at least 30 consecutive hours within any 7 consecutive days.<br>
+          ⑦ Sector limits: max 4 sectors per FDP; up to 6 sectors in case of force majeure diversion.<br>
+          ⑧ Time zone adaptation: if stay &gt; 48h and time diff ≥ 6h, no flight duty within 48h after returning to base (DHD with min rest requirement permitted).<br>
+          ⑨ WOCL (Window of Circadian Low, local 02:00–05:00):<br>
+          &nbsp;&nbsp;• No more than 3 consecutive days of WOCL-infringing duty.<br>
+          &nbsp;&nbsp;• 2 consecutive WOCL days → min 34h rest after duty.<br>
+          &nbsp;&nbsp;• 3 consecutive WOCL days → min 54h rest after duty.<br>
+          &nbsp;&nbsp;• Exception: if ≥ 14h rest given after each WOCL duty, the 34/54h requirement is waived.<br><br>
+          ① 24 小時內之飛航時間。<br>
+          ② 執勤時間可延長至 260h；待命及乘客身分搭機最多 30h 可計入。<br>
+          ③ 待命勤務前，飛航組員須有連續 10 小時休息。<br>
+          ④ 國內航線：FT ≤ 8h/24h，FDP ≤ 12h。<br>
+          ★ 機長裁量權：Max FDP +2h（僅 3P）。<br>
           ⑤ 執勤前基本休時：任何飛航任務或待命前，必須給予至少連續 10 小時的休息。<br>
           ⑥ 7 日連續休時：在任何連續 7 天內，必須提供至少連續 30 小時的休息時間。<br>
           ⑦ 起降航段限制：單一 FDP 內最多 4 個航段；遇不可抗力轉降最多可放寬至 6 個航段。<br>
           ⑧ 時區差異適應：若外站停留 &gt; 48h 且時差 ≥ 6h，返回基地後 48 小時內不得指派飛航任務（可指派帶最低休時規定之 DHD）。<br>
           ⑨ WOCL（生理時鐘低潮期，當地 02:00–05:00）：<br>
-          &nbsp;&nbsp;• 不得連續超過 3 天指派侵犯 WOCL 之任務。<br>
-          &nbsp;&nbsp;• 連續 2 天侵犯 WOCL → 任務後至少 34h 休息。<br>
-          &nbsp;&nbsp;• 連續 3 天侵犯 WOCL → 任務後至少 54h 休息。<br>
-          &nbsp;&nbsp;• 例外：每次侵犯 WOCL 後皆有 ≥ 14h 休息，則免除 34/54h 限制。
+          &nbsp;&nbsp;• 不得連續超過 3 天指派觸及 WOCL 之任務。<br>
+          &nbsp;&nbsp;• 連續 2 天觸及 WOCL → 任務後至少 34h 休息。<br>
+          &nbsp;&nbsp;• 連續 3 天觸及 WOCL → 任務後至少 54h 休息。<br>
+          &nbsp;&nbsp;• 例外：每次觸及 WOCL 後皆有 ≥ 14h 休息，則免除 34/54h 限制。
         </div>
       </div>
 
@@ -472,7 +483,7 @@ export function getSpaHtmlBody(): string {
       <div class="dt-body" style="padding-bottom:0">
         <div class="dt-mode-row">
           <button class="dt-mode-btn active" id="dt-mode-home" onclick="dtSetMode('home')">🏠 Home Base</button>
-          <button class="dt-mode-btn" id="dt-mode-out" onclick="dtSetMode('out')">✈️ Outstation</button>
+          <button class="dt-mode-btn" id="dt-mode-out" onclick="dtSetMode('out')">🛏️ Outstation</button>
         </div>
       </div>
 
@@ -646,14 +657,6 @@ export function getSpaHtmlBody(): string {
         選好人數並輸入 FDP Start，按「計算」即可查看最大限制時間
       </div>
 
-      <div class="dt-logic-note">
-        <div class="dt-logic-title">📌 邏輯說明：</div>
-        <div>Commander's Discretion: 僅於組員為 3 人 (Multiple Crew) 時顯示，勾選後 Max FDP 自動增加 2 小時。</div>
-        <div>Accommodation (Not Start): Actual FDP 扣除休息時數 (無上限延長)。</div>
-        <div>Accommodation (Started): Max FDP 增加休息時數的 50% (上限 24h)。</div>
-        <div>Time Diff ≥ 6h: 若勾選，基地最小休息時間顯示為 "No FD at least 48hr"。</div>
-        <div>WOCL (02:00-05:00 LT): 依據所選 Base Timezone 計算夜間勤務。</div>
-      </div>
 
     </div>
   </div>
@@ -791,7 +794,7 @@ export function getSpaHtmlBody(): string {
       <button class="tab-util-btn tab-install-btn" id="tab-install-btn" onclick="showInstallGuide()" style="display:none">
         <span>📲</span>安裝
       </button>
-      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V5.215</span>
+      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V5.216</span>
     </div>
   </div>
 </div>
@@ -821,15 +824,15 @@ export function getSpaHtmlBody(): string {
       <div style="margin-bottom:4px">📱 建議使用 <b>iPad 橫向</b>操作以獲得最佳體驗</div>
       <div style="color:var(--muted)">Best experience on iPad in landscape mode</div>
     </div>
-    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V5.215</div>
+    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V5.216</div>
+    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
+      <div>CAR 參考面板改為中英對照（①–⑨）；刪除 PIC Discretion requires report；Outstation 圖示改 🛏️；移除底部邏輯說明區塊</div>
+      <div style="opacity:.7">CAR ref panel bilingual notes (①–⑨ EN + ZH); remove PIC Discretion "requires report"; Outstation icon to 🛏️; remove logic note section</div>
+    </div>
+    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V5.215</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
       <div>新增 Time Diff ≥ 6h checkbox；日期改為日曆選擇器（顯示 MM/DD）；CAR 參考面板新增其他重要休時與派遣規定（⑤–⑨）</div>
       <div style="opacity:.7">Add Time Diff ≥ 6h checkbox; date picker with MM/DD display; add rest &amp; dispatch rules (⑤–⑨) to CAR ref panel</div>
-    </div>
-    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V5.214</div>
-    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
-      <div>Duty Time CAR 參考面板展開不再被壓縮成一行</div>
-      <div style="opacity:.7">Fix CAR 07-02A ref panel being compressed to one line when expanded</div>
     </div>
     <button class="install-close-btn" onclick="closeAbout()">關閉</button>
   </div>
