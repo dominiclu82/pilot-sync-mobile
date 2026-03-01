@@ -2,6 +2,36 @@
 var DT_MAX_FDP = {2:14*60, 3:18*60, 4:24*60};
 var DT_MAX_FT  = {2:{noC1:10*60,c1:10*60}, 3:{noC1:12*60,c1:16*60}, 4:{noC1:12*60,c1:18*60}};
 var dtMode = 'home';
+var DT_DATE_IDS = ['dt-s-day','dt-e-day','dt-n-day','dt-ci-day','dt-co-day'];
+
+function dtInitDates() {
+  var now = new Date();
+  var yyyy = now.getUTCFullYear();
+  var mm = ('0'+(now.getUTCMonth()+1)).slice(-2);
+  var dd = ('0'+now.getUTCDate()).slice(-2);
+  var today = yyyy+'-'+mm+'-'+dd;
+  var label = mm+'/'+dd;
+  DT_DATE_IDS.forEach(function(id) {
+    var inp = document.getElementById(id);
+    var btn = document.getElementById(id+'-btn');
+    if (inp) { inp.value = today; }
+    if (btn) { btn.textContent = label; }
+  });
+}
+
+function dtOpenDate(inputId, btn) {
+  var inp = document.getElementById(inputId);
+  inp.onchange = function() {
+    if (inp.value) {
+      var parts = inp.value.split('-');
+      btn.textContent = parts[1]+'/'+parts[2];
+    } else {
+      btn.textContent = '--/--';
+    }
+  };
+  if (inp.showPicker) { inp.showPicker(); }
+  else { inp.focus(); inp.click(); }
+}
 
 function dtGetTzOffset(tzId) {
   var now = new Date();
@@ -140,12 +170,14 @@ function dtFmtUTC(m) {
 }
 
 function dtDayMin(dayId, hId, mId) {
-  var d = parseInt(document.getElementById(dayId).value);
+  var dateVal = document.getElementById(dayId).value; // YYYY-MM-DD
   var h = parseInt(document.getElementById(hId).value);
   var m = parseInt(document.getElementById(mId).value);
   if (isNaN(h) || isNaN(m)) return null;
-  var base = isNaN(d) ? 0 : d * 1440;
-  return base + h*60 + m;
+  if (!dateVal) return h*60 + m;
+  var parts = dateVal.split('-');
+  var dt = new Date(Date.UTC(parseInt(parts[0]), parseInt(parts[1])-1, parseInt(parts[2]), h, m));
+  return dt.getTime() / 60000; // absolute minutes since epoch
 }
 
 function dtSelectCrew(btn) {
@@ -191,6 +223,7 @@ function dtCalculate() {
   var crew  = parseInt(document.querySelector('.dt-crew-btn.active').dataset.crew);
   var hasC1 = document.getElementById('dt-c1').checked;
   var disc  = crew===3 && document.getElementById('dt-disc').checked;
+  var td6   = document.getElementById('dt-td6').checked;
   var tz    = dtGetTzOffset(document.getElementById('dt-tz').value);
 
   var startMin = dtDayMin('dt-s-day','dt-s-h','dt-s-m');
@@ -237,7 +270,7 @@ function dtCalculate() {
   if (endMin <= startMin) endMin += 1440;
 
   var actFdp  = endMin - startMin;
-  var minRest = dtMinRest(crew, ftMin);
+  var minRest = td6 ? 48*60 : dtMinRest(crew, ftMin);
 
   // Show compliance cards and timeline
   document.querySelector('.dt-tl2').style.display = '';
@@ -276,15 +309,16 @@ function dtCalculate() {
   dtCardState('dt-card-ft', ftOk);
 
   // Rest card
+  var minRestLabel = td6 ? 'No FD at least 48hr' : dtFmtHM(minRest);
   document.getElementById('dt-card-rest').style.display = '';
   if (actRest !== null) {
     var restOk = actRest >= minRest;
     document.getElementById('dt-r-rest').textContent     = dtFmtHM(actRest) + (restOk ? ' ✓' : ' ✗');
-    document.getElementById('dt-r-rest-min').textContent = 'Min: ' + dtFmtHM(minRest);
+    document.getElementById('dt-r-rest-min').textContent = 'Min: ' + minRestLabel;
     dtCardState('dt-card-rest', restOk);
   } else {
     document.getElementById('dt-r-rest').textContent     = '—';
-    document.getElementById('dt-r-rest-min').textContent = 'Min required: ' + dtFmtHM(minRest);
+    document.getElementById('dt-r-rest-min').textContent = 'Min required: ' + minRestLabel;
     dtCardState('dt-card-rest', null);
   }
 
@@ -303,6 +337,7 @@ function dtCalculate() {
 }
 
 // ── Boot ─────────────────────────────────────────────────────────────────────
+dtInitDates();
 showMain();
 // 預設顯示簡報箱 datis 分頁 → 立即載入初始天氣資料
 wxLoaded = true; (function(){ var fsel = document.getElementById('wx-fleet-select'); if (fsel) fsel.value = wxCurrentFleet; })(); loadWxRegion(wxCurrentRegion);

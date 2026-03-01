@@ -374,6 +374,11 @@ export function getSpaHtmlBody(): string {
             <input type="checkbox" id="dt-disc"> PIC Discretion (+2h)
           </label>
         </div>
+        <div class="dt-opt-row">
+          <label class="dt-chk-label">
+            <input type="checkbox" id="dt-td6"> Time Diff ≥ 6h &amp; Stay &gt; 48h
+          </label>
+        </div>
         <div class="dt-opt-row" style="margin-bottom:4px">
           <span style="font-size:.72em;color:var(--dim);flex-shrink:0">時區</span>
           <select class="dt-tz-select" id="dt-tz">
@@ -448,6 +453,18 @@ export function getSpaHtmlBody(): string {
           ④ Domestic: FT ≤ 8h/24h, FDP ≤ 12h.<br>
           ★ PIC Discretion: +2h to Max FDP (3P only), requires report.
         </div>
+        <div class="dt-ref-note" style="margin-top:10px">
+          <b>其他重要休時與派遣規定</b><br>
+          ⑤ 執勤前基本休時：任何飛航任務或待命前，必須給予至少連續 10 小時的休息。<br>
+          ⑥ 7 日連續休時：在任何連續 7 天內，必須提供至少連續 30 小時的休息時間。<br>
+          ⑦ 起降航段限制：單一 FDP 內最多 4 個航段；遇不可抗力轉降最多可放寬至 6 個航段。<br>
+          ⑧ 時區差異適應：若外站停留 &gt; 48h 且時差 ≥ 6h，返回基地後 48 小時內不得指派飛航任務（可指派帶最低休時規定之 DHD）。<br>
+          ⑨ WOCL（生理時鐘低潮期，當地 02:00–05:00）：<br>
+          &nbsp;&nbsp;• 不得連續超過 3 天指派侵犯 WOCL 之任務。<br>
+          &nbsp;&nbsp;• 連續 2 天侵犯 WOCL → 任務後至少 34h 休息。<br>
+          &nbsp;&nbsp;• 連續 3 天侵犯 WOCL → 任務後至少 54h 休息。<br>
+          &nbsp;&nbsp;• 例外：每次侵犯 WOCL 後皆有 ≥ 14h 休息，則免除 34/54h 限制。
+        </div>
       </div>
 
 
@@ -466,7 +483,8 @@ export function getSpaHtmlBody(): string {
         <div class="dt-field">
           <div class="dt-field-label">FDP Start (UTC) — Report Time</div>
           <div class="dt-time-row">
-            <input class="dt-date-box" type="text" id="dt-s-day" placeholder="DD" maxlength="2" inputmode="numeric">
+            <input type="date" id="dt-s-day" class="dt-date-hidden">
+            <button type="button" class="dt-date-box" onclick="dtOpenDate('dt-s-day',this)" id="dt-s-day-btn">--/--</button>
             <span class="dt-sep">/</span>
             <input class="dt-time-box" type="text" id="dt-s-h" placeholder="HH" maxlength="2" inputmode="numeric">
             <span class="dt-sep">:</span>
@@ -479,7 +497,8 @@ export function getSpaHtmlBody(): string {
         <div class="dt-field">
           <div class="dt-field-label">FDP End (UTC) — Block In / Release <span style="color:var(--muted);font-size:.85em">（選填，用於檢查實際 FDP）</span></div>
           <div class="dt-time-row">
-            <input class="dt-date-box" type="text" id="dt-e-day" placeholder="DD" maxlength="2" inputmode="numeric">
+            <input type="date" id="dt-e-day" class="dt-date-hidden">
+            <button type="button" class="dt-date-box" onclick="dtOpenDate('dt-e-day',this)" id="dt-e-day-btn">--/--</button>
             <span class="dt-sep">/</span>
             <input class="dt-time-box" type="text" id="dt-e-h" placeholder="HH" maxlength="2" inputmode="numeric">
             <span class="dt-sep">:</span>
@@ -502,7 +521,8 @@ export function getSpaHtmlBody(): string {
         <div class="dt-field" id="dt-next-section">
           <div class="dt-field-label">Next Duty Report (UTC) — 選填</div>
           <div class="dt-time-row">
-            <input class="dt-date-box" type="text" id="dt-n-day" placeholder="DD" maxlength="2" inputmode="numeric">
+            <input type="date" id="dt-n-day" class="dt-date-hidden">
+            <button type="button" class="dt-date-box" onclick="dtOpenDate('dt-n-day',this)" id="dt-n-day-btn">--/--</button>
             <span class="dt-sep">/</span>
             <input class="dt-time-box" type="text" id="dt-n-h" placeholder="HH" maxlength="2" inputmode="numeric">
             <span class="dt-sep">:</span>
@@ -515,7 +535,8 @@ export function getSpaHtmlBody(): string {
         <div class="dt-field" id="dt-hotel-section" style="display:none">
           <div class="dt-field-label">Hotel Check-in (UTC)</div>
           <div class="dt-time-row">
-            <input class="dt-date-box" type="text" id="dt-ci-day" placeholder="DD" maxlength="2" inputmode="numeric">
+            <input type="date" id="dt-ci-day" class="dt-date-hidden">
+            <button type="button" class="dt-date-box" onclick="dtOpenDate('dt-ci-day',this)" id="dt-ci-day-btn">--/--</button>
             <span class="dt-sep">/</span>
             <input class="dt-time-box" type="text" id="dt-ci-h" placeholder="HH" maxlength="2" inputmode="numeric">
             <span class="dt-sep">:</span>
@@ -524,7 +545,8 @@ export function getSpaHtmlBody(): string {
           </div>
           <div class="dt-field-label" style="margin-top:8px">Hotel Check-out (UTC)</div>
           <div class="dt-time-row">
-            <input class="dt-date-box" type="text" id="dt-co-day" placeholder="DD" maxlength="2" inputmode="numeric">
+            <input type="date" id="dt-co-day" class="dt-date-hidden">
+            <button type="button" class="dt-date-box" onclick="dtOpenDate('dt-co-day',this)" id="dt-co-day-btn">--/--</button>
             <span class="dt-sep">/</span>
             <input class="dt-time-box" type="text" id="dt-co-h" placeholder="HH" maxlength="2" inputmode="numeric">
             <span class="dt-sep">:</span>
@@ -769,7 +791,7 @@ export function getSpaHtmlBody(): string {
       <button class="tab-util-btn tab-install-btn" id="tab-install-btn" onclick="showInstallGuide()" style="display:none">
         <span>📲</span>安裝
       </button>
-      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V5.214</span>
+      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V5.215</span>
     </div>
   </div>
 </div>
@@ -799,15 +821,15 @@ export function getSpaHtmlBody(): string {
       <div style="margin-bottom:4px">📱 建議使用 <b>iPad 橫向</b>操作以獲得最佳體驗</div>
       <div style="color:var(--muted)">Best experience on iPad in landscape mode</div>
     </div>
-    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V5.214</div>
+    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V5.215</div>
+    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
+      <div>新增 Time Diff ≥ 6h checkbox；日期改為日曆選擇器（顯示 MM/DD）；CAR 參考面板新增其他重要休時與派遣規定（⑤–⑨）</div>
+      <div style="opacity:.7">Add Time Diff ≥ 6h checkbox; date picker with MM/DD display; add rest &amp; dispatch rules (⑤–⑨) to CAR ref panel</div>
+    </div>
+    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V5.214</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
       <div>Duty Time CAR 參考面板展開不再被壓縮成一行</div>
       <div style="opacity:.7">Fix CAR 07-02A ref panel being compressed to one line when expanded</div>
-    </div>
-    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V5.213</div>
-    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
-      <div>簡報箱所有子分頁統一固定上下 bar；Duty Time CAR 規定說明展開自動捲動至可見位置</div>
-      <div style="opacity:.7">Fix all briefing subtabs to lock top/bottom bars; Duty Time CAR ref panel auto-scrolls into view on expand</div>
     </div>
     <button class="install-close-btn" onclick="closeAbout()">關閉</button>
   </div>

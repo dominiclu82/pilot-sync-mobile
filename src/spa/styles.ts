@@ -296,7 +296,8 @@ html:has(#tab-briefing.tab-active #briefing-coldtemp.active) #tab-briefing.tab-a
 .dt-field{margin-bottom:10px}
 .dt-field-label{font-size:.72em;font-weight:700;color:var(--muted);margin-bottom:4px}
 .dt-time-row{display:flex;align-items:center;gap:5px;flex-wrap:wrap}
-.dt-date-box{padding:7px 5px;background:var(--surface);border:1.5px solid var(--dim);border-radius:8px;color:var(--text);font-size:.85em;font-weight:600;width:48px;text-align:center}
+.dt-date-hidden{position:absolute;opacity:0;pointer-events:none;width:0;height:0}
+.dt-date-box{padding:7px 5px;background:var(--surface);border:1.5px solid var(--dim);border-radius:8px;color:var(--text);font-size:.85em;font-weight:600;min-width:52px;text-align:center;cursor:pointer;-webkit-appearance:none}
 .dt-time-box{width:40px;padding:7px 3px;text-align:center;font-size:.92em;font-weight:700;background:var(--surface);border:1.5px solid var(--dim);border-radius:8px;color:var(--text)}
 .dt-sep{font-weight:700;color:var(--muted)}
 .dt-tag{font-size:.68em;color:var(--muted);padding:2px 5px;border:1px solid var(--dim);border-radius:4px;white-space:nowrap}
