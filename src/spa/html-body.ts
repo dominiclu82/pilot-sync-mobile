@@ -755,7 +755,7 @@ export function getSpaHtmlBody(): string {
       <button class="tab-util-btn tab-install-btn" id="tab-install-btn" onclick="showInstallGuide()" style="display:none">
         <span>📲</span>安裝
       </button>
-      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V5.203</span>
+      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V5.204</span>
     </div>
   </div>
 </div>
@@ -785,15 +785,15 @@ export function getSpaHtmlBody(): string {
       <div style="margin-bottom:4px">📱 建議使用 <b>iPad 橫向</b>操作以獲得最佳體驗</div>
       <div style="color:var(--muted)">Best experience on iPad in landscape mode</div>
     </div>
-    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V5.203</div>
+    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V5.204</div>
+    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
+      <div>PA 左右面板防回彈（overscroll-behavior）；左欄寬度 380px；A+/A- iPad 順序修正（A+ 在右）</div>
+      <div style="opacity:.7">PA panels overscroll bounce fix; left panel width 380px; A+/A- iPad order fix (A+ on right)</div>
+    </div>
+    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V5.203</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
       <div>Gate Info Orig/Dest 按鈕改為捲動切換（不隱藏欄位）；按鈕移至 STD/STA 下方；PA 筆記按鈕移至語言標籤旁；展開不自動跳鍵盤；底部捲動修正</div>
       <div style="opacity:.7">Gate Info Orig/Dest button scrolls instead of hiding columns; button moved below STD/STA; PA note button moved next to language label; no auto-focus on expand; bottom scroll fix</div>
-    </div>
-    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V5.202</div>
-    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
-      <div>PA 筆記功能（英文/中文各一區，localStorage 持久化）；PA 左欄寬度微調；Gate Info 預設排序改回目的地；時間欄預設隱藏；手機 Orig/Dest 切換按鈕（🛫/🛬）；A+/A- 手機直向上下排列；日夜間按鈕移除中文標籤</div>
-      <div style="opacity:.7">PA notes per template (EN/ZH, localStorage persistent); PA left panel width adjusted; Gate Info default sort: destination; time columns hidden by default; mobile Orig/Dest column toggle; A+/A- stacked vertically on portrait; theme toggle: removed Chinese label</div>
     </div>
     <button class="install-close-btn" onclick="closeAbout()">關閉</button>
   </div>

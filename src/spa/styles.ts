@@ -32,7 +32,7 @@ body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSy
   cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:1px;padding:0;-webkit-appearance:none}
 .tab-util-btn span{font-size:1.3em;line-height:1}
 .font-size-wrap{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px}
-@media(min-width:500px){.font-size-wrap{flex-direction:row;gap:4px}}
+@media(min-width:500px){.font-size-wrap{flex-direction:row-reverse;gap:4px}}
 .font-size-btn{font-weight:700;padding:2px 6px;border:1px solid var(--dim)!important;border-radius:4px}
 .font-size-btn-sm{font-size:.7em!important}
 .font-size-btn-lg{font-size:1em!important}
@@ -457,7 +457,7 @@ html:has(#tab-briefing.tab-active #briefing-coldtemp.active) #tab-briefing.tab-a
 .privacy-a{font-size:.78em;color:var(--text);line-height:1.65;margin-bottom:4px}
 /* ── PA 工具 ─────────────────────────────────────────── */
 .pa-split{display:flex;flex-direction:column;flex:1;min-height:0;overflow:hidden}
-.pa-left{padding:12px 14px;border-bottom:1px solid var(--dim);flex-shrink:0;overflow-y:auto;max-height:45%}
+.pa-left{padding:12px 14px 40px;border-bottom:1px solid var(--dim);flex-shrink:0;overflow-y:auto;max-height:45%;overscroll-behavior:none}
 .pa-right{flex:1;display:flex;flex-direction:column;min-height:0;overflow:hidden}
 .pa-section{margin-bottom:20px}
 .pa-section:last-child{margin-bottom:0}
@@ -506,7 +506,7 @@ html:has(#tab-briefing.tab-active #briefing-coldtemp.active) #tab-briefing.tab-a
 .pa-cat-btn{padding:6px 12px;border:1.5px solid var(--dim);border-radius:8px;background:none;
   color:var(--muted);font-size:.75em;font-weight:600;cursor:pointer;white-space:nowrap;-webkit-appearance:none}
 .pa-cat-btn.active{border-color:var(--accent);color:var(--accent);background:rgba(99,102,241,.08)}
-.pa-content{flex:1;overflow-y:auto;padding:14px 14px 40px;min-height:0}
+.pa-content{flex:1;overflow-y:auto;padding:14px 14px 40px;min-height:0;overscroll-behavior:none}
 .pa-placeholder{text-align:center;color:var(--muted);font-size:.85em;padding:40px 20px;line-height:1.8}
 .pa-script{font-size:.85em;line-height:2;color:var(--text)}
 .pa-script .pa-lang{font-weight:700;color:var(--accent);margin:14px 0 6px;font-size:.9em}
@@ -530,7 +530,7 @@ html:has(#tab-briefing.tab-active #briefing-coldtemp.active) #tab-briefing.tab-a
 .pa-input-num{min-width:30px;max-width:50px}
 @media(orientation:landscape) and (min-width:768px){
 .pa-split{flex-direction:row}
-.pa-left{width:400px;flex-shrink:0;border-bottom:none;border-right:1px solid var(--dim);max-height:none;overflow-y:auto}
+.pa-left{width:380px;flex-shrink:0;border-bottom:none;border-right:1px solid var(--dim);max-height:none;overflow-y:auto}
 .pa-right{flex:1}
 }
 `;
