@@ -29,6 +29,19 @@ function dtDateChanged(inp) {
   }
 }
 
+function dtToggleAccom() {
+  var on = document.getElementById('dt-accom').checked;
+  document.getElementById('dt-accom-detail').style.display = on ? 'block' : 'none';
+}
+
+function dtGetAccomType() {
+  var radios = document.getElementsByName('dt-accom-type');
+  for (var i = 0; i < radios.length; i++) {
+    if (radios[i].checked) return radios[i].value;
+  }
+  return 'notstart';
+}
+
 function dtGetTzOffset(tzId) {
   var now = new Date();
   var yr  = now.getUTCFullYear();
@@ -52,10 +65,12 @@ function dtFmtH(m) { // "HH:MM" for timeline labels
   return h+':'+(mm<10?'0':'')+mm;
 }
 
-function dtRenderTimeline(startMin, endMin, maxFdp, restStart, restEnd, minRest, tz, disc) {
+function dtRenderTimeline(startMin, endMin, maxFdp, restStart, restEnd, minRest, tz, disc, accomExt, accomType) {
   try {
   var actFdp = endMin - startMin;
-  var baseFdp = disc ? maxFdp - 2*60 : maxFdp;
+  // Calculate total extension and base Max FDP
+  var totalExt = (disc ? 2*60 : 0) + (accomType === 'start' ? (accomExt || 0) : 0);
+  var baseFdp = maxFdp - totalExt;
   var spanEnd = restEnd !== null
     ? Math.max(startMin + maxFdp, restEnd) + 60
     : startMin + maxFdp + minRest + 60;
@@ -71,15 +86,18 @@ function dtRenderTimeline(startMin, endMin, maxFdp, restStart, restEnd, minRest,
   // Bars
   setBar('dt-bar-fdp', 0, actFdp);
   document.getElementById('dt-lbl-fdp').textContent = 'Actual FDP ' + dtFmtH(actFdp);
-  setBar('dt-bar-maxfdp', 0, disc ? baseFdp : maxFdp);
-  document.getElementById('dt-lbl-maxfdp').textContent = 'Max ' + dtFmtH(disc ? baseFdp : maxFdp);
+  setBar('dt-bar-maxfdp', 0, baseFdp);
+  document.getElementById('dt-lbl-maxfdp').textContent = 'Max ' + dtFmtH(baseFdp);
 
-  // Ext bar (PIC Discretion +2h)
+  // Ext bar (PIC Discretion and/or Accommodation Start)
   var extEl = document.getElementById('dt-bar-ext');
-  if (disc) {
+  if (totalExt > 0) {
     extEl.style.display = 'flex';
-    setBar('dt-bar-ext', baseFdp, 2*60);
-    document.getElementById('dt-lbl-ext').textContent = 'PIC +2h';
+    setBar('dt-bar-ext', baseFdp, totalExt);
+    var extParts = [];
+    if (disc) extParts.push('PIC +2h');
+    if (accomType === 'start' && accomExt > 0) extParts.push('Accom +' + dtFmtH(accomExt));
+    document.getElementById('dt-lbl-ext').textContent = extParts.join(' / ');
   } else {
     extEl.style.display = 'none';
   }
@@ -231,6 +249,13 @@ function dtCalculate() {
   var hasC1 = document.getElementById('dt-c1').checked;
   var disc  = crew===3 && document.getElementById('dt-disc').checked;
   var td6   = document.getElementById('dt-td6').checked;
+  var accom = document.getElementById('dt-accom').checked;
+  var accomMin = 0, accomType = 'notstart';
+  if (accom) {
+    accomMin = (parseInt(document.getElementById('dt-accom-h').value)||0)*60 +
+               (parseInt(document.getElementById('dt-accom-m').value)||0);
+    accomType = dtGetAccomType();
+  }
   var tz    = dtGetTzOffset(document.getElementById('dt-tz').value);
 
   var startMin = dtDayMin('dt-s-day','dt-s-h','dt-s-m');
@@ -244,6 +269,11 @@ function dtCalculate() {
   }
 
   var maxFdp = DT_MAX_FDP[crew] + (disc ? 2*60 : 0);
+  var accomExt = 0;
+  if (accom && accomMin > 0 && accomType === 'start') {
+    accomExt = Math.floor(accomMin * 0.5);
+    maxFdp = Math.min(maxFdp + accomExt, 24*60);
+  }
   var maxFt  = hasC1 ? DT_MAX_FT[crew].c1 : DT_MAX_FT[crew].noC1;
 
   // ── Deadline cards (always shown) ──────────────────────────────────────────
@@ -277,6 +307,11 @@ function dtCalculate() {
   if (endMin <= startMin) endMin += 1440;
 
   var actFdp  = endMin - startMin;
+  // Accommodation Not Start: deduct rest from actual FDP
+  var adjFdp = actFdp;
+  if (accom && accomMin > 0 && accomType === 'notstart') {
+    adjFdp = Math.max(0, actFdp - accomMin);
+  }
   var minRest = td6 ? 48*60 : dtMinRest(crew, ftMin);
 
   // Show compliance cards and timeline
@@ -302,10 +337,17 @@ function dtCalculate() {
   }
 
   // FDP card
-  var fdpOk = actFdp <= maxFdp;
+  var fdpOk = adjFdp <= maxFdp;
   document.getElementById('dt-card-fdp').style.display    = '';
-  document.getElementById('dt-r-fdp').textContent         = dtFmtHM(actFdp);
-  document.getElementById('dt-r-fdp-max').textContent     = 'Max: ' + dtFmtHM(maxFdp) + (disc ? ' (incl. PIC disc.)' : '');
+  var fdpLabel = dtFmtHM(actFdp);
+  if (accom && accomMin > 0 && accomType === 'notstart') {
+    fdpLabel += ' → ' + dtFmtHM(adjFdp) + ' (−Accom)';
+  }
+  document.getElementById('dt-r-fdp').textContent         = fdpLabel;
+  var maxLabel = 'Max: ' + dtFmtHM(maxFdp);
+  if (disc) maxLabel += ' (incl. PIC disc.)';
+  if (accom && accomMin > 0 && accomType === 'start') maxLabel += ' (incl. Accom +' + dtFmtHM(accomExt) + ')';
+  document.getElementById('dt-r-fdp-max').textContent     = maxLabel;
   dtCardState('dt-card-fdp', fdpOk);
 
   // FT card
@@ -340,7 +382,7 @@ function dtCalculate() {
   }
 
   // CSS percentages recalculate on reflow, no timing hacks needed
-  dtRenderTimeline(startMin, endMin, maxFdp, restStart, restEnd, minRest, tz, disc);
+  dtRenderTimeline(startMin, endMin, maxFdp, restStart, restEnd, minRest, tz, disc, accomExt, accomType);
 }
 
 // ── Boot ─────────────────────────────────────────────────────────────────────

@@ -379,6 +379,25 @@ export function getSpaHtmlBody(): string {
             <input type="checkbox" id="dt-td6"> Time Diff ≥ 6h &amp; Stay &gt; 48h
           </label>
         </div>
+        <div class="dt-opt-row">
+          <label class="dt-chk-label">
+            <input type="checkbox" id="dt-accom" onchange="dtToggleAccom()"> Rest in Appropriate Accommodation
+          </label>
+        </div>
+        <div id="dt-accom-detail" style="display:none;padding:0 4px;margin-bottom:4px">
+          <div class="dt-time-row" style="margin-bottom:6px">
+            <span style="font-size:.72em;color:var(--dim);flex-shrink:0">Rest Duration</span>
+            <input class="dt-time-box" type="text" id="dt-accom-h" placeholder="H" maxlength="2" inputmode="numeric" style="width:36px">
+            <span class="dt-sep">hr</span>
+            <input class="dt-time-box" type="text" id="dt-accom-m" placeholder="MM" maxlength="2" inputmode="numeric" style="width:36px">
+            <span class="dt-sep">min</span>
+          </div>
+          <div style="display:flex;gap:12px;font-size:.75em;color:var(--text)">
+            <label><input type="radio" name="dt-accom-type" value="notstart" checked> First Sector Not Start</label>
+            <label><input type="radio" name="dt-accom-type" value="start"> First Sector Start</label>
+          </div>
+          <div id="dt-accom-hint" style="font-size:.68em;color:var(--muted);margin-top:4px">* Actual FDP deducted by rest duration</div>
+        </div>
         <div class="dt-opt-row" style="margin-bottom:4px">
           <span style="font-size:.72em;color:var(--dim);flex-shrink:0">時區</span>
           <select class="dt-tz-select" id="dt-tz">
@@ -808,7 +827,7 @@ export function getSpaHtmlBody(): string {
       <button class="tab-util-btn tab-install-btn" id="tab-install-btn" onclick="showInstallGuide()" style="display:none">
         <span>📲</span>安裝
       </button>
-      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V5.217</span>
+      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V5.218</span>
     </div>
   </div>
 </div>
@@ -838,15 +857,15 @@ export function getSpaHtmlBody(): string {
       <div style="margin-bottom:4px">📱 建議使用 <b>iPad 橫向</b>操作以獲得最佳體驗</div>
       <div style="color:var(--muted)">Best experience on iPad in landscape mode</div>
     </div>
-    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V5.217</div>
+    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V5.218</div>
+    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
+      <div>新增 Rest in Appropriate Accommodation 功能（Not Start 扣除 FDP / Start 延長 Max FDP 50%）；Timeline Ext bar 整合顯示</div>
+      <div style="opacity:.7">Add Accommodation rest feature (Not Start deducts FDP / Start extends Max FDP by 50%); Ext bar shows combined extensions</div>
+    </div>
+    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V5.217</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
       <div>Timeline 全新配色 + 新增 Ext bar（PIC +2h）；日期選擇器修復 iPad 相容性；計算按鈕改英文</div>
       <div style="opacity:.7">Timeline new color scheme + Ext bar (PIC +2h); fix date picker for iPad; Calculate button in English</div>
-    </div>
-    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V5.216</div>
-    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
-      <div>CAR 參考面板改為中英對照（①–⑨）；刪除 PIC Discretion requires report；移除底部邏輯說明區塊</div>
-      <div style="opacity:.7">CAR ref panel bilingual notes (①–⑨ EN + ZH); remove PIC Discretion "requires report"; remove logic note section</div>
     </div>
     <button class="install-close-btn" onclick="closeAbout()">關閉</button>
   </div>
