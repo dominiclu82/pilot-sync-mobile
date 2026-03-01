@@ -171,7 +171,7 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
 .wx-route-btn{padding:4px 10px;font-size:.76em;background:none;border:1.5px solid var(--dim);
   border-radius:14px;color:var(--muted);font-weight:500;cursor:pointer;transition:all .2s;margin:0;-webkit-appearance:none}
 .wx-route-btn.active{background:var(--accent);color:#fff;border-color:var(--accent)}
-#briefing-datis.active,#briefing-pa.active{display:flex!important;flex-direction:column;padding:0!important}
+#briefing-datis.active,#briefing-pa.active,#briefing-duty.active{display:flex!important;flex-direction:column;padding:0!important}
 .wx-fixed-header{position:sticky;top:calc(env(safe-area-inset-top,0px) + 60px);z-index:90;background:var(--bg);flex-shrink:0}
 .wx-split{display:flex;flex-direction:column;flex:1}
 .wx-list-pane{border-bottom:1px solid var(--dim)}
@@ -190,20 +190,16 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
   .briefing-subtabs{position:sticky;top:0;z-index:100;flex-shrink:0}
   .subtab-slot{flex:1}
   .briefing-panel.active{padding:0}
-  /* ── 需要固定高度的 tab：datis 分割面板、HF iframe ── */
-  html:has(#tab-briefing.tab-active #briefing-datis.active),html:has(#tab-briefing.tab-active #briefing-hf.active),
-  html:has(#tab-briefing.tab-active #briefing-pa.active),
+  /* ── 所有 tab 固定高度，上下 bar 不動 ── */
+  html:has(#tab-briefing.tab-active),
   html:has(#tab-sync.tab-active),html:has(#tab-gate.tab-active){overflow:hidden;height:100dvh}
-  html:has(#tab-briefing.tab-active #briefing-datis.active) body,html:has(#tab-briefing.tab-active #briefing-hf.active) body,
-  html:has(#tab-briefing.tab-active #briefing-pa.active) body,
+  html:has(#tab-briefing.tab-active) body,
   html:has(#tab-sync.tab-active) body,html:has(#tab-gate.tab-active) body{overflow:hidden;height:100dvh}
-  html:has(#tab-briefing.tab-active #briefing-datis.active) #tab-briefing.tab-active,
-  html:has(#tab-briefing.tab-active #briefing-hf.active) #tab-briefing.tab-active,
-  html:has(#tab-briefing.tab-active #briefing-pa.active) #tab-briefing.tab-active,
-  html:has(#tab-briefing.tab-active #briefing-duty.active) #tab-briefing.tab-active{
+  #tab-briefing.tab-active{
     display:flex;flex-direction:column;
     height:calc(100dvh - calc(56px + env(safe-area-inset-bottom,0px)));
     min-height:unset;overflow:hidden;padding:0}
+  .briefing-panel.active{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;min-height:0}
   #tab-sync.tab-active{height:calc(100dvh - calc(56px + env(safe-area-inset-bottom,0px)));
     min-height:unset;overflow-y:auto}
   #briefing-datis.active,#briefing-pa.active,#briefing-duty.active{display:flex;flex-direction:column;flex:1;overflow:hidden}
@@ -274,7 +270,7 @@ html:has(#tab-briefing.tab-active #briefing-coldtemp.active) #tab-briefing.tab-a
 .ct-no-corr{background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.3);border-radius:10px;
   padding:12px 16px;color:#4ade80;font-size:.9em;font-weight:600;margin-top:12px;text-align:center}
 /* ── Duty Time ── */
-.dt-wrap{display:block}
+.dt-wrap{display:flex;flex-direction:column;flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch}
 .dt-lock-overlay{position:absolute;inset:0;z-index:50;background:var(--bg);display:flex;align-items:center;justify-content:center;padding:24px}
 .dt-lock-card{background:var(--card);border-radius:16px;padding:28px 24px;width:100%;max-width:320px;text-align:center;box-shadow:0 4px 24px rgba(0,0,0,.25)}
 .dt-lock-icon{font-size:2.5em;margin-bottom:10px}

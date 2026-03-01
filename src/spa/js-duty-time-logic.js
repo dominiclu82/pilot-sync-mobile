@@ -122,6 +122,9 @@ function dtToggleRef() {
   var open = p.style.display !== 'none';
   p.style.display = open ? 'none' : 'block';
   a.textContent   = open ? '▼' : '▲';
+  if (!open) {
+    setTimeout(function() { p.scrollIntoView({ behavior:'smooth', block:'start' }); }, 50);
+  }
 }
 
 function dtFmtHM(m) {
