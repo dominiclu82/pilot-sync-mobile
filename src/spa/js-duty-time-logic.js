@@ -172,11 +172,13 @@ function dtRenderTimeline(startMin, endMin, maxFdp, restStart, restEnd, minRest,
   if (actFdp > maxFdp) {
     fdpBar.classList.add('dt-bar-alert');
     fdpOver.style.display = '';
+    fdpOver.classList.add('dt-bar-alert');
     fdpOver.style.left = pct(maxFdp) + '%';
     fdpOver.style.width = (Math.max(0.1, actFdp - maxFdp) / span * 100).toFixed(2) + '%';
   } else {
     fdpBar.classList.remove('dt-bar-alert');
     fdpOver.style.display = 'none';
+    fdpOver.classList.remove('dt-bar-alert');
   }
 
   // Ext bar (PIC Discretion and/or Accommodation Start)

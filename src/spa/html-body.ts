@@ -832,7 +832,7 @@ export function getSpaHtmlBody(): string {
       <button class="tab-util-btn tab-install-btn" id="tab-install-btn" onclick="showInstallGuide()" style="display:none">
         <span>📲</span>安裝
       </button>
-      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V5.231</span>
+      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V5.232</span>
     </div>
   </div>
 </div>
@@ -862,15 +862,15 @@ export function getSpaHtmlBody(): string {
       <div style="margin-bottom:4px">📱 建議使用 <b>iPad 橫向</b>操作以獲得最佳體驗</div>
       <div style="color:var(--muted)">Best experience on iPad in landscape mode</div>
     </div>
-    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V5.231</div>
+    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V5.232</div>
+    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
+      <div>FDP 超限紅色實心部分同步閃爍</div>
+      <div style="opacity:.7">FDP exceed red bar now blinks in sync with the alert border</div>
+    </div>
+    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V5.231</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
       <div>圖表新增 FDP 超限警示（紅色外框 + 閃爍 + 超出部分紅色標示）及 MRT 不足警示（紅色外框 + 閃爍），底部顯示紅字說明</div>
       <div style="opacity:.7">Added FDP exceed alert (red border + blink + red excess bar) and MRT insufficient alert (red border + blink) on timeline with warning text</div>
-    </div>
-    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V5.230</div>
-    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
-      <div>Accommodation 休息時間欄位取消輸入限制；placeholder 修正為 HH</div>
-      <div style="opacity:.7">Removed input restriction on Accommodation rest duration fields; fixed placeholder to HH</div>
     </div>
     <button class="install-close-btn" onclick="closeAbout()">關閉</button>
   </div>
