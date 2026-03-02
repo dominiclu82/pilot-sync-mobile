@@ -829,7 +829,7 @@ export function getSpaHtmlBody(): string {
       <button class="tab-util-btn tab-install-btn" id="tab-install-btn" onclick="showInstallGuide()" style="display:none">
         <span>📲</span>安裝
       </button>
-      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V5.227</span>
+      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V5.228</span>
     </div>
   </div>
 </div>
@@ -859,15 +859,15 @@ export function getSpaHtmlBody(): string {
       <div style="margin-bottom:4px">📱 建議使用 <b>iPad 橫向</b>操作以獲得最佳體驗</div>
       <div style="color:var(--muted)">Best experience on iPad in landscape mode</div>
     </div>
-    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V5.227</div>
+    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V5.228</div>
+    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
+      <div>修正 iPad 展開 CAR 規定時上方導覽列被推走的問題</div>
+      <div style="opacity:.7">Fixed iPad issue where expanding CAR reference pushed the top navigation bar off screen</div>
+    </div>
+    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V5.227</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
       <div>修正 iPad 展開 CAR 面板時上方 bar 被推走的問題（加 min-height:0）</div>
       <div style="opacity:.7">Fix iPad Safari CAR panel expansion pushing top bar off screen (add min-height:0)</div>
-    </div>
-    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V5.226</div>
-    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
-      <div>提示文字移至最上方並永遠顯示、顏色改為明顯色</div>
-      <div style="opacity:.7">Move hint text to top (always visible) with brighter color</div>
     </div>
     <button class="install-close-btn" onclick="closeAbout()">關閉</button>
   </div>

@@ -213,7 +213,13 @@ function dtToggleRef() {
   p.style.display = open ? 'none' : 'block';
   a.textContent   = open ? '▼' : '▲';
   if (!open) {
-    setTimeout(function() { p.scrollIntoView({ behavior:'smooth', block:'start' }); }, 50);
+    setTimeout(function() {
+      var wrap = p.closest('.dt-wrap');
+      if (wrap) {
+        var toggle = document.querySelector('.dt-ref-toggle');
+        wrap.scrollTo({ top: toggle ? toggle.offsetTop : wrap.scrollHeight, behavior: 'smooth' });
+      }
+    }, 50);
   }
 }
 
