@@ -484,7 +484,7 @@ function dtCalculate() {
   document.getElementById('dt-card-rest').style.display = '';
   if (actRest !== null) {
     var restOk = actRest >= minRest;
-    document.getElementById('dt-r-rest').textContent     = dtFmtHM(actRest) + (restOk ? ' ✓' : ' ✗');
+    document.getElementById('dt-r-rest').textContent     = dtFmtHM(actRest);
     document.getElementById('dt-r-rest-min').textContent = 'Min: ' + minRestLabel;
     dtCardState('dt-card-rest', restOk);
   } else {
@@ -497,7 +497,7 @@ function dtCalculate() {
   var woclHit = dtWoclCheck(startMin, endMin, tz);
   var woclBox = document.getElementById('dt-wocl-box');
   if (woclHit) {
-    document.getElementById('dt-wocl-msg').textContent = 'FDP 觸碰 WOCL 時段。連續2天需34h休息，連續3天需54h休息。例外：每次WOCL後有14h休息則免除。';
+    document.getElementById('dt-wocl-msg').innerHTML = 'FDP 觸碰 WOCL 時段。連續2天需34h休息，連續3天需54h休息。例外：每次WOCL後有14h休息則免除。<br><span style="opacity:.7">FDP overlaps WOCL window. 2 consecutive days require 34h rest; 3 consecutive days require 54h rest. Exception: waived if 14h rest is provided after each WOCL.</span>';
     woclBox.style.display = 'block';
   } else {
     woclBox.style.display = 'none';

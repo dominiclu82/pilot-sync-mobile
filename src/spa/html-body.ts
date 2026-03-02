@@ -148,10 +148,10 @@ export function getSpaHtmlBody(): string {
         <option value="A350-1000">A350-1000</option>
       </select>
     </div>
-    <div class="subtab-slot"><button class="briefing-subtab" id="subtabBtn-pa" onclick="switchBriefingTab('pa',this)">🎙️ PA工具</button></div>
+    <div class="subtab-slot"><button class="briefing-subtab" id="subtabBtn-pa" onclick="switchBriefingTab('pa',this)">🎙️ PA</button></div>
     <div class="subtab-slot"><button class="briefing-subtab" id="subtabBtn-hf" onclick="switchBriefingTab('hf',this)">📻 Pacific HF</button></div>
-    <div class="subtab-slot"><button class="briefing-subtab" id="subtabBtn-coldtemp" onclick="switchBriefingTab('coldtemp',this)">❄️ 低溫修正</button></div>
-    <div class="subtab-slot"><button class="briefing-subtab" id="subtabBtn-tools" onclick="switchBriefingTab('tools',this)">🗺️ 工具連結</button></div>
+    <div class="subtab-slot"><button class="briefing-subtab" id="subtabBtn-coldtemp" onclick="switchBriefingTab('coldtemp',this)">❄️ Cold Temp</button></div>
+    <div class="subtab-slot"><button class="briefing-subtab" id="subtabBtn-tools" onclick="switchBriefingTab('tools',this)">🗺️ Tools</button></div>
     <div class="subtab-slot"><button class="briefing-subtab" id="subtabBtn-duty" onclick="switchBriefingTab('duty',this)">⏱️ Duty Time</button></div>
   </div>
 
@@ -360,7 +360,7 @@ export function getSpaHtmlBody(): string {
 
       <!-- Placeholder hint -->
       <div id="dt-placeholder" style="padding:10px 14px 4px;text-align:center;color:var(--text);font-size:.82em">
-        選好人數並輸入 FDP Start，按「Calculate」即可查看最大限制時間
+        選好人數並輸入 FDP Start，按「Calculate」即可查看最大限制時間<br><span style="opacity:.7;font-size:.9em">Select crew config, enter FDP Start, then press "Calculate" to view max limits</span>
       </div>
 
       <!-- Config -->
@@ -444,7 +444,7 @@ export function getSpaHtmlBody(): string {
 
         <!-- FDP End -->
         <div class="dt-field">
-          <div class="dt-field-label">FDP End (UTC) — Block In / Release <span style="color:var(--muted);font-size:.85em">（選填，用於檢查實際 FDP）</span></div>
+          <div class="dt-field-label">FDP End (UTC) — Block In / Release <span style="color:var(--muted);font-size:.85em">（選填 用於檢查實際FDP — Optional / for actual FDP check）</span></div>
           <div class="dt-time-row">
             <div class="dt-date-wrap">
               <input type="date" id="dt-e-day" class="dt-date-input" onchange="dtDateChanged(this)">
@@ -601,7 +601,7 @@ export function getSpaHtmlBody(): string {
             </div>
           </div>
 
-          <div class="dt-notice">⚠ Non-operational reference only · CAR 07-02A · 請以公司手冊為準</div>
+          <div class="dt-notice">⚠ Non-operational reference only · Refer to company manuals</div>
         </div>
       </div>
 
@@ -810,10 +810,10 @@ export function getSpaHtmlBody(): string {
 <!-- ══ Tab Bar ═══════════════════════════════════════════════════════ -->
 <div class="tab-bar">
   <button class="tab-btn" id="tabBtn-sync" onclick="switchTab('sync',this)">
-    <span class="tab-btn-icon">⇄</span>班表同步
+    <span class="tab-btn-icon">⇄</span>Roster Sync
   </button>
   <button class="tab-btn tab-active" id="tabBtn-briefing" onclick="switchTab('briefing',this)">
-    <span class="tab-btn-icon">💼</span>簡報箱
+    <span class="tab-btn-icon">💼</span>Briefing
   </button>
   <button class="tab-btn" id="tabBtn-gate" onclick="switchTab('gate',this)">
     <span class="tab-btn-icon">🌏</span>Gate Info
@@ -832,7 +832,7 @@ export function getSpaHtmlBody(): string {
       <button class="tab-util-btn tab-install-btn" id="tab-install-btn" onclick="showInstallGuide()" style="display:none">
         <span>📲</span>安裝
       </button>
-      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V5.233</span>
+      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V5.234</span>
     </div>
   </div>
 </div>
@@ -862,15 +862,15 @@ export function getSpaHtmlBody(): string {
       <div style="margin-bottom:4px">📱 建議使用 <b>iPad 橫向</b>操作以獲得最佳體驗</div>
       <div style="color:var(--muted)">Best experience on iPad in landscape mode</div>
     </div>
-    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V5.233</div>
+    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V5.234</div>
+    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
+      <div>UI 全面英文化：Tab 列、Briefing subtab、Duty Time 提示文字；WOCL 說明加英文對照；移除 Actual Rest ✓/✗ 符號</div>
+      <div style="opacity:.7">Localized UI to English: tab bar, briefing subtabs, Duty Time hints; added English translation to WOCL description; removed ✓/✗ from Actual Rest card</div>
+    </div>
+    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V5.233</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
       <div>修正 WOCL 偵測在跨午夜 FDP 時失效的 bug</div>
       <div style="opacity:.7">Fixed WOCL detection bug for FDP periods crossing midnight</div>
-    </div>
-    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V5.232</div>
-    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
-      <div>FDP 超限紅色實心部分同步閃爍</div>
-      <div style="opacity:.7">FDP exceed red bar now blinks in sync with the alert border</div>
     </div>
     <button class="install-close-btn" onclick="closeAbout()">關閉</button>
   </div>
