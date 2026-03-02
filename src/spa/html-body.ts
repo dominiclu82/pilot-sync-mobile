@@ -843,7 +843,7 @@ export function getSpaHtmlBody(): string {
 <!-- ══ Tab Bar ═══════════════════════════════════════════════════════ -->
 <div class="tab-bar">
   <button class="tab-btn" id="tabBtn-sync" onclick="switchTab('sync',this)">
-    <span class="tab-btn-icon">⇄</span>Roster Sync
+    <span class="tab-btn-icon">✈️</span>Roster Sync
   </button>
   <button class="tab-btn tab-active" id="tabBtn-briefing" onclick="switchTab('briefing',this)">
     <span class="tab-btn-icon">💼</span>Briefing
@@ -865,7 +865,7 @@ export function getSpaHtmlBody(): string {
       <button class="tab-util-btn tab-install-btn" id="tab-install-btn" onclick="showInstallGuide()" style="display:none">
         <span>📲</span>安裝
       </button>
-      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V5.300</span>
+      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V5.301</span>
     </div>
   </div>
 </div>
@@ -895,7 +895,7 @@ export function getSpaHtmlBody(): string {
       <div style="margin-bottom:4px">📱 建議使用 <b>iPad 橫向</b>操作以獲得最佳體驗</div>
       <div style="color:var(--muted)">Best experience on iPad in landscape mode</div>
     </div>
-    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V5.300</div>
+    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V5.301</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
       <div>新增 Google Calendar 整合：月視圖（含跨日事件橫條）、週視圖（時間軸 + 農曆）、Schedule 時間表；事件詳情含地點、說明、提醒；Duty Time 新增 Flight Time 即時驗證、修正 Timeline 文字重疊</div>
       <div style="opacity:.7">Added Google Calendar integration: Month view (spanning bars for multi-day events), Week view (time grid + lunar dates), Schedule list view; event details with location, description &amp; reminders; Duty Time: real-time Flight Time validation, fixed timeline label overlap</div>
