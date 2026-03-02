@@ -346,17 +346,16 @@ function dtCardState(cardId, ok) {
 }
 
 function dtWoclCheck(startMin, endMin, tzOffset) {
-  // WOCL = 02:00–05:00 local = (02:00 - tzOffset) UTC
-  var woclStart = (2*60 - tzOffset*60 + 1440*3) % 1440;
-  var woclEnd   = (5*60 - tzOffset*60 + 1440*3) % 1440;
-  // Check if FDP window overlaps WOCL (simple daily check)
-  var s = startMin % 1440, e = endMin % 1440;
-  function overlaps(a1,a2,b1,b2) {
-    if (b1 < b2) return a1 < b2 && a2 > b1;
-    return a1 < b2 || a2 > b1; // wraps midnight
-  }
-  if (woclStart < woclEnd) return overlaps(s, e, woclStart, woclEnd);
-  return s < woclEnd || e > woclStart;
+  // WOCL = 02:00–05:00 local → convert to UTC
+  var wS = ((2*60 - tzOffset*60) % 1440 + 1440) % 1440;
+  var wE = ((5*60 - tzOffset*60) % 1440 + 1440) % 1440;
+  var wDur = wS < wE ? (wE - wS) : (1440 - wS + wE);
+  // Use absolute minutes (same approach as timeline rendering)
+  var sDay = Math.floor(startMin / 1440) * 1440;
+  var wAbs = sDay + wS;
+  if (wAbs + wDur <= startMin) wAbs += 1440;
+  // Check overlap: FDP [startMin, endMin] vs WOCL [wAbs, wAbs+wDur]
+  return startMin < wAbs + wDur && endMin > wAbs;
 }
 
 function dtCalculate() {
