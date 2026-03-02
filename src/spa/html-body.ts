@@ -389,7 +389,7 @@ export function getSpaHtmlBody(): string {
             <input type="checkbox" id="dt-accom" onchange="dtToggleAccom()">
           </label>
           <span style="font-size:.78em;color:var(--text);flex-shrink:0">Rest at an Appropriate Accommodation</span>
-          <input class="dt-time-box" type="text" id="dt-accom-h" placeholder="H" maxlength="2" inputmode="numeric" style="width:36px" oninput="dtUpdateAccomHint()">
+          <input class="dt-time-box" type="text" id="dt-accom-h" placeholder="HH" maxlength="2" inputmode="numeric" style="width:36px" oninput="dtUpdateAccomHint()">
           <span class="dt-sep">hr</span>
           <input class="dt-time-box" type="text" id="dt-accom-m" placeholder="MM" maxlength="2" inputmode="numeric" style="width:36px" oninput="dtUpdateAccomHint()">
           <span class="dt-sep">min</span>
@@ -830,7 +830,7 @@ export function getSpaHtmlBody(): string {
       <button class="tab-util-btn tab-install-btn" id="tab-install-btn" onclick="showInstallGuide()" style="display:none">
         <span>📲</span>安裝
       </button>
-      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V5.229</span>
+      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V5.230</span>
     </div>
   </div>
 </div>
@@ -860,15 +860,15 @@ export function getSpaHtmlBody(): string {
       <div style="margin-bottom:4px">📱 建議使用 <b>iPad 橫向</b>操作以獲得最佳體驗</div>
       <div style="color:var(--muted)">Best experience on iPad in landscape mode</div>
     </div>
-    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V5.229</div>
+    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V5.230</div>
+    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
+      <div>Accommodation 休息時間欄位取消輸入限制；placeholder 修正為 HH</div>
+      <div style="opacity:.7">Removed input restriction on Accommodation rest duration fields; fixed placeholder to HH</div>
+    </div>
+    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V5.229</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
       <div>時間欄位加入輸入限制（HH ≤ 23 / MM ≤ 59）；Flight Time 超過法規上限時數字變紅並顯示警告</div>
       <div style="opacity:.7">Added input validation for time fields (HH ≤ 23 / MM ≤ 59); Flight Time turns red with warning when exceeding regulatory limit</div>
-    </div>
-    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V5.228</div>
-    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
-      <div>修正 iPad 展開 CAR 規定時上方導覽列被推走的問題</div>
-      <div style="opacity:.7">Fixed iPad issue where expanding CAR reference pushed the top navigation bar off screen</div>
     </div>
     <button class="install-close-btn" onclick="closeAbout()">關閉</button>
   </div>

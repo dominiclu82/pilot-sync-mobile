@@ -10,8 +10,8 @@ document.addEventListener('input', function(e) {
   if (!el.classList.contains('dt-time-box')) return;
   var v = el.value.replace(/[^0-9]/g, '').slice(0, 2);
   var id = el.id;
-  // Flight Time: no hard clamp (soft warning via dtCheckFT)
-  if (id === 'dt-ft-h' || id === 'dt-ft-m') { el.value = v; return; }
+  // Flight Time & Accommodation: no hard clamp
+  if (id === 'dt-ft-h' || id === 'dt-ft-m' || id === 'dt-accom-h' || id === 'dt-accom-m') { el.value = v; return; }
   var max = id.match(/-m$/) ? 59 : 23;
   if (v !== '' && parseInt(v, 10) > max) v = String(max);
   if (el.value !== v) el.value = v;
