@@ -166,6 +166,19 @@ function dtRenderTimeline(startMin, endMin, maxFdp, restStart, restEnd, minRest,
   setBar('dt-bar-maxfdp', 0, baseFdp);
   document.getElementById('dt-lbl-maxfdp').textContent = 'Max ' + dtFmtH(baseFdp);
 
+  // FDP exceed bar + alert
+  var fdpOver = document.getElementById('dt-bar-fdp-over');
+  var fdpBar = document.getElementById('dt-bar-fdp');
+  if (actFdp > maxFdp) {
+    fdpBar.classList.add('dt-bar-alert');
+    fdpOver.style.display = '';
+    fdpOver.style.left = pct(maxFdp) + '%';
+    fdpOver.style.width = (Math.max(0.1, actFdp - maxFdp) / span * 100).toFixed(2) + '%';
+  } else {
+    fdpBar.classList.remove('dt-bar-alert');
+    fdpOver.style.display = 'none';
+  }
+
   // Ext bar (PIC Discretion and/or Accommodation Start)
   var extEl = document.getElementById('dt-bar-ext');
   if (totalExt > 0) {
@@ -181,13 +194,21 @@ function dtRenderTimeline(startMin, endMin, maxFdp, restStart, restEnd, minRest,
   setBar('dt-bar-minrest', actFdp, minRest);
   document.getElementById('dt-lbl-minrest').textContent = 'Min Req ' + dtFmtH(minRest);
 
+  var restBar = document.getElementById('dt-bar-rest');
+  var actRest = 0;
   if (restEnd !== null) {
-    var restEl = document.getElementById('dt-bar-rest');
-    restEl.style.display = 'flex';
-    setBar('dt-bar-rest', restStart - startMin, restEnd - restStart);
-    document.getElementById('dt-lbl-rest').textContent = 'Rest ' + dtFmtH(restEnd - restStart);
+    actRest = restEnd - restStart;
+    restBar.style.display = 'flex';
+    setBar('dt-bar-rest', restStart - startMin, actRest);
+    document.getElementById('dt-lbl-rest').textContent = 'Rest ' + dtFmtH(actRest);
+    if (actRest < minRest) {
+      restBar.classList.add('dt-bar-alert');
+    } else {
+      restBar.classList.remove('dt-bar-alert');
+    }
   } else {
-    document.getElementById('dt-bar-rest').style.display = 'none';
+    restBar.style.display = 'none';
+    restBar.classList.remove('dt-bar-alert');
   }
 
   // WOCL overlay (02:00-05:00 local time)
@@ -237,6 +258,14 @@ function dtRenderTimeline(startMin, endMin, maxFdp, restStart, restEnd, minRest,
   html += makeTick(pct(actFdp), 'Rst Start (FDP End)', fmtUTC(endMin));
   if (restEnd !== null) html += makeTick(pct(restEnd - startMin), 'Next Rpt', fmtUTC(restEnd));
   ticks.innerHTML = html;
+
+  // Warning text
+  var warnEl = document.getElementById('dt-tl2-warn');
+  var warns = [];
+  if (actFdp > maxFdp) warns.push('\u26a0 FDP EXCEEDS LIMIT \u2014 Over by ' + dtFmtH(actFdp - maxFdp));
+  if (restEnd !== null && actRest < minRest) warns.push('\u26a0 MINIMUM REST NOT MET \u2014 Short by ' + dtFmtH(minRest - actRest));
+  if (warns.length) { warnEl.innerHTML = warns.join('<br>'); warnEl.style.display = 'block'; }
+  else { warnEl.style.display = 'none'; warnEl.innerHTML = ''; }
 
   } catch(e) { alert('Timeline Error: ' + e.message); }
 }

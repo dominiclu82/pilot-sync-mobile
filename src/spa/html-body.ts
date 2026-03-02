@@ -545,6 +545,7 @@ export function getSpaHtmlBody(): string {
               <div id="dt-bar-fdp" style="position:absolute;top:0;height:28px;background:#10b981;border-radius:4px;display:flex;align-items:center;overflow:hidden;z-index:2">
                 <span id="dt-lbl-fdp" style="font-size:.65em;font-weight:700;color:#fff;white-space:nowrap;padding:0 6px"></span>
               </div>
+              <div id="dt-bar-fdp-over" style="position:absolute;top:0;height:28px;background:#ef4444;border-radius:0 4px 4px 0;display:none;z-index:2"></div>
               <div id="dt-bar-maxfdp" style="position:absolute;top:34px;height:28px;background:repeating-linear-gradient(-45deg,#3b82f6 0,#3b82f6 7px,#60a5fa 7px,#60a5fa 14px);border-radius:4px;display:flex;align-items:center;overflow:hidden;z-index:2">
                 <span id="dt-lbl-maxfdp" style="font-size:.65em;font-weight:700;color:#fff;white-space:nowrap;padding:0 6px"></span>
               </div>
@@ -572,6 +573,7 @@ export function getSpaHtmlBody(): string {
               <div class="dt-leg-item"><div class="dt-leg-box" style="background:repeating-linear-gradient(-45deg,#d97706 0,#d97706 4px,#f59e0b 4px,#f59e0b 8px)"></div>Min Rest</div>
               <div class="dt-leg-item"><div class="dt-leg-box" style="background:#475569"></div>Rest</div>
             </div>
+            <div id="dt-tl2-warn" style="margin-top:8px;font-size:.75em;font-weight:700;color:#ef4444;line-height:1.6;display:none"></div>
           </div>
 
           <!-- WOCL -->
@@ -830,7 +832,7 @@ export function getSpaHtmlBody(): string {
       <button class="tab-util-btn tab-install-btn" id="tab-install-btn" onclick="showInstallGuide()" style="display:none">
         <span>📲</span>安裝
       </button>
-      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V5.230</span>
+      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V5.231</span>
     </div>
   </div>
 </div>
@@ -860,15 +862,15 @@ export function getSpaHtmlBody(): string {
       <div style="margin-bottom:4px">📱 建議使用 <b>iPad 橫向</b>操作以獲得最佳體驗</div>
       <div style="color:var(--muted)">Best experience on iPad in landscape mode</div>
     </div>
-    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V5.230</div>
+    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V5.231</div>
+    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
+      <div>圖表新增 FDP 超限警示（紅色外框 + 閃爍 + 超出部分紅色標示）及 MRT 不足警示（紅色外框 + 閃爍），底部顯示紅字說明</div>
+      <div style="opacity:.7">Added FDP exceed alert (red border + blink + red excess bar) and MRT insufficient alert (red border + blink) on timeline with warning text</div>
+    </div>
+    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V5.230</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
       <div>Accommodation 休息時間欄位取消輸入限制；placeholder 修正為 HH</div>
       <div style="opacity:.7">Removed input restriction on Accommodation rest duration fields; fixed placeholder to HH</div>
-    </div>
-    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V5.229</div>
-    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
-      <div>時間欄位加入輸入限制（HH ≤ 23 / MM ≤ 59）；Flight Time 超過法規上限時數字變紅並顯示警告</div>
-      <div style="opacity:.7">Added input validation for time fields (HH ≤ 23 / MM ≤ 59); Flight Time turns red with warning when exceeding regulatory limit</div>
     </div>
     <button class="install-close-btn" onclick="closeAbout()">關閉</button>
   </div>

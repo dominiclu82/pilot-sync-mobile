@@ -347,6 +347,8 @@ input[type=radio]{width:15px;height:15px;aspect-ratio:1;accent-color:var(--accen
 .dt-tl2-vline{position:absolute;top:0;bottom:0;width:0;border-left:1.5px dashed rgba(148,163,184,.5);pointer-events:none;z-index:2}
 .dt-tl2-ticks{position:relative;height:44px;min-width:280px;margin-top:4px}
 .dt-tl2-tick{position:absolute;transform:translateX(-50%);text-align:center;font-size:.58em;color:var(--muted);line-height:1.35;white-space:nowrap}
+@keyframes dt-blink{0%,100%{opacity:1}50%{opacity:.3}}
+.dt-bar-alert{border:2px solid #ef4444;box-sizing:border-box;animation:dt-blink 1.5s ease-in-out infinite}
 .dt-legend{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
 .dt-leg-item{display:flex;align-items:center;gap:4px;font-size:.62em;color:var(--muted)}
 .dt-leg-box{width:11px;height:9px;border-radius:2px;flex-shrink:0}
