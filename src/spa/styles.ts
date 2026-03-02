@@ -202,7 +202,7 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
   .briefing-panel.active{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;min-height:0}
   #tab-sync.tab-active{height:calc(100dvh - calc(56px + env(safe-area-inset-bottom,0px)));
     min-height:unset;overflow-y:auto}
-  #briefing-datis.active,#briefing-pa.active,#briefing-duty.active{display:flex;flex-direction:column;flex:1;overflow:hidden}
+  #briefing-datis.active,#briefing-pa.active,#briefing-duty.active{display:flex;flex-direction:column;flex:1;min-height:0;overflow:hidden}
   #briefing-hf.active{display:flex;flex-direction:column;flex:1;overflow:hidden;padding:0}
   .wx-fixed-header{position:static;flex-shrink:0}
   .wx-split{flex-direction:row;overflow:hidden;flex:1}
