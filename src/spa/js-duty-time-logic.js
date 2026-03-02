@@ -35,9 +35,24 @@ function dtCheckFT() {
   var hasC1 = document.getElementById('dt-c1').checked;
   var maxFT = DT_MAX_FT[crew][hasC1 ? 'c1' : 'noC1'];
   var maxH = Math.floor(maxFT / 60);
+  // Check FT vs Max FT
+  var warns = [];
   if (totalMin > maxFT) {
+    warns.push('\u26a0 Max FT: ' + maxH + 'h (' + crew + 'P' + (hasC1 ? ' + C1' : '') + ')');
+  }
+  // Check FT vs FDP duration
+  var startMin = dtDayMin('dt-s-day','dt-s-h','dt-s-m');
+  var endMin = dtDayMin('dt-e-day','dt-e-h','dt-e-m');
+  if (startMin !== null && endMin !== null) {
+    if (endMin <= startMin) endMin += 1440;
+    var actFdp = endMin - startMin;
+    if (totalMin > actFdp) {
+      warns.push('\u26a0 FT (' + dtFmtHM(totalMin) + ') exceeds FDP (' + dtFmtHM(actFdp) + ')');
+    }
+  }
+  if (warns.length) {
     hEl.style.color = '#ef4444'; mEl.style.color = '#ef4444';
-    err.textContent = '\u26a0 Max FT: ' + maxH + 'h (' + crew + 'P' + (hasC1 ? ' + C1' : '') + ')';
+    err.innerHTML = warns.join('<br>');
     err.style.display = 'block';
   } else {
     hEl.style.color = ''; mEl.style.color = '';
@@ -250,15 +265,23 @@ function dtRenderTimeline(startMin, endMin, maxFdp, restStart, restEnd, minRest,
     var t=((m%1440)+1440)%1440, h=Math.floor(t/60), mm=t%60;
     return (h<10?'0':'')+h+':'+(mm<10?'0':'')+mm+'Z';
   }
-  function makeTick(leftPct, line1, line2, align) {
+  function makeTick(leftPct, line1, line2, align, topPx) {
     var tx = align === 'left' ? 'translateX(0)' : align === 'right' ? 'translateX(-100%)' : 'translateX(-50%)';
     var ta = align === 'left' ? 'left' : align === 'right' ? 'right' : 'center';
-    return '<div style="position:absolute;left:' + leftPct + '%;transform:' + tx + ';text-align:' + ta + ';font-size:.58em;color:var(--dim);line-height:1.35;white-space:nowrap">' + line1 + '<br>' + line2 + '</div>';
+    var topS = topPx ? 'top:' + topPx + 'px;' : '';
+    return '<div style="position:absolute;left:' + leftPct + '%;transform:' + tx + ';text-align:' + ta + ';font-size:.58em;color:var(--dim);line-height:1.35;white-space:nowrap;' + topS + '">' + line1 + '<br>' + line2 + '</div>';
   }
   var ticks = document.getElementById('dt-tl2-ticks');
+  var rstPct = parseFloat(pct(actFdp));
+  var nxtPct = restEnd !== null ? parseFloat(pct(restEnd - startMin)) : -999;
+  // Smart alignment: right-align if close to right edge, and stagger if ticks overlap
+  var rstAlign = rstPct > 75 ? 'right' : 'center';
+  var nxtAlign = 'right';
+  var nxtTop = 0;
+  if (restEnd !== null && Math.abs(nxtPct - rstPct) < 18) nxtTop = 28;
   var html = makeTick(pct(0), 'FDP Start', fmtUTC(startMin), 'left');
-  html += makeTick(pct(actFdp), 'Rst Start (FDP End)', fmtUTC(endMin));
-  if (restEnd !== null) html += makeTick(pct(restEnd - startMin), 'Next Rpt', fmtUTC(restEnd));
+  html += makeTick(pct(actFdp), 'Rst Start (FDP End)', fmtUTC(endMin), rstAlign);
+  if (restEnd !== null) html += makeTick(pct(restEnd - startMin), 'Next Rpt', fmtUTC(restEnd), nxtAlign, nxtTop);
   ticks.innerHTML = html;
 
   // Warning text
@@ -429,6 +452,9 @@ function dtCalculate() {
   if (endMin <= startMin) endMin += 1440;
 
   var actFdp  = endMin - startMin;
+
+  // Re-validate FT vs FDP in case Calculate was pressed
+  dtCheckFT();
   // Accommodation Not Start: deduct rest from actual FDP
   var adjFdp = actFdp;
   if (accom && accomMin > 0 && accomType === 'notstart') {

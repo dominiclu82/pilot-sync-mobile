@@ -15,6 +15,7 @@ import { getSpaDutyTimeJs } from './spa/js-duty-time.js';
 import { getSpaGateInfoJs } from './spa/js-gate-info.js';
 import { getSpaPaJs } from './spa/js-pa.js';
 import { getSpaAirportDataJs } from './spa/js-airport-data.js';
+import { getSpaCalendarJs } from './spa/js-calendar-wrap.js';
 
 
 config({ path: path.join(ROOT, '.env') });
@@ -61,6 +62,7 @@ app.use(express.json());
 
 app.get('/', (_req, res) => {
   res.setHeader('Content-Type', 'text/html; charset=utf-8');
+  res.setHeader('Cache-Control', 'no-store');
   res.send(getSPAHtml());
 });
 
@@ -446,6 +448,53 @@ app.get('/debug/screenshot', (_req, res) => {
   } catch (err: any) { res.status(500).send(err.message); }
 });
 
+app.get('/api/calendar-events', async (req, res) => {
+  try {
+    const { refreshToken, start, end } = req.query as Record<string, string>;
+    if (!refreshToken || !start || !end) {
+      res.status(400).json({ error: 'Missing refreshToken, start, or end' });
+      return;
+    }
+    const creds = loadCredentials();
+    const oauth2 = new google.auth.OAuth2(creds.web.client_id, creds.web.client_secret);
+    oauth2.setCredentials({ refresh_token: refreshToken });
+
+    const calendar = google.calendar({ version: 'v3', auth: oauth2 });
+    const calInfo = await calendar.calendarList.get({ calendarId: 'primary' });
+    const defaultReminderMins = ((calInfo.data.defaultReminders || []) as Array<{method?: string; minutes?: number}>)
+      .map((r: {minutes?: number}) => r.minutes ?? 0).sort((a: number, b: number) => a - b);
+
+    const resp = await calendar.events.list({
+      calendarId: 'primary',
+      timeMin: new Date(start).toISOString(),
+      timeMax: new Date(end).toISOString(),
+      singleEvents: true,
+      orderBy: 'startTime',
+      maxResults: 250,
+    });
+
+    const events = (resp.data.items || []).map(ev => ({
+      id: ev.id,
+      title: ev.summary || '(No title)',
+      start: ev.start?.dateTime || ev.start?.date || '',
+      end: ev.end?.dateTime || ev.end?.date || '',
+      allDay: !ev.start?.dateTime,
+      color: ev.colorId || null,
+      location: ev.location || '',
+      description: ev.description || '',
+      reminders: ev.reminders?.useDefault
+        ? defaultReminderMins
+        : (ev.reminders?.overrides || []).map(r => r.minutes ?? 0).sort((a, b) => a - b),
+    }));
+
+    const withLoc = events.filter(e => e.location);
+    if (withLoc.length) console.log('[Calendar] Events with location:', withLoc.map(e => e.title + ' @ ' + e.location));
+    res.json({ events });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.post('/sync', async (req, res) => {
   const { year, month, jxUsername, jxPassword, refreshToken, calendarId } = req.body;
   if (!year || !month || !jxUsername || !jxPassword || !refreshToken || !calendarId) {
@@ -528,6 +577,7 @@ ${getSpaWeatherJs()}
 ${getSpaDutyTimeJs()}
 ${getSpaGateInfoJs()}
 ${getSpaPaJs()}
+${getSpaCalendarJs()}
 </script>
 </body>
 </html>`;

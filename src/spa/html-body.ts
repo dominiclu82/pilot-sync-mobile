@@ -5,6 +5,15 @@ export function getSpaHtmlBody(): string {
 <!-- ══ Tab: 同步 ═════════════════════════════════════════════════════ -->
 <div id="tab-sync">
 
+<!-- Roster Subtab Bar -->
+<div class="roster-subtabs">
+  <button class="roster-subtab active" onclick="switchRosterTab('crew',this)">✈️ Crew Sync</button>
+  <button class="roster-subtab" onclick="switchRosterTab('cal',this)">📅 Calendar</button>
+</div>
+
+<!-- ── Crew Sync panel ── -->
+<div id="roster-crew" class="roster-panel active">
+
 <!-- ══ Main（含帳號 + 月份，一個畫面搞定）══════════════════════════════ -->
 <div id="screen-main" class="screen active">
   <div class="logo">
@@ -129,6 +138,30 @@ export function getSpaHtmlBody(): string {
     <div id="settings-msg" class="alert" style="display:none"></div>
     <button class="btn btn-danger btn-sm" onclick="clearSavedData()">🗑️ 清除已儲存的資料</button>
     <button class="btn btn-secondary" onclick="showMain()">← 返回</button>
+  </div>
+</div>
+
+</div><!-- end roster-crew -->
+
+<!-- ── Calendar panel ── -->
+<div id="roster-cal" class="roster-panel">
+  <div class="gcal-wrap">
+    <div class="gcal-main">
+      <div class="gcal-header">
+        <button class="gcal-today-btn" onclick="gcalToday()">Today</button>
+        <div class="gcal-view-bar">
+          <button class="gcal-view-btn" data-view="week" onclick="gcalSetView('week')">Week</button>
+          <button class="gcal-view-btn active" data-view="month" onclick="gcalSetView('month')">Month</button>
+          <button class="gcal-view-btn" data-view="schedule" onclick="gcalSetView('schedule')">Schedule</button>
+        </div>
+        <button class="gcal-nav" onclick="gcalPrev()">◀</button>
+        <button class="gcal-nav" onclick="gcalNext()">▶</button>
+        <span class="gcal-title" id="gcal-title"></span>
+      </div>
+      <div class="gcal-weekdays" id="gcal-weekdays"></div>
+      <div class="gcal-grid" id="gcal-grid"></div>
+    </div>
+    <div class="gcal-events" id="gcal-events"></div>
   </div>
 </div>
 
@@ -451,9 +484,9 @@ export function getSpaHtmlBody(): string {
               <span class="dt-date-display" id="dt-e-day-btn">--/--</span>
             </div>
             <span class="dt-sep">/</span>
-            <input class="dt-time-box" type="text" id="dt-e-h" placeholder="HH" maxlength="2" inputmode="numeric">
+            <input class="dt-time-box" type="text" id="dt-e-h" placeholder="HH" maxlength="2" inputmode="numeric" oninput="dtCheckFT()">
             <span class="dt-sep">:</span>
-            <input class="dt-time-box" type="text" id="dt-e-m" placeholder="MM" maxlength="2" inputmode="numeric">
+            <input class="dt-time-box" type="text" id="dt-e-m" placeholder="MM" maxlength="2" inputmode="numeric" oninput="dtCheckFT()">
             <span class="dt-tag">UTC</span>
           </div>
         </div>
@@ -564,7 +597,7 @@ export function getSpaHtmlBody(): string {
               <div id="dt-vline-next" style="position:absolute;top:0;bottom:0;border-left:1.5px dashed rgba(148,163,184,.5);z-index:3;display:none"></div>
             </div>
             <!-- Tick labels (positioned absolutely inside relative container) -->
-            <div id="dt-tl2-ticks" style="position:relative;height:40px;margin-top:4px"></div>
+            <div id="dt-tl2-ticks" style="position:relative;min-height:40px;margin-top:4px"></div>
             <div class="dt-legend">
               <div class="dt-leg-item"><div class="dt-leg-box" style="background:#10b981"></div>FDP</div>
               <div class="dt-leg-item"><div class="dt-leg-box" style="background:rgba(239,68,68,.25)"></div>WOCL (02-05)</div>
@@ -832,7 +865,7 @@ export function getSpaHtmlBody(): string {
       <button class="tab-util-btn tab-install-btn" id="tab-install-btn" onclick="showInstallGuide()" style="display:none">
         <span>📲</span>安裝
       </button>
-      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V5.234</span>
+      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V5.300</span>
     </div>
   </div>
 </div>
@@ -862,15 +895,15 @@ export function getSpaHtmlBody(): string {
       <div style="margin-bottom:4px">📱 建議使用 <b>iPad 橫向</b>操作以獲得最佳體驗</div>
       <div style="color:var(--muted)">Best experience on iPad in landscape mode</div>
     </div>
-    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V5.234</div>
+    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V5.300</div>
+    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
+      <div>新增 Google Calendar 整合：月視圖（含跨日事件橫條）、週視圖（時間軸 + 農曆）、Schedule 時間表；事件詳情含地點、說明、提醒；Duty Time 新增 Flight Time 即時驗證、修正 Timeline 文字重疊</div>
+      <div style="opacity:.7">Added Google Calendar integration: Month view (spanning bars for multi-day events), Week view (time grid + lunar dates), Schedule list view; event details with location, description &amp; reminders; Duty Time: real-time Flight Time validation, fixed timeline label overlap</div>
+    </div>
+    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V5.234</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
       <div>UI 全面英文化：Tab 列、Briefing subtab、Duty Time 提示文字；WOCL 說明加英文對照；移除 Actual Rest ✓/✗ 符號</div>
       <div style="opacity:.7">Localized UI to English: tab bar, briefing subtabs, Duty Time hints; added English translation to WOCL description; removed ✓/✗ from Actual Rest card</div>
-    </div>
-    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V5.233</div>
-    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
-      <div>修正 WOCL 偵測在跨午夜 FDP 時失效的 bug</div>
-      <div style="opacity:.7">Fixed WOCL detection bug for FDP periods crossing midnight</div>
     </div>
     <button class="install-close-btn" onclick="closeAbout()">關閉</button>
   </div>

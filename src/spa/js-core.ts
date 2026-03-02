@@ -260,6 +260,16 @@ function mkStat(n, label) {
   return '<div class="stat-item"><div class="stat-num">' + n + '</div><div class="stat-lbl">' + label + '</div></div>';
 }
 
+// ── Roster sub-tab ───────────────────────────────────────────────────────────
+var gcalInited = false;
+function switchRosterTab(panel, btn) {
+  document.querySelectorAll('.roster-subtab').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.roster-panel').forEach(p => p.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('roster-' + panel).classList.add('active');
+  if (panel === 'cal' && !gcalInited) { gcalInited = true; gcalInit(); }
+}
+
 // ── Tab switching ─────────────────────────────────────────────────────────────
 function switchTab(tab, btn) {
   ['tab-sync','tab-briefing','tab-gate'].forEach(function(id) {
