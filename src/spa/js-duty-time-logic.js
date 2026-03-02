@@ -4,6 +4,48 @@ var DT_MAX_FT  = {2:{noC1:10*60,c1:10*60}, 3:{noC1:12*60,c1:16*60}, 4:{noC1:12*6
 var dtMode = 'home';
 var DT_DATE_IDS = ['dt-s-day','dt-e-day','dt-n-day','dt-ci-day','dt-co-day'];
 
+// ── HH/MM input clamp (capture phase → fires before inline handlers) ──
+document.addEventListener('input', function(e) {
+  var el = e.target;
+  if (!el.classList.contains('dt-time-box')) return;
+  var v = el.value.replace(/[^0-9]/g, '').slice(0, 2);
+  var id = el.id;
+  // Flight Time: no hard clamp (soft warning via dtCheckFT)
+  if (id === 'dt-ft-h' || id === 'dt-ft-m') { el.value = v; return; }
+  var max = id.match(/-m$/) ? 59 : 23;
+  if (v !== '' && parseInt(v, 10) > max) v = String(max);
+  if (el.value !== v) el.value = v;
+}, true);
+
+// ── Flight Time real-time check ──
+function dtCheckFT() {
+  var err = document.getElementById('dt-ft-err');
+  var hEl = document.getElementById('dt-ft-h');
+  var mEl = document.getElementById('dt-ft-m');
+  if (!err || !hEl || !mEl) return;
+  var h = parseInt(hEl.value) || 0;
+  var m = parseInt(mEl.value) || 0;
+  var totalMin = h * 60 + m;
+  if (totalMin <= 0) {
+    hEl.style.color = ''; mEl.style.color = '';
+    err.style.display = 'none'; err.textContent = '';
+    return;
+  }
+  var crew = parseInt(document.querySelector('.dt-crew-btn.active').dataset.crew);
+  var hasC1 = document.getElementById('dt-c1').checked;
+  var maxFT = DT_MAX_FT[crew][hasC1 ? 'c1' : 'noC1'];
+  var maxH = Math.floor(maxFT / 60);
+  if (totalMin > maxFT) {
+    hEl.style.color = '#ef4444'; mEl.style.color = '#ef4444';
+    err.textContent = '\u26a0 Max FT: ' + maxH + 'h (' + crew + 'P' + (hasC1 ? ' + C1' : '') + ')';
+    err.style.display = 'block';
+  } else {
+    hEl.style.color = ''; mEl.style.color = '';
+    err.style.display = 'none';
+    err.textContent = '';
+  }
+}
+
 function dtInitDates() {
   var now = new Date();
   var yyyy = now.getUTCFullYear();
@@ -254,6 +296,7 @@ function dtSelectCrew(btn) {
   document.getElementById('dt-disc-row').style.display = crew === 3 ? 'flex' : 'none';
   if (crew !== 3) document.getElementById('dt-disc').checked = false;
   if (crew < 3)   document.getElementById('dt-c1').checked  = false;
+  dtCheckFT();
 }
 
 function dtSetMode(mode) {
