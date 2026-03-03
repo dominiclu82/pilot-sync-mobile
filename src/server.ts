@@ -16,6 +16,7 @@ import { getSpaGateInfoJs } from './spa/js-gate-info.js';
 import { getSpaPaJs } from './spa/js-pa.js';
 import { getSpaAirportDataJs } from './spa/js-airport-data.js';
 import { getSpaCalendarJs } from './spa/js-calendar-wrap.js';
+import { getSpaLiveRadarJs } from './spa/js-live-radar.js';
 
 
 config({ path: path.join(ROOT, '.env') });
@@ -229,6 +230,40 @@ app.get('/api/fids', async (req, res) => {
     res.json({ dep, arr, date: odate });
   } catch (e: any) {
     console.error('FIDS proxy error:', e.message);
+    res.status(502).json({ error: e.message });
+  }
+});
+
+// ── OpenSky Network proxy ─────────────────────────────────────────────────────
+let _oskyCache: { ts: number; data: any } = { ts: 0, data: null };
+app.get('/api/opensky', async (req, res) => {
+  try {
+    const now = Date.now();
+    const { lamin, lomin, lamax, lomax } = req.query;
+    // server-side 10s cache
+    if (_oskyCache.data && now - _oskyCache.ts < 10000) {
+      res.json(_oskyCache.data);
+      return;
+    }
+    let url = 'https://opensky-network.org/api/states/all';
+    const params: string[] = [];
+    if (lamin) params.push(`lamin=${lamin}`);
+    if (lomin) params.push(`lomin=${lomin}`);
+    if (lamax) params.push(`lamax=${lamax}`);
+    if (lomax) params.push(`lomax=${lomax}`);
+    if (params.length) url += '?' + params.join('&');
+    const r = await fetch(url, {
+      headers: { 'User-Agent': 'CrewSync/1.0' }
+    });
+    if (!r.ok) {
+      res.status(502).json({ error: `OpenSky returned ${r.status}` });
+      return;
+    }
+    const data = await r.json();
+    _oskyCache = { ts: now, data };
+    res.json(data);
+  } catch (e: any) {
+    console.error('OpenSky proxy error:', e.message);
     res.status(502).json({ error: e.message });
   }
 });
@@ -563,6 +598,7 @@ function getSPAHtml(): string {
 <link rel="manifest" href="/manifest.json">
 <link rel="icon" href="/icon.svg">
 <link rel="apple-touch-icon" href="/icon.svg">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.min.css"/>
 <title>CrewSync</title>
 <style>
 ${getSpaStyles()}
@@ -570,6 +606,7 @@ ${getSpaStyles()}
 </head>
 <body>
 ${getSpaHtmlBody()}
+<script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.min.js"></script>
 <script>
 ${getSpaCoreJs()}
 ${getSpaAirportDataJs()}
@@ -578,6 +615,7 @@ ${getSpaDutyTimeJs()}
 ${getSpaGateInfoJs()}
 ${getSpaPaJs()}
 ${getSpaCalendarJs()}
+${getSpaLiveRadarJs()}
 </script>
 </body>
 </html>`;

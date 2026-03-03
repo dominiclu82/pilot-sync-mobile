@@ -188,6 +188,7 @@ export function getSpaHtmlBody(): string {
     </div>
     <div class="subtab-slot"><button class="briefing-subtab" id="subtabBtn-pa" onclick="switchBriefingTab('pa',this)">🎙️ PA</button></div>
     <div class="subtab-slot"><button class="briefing-subtab" id="subtabBtn-hf" onclick="switchBriefingTab('hf',this)">📻 Pacific HF</button></div>
+    <div class="subtab-slot"><button class="briefing-subtab" id="subtabBtn-live" onclick="switchBriefingTab('live',this)">📡 Live</button></div>
     <div class="subtab-slot"><button class="briefing-subtab" id="subtabBtn-coldtemp" onclick="switchBriefingTab('coldtemp',this)">❄️ Cold Temp</button></div>
     <div class="subtab-slot"><button class="briefing-subtab" id="subtabBtn-tools" onclick="switchBriefingTab('tools',this)">🗺️ Tools</button></div>
     <div class="subtab-slot"><button class="briefing-subtab" id="subtabBtn-duty" onclick="switchBriefingTab('duty',this)">⏱️ Duty Time</button></div>
@@ -216,6 +217,39 @@ export function getSpaHtmlBody(): string {
           </div>
         </div>
         <iframe id="tool-frame" src="" style="width:100%;height:65vh;border:none;border-radius:12px;background:var(--surface)"></iframe>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── 📡 Live Radar panel ── -->
+  <div id="briefing-live" class="briefing-panel">
+    <div id="live-map"></div>
+    <button id="live-sidebar-toggle" class="live-toggle-btn" onclick="liveToggleSidebar()">☰</button>
+    <div id="live-sidebar" class="live-sidebar live-sidebar-left">
+      <div class="live-sb-header">
+        <span style="font-weight:700;font-size:.85em">Filter</span>
+        <button class="live-sb-pos-btn" onclick="liveSwitchSidebarPos()" title="Switch side">⇄</button>
+      </div>
+      <div class="live-sb-section">
+        <label class="live-cb-label"><input type="checkbox" id="live-f-jx" checked onchange="liveApplyFilter()"><span>JX 星宇</span></label>
+        <label class="live-cb-label"><input type="checkbox" id="live-f-br" onchange="liveApplyFilter()"><span>BR 長榮</span></label>
+        <label class="live-cb-label"><input type="checkbox" id="live-f-ci" onchange="liveApplyFilter()"><span>CI 華航</span></label>
+      </div>
+      <div class="live-sb-section">
+        <label class="live-cb-label"><input type="checkbox" id="live-f-all" onchange="liveToggleAll()"><span>All flights</span></label>
+        <div style="font-size:.7em;color:#f5a623;margin-top:2px;line-height:1.3">⚠ 資料量較大，載入較慢<br>Large dataset, slower loading</div>
+      </div>
+      <div class="live-sb-section">
+        <div style="font-size:.75em;color:var(--muted);margin-bottom:4px">Custom callsign prefix</div>
+        <input type="text" id="live-f-custom" class="live-custom-input" placeholder="e.g. UAL, DAL" onchange="liveApplyFilter()">
+      </div>
+      <button class="live-refresh-btn" onclick="liveFetchData()">↻ Refresh</button>
+      <div id="live-count" style="font-size:.72em;color:var(--muted);margin-top:8px;text-align:center"></div>
+      <div style="font-size:.65em;margin-top:12px;line-height:1.4;border-top:1px solid rgba(255,255,255,.08);padding-top:8px">
+        <span style="color:#f5a623">⚠ 需手動按 Refresh 更新資料<br>
+        Manual refresh required</span><br><br>
+        <span style="color:var(--muted)">僅顯示即時位置，無起訖地資訊<br>
+        Real-time position only, no route info</span>
       </div>
     </div>
   </div>
@@ -896,7 +930,7 @@ export function getSpaHtmlBody(): string {
       <button class="tab-util-btn tab-install-btn" id="tab-install-btn" onclick="showInstallGuide()" style="display:none">
         <span>📲</span>安裝
       </button>
-      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V5.311</span>
+      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V5.400</span>
     </div>
   </div>
 </div>
@@ -926,15 +960,15 @@ export function getSpaHtmlBody(): string {
       <div style="margin-bottom:4px">📱 建議使用 <b>iPad 橫向</b>操作以獲得最佳體驗</div>
       <div style="color:var(--muted)">Best experience on iPad in landscape mode</div>
     </div>
-    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V5.311</div>
+    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V5.400</div>
+    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
+      <div>新增 Briefing → 📡 Live 即時航班雷達（Leaflet + OpenSky Network）</div>
+      <div>Added Live Radar subtab in Briefing (Leaflet + OpenSky Network)</div>
+    </div>
+    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V5.311</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
       <div>修正手機版 Calendar header 被 subtabs 遮住的問題</div>
       <div>Fix mobile Calendar header hidden behind subtabs</div>
-    </div>
-    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V5.310</div>
-    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
-      <div>修正手機版 Calendar header 消失問題，高度計算加入 safe-area-inset-top</div>
-      <div>Fix mobile Calendar header disappearing by including safe-area-inset-top in height calc</div>
     </div>
     <button class="install-close-btn" onclick="closeAbout()">關閉</button>
   </div>

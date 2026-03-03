@@ -534,6 +534,9 @@ function switchBriefingTab(panel, btn) {
   if (panel === 'pa') {
     paStartTzTimer();
   }
+  if (panel === 'live') {
+    liveInit();
+  }
 }
 
 // ── Duty Time 密碼鎖 ──────────────────────────────────────────────────────────
