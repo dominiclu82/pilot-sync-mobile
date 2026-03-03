@@ -46,8 +46,25 @@ var _liveAirportDb = {
   CYYZ:[43.68,-79.63],CYVR:[49.19,-123.18]
 };
 
+/* ── lock/unlock landscape ── */
+function _liveLockLandscape() {
+  try {
+    if (screen.orientation && screen.orientation.lock) {
+      screen.orientation.lock('landscape').catch(function() {});
+    }
+  } catch (e) {}
+}
+function _liveUnlockOrientation() {
+  try {
+    if (screen.orientation && screen.orientation.unlock) {
+      screen.orientation.unlock();
+    }
+  } catch (e) {}
+}
+
 /* ── init ── */
 function liveInit() {
+  _liveLockLandscape();
   if (_liveInited) {
     if (_liveMap) _liveMap.invalidateSize();
     return;

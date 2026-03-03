@@ -963,7 +963,7 @@ export function getSpaHtmlBody(): string {
       <button class="tab-util-btn tab-install-btn" id="tab-install-btn" onclick="showInstallGuide()" style="display:none">
         <span>📲</span>安裝
       </button>
-      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V5.401</span>
+      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V5.402</span>
     </div>
   </div>
 </div>
@@ -993,15 +993,15 @@ export function getSpaHtmlBody(): string {
       <div style="margin-bottom:4px">📱 建議使用 <b>iPad 橫向</b>操作以獲得最佳體驗</div>
       <div style="color:var(--muted)">Best experience on iPad in landscape mode</div>
     </div>
-    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V5.401</div>
+    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V5.402</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
-      <div>Live Radar 側邊欄改版：航班列表、標籤切換、機場跳轉、手機全螢幕覆蓋</div>
-      <div>Live Radar sidebar redesign: flight list, labels toggle, airport jump, mobile full-screen overlay</div>
+      <div>Live Radar 手機橫向鎖定、側邊欄捲動修正</div>
+      <div>Mobile landscape lock, sidebar scroll fix</div>
     </div>
-    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V5.400</div>
+    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V5.401</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
-      <div>新增 Briefing → 📡 Live 即時航班雷達（Leaflet + OpenSky Network）</div>
-      <div>Added Live Radar subtab in Briefing (Leaflet + OpenSky Network)</div>
+      <div>Live Radar 側邊欄重新設計：航班列表、標籤開關、機場跳轉、手機版排版</div>
+      <div>Live Radar sidebar redesign: flight list, labels toggle, airport jump, mobile layout</div>
     </div>
     <button class="install-close-btn" onclick="closeAbout()">關閉</button>
   </div>

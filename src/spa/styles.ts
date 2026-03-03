@@ -366,7 +366,7 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
 .live-toggle-btn:active{opacity:.6}
 .live-sidebar{position:absolute;top:0;width:260px;height:100%;background:rgba(10,14,26,.92);
   z-index:700;display:flex;flex-direction:column;padding:10px;border-left:1px solid var(--dim);
-  transition:width .2s,padding .2s;-webkit-overflow-scrolling:touch}
+  transition:width .2s,padding .2s;overflow-y:auto;-webkit-overflow-scrolling:touch}
 .live-sidebar-right{right:0;border-left:1px solid var(--dim);border-right:none}
 .live-sidebar-left{left:0;border-right:1px solid var(--dim);border-left:none}
 .live-sidebar.collapsed{width:0;padding:0;overflow:hidden;border:none}
@@ -418,12 +418,18 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
 .live-popup-table td{padding:2px 0;border-bottom:1px solid var(--dim)}
 .live-popup-table td:first-child{color:var(--muted);padding-right:10px;white-space:nowrap}
 @media(max-width:639px){
-  .live-sidebar{width:100%!important;border:none!important}
+  .live-sidebar{width:100%!important;border:none!important;overflow-y:auto}
   .live-sidebar-left,.live-sidebar-right{left:0;right:0}
   .live-sidebar.collapsed{width:0!important}
   .live-toggle-btn{left:6px!important;right:auto!important}
   .live-sb-pos-btn{display:none}
   .live-sb-close-btn{display:block}
+}
+@media(max-height:500px){
+  .live-sidebar{overflow-y:auto}
+  .live-sb-section{margin-bottom:4px;padding-bottom:4px}
+  .live-sb-close-btn{display:block}
+  .live-sb-pos-btn{display:none}
 }
 #briefing-hf.active{padding:0;display:flex;flex-direction:column;
   height:calc(100dvh - calc(56px + env(safe-area-inset-bottom,0px)) - 40px)}
