@@ -896,7 +896,7 @@ export function getSpaHtmlBody(): string {
       <button class="tab-util-btn tab-install-btn" id="tab-install-btn" onclick="showInstallGuide()" style="display:none">
         <span>📲</span>安裝
       </button>
-      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V5.306</span>
+      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V5.307</span>
     </div>
   </div>
 </div>
@@ -926,15 +926,15 @@ export function getSpaHtmlBody(): string {
       <div style="margin-bottom:4px">📱 建議使用 <b>iPad 橫向</b>操作以獲得最佳體驗</div>
       <div style="color:var(--muted)">Best experience on iPad in landscape mode</div>
     </div>
-    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V5.306</div>
+    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V5.307</div>
+    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
+      <div>修正手機版 Calendar header 被推走：佈局約束加 justify-content + flex:1</div>
+      <div>Fixed mobile calendar header scrolling away: layout constraints with justify-content + flex:1</div>
+    </div>
+    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V5.306</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
       <div>手機版 Calendar 改用 JS 動態高度約束，修正 header 固定 + subtab 消失問題</div>
       <div>Mobile calendar: JS-based dynamic height constraint, fixed header pinning &amp; subtab visibility</div>
-    </div>
-    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V5.305</div>
-    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
-      <div>修正手機版 Calendar header 捲動時被推走的問題（佈局約束對齊 iPad）</div>
-      <div>Fixed mobile calendar header scrolling away (layout constraints aligned with iPad)</div>
     </div>
     <button class="install-close-btn" onclick="closeAbout()">關閉</button>
   </div>

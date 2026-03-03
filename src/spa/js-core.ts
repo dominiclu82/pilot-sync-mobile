@@ -268,26 +268,7 @@ function switchRosterTab(panel, btn) {
   btn.classList.add('active');
   document.getElementById('roster-' + panel).classList.add('active');
   if (panel === 'cal' && !gcalInited) { gcalInited = true; gcalInit(); }
-  // Mobile: constrain Calendar panel height so header stays fixed
-  var rosterCal = document.getElementById('roster-cal');
-  if (panel === 'cal' && window.innerWidth < 640) {
-    _resizeCalPanel();
-  } else if (rosterCal) {
-    rosterCal.style.height = '';
-    rosterCal.style.overflow = '';
-  }
 }
-function _resizeCalPanel() {
-  var panel = document.getElementById('roster-cal');
-  if (!panel || window.innerWidth >= 640) return;
-  var subtabs = document.querySelector('.roster-subtabs');
-  var st = subtabs ? subtabs.getBoundingClientRect().bottom : 0;
-  var tabBar = document.querySelector('.tab-bar');
-  var tb = tabBar ? tabBar.getBoundingClientRect().top : window.innerHeight;
-  panel.style.height = Math.max(0, tb - st) + 'px';
-  panel.style.overflow = 'hidden';
-}
-window.addEventListener('resize', _resizeCalPanel);
 // Auto-switch to Calendar if user already authorized (setTimeout to wait for calendar JS)
 setTimeout(function() {
   if (localStorage.getItem('crewsync_rt')) {
