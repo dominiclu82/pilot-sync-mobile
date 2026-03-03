@@ -896,7 +896,7 @@ export function getSpaHtmlBody(): string {
       <button class="tab-util-btn tab-install-btn" id="tab-install-btn" onclick="showInstallGuide()" style="display:none">
         <span>📲</span>安裝
       </button>
-      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V5.304</span>
+      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V5.305</span>
     </div>
   </div>
 </div>
@@ -926,15 +926,15 @@ export function getSpaHtmlBody(): string {
       <div style="margin-bottom:4px">📱 建議使用 <b>iPad 橫向</b>操作以獲得最佳體驗</div>
       <div style="color:var(--muted)">Best experience on iPad in landscape mode</div>
     </div>
-    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V5.304</div>
+    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V5.305</div>
+    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
+      <div>修正手機版 Calendar header 捲動時被推走的問題（佈局約束對齊 iPad）</div>
+      <div>Fixed mobile calendar header scrolling away (layout constraints aligned with iPad)</div>
+    </div>
+    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V5.304</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
       <div>修正手機版 Calendar header 捲動時未固定的問題</div>
       <div>Fixed mobile calendar header not staying sticky when scrolling</div>
-    </div>
-    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V5.303</div>
-    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
-      <div>修正 Roster Sync 自動切換 Calendar 導致全站 JS 失效的問題</div>
-      <div>Fixed Roster Sync auto-switch to Calendar causing site-wide JS failure</div>
     </div>
     <button class="install-close-btn" onclick="closeAbout()">關閉</button>
   </div>
