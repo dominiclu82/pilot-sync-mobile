@@ -154,6 +154,11 @@ export function getSpaHtmlBody(): string {
           <button class="gcal-view-btn active" data-view="month" onclick="gcalSetView('month')">Month</button>
           <button class="gcal-view-btn" data-view="schedule" onclick="gcalSetView('schedule')">Schedule</button>
         </div>
+        <select class="gcal-view-select" id="gcal-view-select" onchange="gcalSetView(this.value)">
+          <option value="week">Week</option>
+          <option value="month" selected>Month</option>
+          <option value="schedule">Schedule</option>
+        </select>
         <button class="gcal-nav" onclick="gcalPrev()">◀</button>
         <button class="gcal-nav" onclick="gcalNext()">▶</button>
         <span class="gcal-title" id="gcal-title"></span>
@@ -491,6 +496,28 @@ export function getSpaHtmlBody(): string {
           </div>
         </div>
 
+        <!-- DHD after OPS -->
+        <div class="dt-opt-row" style="margin-top:8px">
+          <label class="dt-chk-label">
+            <input type="checkbox" id="dt-dhd" onchange="dtToggleDhd()"> DHD after OPS
+          </label>
+        </div>
+        <div style="font-size:.72em;color:var(--muted);padding:0 4px;margin-top:-2px">* DHD before OPS：FDP Start 填 sign-on 時間，限制照算<br>DHD before OPS: Use sign-on time as FDP Start — same limits apply</div>
+        <div class="dt-field" id="dt-dhd-section" style="display:none">
+          <div class="dt-field-label">DHD End Time (UTC) — REST START</div>
+          <div class="dt-time-row">
+            <div class="dt-date-wrap">
+              <input type="date" id="dt-dhd-day" class="dt-date-input" onchange="dtDateChanged(this)">
+              <span class="dt-date-display" id="dt-dhd-day-btn">--/--</span>
+            </div>
+            <span class="dt-sep">/</span>
+            <input class="dt-time-box" type="text" id="dt-dhd-h" placeholder="HH" maxlength="2" inputmode="numeric">
+            <span class="dt-sep">:</span>
+            <input class="dt-time-box" type="text" id="dt-dhd-m" placeholder="MM" maxlength="2" inputmode="numeric">
+            <span class="dt-tag">UTC</span>
+          </div>
+        </div>
+
         <!-- Flight Time -->
         <div class="dt-field">
           <div class="dt-field-label">Flight Time (Block Time)</div>
@@ -579,6 +606,9 @@ export function getSpaHtmlBody(): string {
                 <span id="dt-lbl-fdp" style="font-size:.65em;font-weight:700;color:#fff;white-space:nowrap;padding:0 6px"></span>
               </div>
               <div id="dt-bar-fdp-over" style="position:absolute;top:0;height:28px;background:#ef4444;border-radius:0 4px 4px 0;display:none;z-index:2"></div>
+              <div id="dt-bar-dhd" style="position:absolute;top:0;height:28px;background:#8b5cf6;border-radius:0 4px 4px 0;display:flex;align-items:center;overflow:hidden;display:none;z-index:2">
+                <span id="dt-lbl-dhd" style="font-size:.65em;font-weight:700;color:#fff;white-space:nowrap;padding:0 6px"></span>
+              </div>
               <div id="dt-bar-maxfdp" style="position:absolute;top:34px;height:28px;background:repeating-linear-gradient(-45deg,#3b82f6 0,#3b82f6 7px,#60a5fa 7px,#60a5fa 14px);border-radius:4px;display:flex;align-items:center;overflow:hidden;z-index:2">
                 <span id="dt-lbl-maxfdp" style="font-size:.65em;font-weight:700;color:#fff;white-space:nowrap;padding:0 6px"></span>
               </div>
@@ -600,6 +630,7 @@ export function getSpaHtmlBody(): string {
             <div id="dt-tl2-ticks" style="position:relative;min-height:40px;margin-top:4px"></div>
             <div class="dt-legend">
               <div class="dt-leg-item"><div class="dt-leg-box" style="background:#10b981"></div>FDP</div>
+              <div class="dt-leg-item" id="dt-leg-dhd" style="display:none"><div class="dt-leg-box" style="background:#8b5cf6"></div>DHD</div>
               <div class="dt-leg-item"><div class="dt-leg-box" style="background:rgba(239,68,68,.25)"></div>WOCL (02-05)</div>
               <div class="dt-leg-item"><div class="dt-leg-box" style="background:repeating-linear-gradient(-45deg,#3b82f6 0,#3b82f6 4px,#60a5fa 4px,#60a5fa 8px)"></div>Max FDP</div>
               <div class="dt-leg-item"><div class="dt-leg-box" style="background:repeating-linear-gradient(-45deg,#e11d48 0,#e11d48 4px,#f43f5e 4px,#f43f5e 8px)"></div>Ext</div>
@@ -865,7 +896,7 @@ export function getSpaHtmlBody(): string {
       <button class="tab-util-btn tab-install-btn" id="tab-install-btn" onclick="showInstallGuide()" style="display:none">
         <span>📲</span>安裝
       </button>
-      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V5.301</span>
+      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V5.302</span>
     </div>
   </div>
 </div>
@@ -895,15 +926,15 @@ export function getSpaHtmlBody(): string {
       <div style="margin-bottom:4px">📱 建議使用 <b>iPad 橫向</b>操作以獲得最佳體驗</div>
       <div style="color:var(--muted)">Best experience on iPad in landscape mode</div>
     </div>
-    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V5.301</div>
+    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V5.302</div>
+    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
+      <div>Duty Time 新增 DHD after OPS 功能，自動計算休息起算時間；Calendar 手機版 header 改善：view 改下拉選單、sticky 固定、標題不重疊；Roster Sync 已授權用戶自動顯示 Calendar</div>
+      <div>Added DHD after OPS to Duty Time calculator with rest start adjustment; Mobile calendar header: view dropdown, sticky header, no title overlap; Roster Sync defaults to Calendar if Google authorized</div>
+    </div>
+    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V5.301</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
       <div>新增 Google Calendar 整合：月視圖（含跨日事件橫條）、週視圖（時間軸 + 農曆）、Schedule 時間表；事件詳情含地點、說明、提醒；Duty Time 新增 Flight Time 即時驗證、修正 Timeline 文字重疊</div>
-      <div style="opacity:.7">Added Google Calendar integration: Month view (spanning bars for multi-day events), Week view (time grid + lunar dates), Schedule list view; event details with location, description &amp; reminders; Duty Time: real-time Flight Time validation, fixed timeline label overlap</div>
-    </div>
-    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V5.234</div>
-    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
-      <div>UI 全面英文化：Tab 列、Briefing subtab、Duty Time 提示文字；WOCL 說明加英文對照；移除 Actual Rest ✓/✗ 符號</div>
-      <div style="opacity:.7">Localized UI to English: tab bar, briefing subtabs, Duty Time hints; added English translation to WOCL description; removed ✓/✗ from Actual Rest card</div>
+      <div>Added Google Calendar integration: Month view (spanning bars for multi-day events), Week view (time grid + lunar dates), Schedule list view; event details with location, description &amp; reminders; Duty Time: real-time Flight Time validation, fixed timeline label overlap</div>
     </div>
     <button class="install-close-btn" onclick="closeAbout()">關閉</button>
   </div>

@@ -269,6 +269,11 @@ function switchRosterTab(panel, btn) {
   document.getElementById('roster-' + panel).classList.add('active');
   if (panel === 'cal' && !gcalInited) { gcalInited = true; gcalInit(); }
 }
+// Auto-switch to Calendar if user already authorized
+if (localStorage.getItem('crewsync_rt')) {
+  var calBtn = document.querySelectorAll('.roster-subtab')[1];
+  if (calBtn) switchRosterTab('cal', calBtn);
+}
 
 // ── Tab switching ─────────────────────────────────────────────────────────────
 function switchTab(tab, btn) {

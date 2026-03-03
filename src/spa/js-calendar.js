@@ -51,6 +51,8 @@ function gcalInit() {
   document.querySelectorAll('.gcal-view-btn').forEach(function(btn) {
     btn.classList.toggle('active', btn.dataset.view === 'month');
   });
+  var vsel = document.getElementById('gcal-view-select');
+  if (vsel) vsel.value = 'month';
   gcalRender();
   gcalFetchEvents();
 }
@@ -61,6 +63,8 @@ function gcalSetView(view) {
   document.querySelectorAll('.gcal-view-btn').forEach(function(btn) {
     btn.classList.toggle('active', btn.dataset.view === view);
   });
+  var vsel = document.getElementById('gcal-view-select');
+  if (vsel) vsel.value = view;
   if (!gcalSelDay) {
     var now = new Date();
     if (gcalYear === now.getFullYear() && gcalMonth === now.getMonth()) {

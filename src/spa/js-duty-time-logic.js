@@ -2,7 +2,7 @@
 var DT_MAX_FDP = {2:14*60, 3:18*60, 4:24*60};
 var DT_MAX_FT  = {2:{noC1:10*60,c1:10*60}, 3:{noC1:12*60,c1:16*60}, 4:{noC1:12*60,c1:18*60}};
 var dtMode = 'home';
-var DT_DATE_IDS = ['dt-s-day','dt-e-day','dt-n-day','dt-ci-day','dt-co-day'];
+var DT_DATE_IDS = ['dt-s-day','dt-e-day','dt-n-day','dt-ci-day','dt-co-day','dt-dhd-day'];
 
 // ── HH/MM input clamp (capture phase → fires before inline handlers) ──
 document.addEventListener('input', function(e) {
@@ -92,6 +92,11 @@ function dtToggleAccom() {
   if (on) dtUpdateAccomHint();
 }
 
+function dtToggleDhd() {
+  var on = document.getElementById('dt-dhd').checked;
+  document.getElementById('dt-dhd-section').style.display = on ? 'block' : 'none';
+}
+
 function dtUpdateAccomHint() {
   var h = parseInt(document.getElementById('dt-accom-h').value) || 0;
   var m = parseInt(document.getElementById('dt-accom-m').value) || 0;
@@ -157,15 +162,17 @@ function dtFmtH(m) { // "HH:MM" for timeline labels
   return h+':'+(mm<10?'0':'')+mm;
 }
 
-function dtRenderTimeline(startMin, endMin, maxFdp, restStart, restEnd, minRest, tz, disc, accomExt, accomType) {
+function dtRenderTimeline(startMin, endMin, maxFdp, restStart, restEnd, minRest, tz, disc, accomExt, accomType, dhdEndMin) {
   try {
   var actFdp = endMin - startMin;
+  var dhdDur = dhdEndMin ? dhdEndMin - endMin : 0;
   // Calculate total extension and base Max FDP
   var totalExt = (disc ? 2*60 : 0) + (accomType === 'start' ? (accomExt || 0) : 0);
   var baseFdp = maxFdp - totalExt;
+  var dhdEnd = dhdEndMin || startMin;
   var spanEnd = restEnd !== null
-    ? Math.max(startMin + maxFdp, restEnd) + 60
-    : startMin + maxFdp + minRest + 60;
+    ? Math.max(startMin + maxFdp, restEnd, dhdEnd) + 60
+    : Math.max(startMin + maxFdp, dhdEnd) + minRest + 60;
   var span = spanEnd - startMin;
 
   function pct(offset) { return (Math.max(0, offset) / span * 100).toFixed(2); }
@@ -208,7 +215,22 @@ function dtRenderTimeline(startMin, endMin, maxFdp, restStart, restEnd, minRest,
   } else {
     extEl.style.display = 'none';
   }
-  setBar('dt-bar-minrest', actFdp, minRest);
+
+  // DHD bar
+  var dhdBar = document.getElementById('dt-bar-dhd');
+  var dhdLeg = document.getElementById('dt-leg-dhd');
+  if (dhdEndMin && dhdDur > 0) {
+    dhdBar.style.display = 'flex';
+    setBar('dt-bar-dhd', actFdp, dhdDur);
+    document.getElementById('dt-lbl-dhd').textContent = 'DHD ' + dtFmtH(dhdDur);
+    if (dhdLeg) dhdLeg.style.display = '';
+  } else {
+    dhdBar.style.display = 'none';
+    if (dhdLeg) dhdLeg.style.display = 'none';
+  }
+
+  var minRestOffset = dhdEndMin ? (dhdEndMin - startMin) : actFdp;
+  setBar('dt-bar-minrest', minRestOffset, minRest);
   document.getElementById('dt-lbl-minrest').textContent = 'Min Req ' + dtFmtH(minRest);
 
   var restBar = document.getElementById('dt-bar-rest');
@@ -272,15 +294,25 @@ function dtRenderTimeline(startMin, endMin, maxFdp, restStart, restEnd, minRest,
     return '<div style="position:absolute;left:' + leftPct + '%;transform:' + tx + ';text-align:' + ta + ';font-size:.58em;color:var(--dim);line-height:1.35;white-space:nowrap;' + topS + '">' + line1 + '<br>' + line2 + '</div>';
   }
   var ticks = document.getElementById('dt-tl2-ticks');
-  var rstPct = parseFloat(pct(actFdp));
+  var fdpEndPct = parseFloat(pct(actFdp));
+  var dhdEndPctVal = dhdEndMin ? parseFloat(pct(dhdEndMin - startMin)) : -999;
+  var rstPct = dhdEndMin ? dhdEndPctVal : fdpEndPct;
   var nxtPct = restEnd !== null ? parseFloat(pct(restEnd - startMin)) : -999;
   // Smart alignment: right-align if close to right edge, and stagger if ticks overlap
-  var rstAlign = rstPct > 75 ? 'right' : 'center';
   var nxtAlign = 'right';
   var nxtTop = 0;
   if (restEnd !== null && Math.abs(nxtPct - rstPct) < 18) nxtTop = 28;
   var html = makeTick(pct(0), 'FDP Start', fmtUTC(startMin), 'left');
-  html += makeTick(pct(actFdp), 'Rst Start (FDP End)', fmtUTC(endMin), rstAlign);
+  if (dhdEndMin) {
+    var feAlign = fdpEndPct > 75 ? 'right' : 'center';
+    html += makeTick(pct(actFdp), 'FDP End', fmtUTC(endMin), feAlign);
+    var dhdAlign = dhdEndPctVal > 75 ? 'right' : 'center';
+    var dhdTop = Math.abs(dhdEndPctVal - fdpEndPct) < 18 ? 28 : 0;
+    html += makeTick(pct(dhdEndMin - startMin), 'Rst Start (DHD End)', fmtUTC(dhdEndMin), dhdAlign, dhdTop);
+  } else {
+    var rstAlign = fdpEndPct > 75 ? 'right' : 'center';
+    html += makeTick(pct(actFdp), 'Rst Start (FDP End)', fmtUTC(endMin), rstAlign);
+  }
   if (restEnd !== null) html += makeTick(pct(restEnd - startMin), 'Next Rpt', fmtUTC(restEnd), nxtAlign, nxtTop);
   ticks.innerHTML = html;
 
@@ -406,6 +438,8 @@ function dtCalculate() {
 
   var startMin = dtDayMin('dt-s-day','dt-s-h','dt-s-m');
   var endMin   = dtDayMin('dt-e-day','dt-e-h','dt-e-m');
+  var hasDhd   = document.getElementById('dt-dhd').checked;
+  var dhdEndMin = hasDhd ? dtDayMin('dt-dhd-day','dt-dhd-h','dt-dhd-m') : null;
   var ftMin    = (parseInt(document.getElementById('dt-ft-h').value)||0)*60 +
                  (parseInt(document.getElementById('dt-ft-m').value)||0);
 
@@ -450,6 +484,8 @@ function dtCalculate() {
 
   // If end < start (crossed midnight), add 1 day
   if (endMin <= startMin) endMin += 1440;
+  // DHD End must be after FDP End
+  if (dhdEndMin !== null && dhdEndMin <= endMin) dhdEndMin += 1440;
 
   var actFdp  = endMin - startMin;
 
@@ -470,7 +506,8 @@ function dtCalculate() {
   if (dtMode === 'home') {
     var nxtMin = dtDayMin('dt-n-day','dt-n-h','dt-n-m');
     if (nxtMin !== null) {
-      restStart = endMin; restEnd = nxtMin;
+      restStart = (dhdEndMin !== null) ? dhdEndMin : endMin;
+      restEnd = nxtMin;
       if (restEnd <= restStart) restEnd += 1440;
       actRest = restEnd - restStart;
     }
@@ -530,7 +567,7 @@ function dtCalculate() {
   }
 
   // CSS percentages recalculate on reflow, no timing hacks needed
-  dtRenderTimeline(startMin, endMin, maxFdp, restStart, restEnd, minRest, tz, disc, accomExt, accomType);
+  dtRenderTimeline(startMin, endMin, maxFdp, restStart, restEnd, minRest, tz, disc, accomExt, accomType, dhdEndMin);
 }
 
 // ── Boot ─────────────────────────────────────────────────────────────────────

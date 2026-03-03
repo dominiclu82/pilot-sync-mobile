@@ -174,6 +174,16 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
   padding:3px 8px;border-radius:10px;cursor:pointer;-webkit-appearance:none;transition:all .15s;white-space:nowrap}
 .gcal-view-btn.active{background:var(--accent);border-color:var(--accent);color:#fff}
 .gcal-view-btn:active{opacity:.7}
+.gcal-view-select{display:none;background:var(--surface);border:1px solid var(--dim);color:var(--text);
+  font-size:.72em;font-weight:600;padding:3px 6px;border-radius:10px;-webkit-appearance:none;appearance:none;
+  cursor:pointer;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='5'%3E%3Cpath d='M0 0l4 5 4-5z' fill='%23888'/%3E%3C/svg%3E");
+  background-repeat:no-repeat;background-position:right 6px center;padding-right:18px}
+@media(max-width:767px){
+  .gcal-view-bar{display:none!important}
+  .gcal-view-select{display:block}
+  .gcal-header{position:sticky;top:0;z-index:10;background:var(--bg)}
+  .gcal-title{position:static;transform:none;pointer-events:auto}
+}
 .gcal-weekdays{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));text-align:center;flex-shrink:0;
   border-bottom:1px solid var(--dim)}
 .gcal-wk-cell{font-size:.75em;font-weight:600;color:var(--muted);padding:6px 0}
