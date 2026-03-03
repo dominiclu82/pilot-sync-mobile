@@ -190,7 +190,7 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
     align-items:stretch;justify-content:flex-start;
     height:calc(100dvh - 56px - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px));
     min-height:unset;overflow:hidden;padding:0}
-  .roster-subtabs{flex-shrink:0}
+  .roster-subtabs{flex-shrink:0;top:0}
   .roster-panel.active{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;min-height:0}
   #roster-crew.active{justify-content:flex-start}
   #roster-cal.active{overflow:hidden}
