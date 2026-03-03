@@ -178,15 +178,6 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
   font-size:.72em;font-weight:600;padding:3px 6px;border-radius:10px;-webkit-appearance:none;appearance:none;
   cursor:pointer;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='5'%3E%3Cpath d='M0 0l4 5 4-5z' fill='%23888'/%3E%3C/svg%3E");
   background-repeat:no-repeat;background-position:right 6px center;padding-right:18px}
-@media(max-width:639px){
-  html:has(#tab-sync.tab-active){overflow:hidden;height:100dvh}
-  html:has(#tab-sync.tab-active) body{overflow:hidden;height:100dvh}
-  #tab-sync.tab-active{height:calc(100dvh - calc(56px + env(safe-area-inset-bottom,0px)));
-    min-height:unset;overflow:hidden;padding:0;justify-content:flex-start}
-  .roster-subtabs{flex-shrink:0}
-  .roster-panel.active{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;min-height:0}
-  #roster-cal.active{overflow:hidden}
-}
 @media(max-width:767px){
   .gcal-view-bar{display:none!important}
   .gcal-view-select{display:block}

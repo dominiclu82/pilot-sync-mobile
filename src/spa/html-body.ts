@@ -896,7 +896,7 @@ export function getSpaHtmlBody(): string {
       <button class="tab-util-btn tab-install-btn" id="tab-install-btn" onclick="showInstallGuide()" style="display:none">
         <span>📲</span>安裝
       </button>
-      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V5.307</span>
+      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V5.308</span>
     </div>
   </div>
 </div>
@@ -926,15 +926,15 @@ export function getSpaHtmlBody(): string {
       <div style="margin-bottom:4px">📱 建議使用 <b>iPad 橫向</b>操作以獲得最佳體驗</div>
       <div style="color:var(--muted)">Best experience on iPad in landscape mode</div>
     </div>
-    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V5.307</div>
+    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V5.308</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
-      <div>修正手機版 Calendar header 被推走：佈局約束加 justify-content + flex:1</div>
-      <div>Fixed mobile calendar header scrolling away: layout constraints with justify-content + flex:1</div>
+      <div>還原手機版佈局約束，恢復 Crew Sync 捲動與 Calendar 正常運作</div>
+      <div>Reverted mobile layout constraints, restored Crew Sync scrolling &amp; Calendar functionality</div>
     </div>
-    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V5.306</div>
+    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V5.302</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
-      <div>手機版 Calendar 改用 JS 動態高度約束，修正 header 固定 + subtab 消失問題</div>
-      <div>Mobile calendar: JS-based dynamic height constraint, fixed header pinning &amp; subtab visibility</div>
+      <div>Duty Time 新增 DHD after OPS 功能，自動計算休息起算時間；Calendar 手機版 header 改善：view 改下拉選單、sticky 固定、標題不重疊；Roster Sync 已授權用戶自動顯示 Calendar</div>
+      <div>Added DHD after OPS to Duty Time calculator with rest start adjustment; Mobile calendar header: view dropdown, sticky header, no title overlap; Roster Sync defaults to Calendar if Google authorized</div>
     </div>
     <button class="install-close-btn" onclick="closeAbout()">關閉</button>
   </div>
