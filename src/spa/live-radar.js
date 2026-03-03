@@ -1,12 +1,50 @@
 /* ── 📡 Live Radar ─────────────────────────────────────────────── */
 var _liveMap = null;
 var _livePlaneLayer = null;
+var _liveLabelLayer = null;
 var _liveStates = [];
+var _liveFiltered = [];
 var _liveInited = false;
+var _liveShowLabels = false;
 
 /* callsign prefix → IATA mapping */
 var _livePrefixMap = { SJX: 'JX', EVA: 'BR', CAL: 'CI' };
 var _liveIataToIcao = { JX: 'SJX', BR: 'EVA', CI: 'CAL' };
+
+/* ICAO airport coordinates [lat, lon] */
+var _liveAirportDb = {
+  /* Taiwan */
+  RCTP:[25.08,121.23],RCSS:[25.07,121.55],RCKH:[22.57,120.35],RCMQ:[24.26,120.62],
+  /* Japan */
+  RJTT:[35.55,139.78],RJAA:[35.76,140.39],RJBB:[34.43,135.24],RJCC:[42.77,141.69],
+  RJFF:[33.59,130.45],RJOO:[34.78,135.44],RJSN:[37.96,139.11],RJNK:[36.39,136.41],
+  ROAH:[26.20,127.65],RJFK:[33.55,131.74],
+  /* Korea */
+  RKSI:[37.47,126.45],RKSS:[37.56,126.79],RKPC:[33.51,126.49],RKPK:[35.18,128.94],
+  /* China / HK / Macau */
+  VHHH:[22.31,113.91],VMMC:[22.15,113.59],ZBAA:[40.08,116.58],ZSPD:[31.14,121.80],
+  ZGGG:[23.39,113.30],ZUCK:[29.72,106.64],ZUUU:[30.58,103.95],ZSSS:[31.20,121.34],
+  /* Southeast Asia */
+  WSSS:[1.36,103.99],VTBS:[13.69,100.75],WIII:[-6.13,106.66],RPLL:[14.51,121.02],
+  VVNB:[21.22,105.81],VVTS:[10.82,106.65],WMKK:[2.74,101.70],
+  /* USA */
+  KLAX:[33.94,-118.41],KSFO:[37.62,-122.38],KJFK:[40.64,-73.78],KATL:[33.64,-84.43],
+  KORD:[41.97,-87.91],KDFW:[32.90,-97.04],KDEN:[39.86,-104.67],KSEA:[47.45,-122.31],
+  KPHX:[33.43,-112.01],KMIA:[25.80,-80.29],KLAS:[36.08,-115.15],KIAH:[29.98,-95.34],
+  KEWR:[40.69,-74.17],KBOS:[42.36,-71.01],KMSP:[44.88,-93.22],KDTW:[42.21,-83.35],
+  KHNL:[21.32,-157.92],
+  /* Europe */
+  EGLL:[51.47,-0.46],LFPG:[49.01,2.55],EDDF:[50.03,8.57],EHAM:[52.31,4.76],
+  LEMD:[40.47,-3.57],LIRF:[41.80,12.24],LSZH:[47.46,8.55],LOWW:[48.11,16.57],
+  EKCH:[55.62,12.66],ENGM:[60.19,11.10],EFHK:[60.32,24.96],
+  /* Middle East */
+  OMDB:[25.25,55.36],OTHH:[25.27,51.61],OEJN:[21.68,39.16],OERK:[24.96,46.70],
+  LLBG:[32.01,34.89],OIII:[35.69,51.31],
+  /* Oceania */
+  YSSY:[-33.95,151.18],YMML:[-37.67,144.84],NZAA:[-37.01,174.79],
+  /* Canada */
+  CYYZ:[43.68,-79.63],CYVR:[49.19,-123.18]
+};
 
 /* ── init ── */
 function liveInit() {
@@ -27,6 +65,7 @@ function liveInit() {
   }).addTo(_liveMap);
   L.control.zoom({ position: 'topright' }).addTo(_liveMap);
   _livePlaneLayer = L.layerGroup().addTo(_liveMap);
+  _liveLabelLayer = L.layerGroup().addTo(_liveMap);
 
   /* prevent Leaflet from stealing sidebar clicks */
   var sb = document.getElementById('live-sidebar');
@@ -34,6 +73,12 @@ function liveInit() {
   L.DomEvent.disableClickPropagation(sb);
   L.DomEvent.disableScrollPropagation(sb);
   L.DomEvent.disableClickPropagation(tbtn);
+
+  /* re-render on map move when showing all flights */
+  _liveMap.on('moveend', function() {
+    var allCheck = document.getElementById('live-f-all');
+    if (allCheck && allCheck.checked) liveApplyFilter();
+  });
 
   /* restore saved settings */
   _liveRestoreSettings();
@@ -62,10 +107,21 @@ function liveFetchData() {
     });
 }
 
+/* ── convert callsign to display name ── */
+function _liveDisplayName(cs) {
+  for (var prefix in _livePrefixMap) {
+    if (cs.indexOf(prefix) === 0) {
+      return _livePrefixMap[prefix] + cs.substring(prefix.length);
+    }
+  }
+  return cs;
+}
+
 /* ── apply filter & render ── */
 function liveApplyFilter() {
   if (!_liveMap) return;
   _livePlaneLayer.clearLayers();
+  _liveLabelLayer.clearLayers();
 
   var allCheck = document.getElementById('live-f-all');
   var showAll = allCheck && allCheck.checked;
@@ -82,7 +138,12 @@ function liveApplyFilter() {
     }
   }
 
-  var count = 0;
+  /* viewbox bounds for All flights mode */
+  var bounds = null;
+  var MAX_ALL = 500;
+  if (showAll) bounds = _liveMap.getBounds();
+
+  _liveFiltered = [];
   for (var j = 0; j < _liveStates.length; j++) {
     var s = _liveStates[j];
     var cs = (s[1] || '').trim();
@@ -90,7 +151,11 @@ function liveApplyFilter() {
     var lat = s[6], lon = s[5];
     if (lat == null || lon == null) continue;
 
-    if (!showAll && prefixes.length > 0) {
+    if (showAll) {
+      /* only show planes within visible map area */
+      if (!bounds.contains([lat, lon])) continue;
+      if (_liveFiltered.length >= MAX_ALL) continue;
+    } else if (prefixes.length > 0) {
       var match = false;
       for (var k = 0; k < prefixes.length; k++) {
         if (cs.indexOf(prefixes[k]) === 0) { match = true; break; }
@@ -98,7 +163,7 @@ function liveApplyFilter() {
       if (!match) continue;
     }
 
-    count++;
+    _liveFiltered.push(s);
     var heading = s[10] || 0;
     var icon = L.divIcon({
       className: 'live-plane-icon',
@@ -112,27 +177,81 @@ function liveApplyFilter() {
       _liveShowPopup(e.target);
     });
     _livePlaneLayer.addLayer(marker);
+
+    /* label */
+    if (_liveShowLabels) {
+      var altFt = s[7] != null ? Math.round(s[7] * 3.28084) : null;
+      var altStr = altFt != null ? altFt.toLocaleString() : '';
+      var labelHtml = '<div class="live-label">' + _liveDisplayName(cs) +
+        (altStr ? '<br>' + altStr + ' ft' : '') + '</div>';
+      var labelIcon = L.divIcon({
+        className: 'live-label-icon',
+        html: labelHtml,
+        iconSize: [0, 0],
+        iconAnchor: [-12, 10]
+      });
+      _liveLabelLayer.addLayer(L.marker([lat, lon], { icon: labelIcon, interactive: false }));
+    }
   }
 
   var countEl = document.getElementById('live-count');
-  if (countEl) countEl.textContent = count + ' aircraft';
+  if (countEl) {
+    var cntText = _liveFiltered.length + ' aircraft';
+    if (showAll && _liveFiltered.length >= MAX_ALL) cntText += ' (max ' + MAX_ALL + ')';
+    countEl.textContent = cntText;
+  }
+
+  /* update flight list */
+  _liveRenderFlightList();
 
   /* save filter settings */
   _liveSaveSettings();
+}
+
+/* ── render flight list ── */
+function _liveRenderFlightList() {
+  var el = document.getElementById('live-flight-list');
+  if (!el) return;
+  if (_liveFiltered.length === 0) {
+    el.innerHTML = '<div style="color:var(--muted);font-size:.7em;text-align:center;padding:8px">No flights</div>';
+    return;
+  }
+  var html = '<table class="live-list-table"><thead><tr><th>Flight</th><th>Alt</th><th>Spd</th></tr></thead><tbody>';
+  for (var i = 0; i < _liveFiltered.length; i++) {
+    var s = _liveFiltered[i];
+    var cs = (s[1] || '').trim();
+    var display = _liveDisplayName(cs);
+    var altFt = s[7] != null ? Math.round(s[7] * 3.28084).toLocaleString() : '—';
+    var spdKt = s[9] != null ? Math.round(s[9] * 1.94384) : '—';
+    html += '<tr data-idx="' + i + '" onclick="_liveListClick(' + i + ')">' +
+      '<td>' + display + '</td>' +
+      '<td>' + altFt + '</td>' +
+      '<td>' + spdKt + '</td></tr>';
+  }
+  html += '</tbody></table>';
+  el.innerHTML = html;
+}
+
+/* ── flight list click → fly to plane ── */
+function _liveListClick(idx) {
+  var s = _liveFiltered[idx];
+  if (!s || !_liveMap) return;
+  var lat = s[6], lon = s[5];
+  if (lat == null || lon == null) return;
+  _liveMap.flyTo([lat, lon], 8, { duration: 0.8 });
+  /* find marker and open popup */
+  _livePlaneLayer.eachLayer(function(layer) {
+    if (layer._oskyState === s) {
+      _liveShowPopup(layer);
+    }
+  });
 }
 
 /* ── popup info card ── */
 function _liveShowPopup(marker) {
   var s = marker._oskyState;
   var cs = (s[1] || '').trim();
-  var display = cs;
-  /* convert ICAO callsign to IATA */
-  for (var prefix in _livePrefixMap) {
-    if (cs.indexOf(prefix) === 0) {
-      display = _livePrefixMap[prefix] + cs.substring(prefix.length);
-      break;
-    }
-  }
+  var display = _liveDisplayName(cs);
   var baroFt = s[7] != null ? Math.round(s[7] * 3.28084).toLocaleString() + ' ft' : '—';
   var geoFt = s[13] != null ? Math.round(s[13] * 3.28084).toLocaleString() + ' ft' : '—';
   var spdKt = s[9] != null ? Math.round(s[9] * 1.94384) + ' kt' : '—';
@@ -164,6 +283,40 @@ function _liveShowPopup(marker) {
   marker.bindPopup(html, { className: 'live-popup-wrap', maxWidth: 250 }).openPopup();
 }
 
+/* ── toggle labels ── */
+function liveToggleLabels() {
+  _liveShowLabels = document.getElementById('live-f-labels').checked;
+  liveApplyFilter();
+}
+
+/* ── jump to airport ── */
+function liveJumpTo() {
+  var sel = document.getElementById('live-jump');
+  var val = sel.value;
+  if (!val || !_liveMap) return;
+  var parts = val.split(',');
+  var lat = parseFloat(parts[0]);
+  var lon = parseFloat(parts[1]);
+  var zoom = parseInt(parts[2], 10);
+  _liveMap.flyTo([lat, lon], zoom, { duration: 1 });
+  sel.value = '';
+}
+
+/* ── jump by ICAO code input ── */
+function liveJumpToIcao() {
+  var inp = document.getElementById('live-jump-input');
+  var code = (inp.value || '').trim().toUpperCase();
+  if (!code || !_liveMap) return;
+  var coords = _liveAirportDb[code];
+  if (coords) {
+    _liveMap.flyTo(coords, 10, { duration: 1 });
+    inp.value = '';
+  } else {
+    inp.style.borderColor = '#f44';
+    setTimeout(function() { inp.style.borderColor = ''; }, 1500);
+  }
+}
+
 /* ── sidebar toggle ── */
 function liveToggleSidebar() {
   var sb = document.getElementById('live-sidebar');
@@ -174,21 +327,29 @@ function liveToggleSidebar() {
 function _liveUpdateTogglePos() {
   var sb = document.getElementById('live-sidebar');
   var btn = document.getElementById('live-sidebar-toggle');
-  var isRight = sb.classList.contains('live-sidebar-right');
+  var isMobile = window.innerWidth < 640;
   var isCollapsed = sb.classList.contains('collapsed');
+  if (isMobile) {
+    btn.style.right = '';
+    btn.style.left = isCollapsed ? '6px' : '';
+    btn.style.display = isCollapsed ? '' : 'none';
+    return;
+  }
+  var isRight = sb.classList.contains('live-sidebar-right');
+  var sbWidth = 266;
   if (isRight) {
     btn.style.left = '';
-    btn.style.right = isCollapsed ? '6px' : '186px';
+    btn.style.right = isCollapsed ? '6px' : (sbWidth + 6) + 'px';
   } else {
     btn.style.right = '';
-    btn.style.left = isCollapsed ? '6px' : '186px';
+    btn.style.left = isCollapsed ? '6px' : (sbWidth + 6) + 'px';
   }
+  btn.style.display = '';
 }
 
 /* ── sidebar left/right switch ── */
 function liveSwitchSidebarPos() {
   var sb = document.getElementById('live-sidebar');
-  var btn = document.getElementById('live-sidebar-toggle');
   if (sb.classList.contains('live-sidebar-right')) {
     sb.classList.remove('live-sidebar-right');
     sb.classList.add('live-sidebar-left');
@@ -224,7 +385,8 @@ function _liveSaveSettings() {
     br: document.getElementById('live-f-br').checked,
     ci: document.getElementById('live-f-ci').checked,
     all: document.getElementById('live-f-all').checked,
-    custom: document.getElementById('live-f-custom').value
+    custom: document.getElementById('live-f-custom').value,
+    labels: document.getElementById('live-f-labels').checked
   };
   try {
     localStorage.setItem('crewsync_live_sb', pos);
@@ -243,6 +405,8 @@ function _liveRestoreSettings() {
       document.getElementById('live-f-ci').checked = !!f.ci;
       document.getElementById('live-f-all').checked = !!f.all;
       document.getElementById('live-f-custom').value = f.custom || '';
+      document.getElementById('live-f-labels').checked = !!f.labels;
+      _liveShowLabels = !!f.labels;
       if (f.all) liveToggleAll();
     }
   } catch (e) {}

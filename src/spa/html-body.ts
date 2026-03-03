@@ -226,31 +226,64 @@ export function getSpaHtmlBody(): string {
     <div id="live-map"></div>
     <button id="live-sidebar-toggle" class="live-toggle-btn" onclick="liveToggleSidebar()">☰</button>
     <div id="live-sidebar" class="live-sidebar live-sidebar-left">
+      <!-- header -->
       <div class="live-sb-header">
-        <span style="font-weight:700;font-size:.85em">Filter</span>
-        <button class="live-sb-pos-btn" onclick="liveSwitchSidebarPos()" title="Switch side">⇄</button>
+        <div id="live-count" style="font-weight:700;font-size:.8em"></div>
+        <div style="display:flex;gap:6px">
+          <button class="live-sb-pos-btn" onclick="liveSwitchSidebarPos()" title="Switch side">⇄</button>
+          <button class="live-sb-close-btn" onclick="liveToggleSidebar()" title="Close">✕</button>
+        </div>
       </div>
+      <!-- airline quick filter -->
       <div class="live-sb-section">
-        <label class="live-cb-label"><input type="checkbox" id="live-f-jx" checked onchange="liveApplyFilter()"><span>JX 星宇</span></label>
-        <label class="live-cb-label"><input type="checkbox" id="live-f-br" onchange="liveApplyFilter()"><span>BR 長榮</span></label>
-        <label class="live-cb-label"><input type="checkbox" id="live-f-ci" onchange="liveApplyFilter()"><span>CI 華航</span></label>
+        <div class="live-airline-row">
+          <label class="live-cb-label"><input type="checkbox" id="live-f-jx" checked onchange="liveApplyFilter()"><span>JX</span></label>
+          <label class="live-cb-label"><input type="checkbox" id="live-f-br" onchange="liveApplyFilter()"><span>BR</span></label>
+          <label class="live-cb-label"><input type="checkbox" id="live-f-ci" onchange="liveApplyFilter()"><span>CI</span></label>
+        </div>
+        <label class="live-cb-label" style="margin-top:4px"><input type="checkbox" id="live-f-all" onchange="liveToggleAll()"><span>All flights</span></label>
+        <div style="font-size:.65em;color:#f5a623;margin-top:1px;line-height:1.2;padding-left:21px">⚠ 顯示可視範圍，上限 500</div>
       </div>
-      <div class="live-sb-section">
-        <label class="live-cb-label"><input type="checkbox" id="live-f-all" onchange="liveToggleAll()"><span>All flights</span></label>
-        <div style="font-size:.7em;color:#f5a623;margin-top:2px;line-height:1.3">⚠ 資料量較大，載入較慢<br>Large dataset, slower loading</div>
+      <!-- custom prefix + labels -->
+      <div class="live-sb-section" style="display:flex;align-items:center;gap:6px">
+        <div style="font-size:.7em;color:var(--muted);white-space:nowrap">Prefix</div>
+        <input type="text" id="live-f-custom" class="live-custom-input" placeholder="UAL" onchange="liveApplyFilter()" style="width:60px;flex:none">
+        <label class="live-cb-label" style="margin-left:auto"><input type="checkbox" id="live-f-labels" onchange="liveToggleLabels()"><span>Labels</span></label>
       </div>
-      <div class="live-sb-section">
-        <div style="font-size:.75em;color:var(--muted);margin-bottom:4px">Custom callsign prefix</div>
-        <input type="text" id="live-f-custom" class="live-custom-input" placeholder="e.g. UAL, DAL" onchange="liveApplyFilter()">
+      <!-- jump to airport -->
+      <div class="live-sb-section" style="display:flex;align-items:center;gap:4px">
+        <select id="live-jump" class="live-jump-select" style="flex:1;min-width:0" onchange="liveJumpTo()">
+          <option value="">Jump to</option>
+          <option value="25.08,121.23,8">TPE</option>
+          <option value="22.57,120.35,10">KHH</option>
+          <option value="35.76,140.39,8">NRT</option>
+          <option value="34.43,135.24,10">KIX</option>
+          <option value="42.77,141.69,10">CTS</option>
+          <option value="22.31,113.91,10">HKG</option>
+          <option value="1.36,103.99,10">SIN</option>
+          <option value="13.69,100.75,10">BKK</option>
+          <option value="33.94,-118.41,8">LAX</option>
+          <option value="37.62,-122.38,10">SFO</option>
+          <option value="47.45,-122.31,10">SEA</option>
+          <option value="33.43,-112.01,10">PHX</option>
+          <option value="25.0,121.5,5">Asia</option>
+          <option value="40.0,-100.0,4">USA</option>
+          <option value="50.0,10.0,4">Europe</option>
+          <option value="0,0,2">World</option>
+        </select>
+        <input type="text" id="live-jump-input" class="live-custom-input" placeholder="ICAO" style="width:56px;flex:none" onkeydown="if(event.key==='Enter')liveJumpToIcao()">
+        <button class="live-sb-pos-btn" onclick="liveJumpToIcao()" style="padding:4px 6px;font-size:.72em">Go</button>
       </div>
+      <!-- refresh -->
       <button class="live-refresh-btn" onclick="liveFetchData()">↻ Refresh</button>
-      <div id="live-count" style="font-size:.72em;color:var(--muted);margin-top:8px;text-align:center"></div>
-      <div style="font-size:.65em;margin-top:12px;line-height:1.4;border-top:1px solid rgba(255,255,255,.08);padding-top:8px">
-        <span style="color:#f5a623">⚠ 需手動按 Refresh 更新資料<br>
-        Manual refresh required</span><br><br>
-        <span style="color:var(--muted)">僅顯示即時位置，無起訖地資訊<br>
-        Real-time position only, no route info</span>
+      <!-- notes -->
+      <div style="font-size:.6em;margin-top:8px;line-height:1.3">
+        <span style="color:#f5a623">⚠ 需手動 Refresh</span><br>
+        <span style="color:var(--muted)">僅即時位置，無起訖地資訊</span>
       </div>
+      <!-- flight list -->
+      <div class="live-list-header">Flights</div>
+      <div id="live-flight-list" class="live-flight-list"></div>
     </div>
   </div>
 
@@ -930,7 +963,7 @@ export function getSpaHtmlBody(): string {
       <button class="tab-util-btn tab-install-btn" id="tab-install-btn" onclick="showInstallGuide()" style="display:none">
         <span>📲</span>安裝
       </button>
-      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V5.400</span>
+      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V5.401</span>
     </div>
   </div>
 </div>
@@ -960,15 +993,15 @@ export function getSpaHtmlBody(): string {
       <div style="margin-bottom:4px">📱 建議使用 <b>iPad 橫向</b>操作以獲得最佳體驗</div>
       <div style="color:var(--muted)">Best experience on iPad in landscape mode</div>
     </div>
-    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V5.400</div>
+    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V5.401</div>
+    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
+      <div>Live Radar 側邊欄改版：航班列表、標籤切換、機場跳轉、手機全螢幕覆蓋</div>
+      <div>Live Radar sidebar redesign: flight list, labels toggle, airport jump, mobile full-screen overlay</div>
+    </div>
+    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V5.400</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
       <div>新增 Briefing → 📡 Live 即時航班雷達（Leaflet + OpenSky Network）</div>
       <div>Added Live Radar subtab in Briefing (Leaflet + OpenSky Network)</div>
-    </div>
-    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V5.311</div>
-    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
-      <div>修正手機版 Calendar header 被 subtabs 遮住的問題</div>
-      <div>Fix mobile Calendar header hidden behind subtabs</div>
     </div>
     <button class="install-close-btn" onclick="closeAbout()">關閉</button>
   </div>
