@@ -181,8 +181,11 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
 @media(max-width:767px){
   .gcal-view-bar{display:none!important}
   .gcal-view-select{display:block}
+  .gcal-main{overflow-y:auto!important}
   .gcal-header{position:sticky;top:0;z-index:10;background:var(--bg)}
   .gcal-title{position:static;transform:none;pointer-events:auto}
+  .gcal-grid{overflow:visible!important}
+  .gcal-sch-list{overflow:visible!important}
 }
 .gcal-weekdays{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));text-align:center;flex-shrink:0;
   border-bottom:1px solid var(--dim)}
