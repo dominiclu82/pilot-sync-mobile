@@ -188,12 +188,11 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
   html:has(#tab-sync.tab-active) body{overflow:hidden;height:100dvh}
   #tab-sync.tab-active{display:flex;flex-direction:column;
     align-items:stretch;justify-content:flex-start;
-    height:calc(100dvh - calc(56px + env(safe-area-inset-bottom,0px)));
+    height:calc(100dvh - 56px - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px));
     min-height:unset;overflow:hidden;padding:0}
   .roster-subtabs{flex-shrink:0}
-  .roster-panel.active{flex:1;min-height:0}
-  #roster-crew.active{justify-content:flex-start;
-    overflow-y:auto;-webkit-overflow-scrolling:touch}
+  .roster-panel.active{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;min-height:0}
+  #roster-crew.active{justify-content:flex-start}
   #roster-cal.active{overflow:hidden}
 }
 .gcal-weekdays{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));text-align:center;flex-shrink:0;
