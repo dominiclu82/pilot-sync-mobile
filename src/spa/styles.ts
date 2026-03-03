@@ -417,6 +417,9 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
 .live-popup-table{width:100%;border-collapse:collapse}
 .live-popup-table td{padding:2px 0;border-bottom:1px solid var(--dim)}
 .live-popup-table td:first-child{color:var(--muted);padding-right:10px;white-space:nowrap}
+.live-portrait-overlay{position:absolute;inset:0;z-index:9999;
+  background:rgba(10,14,26,.96);display:flex;flex-direction:column;
+  align-items:center;justify-content:center;color:#e8eaed;text-align:center}
 @media(max-width:639px){
   .live-sidebar{width:100%!important;border:none!important;overflow-y:auto}
   .live-sidebar-left,.live-sidebar-right{left:0;right:0}

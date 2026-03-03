@@ -47,19 +47,54 @@ var _liveAirportDb = {
 };
 
 /* ── lock/unlock landscape ── */
+var _liveLandscapeLocked = false;
+var _livePortraitListening = false;
 function _liveLockLandscape() {
-  try {
-    if (screen.orientation && screen.orientation.lock) {
-      screen.orientation.lock('landscape').catch(function() {});
-    }
-  } catch (e) {}
+  if (window.innerWidth >= 640) return;
+  if (screen.orientation && screen.orientation.lock) {
+    screen.orientation.lock('landscape').then(function() {
+      _liveLandscapeLocked = true;
+      _liveHidePortraitOverlay();
+    }).catch(function() {
+      _liveStartPortraitDetect();
+    });
+  } else {
+    _liveStartPortraitDetect();
+  }
 }
 function _liveUnlockOrientation() {
-  try {
-    if (screen.orientation && screen.orientation.unlock) {
-      screen.orientation.unlock();
-    }
-  } catch (e) {}
+  if (_liveLandscapeLocked) {
+    try {
+      if (screen.orientation && screen.orientation.unlock) {
+        screen.orientation.unlock();
+      }
+    } catch (e) {}
+    _liveLandscapeLocked = false;
+  }
+  _liveHidePortraitOverlay();
+}
+function _liveStartPortraitDetect() {
+  _liveCheckPortrait();
+  if (!_livePortraitListening) {
+    _livePortraitListening = true;
+    window.addEventListener('resize', _liveCheckPortrait);
+  }
+}
+function _liveCheckPortrait() {
+  var overlay = document.getElementById('live-portrait-overlay');
+  if (!overlay) return;
+  var isLive = document.getElementById('briefing-live') &&
+    document.getElementById('briefing-live').classList.contains('active');
+  if (!isLive) { overlay.style.display = 'none'; return; }
+  if (window.innerWidth < 640 && window.innerHeight > window.innerWidth) {
+    overlay.style.display = 'flex';
+  } else {
+    overlay.style.display = 'none';
+  }
+}
+function _liveHidePortraitOverlay() {
+  var overlay = document.getElementById('live-portrait-overlay');
+  if (overlay) overlay.style.display = 'none';
 }
 
 /* ── init ── */
