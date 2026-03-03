@@ -494,14 +494,6 @@ html:has(#tab-briefing.tab-active #briefing-coldtemp.active) #tab-briefing.tab-a
 /* ── Duty Time ── */
 .dt-wrap{display:flex;flex-direction:column;flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:none}
 .dt-wrap>*{flex-shrink:0}
-.dt-lock-overlay{position:absolute;inset:0;z-index:50;background:var(--bg);display:flex;align-items:center;justify-content:center;padding:24px}
-.dt-lock-card{background:var(--card);border-radius:16px;padding:28px 24px;width:100%;max-width:320px;text-align:center;box-shadow:0 4px 24px rgba(0,0,0,.25)}
-.dt-lock-icon{font-size:2.5em;margin-bottom:10px}
-.dt-lock-title{font-size:1em;font-weight:800;color:var(--text);margin-bottom:4px}
-.dt-lock-sub{font-size:.75em;color:var(--muted);margin-bottom:18px}
-.dt-lock-input{width:100%;padding:12px;text-align:center;font-size:1.2em;letter-spacing:.2em;background:var(--surface);border:1.5px solid var(--dim);border-radius:10px;color:var(--text);margin-bottom:12px;box-sizing:border-box}
-.dt-lock-btn{width:100%;padding:12px;border-radius:10px;border:none;background:var(--accent);color:#fff;font-size:.95em;font-weight:800;cursor:pointer}
-.dt-lock-err{font-size:.78em;color:#ef4444;margin-top:8px;min-height:1.2em}
 .dt-config{background:var(--card);border-bottom:1px solid var(--dim);padding:10px 14px 8px}
 .dt-section-title{font-size:.68em;font-weight:800;color:var(--muted);letter-spacing:.08em;text-transform:uppercase;margin-bottom:6px}
 .dt-crew-row{display:flex;gap:5px;margin-bottom:8px}

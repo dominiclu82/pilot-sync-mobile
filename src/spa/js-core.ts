@@ -528,10 +528,6 @@ function switchBriefingTab(panel, btn) {
     var ifr = document.getElementById('hf-panel-iframe');
     if (ifr && !ifr.getAttribute('src')) ifr.src = '/api/pacific-hf';
   }
-  if (panel === 'duty' && !dtUnlocked) {
-    document.getElementById('dt-lock-overlay').style.display = 'flex';
-    setTimeout(function(){ document.getElementById('dt-lock-pw').focus(); }, 100);
-  }
   if (panel === 'pa') {
     paStartTzTimer();
   }
@@ -542,21 +538,6 @@ function switchBriefingTab(panel, btn) {
   }
 }
 
-// ── Duty Time 密碼鎖 ──────────────────────────────────────────────────────────
-var dtUnlocked = false;
-function dtUnlock() {
-  var pw = document.getElementById('dt-lock-pw').value;
-  if (pw === '12345678') {
-    dtUnlocked = true;
-    document.getElementById('dt-lock-overlay').style.display = 'none';
-    document.getElementById('dt-lock-pw').value = '';
-    document.getElementById('dt-lock-err').textContent = '';
-  } else {
-    document.getElementById('dt-lock-err').textContent = '密碼錯誤，請再試一次';
-    document.getElementById('dt-lock-pw').value = '';
-    document.getElementById('dt-lock-pw').focus();
-  }
-}
 
 // ── 工具連結內嵌 iframe ────────────────────────────────────────────────────────
 function loadTool(e, anchor, mode) {
