@@ -249,12 +249,13 @@ export function getSpaHtmlBody(): string {
         <label class="live-cb-label" style="margin-top:4px"><input type="checkbox" id="live-f-all" onchange="liveToggleAll()"><span>All flights</span></label>
         <div style="font-size:.65em;color:#f5a623;margin-top:1px;line-height:1.2;padding-left:21px">⚠ 顯示可視範圍，上限 500</div>
       </div>
-      <!-- custom prefix + labels -->
+      <!-- custom prefix / flight search + labels -->
       <div class="live-sb-section" style="display:flex;align-items:center;gap:6px">
-        <div style="font-size:.7em;color:var(--muted);white-space:nowrap">Prefix</div>
-        <input type="text" id="live-f-custom" class="live-custom-input" placeholder="UAL" onchange="liveApplyFilter()" style="width:60px;flex:none">
+        <div style="font-size:.7em;color:var(--muted);white-space:nowrap">Search</div>
+        <input type="text" id="live-f-custom" class="live-custom-input" placeholder="JX / JX800" onchange="liveApplyFilter()" onkeydown="if(event.key==='Enter')liveSearchFlight()" style="width:72px;flex:none">
         <label class="live-cb-label" style="margin-left:auto"><input type="checkbox" id="live-f-labels" onchange="liveToggleLabels()"><span>Labels</span></label>
       </div>
+      <div id="live-search-msg" style="font-size:.6em;color:#f87171;min-height:.8em;line-height:1.2"></div>
       <!-- jump to airport -->
       <div class="live-sb-section" style="display:flex;align-items:center;gap:4px">
         <select id="live-jump" class="live-jump-select" style="flex:1;min-width:0" onchange="liveJumpTo()">
@@ -954,7 +955,7 @@ export function getSpaHtmlBody(): string {
       <button class="tab-util-btn tab-install-btn" id="tab-install-btn" onclick="showInstallGuide()" style="display:none">
         <span>📲</span>安裝
       </button>
-      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V6.002</span>
+      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V6.003</span>
     </div>
   </div>
 </div>
@@ -984,15 +985,15 @@ export function getSpaHtmlBody(): string {
       <div style="margin-bottom:4px">📱 建議使用 <b>iPad 橫向</b>操作以獲得最佳體驗</div>
       <div style="color:var(--muted)">Best experience on iPad in landscape mode</div>
     </div>
-    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V6.002</div>
+    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V6.003</div>
+    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
+      <div>Live Radar 航班搜尋：輸入航班號（如 JX800）按 Enter 跳轉定位</div>
+      <div>Flight search: enter flight number (e.g. JX800) + Enter to locate</div>
+    </div>
+    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V6.002</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
       <div>Live Radar 狀態列格式修正（剩餘額度顯示）</div>
       <div>Fixed status bar format (remaining credits display)</div>
-    </div>
-    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V6.001</div>
-    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
-      <div>Live Radar 自動刷新（10 秒）+ 飛機插值滑動 + OAuth2 認證（4,000 credits/天）</div>
-      <div>Auto-refresh (10s) with smooth interpolation + OAuth2 auth (4,000 credits/day)</div>
     </div>
     <button class="install-close-btn" onclick="closeAbout()">關閉</button>
   </div>

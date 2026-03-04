@@ -445,6 +445,57 @@ function liveToggleLabels() {
   liveApplyFilter();
 }
 
+/* ── search flight by number ── */
+function liveSearchFlight() {
+  var msgEl = document.getElementById('live-search-msg');
+  if (msgEl) msgEl.textContent = '';
+  var raw = (document.getElementById('live-f-custom').value || '').trim().toUpperCase();
+  if (!raw) return;
+  /* check if input contains digits → specific flight search */
+  var hasDigit = /\d/.test(raw);
+  if (!hasDigit) {
+    /* just a prefix — apply filter normally */
+    liveApplyFilter();
+    return;
+  }
+  /* extract prefix (letters) and number */
+  var match = raw.match(/^([A-Z]{2,3})(\d+.*)$/);
+  if (!match) { liveApplyFilter(); return; }
+  var iataPrefix = match[1];
+  var flightNum = match[2];
+  /* convert IATA to ICAO if needed */
+  var icaoPrefix = _liveIataToIcao[iataPrefix] || iataPrefix;
+  var searchCallsign = icaoPrefix + flightNum;
+  var displayName = iataPrefix + flightNum;
+  /* set the prefix input to just the airline code for filtering */
+  document.getElementById('live-f-custom').value = iataPrefix;
+  liveApplyFilter();
+  /* now search for the specific flight in _liveStates */
+  var found = null;
+  for (var i = 0; i < _liveStates.length; i++) {
+    var cs = (_liveStates[i][1] || '').trim();
+    if (cs === searchCallsign || cs === searchCallsign + ' ') {
+      found = _liveStates[i];
+      break;
+    }
+  }
+  if (found) {
+    var lat = found[6], lon = found[5];
+    if (lat != null && lon != null) {
+      _liveMap.flyTo([lat, lon], 8, { duration: 0.8 });
+      /* find marker and open popup */
+      _livePlaneLayer.eachLayer(function(layer) {
+        if (layer._oskyState === found) _liveShowPopup(layer);
+      });
+    }
+  } else {
+    if (msgEl) msgEl.textContent = '⚠ ' + displayName + ' 無此航班 Not found';
+    setTimeout(function() { if (msgEl) msgEl.textContent = ''; }, 5000);
+  }
+  /* restore full flight number in input for reference */
+  document.getElementById('live-f-custom').value = raw;
+}
+
 /* ── jump to airport ── */
 function liveJumpTo() {
   var sel = document.getElementById('live-jump');
