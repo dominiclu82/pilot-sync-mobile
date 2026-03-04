@@ -234,34 +234,63 @@ app.get('/api/fids', async (req, res) => {
   }
 });
 
-// ── OpenSky Network proxy ─────────────────────────────────────────────────────
-let _oskyCache: { ts: number; data: any } = { ts: 0, data: null };
+// ── OpenSky Network proxy (OAuth2) ────────────────────────────────────────────
+let _oskyCache: { ts: number; data: any; remaining: number | null } = { ts: 0, data: null, remaining: null };
+let _oskyToken: { token: string; expires: number } = { token: '', expires: 0 };
+
+async function _oskyGetToken(): Promise<string> {
+  const now = Date.now();
+  if (_oskyToken.token && now < _oskyToken.expires - 60000) return _oskyToken.token;
+  const cid = process.env.OPENSKY_CLIENT_ID;
+  const csec = process.env.OPENSKY_CLIENT_SECRET;
+  if (!cid || !csec) return '';
+  try {
+    const r = await fetch('https://auth.opensky-network.org/auth/realms/opensky-network/protocol/openid-connect/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: `grant_type=client_credentials&client_id=${encodeURIComponent(cid)}&client_secret=${encodeURIComponent(csec)}`
+    });
+    if (!r.ok) { console.error('OpenSky token error:', r.status); return ''; }
+    const d = await r.json();
+    _oskyToken = { token: d.access_token, expires: now + (d.expires_in || 1800) * 1000 };
+    return _oskyToken.token;
+  } catch (e: any) { console.error('OpenSky token fetch error:', e.message); return ''; }
+}
+
 app.get('/api/opensky', async (req, res) => {
   try {
     const now = Date.now();
-    const { lamin, lomin, lamax, lomax } = req.query;
-    // server-side 10s cache
-    if (_oskyCache.data && now - _oskyCache.ts < 10000) {
-      res.json(_oskyCache.data);
+    // server-side 8s cache (slightly less than 10s refresh interval)
+    if (_oskyCache.data && now - _oskyCache.ts < 8000) {
+      res.json({ ..._oskyCache.data, _remaining: _oskyCache.remaining });
       return;
     }
     let url = 'https://opensky-network.org/api/states/all';
+    const { lamin, lomin, lamax, lomax } = req.query;
     const params: string[] = [];
     if (lamin) params.push(`lamin=${lamin}`);
     if (lomin) params.push(`lomin=${lomin}`);
     if (lamax) params.push(`lamax=${lamax}`);
     if (lomax) params.push(`lomax=${lomax}`);
     if (params.length) url += '?' + params.join('&');
-    const r = await fetch(url, {
-      headers: { 'User-Agent': 'CrewSync/1.0' }
-    });
+    const headers: Record<string, string> = { 'User-Agent': 'CrewSync/1.0' };
+    const token = await _oskyGetToken();
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+    const r = await fetch(url, { headers });
+    const remaining = r.headers.get('x-rate-limit-remaining');
+    const remainNum = remaining != null ? parseInt(remaining, 10) : null;
     if (!r.ok) {
+      if (r.status === 429) {
+        const retryAfter = r.headers.get('x-rate-limit-retry-after-seconds');
+        res.status(429).json({ error: 'rate_limit', retryAfter: retryAfter ? parseInt(retryAfter, 10) : null, _remaining: 0 });
+        return;
+      }
       res.status(502).json({ error: `OpenSky returned ${r.status}` });
       return;
     }
     const data = await r.json();
-    _oskyCache = { ts: now, data };
-    res.json(data);
+    _oskyCache = { ts: now, data, remaining: remainNum };
+    res.json({ ...data, _remaining: remainNum });
   } catch (e: any) {
     console.error('OpenSky proxy error:', e.message);
     res.status(502).json({ error: e.message });

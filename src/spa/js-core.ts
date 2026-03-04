@@ -291,6 +291,7 @@ function switchTab(tab, btn) {
     loadGateFlights();
   }
   if (typeof _liveUnlockOrientation === 'function') _liveUnlockOrientation();
+  if (typeof liveStopAll === 'function') liveStopAll();
   window.scrollTo(0, 0);
 }
 
@@ -535,6 +536,7 @@ function switchBriefingTab(panel, btn) {
     liveInit();
   } else {
     if (typeof _liveUnlockOrientation === 'function') _liveUnlockOrientation();
+    if (typeof liveStopAll === 'function') liveStopAll();
   }
 }
 

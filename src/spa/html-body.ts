@@ -280,12 +280,13 @@ export function getSpaHtmlBody(): string {
         <button class="live-sb-pos-btn" onclick="liveJumpToIcao()" style="padding:4px 6px;font-size:.72em">Go</button>
       </div>
       <!-- refresh -->
-      <button class="live-refresh-btn" onclick="liveFetchData()">↻ Refresh</button>
-      <!-- notes -->
-      <div style="font-size:.6em;margin-top:8px;line-height:1.3">
-        <span style="color:#f5a623">⚠ 需手動 Refresh</span><br>
-        <span style="color:var(--muted)">僅即時位置，無起訖地資訊</span>
+      <button id="live-refresh-btn" class="live-refresh-btn" onclick="liveManualRefresh()">↻ Refresh</button>
+      <!-- status -->
+      <div id="live-status" style="font-size:.6em;margin-top:6px;line-height:1.3">
+        <span id="live-auto-status" style="color:#4ade80">🟢 Auto 10s</span>
+        <span id="live-credits" style="color:var(--muted);margin-left:6px"></span>
       </div>
+      <div style="font-size:.6em;margin-top:2px;color:var(--muted)">僅即時位置，無起訖地資訊</div>
       <!-- flight list -->
       <div class="live-list-header">Flights</div>
       <div id="live-flight-list" class="live-flight-list"></div>
@@ -956,7 +957,7 @@ export function getSpaHtmlBody(): string {
       <button class="tab-util-btn tab-install-btn" id="tab-install-btn" onclick="showInstallGuide()" style="display:none">
         <span>📲</span>安裝
       </button>
-      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V6.000</span>
+      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V6.001</span>
     </div>
   </div>
 </div>
@@ -986,15 +987,15 @@ export function getSpaHtmlBody(): string {
       <div style="margin-bottom:4px">📱 建議使用 <b>iPad 橫向</b>操作以獲得最佳體驗</div>
       <div style="color:var(--muted)">Best experience on iPad in landscape mode</div>
     </div>
-    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V6.000</div>
+    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V6.001</div>
+    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
+      <div>Live Radar 自動刷新（10 秒）+ 飛機插值滑動 + OAuth2 認證（4,000 credits/天）</div>
+      <div>Auto-refresh (10s) with smooth interpolation + OAuth2 auth (4,000 credits/day)</div>
+    </div>
+    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V6.000</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
       <div>Duty Time Calculator 正式開放，移除密碼鎖</div>
       <div>Duty Time Calculator officially released, password lock removed</div>
-    </div>
-    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V5.405</div>
-    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
-      <div>Live Radar 側邊欄高度修正（iPad Safari 裁切）</div>
-      <div>Fixed sidebar clipping on iPad Safari</div>
     </div>
     <button class="install-close-btn" onclick="closeAbout()">關閉</button>
   </div>

@@ -7,6 +7,16 @@ var _liveFiltered = [];
 var _liveInited = false;
 var _liveShowLabels = false;
 
+/* auto-refresh & interpolation */
+var _liveAutoInterval = null;
+var _liveCountdown = 10;
+var _liveCountdownInterval = null;
+var _liveInterpInterval = null;
+var _liveRateLimited = false;
+var _liveLastFetchTime = 0;
+var LIVE_REFRESH_SEC = 10;
+var LIVE_INTERP_MS = 1000;
+
 /* callsign prefix → IATA mapping */
 var _livePrefixMap = { SJX: 'JX', EVA: 'BR', CAL: 'CI' };
 var _liveIataToIcao = { JX: 'SJX', BR: 'EVA', CI: 'CAL' };
@@ -102,6 +112,7 @@ function liveInit() {
   _liveLockLandscape();
   if (_liveInited) {
     if (_liveMap) _liveMap.invalidateSize();
+    _liveStartAuto();
     return;
   }
   _liveInited = true;
@@ -136,8 +147,9 @@ function liveInit() {
   _liveRestoreSettings();
   _liveUpdateTogglePos();
 
-  /* first fetch */
+  /* first fetch + start auto-refresh */
   liveFetchData();
+  _liveStartAuto();
 }
 
 /* ── fetch data ── */
@@ -145,18 +157,111 @@ function liveFetchData() {
   var countEl = document.getElementById('live-count');
   if (countEl) countEl.textContent = 'Loading...';
   fetch('/api/opensky')
-    .then(function(r) { return r.json(); })
+    .then(function(r) {
+      if (r.status === 429) return r.json().then(function(d) { d._httpStatus = 429; return d; });
+      return r.json();
+    })
     .then(function(data) {
+      if (data._httpStatus === 429 || data.error === 'rate_limit') {
+        _liveRateLimited = true;
+        _liveStopAuto();
+        _liveUpdateStatus();
+        return;
+      }
       if (data.error) {
         if (countEl) countEl.textContent = 'Error: ' + data.error;
         return;
       }
+      _liveRateLimited = false;
+      _liveLastFetchTime = Date.now();
       _liveStates = data.states || [];
+      /* update credits display */
+      if (data._remaining != null) {
+        var credEl = document.getElementById('live-credits');
+        if (credEl) credEl.textContent = data._remaining.toLocaleString() + ' credits';
+      }
       liveApplyFilter();
     })
-    .catch(function(e) {
+    .catch(function() {
       if (countEl) countEl.textContent = 'Fetch error';
     });
+}
+
+/* ── manual refresh (button click) ── */
+function liveManualRefresh() {
+  _liveCountdown = LIVE_REFRESH_SEC;
+  liveFetchData();
+}
+
+/* ── auto-refresh start/stop ── */
+function _liveStartAuto() {
+  _liveStopAuto();
+  if (_liveRateLimited) return;
+  _liveCountdown = LIVE_REFRESH_SEC;
+  _liveUpdateStatus();
+  /* countdown tick every 1s */
+  _liveCountdownInterval = setInterval(function() {
+    _liveCountdown--;
+    if (_liveCountdown <= 0) {
+      _liveCountdown = LIVE_REFRESH_SEC;
+      liveFetchData();
+    }
+    _liveUpdateStatus();
+  }, 1000);
+  /* interpolation tick */
+  _liveInterpInterval = setInterval(_liveInterpolate, LIVE_INTERP_MS);
+}
+
+function _liveStopAuto() {
+  if (_liveCountdownInterval) { clearInterval(_liveCountdownInterval); _liveCountdownInterval = null; }
+  if (_liveInterpInterval) { clearInterval(_liveInterpInterval); _liveInterpInterval = null; }
+}
+
+function liveStopAll() {
+  _liveStopAuto();
+}
+
+/* ── status display ── */
+function _liveUpdateStatus() {
+  var statusEl = document.getElementById('live-auto-status');
+  if (!statusEl) return;
+  if (_liveRateLimited) {
+    statusEl.innerHTML = '<span style="color:#f87171">🔴 額度已滿 Daily limit reached</span>';
+  } else {
+    statusEl.innerHTML = '<span style="color:#4ade80">🟢 Auto ' + _liveCountdown + 's</span>';
+  }
+}
+
+/* ── interpolation: move planes between API refreshes ── */
+function _liveInterpolate() {
+  if (!_liveMap || _liveRateLimited) return;
+  var elapsed = (Date.now() - _liveLastFetchTime) / 1000;
+  _livePlaneLayer.eachLayer(function(marker) {
+    var s = marker._oskyState;
+    if (!s || s[8]) return; /* skip if on ground */
+    var lat0 = s[6], lon0 = s[5];
+    var spd = s[9]; /* m/s */
+    var hdg = s[10]; /* degrees */
+    if (lat0 == null || lon0 == null || spd == null || hdg == null || spd < 10) return;
+    var dist = spd * elapsed; /* meters */
+    var R = 6371000;
+    var brng = hdg * Math.PI / 180;
+    var lat1 = lat0 * Math.PI / 180;
+    var lon1 = lon0 * Math.PI / 180;
+    var lat2 = Math.asin(Math.sin(lat1) * Math.cos(dist / R) + Math.cos(lat1) * Math.sin(dist / R) * Math.cos(brng));
+    var lon2 = lon1 + Math.atan2(Math.sin(brng) * Math.sin(dist / R) * Math.cos(lat1), Math.cos(dist / R) - Math.sin(lat1) * Math.sin(lat2));
+    var newLat = lat2 * 180 / Math.PI;
+    var newLon = lon2 * 180 / Math.PI;
+    marker.setLatLng([newLat, newLon]);
+  });
+  /* also move labels */
+  if (_liveShowLabels) {
+    var labelLayers = _liveLabelLayer.getLayers();
+    var planeLayers = _livePlaneLayer.getLayers();
+    for (var i = 0; i < labelLayers.length && i < planeLayers.length; i++) {
+      labelLayers[i].setLatLng(planeLayers[i].getLatLng());
+    }
+  }
 }
 
 /* ── convert callsign to display name ── */
