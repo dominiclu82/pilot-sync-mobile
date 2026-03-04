@@ -405,6 +405,45 @@ function _fr24ShowPopup(marker) {
 
   marker.unbindPopup();
   marker.bindPopup(html, { className: 'live-popup-wrap', maxWidth: 260 }).openPopup();
+
+  /* fetch flight details for ETA */
+  if (f.id) {
+    fetch('/api/fr24/detail?id=' + encodeURIComponent(f.id))
+      .then(function(r) { return r.ok ? r.json() : null; })
+      .then(function(d) {
+        if (!d || !marker.getPopup() || !marker.getPopup().isOpen()) return;
+        var eta = '';
+        if (d.time && d.time.estimated && d.time.estimated.arrival) {
+          var ts = d.time.estimated.arrival;
+          var dt = new Date(ts * 1000);
+          eta = dt.getUTCFullYear() > 1970 ? dt.toISOString().substring(11, 16) + ' UTC' : '';
+        }
+        if (!eta && d.time && d.time.scheduled && d.time.scheduled.arrival) {
+          var ts2 = d.time.scheduled.arrival;
+          var dt2 = new Date(ts2 * 1000);
+          eta = dt2.getUTCFullYear() > 1970 ? dt2.toISOString().substring(11, 16) + ' UTC (sched)' : '';
+        }
+        var origName = (d.airport && d.airport.origin && d.airport.origin.name) || '';
+        var destName = (d.airport && d.airport.destination && d.airport.destination.name) || '';
+        var airline = (d.airline && d.airline.name) || '';
+        var extra = '';
+        if (airline) extra += '<tr><td>Airline</td><td>' + airline + '</td></tr>';
+        if (origName) extra += '<tr><td>Origin</td><td>' + origName + '</td></tr>';
+        if (destName) extra += '<tr><td>Dest</td><td>' + destName + '</td></tr>';
+        if (eta) extra += '<tr><td>ETA</td><td>' + eta + '</td></tr>';
+        if (extra) {
+          var el = marker.getPopup().getElement();
+          if (el) {
+            var tbl = el.querySelector('.live-popup-table');
+            if (tbl) {
+              var tbody = tbl.querySelector('tbody') || tbl;
+              tbody.insertAdjacentHTML('afterbegin', extra);
+            }
+          }
+        }
+      })
+      .catch(function() {});
+  }
 }
 
 /* ── toggle labels ── */

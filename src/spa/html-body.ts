@@ -350,7 +350,7 @@ export function getSpaHtmlBody(): string {
       </div>
       <button id="fr24-refresh-btn" class="live-refresh-btn" onclick="fr24ManualRefresh()">↻ Refresh</button>
       <div id="fr24-status" style="font-size:.6em;margin-top:6px;line-height:1.3"></div>
-      <div style="font-size:.55em;margin-top:2px;color:var(--muted);opacity:.6">非官方資料源，可能隨時失效</div>
+      <div style="font-size:.55em;margin-top:2px;color:var(--muted);opacity:.6">非FR24官方資料源，可能隨時失效</div>
       <div class="live-list-header">Flights</div>
       <div id="fr24-flight-list" class="live-flight-list"></div>
     </div>
@@ -1020,7 +1020,7 @@ export function getSpaHtmlBody(): string {
       <button class="tab-util-btn tab-install-btn" id="tab-install-btn" onclick="showInstallGuide()" style="display:none">
         <span>📲</span>安裝
       </button>
-      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V6.006</span>
+      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V6.007</span>
     </div>
   </div>
 </div>
@@ -1050,15 +1050,17 @@ export function getSpaHtmlBody(): string {
       <div style="margin-bottom:4px">📱 建議使用 <b>iPad 橫向</b>操作以獲得最佳體驗</div>
       <div style="color:var(--muted)">Best experience on iPad in landscape mode</div>
     </div>
-    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V6.006</div>
+    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V6.007</div>
+    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
+      <div>修復 FR24 checkbox/搜尋欄無法互動、地圖飛機不顯示</div>
+      <div>FR24 資訊卡新增 Airline、起訖機場名稱、ETA</div>
+      <div>Fix FR24 sidebar interaction &amp; missing aircraft on map</div>
+      <div>FR24 info card: add Airline, airport names, ETA</div>
+    </div>
+    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V6.006</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
       <div>新增 ✈️ FR24 subtab（FlightRadar24 非官方資料源，含起訖地、機型）</div>
       <div>Added FR24 subtab (unofficial FlightRadar24 data with origin/destination, aircraft type)</div>
-    </div>
-    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V6.005</div>
-    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
-      <div>Live Radar 自動刷新間隔調整為 15 秒</div>
-      <div>Auto-refresh interval changed to 15 seconds</div>
     </div>
     <button class="install-close-btn" onclick="closeAbout()">關閉</button>
   </div>
