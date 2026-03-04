@@ -567,6 +567,7 @@ function _fr24GreatCircle(lat1d, lon1d, lat2d, lon2d, n) {
   ));
   if (d < 1e-10) return [[lat1d, lon1d], [lat2d, lon2d]];
   var pts = [];
+  var prevLon = null;
   for (var i = 0; i <= n; i++) {
     var f = i / n;
     var A = Math.sin((1 - f) * d) / Math.sin(d);
@@ -574,7 +575,15 @@ function _fr24GreatCircle(lat1d, lon1d, lat2d, lon2d, n) {
     var x = A * Math.cos(lat1) * Math.cos(lon1) + B * Math.cos(lat2) * Math.cos(lon2);
     var y = A * Math.cos(lat1) * Math.sin(lon1) + B * Math.cos(lat2) * Math.sin(lon2);
     var z = A * Math.sin(lat1) + B * Math.sin(lat2);
-    pts.push([Math.atan2(z, Math.sqrt(x * x + y * y)) * toDeg, Math.atan2(y, x) * toDeg]);
+    var lat = Math.atan2(z, Math.sqrt(x * x + y * y)) * toDeg;
+    var lon = Math.atan2(y, x) * toDeg;
+    /* keep longitude continuous across antimeridian */
+    if (prevLon !== null) {
+      while (lon - prevLon > 180) lon -= 360;
+      while (lon - prevLon < -180) lon += 360;
+    }
+    prevLon = lon;
+    pts.push([lat, lon]);
   }
   return pts;
 }
