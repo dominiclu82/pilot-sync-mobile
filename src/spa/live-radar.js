@@ -14,6 +14,7 @@ var _liveCountdownInterval = null;
 var _liveInterpInterval = null;
 var _liveRateLimited = false;
 var _liveLastFetchTime = 0;
+var _liveCreditsRemaining = null;
 var LIVE_REFRESH_SEC = 10;
 var LIVE_INTERP_MS = 1000;
 
@@ -175,11 +176,8 @@ function liveFetchData() {
       _liveRateLimited = false;
       _liveLastFetchTime = Date.now();
       _liveStates = data.states || [];
-      /* update credits display */
-      if (data._remaining != null) {
-        var credEl = document.getElementById('live-credits');
-        if (credEl) credEl.textContent = data._remaining.toLocaleString() + ' credits';
-      }
+      if (data._remaining != null) _liveCreditsRemaining = data._remaining;
+      _liveUpdateStatus();
       liveApplyFilter();
     })
     .catch(function() {
@@ -223,12 +221,13 @@ function liveStopAll() {
 
 /* ── status display ── */
 function _liveUpdateStatus() {
-  var statusEl = document.getElementById('live-auto-status');
-  if (!statusEl) return;
+  var el = document.getElementById('live-status');
+  if (!el) return;
+  var cred = _liveCreditsRemaining != null ? _liveCreditsRemaining.toLocaleString() + ' / 4,000' : '';
   if (_liveRateLimited) {
-    statusEl.innerHTML = '<span style="color:#f87171">🔴 額度已滿 Daily limit reached</span>';
+    el.innerHTML = '<span style="color:#f87171">🔴 額度已滿</span>' + (cred ? ' <span style="color:var(--muted)">| ' + cred + '</span>' : '');
   } else {
-    statusEl.innerHTML = '<span style="color:#4ade80">🟢 Auto ' + _liveCountdown + 's</span>';
+    el.innerHTML = '<span style="color:#4ade80">🟢 Auto ' + _liveCountdown + 's</span>' + (cred ? ' <span style="color:var(--muted)">| 剩餘 ' + cred + '</span>' : '');
   }
 }
 
