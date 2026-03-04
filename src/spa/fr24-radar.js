@@ -625,19 +625,42 @@ function fr24SearchFlight() {
   /* normalize: strip leading zeros for comparison */
   var searchNumVal = parseInt(flightNum, 10);
 
-  /* search in ALL flights, ignore current filter */
-  var found = null;
-  for (var i = 0; i < _fr24Flights.length; i++) {
-    var cs = (_fr24Flights[i].cs || '').trim();
+  /* search in local flights first */
+  var found = _fr24FindInList(_fr24Flights, icaoPrefix, searchNumVal);
+  if (found) {
+    _fr24GoToFound(found, msgEl);
+  } else {
+    /* not in local data → fetch global (no bounds) */
+    if (msgEl) msgEl.textContent = '\u2708 Searching globally...';
+    fetch('/api/fr24')
+      .then(function(r) { return r.ok ? r.json() : null; })
+      .then(function(data) {
+        if (!data || !data.flights) { _fr24NotFound(msgEl, displayName); return; }
+        var gf = _fr24FindInList(data.flights, icaoPrefix, searchNumVal);
+        if (!gf) { _fr24NotFound(msgEl, displayName); return; }
+        if (msgEl) msgEl.textContent = '';
+        _fr24GoToFound(gf, msgEl);
+      })
+      .catch(function() { _fr24NotFound(msgEl, displayName); });
+  }
+}
+
+function _fr24FindInList(list, icaoPrefix, numVal) {
+  for (var i = 0; i < list.length; i++) {
+    var cs = (list[i].cs || '').trim();
     if (cs.indexOf(icaoPrefix) !== 0) continue;
     var csNumPart = cs.substring(icaoPrefix.length).trim();
-    if (parseInt(csNumPart, 10) === searchNumVal) { found = _fr24Flights[i]; break; }
+    if (parseInt(csNumPart, 10) === numVal) return list[i];
   }
-  if (!found) {
-    if (msgEl) msgEl.textContent = '\u26a0 ' + displayName + ' \u7121\u6b64\u822a\u73ed Not found';
-    setTimeout(function() { if (msgEl) msgEl.textContent = ''; }, 5000);
-    return;
-  }
+  return null;
+}
+
+function _fr24NotFound(msgEl, displayName) {
+  if (msgEl) msgEl.textContent = '\u26a0 ' + displayName + ' \u7121\u6b64\u822a\u73ed Not found';
+  setTimeout(function() { if (msgEl) msgEl.textContent = ''; }, 5000);
+}
+
+function _fr24GoToFound(found, msgEl) {
   var lat = found.lat, lon = found.lon;
   if (lat == null || lon == null) return;
 
