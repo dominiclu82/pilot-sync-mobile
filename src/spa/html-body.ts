@@ -1021,7 +1021,7 @@ export function getSpaHtmlBody(): string {
       <button class="tab-util-btn tab-install-btn" id="tab-install-btn" onclick="showInstallGuide()" style="display:none">
         <span>📲</span>安裝
       </button>
-      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V6.100</span>
+      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V6.101</span>
     </div>
   </div>
 </div>
@@ -1051,7 +1051,12 @@ export function getSpaHtmlBody(): string {
       <div style="margin-bottom:4px">📱 建議使用 <b>iPad 橫向</b>操作以獲得最佳體驗</div>
       <div style="color:var(--muted)">Best experience on iPad in landscape mode</div>
     </div>
-    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V6.100</div>
+    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V6.101</div>
+    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
+      <div>修復 FR24 側邊欄遮住底部 tab bar</div>
+      <div>Fix FR24 sidebar overlapping bottom tab bar</div>
+    </div>
+    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V6.100</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
       <div>FR24 獨立為底部 tab（📡圖示），不再是 Briefing subtab</div>
       <div>資訊卡仿 FR24 兩欄排版，新增 STA/ETA 時間</div>
@@ -1063,13 +1068,6 @@ export function getSpaHtmlBody(): string {
       <div>Search ignores filter, supports leading zeros (JX2=JX002)</div>
       <div>Trail persists until clicking blank area or another flight</div>
       <div>Tab bar horizontally scrollable on narrow screens</div>
-    </div>
-    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V6.007</div>
-    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
-      <div>修復 FR24 checkbox/搜尋欄無法互動、地圖飛機不顯示</div>
-      <div>FR24 資訊卡新增 Airline、起訖機場名稱、ETA</div>
-      <div>Fix FR24 sidebar interaction &amp; missing aircraft on map</div>
-      <div>FR24 info card: add Airline, airport names, ETA</div>
     </div>
     <button class="install-close-btn" onclick="closeAbout()">關閉</button>
   </div>

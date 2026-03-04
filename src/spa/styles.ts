@@ -361,7 +361,7 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
 /* ── Live Radar ── */
 #briefing-live.active{display:flex;position:relative;padding:0;overflow:hidden;clip-path:inset(0)}
 #tab-fr24{display:none;flex-direction:column;position:relative;padding:0;overflow:hidden;
-  min-height:calc(100dvh - 56px)}
+  clip-path:inset(0);min-height:calc(100dvh - 56px)}
 #tab-fr24.tab-active{display:flex}
 #fr24-sidebar{z-index:1000}
 #live-map,#fr24-map{flex:1;width:100%;min-height:300px;z-index:1;background:#0a0e1a}
