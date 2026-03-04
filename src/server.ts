@@ -301,16 +301,18 @@ app.get('/api/opensky', async (req, res) => {
 
 // ── FR24 proxy ───────────────────────────────────────────────────────────────
 const _fr24Api = new FR24Pkg.FlightRadar24API();
-let _fr24Cache: { ts: number; data: any } = { ts: 0, data: null };
+let _fr24Cache: { ts: number; bounds: string; data: any } = { ts: 0, bounds: '', data: null };
 
 app.get('/api/fr24', async (req, res) => {
   try {
     const now = Date.now();
-    if (_fr24Cache.data && now - _fr24Cache.ts < 8000) {
+    // bounds format: "latN,latS,lonW,lonE"
+    const b = req.query.bounds as string || '';
+    if (_fr24Cache.data && now - _fr24Cache.ts < 8000 && _fr24Cache.bounds === b) {
       res.json(_fr24Cache.data);
       return;
     }
-    const flights = await _fr24Api.getFlights();
+    const flights = await _fr24Api.getFlights(null, b || null);
     const result = flights.map((f: any) => ({
       id: f.id || '',
       cs: (f.callsign || '').trim(),
@@ -330,7 +332,7 @@ app.get('/api/fr24', async (req, res) => {
       gnd: f.onGround ? 1 : 0
     }));
     const data = { flights: result, time: Math.floor(now / 1000) };
-    _fr24Cache = { ts: now, data };
+    _fr24Cache = { ts: now, bounds: b, data };
     res.json(data);
   } catch (e: any) {
     const msg = e.message || '';
@@ -347,9 +349,7 @@ app.get('/api/fr24/detail', async (req, res) => {
   try {
     const flightId = req.query.id as string;
     if (!flightId) { res.status(400).json({ error: 'missing id' }); return; }
-    const { Flight } = FR24Pkg;
-    const stub = new Flight(flightId, {});
-    const details = await _fr24Api.getFlightDetails(stub);
+    const details = await _fr24Api.getFlightDetails({ id: flightId } as any);
     res.json(details || {});
   } catch (e: any) {
     console.error('FR24 detail error:', e.message);

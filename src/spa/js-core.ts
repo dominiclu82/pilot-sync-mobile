@@ -279,7 +279,7 @@ setTimeout(function() {
 
 // ── Tab switching ─────────────────────────────────────────────────────────────
 function switchTab(tab, btn) {
-  ['tab-sync','tab-briefing','tab-gate'].forEach(function(id) {
+  ['tab-sync','tab-briefing','tab-fr24','tab-gate'].forEach(function(id) {
     var el = document.getElementById(id);
     if (el) { el.classList.remove('tab-active'); el.style.display = 'none'; }
   });
@@ -290,10 +290,14 @@ function switchTab(tab, btn) {
   if (tab === 'gate' && !gateFlightsLoaded) {
     loadGateFlights();
   }
+  if (tab === 'fr24') {
+    if (typeof fr24Init === 'function') fr24Init();
+  } else {
+    if (typeof _fr24UnlockOrientation === 'function') _fr24UnlockOrientation();
+    if (typeof fr24StopAll === 'function') fr24StopAll();
+  }
   if (typeof _liveUnlockOrientation === 'function') _liveUnlockOrientation();
   if (typeof liveStopAll === 'function') liveStopAll();
-  if (typeof _fr24UnlockOrientation === 'function') _fr24UnlockOrientation();
-  if (typeof fr24StopAll === 'function') fr24StopAll();
   window.scrollTo(0, 0);
 }
 
@@ -410,6 +414,7 @@ function toggleTheme() {
     icon.textContent = '🌙';
     localStorage.setItem('crewsync_theme', 'light');
   }
+  if (typeof fr24SwitchTheme === 'function') fr24SwitchTheme();
 }
 (function() {
   if (localStorage.getItem('crewsync_theme') === 'light') {
@@ -539,12 +544,6 @@ function switchBriefingTab(panel, btn) {
   } else {
     if (typeof _liveUnlockOrientation === 'function') _liveUnlockOrientation();
     if (typeof liveStopAll === 'function') liveStopAll();
-  }
-  if (panel === 'fr24') {
-    fr24Init();
-  } else {
-    if (typeof _fr24UnlockOrientation === 'function') _fr24UnlockOrientation();
-    if (typeof fr24StopAll === 'function') fr24StopAll();
   }
 }
 

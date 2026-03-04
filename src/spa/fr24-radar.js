@@ -6,6 +6,10 @@ var _fr24Flights = [];
 var _fr24Filtered = [];
 var _fr24Inited = false;
 var _fr24ShowLabels = false;
+var _fr24TrailLines = [];  /* [solid trail, dashed predicted] */
+var _fr24TrailFlight = null; /* flight object with active trail */
+var _fr24SearchedFlight = null; /* flight found by search (survives filter) */
+var _fr24TileLayer = null;
 
 /* auto-refresh & interpolation */
 var _fr24CountdownInterval = null;
@@ -107,7 +111,9 @@ function fr24Init() {
     zoomControl: false,
     worldCopyJump: true
   });
-  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+  var isDark = document.documentElement.dataset.theme !== 'light';
+  var tileStyle = isDark ? 'dark_all' : 'light_all';
+  _fr24TileLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/' + tileStyle + '/{z}/{x}/{y}{r}.png', {
     attribution: '\u00a9 OpenStreetMap \u00a9 CARTO',
     maxZoom: 18
   }).addTo(_fr24Map);
@@ -122,8 +128,11 @@ function fr24Init() {
   L.DomEvent.disableClickPropagation(tbtn);
 
   _fr24Map.on('moveend', function() {
-    var allCheck = document.getElementById('fr24-f-all');
-    if (allCheck && allCheck.checked) fr24ApplyFilter();
+    fr24ApplyFilter();
+  });
+  _fr24Map.on('click', function() {
+    _fr24ClearTrail();
+    _fr24SearchedFlight = null;
   });
 
   _fr24RestoreSettings();
@@ -137,7 +146,13 @@ function fr24Init() {
 function fr24FetchData() {
   var countEl = document.getElementById('fr24-count');
   if (countEl) countEl.textContent = 'Loading...';
-  fetch('/api/fr24')
+  var url = '/api/fr24';
+  if (_fr24Map) {
+    var b = _fr24Map.getBounds();
+    var boundsStr = b.getNorth().toFixed(2) + ',' + b.getSouth().toFixed(2) + ',' + b.getWest().toFixed(2) + ',' + b.getEast().toFixed(2);
+    url += '?bounds=' + encodeURIComponent(boundsStr);
+  }
+  fetch(url)
     .then(function(r) {
       if (r.status === 429) return r.json().then(function(d) { d._httpStatus = 429; return d; });
       return r.json();
@@ -252,24 +267,22 @@ function fr24ApplyFilter() {
   _fr24PlaneLayer.clearLayers();
   _fr24LabelLayer.clearLayers();
 
-  var allCheck = document.getElementById('fr24-f-all');
-  var showAll = allCheck && allCheck.checked;
   var prefixes = [];
-
-  if (!showAll) {
-    if (document.getElementById('fr24-f-jx').checked) prefixes.push('SJX');
-    if (document.getElementById('fr24-f-br').checked) prefixes.push('EVA');
-    if (document.getElementById('fr24-f-ci').checked) prefixes.push('CAL');
-    var custom = (document.getElementById('fr24-f-custom').value || '').toUpperCase().split(',');
-    for (var i = 0; i < custom.length; i++) {
-      var c = custom[i].trim();
-      if (c && prefixes.indexOf(c) < 0) prefixes.push(c);
-    }
+  if (document.getElementById('fr24-f-jx').checked) prefixes.push('SJX');
+  if (document.getElementById('fr24-f-br').checked) prefixes.push('EVA');
+  if (document.getElementById('fr24-f-ci').checked) prefixes.push('CAL');
+  var custom = (document.getElementById('fr24-f-custom').value || '').toUpperCase().split(',');
+  for (var i = 0; i < custom.length; i++) {
+    var c = custom[i].trim();
+    if (!c) continue;
+    /* convert IATA to ICAO if needed */
+    var icao = _fr24IataToIcao[c] || c;
+    if (prefixes.indexOf(icao) < 0) prefixes.push(icao);
   }
 
-  var bounds = null;
+  var showAll = prefixes.length === 0;
+  var bounds = _fr24Map.getBounds();
   var MAX_ALL = 500;
-  if (showAll) bounds = _fr24Map.getBounds();
 
   _fr24Filtered = [];
   for (var j = 0; j < _fr24Flights.length; j++) {
@@ -282,7 +295,7 @@ function fr24ApplyFilter() {
     if (showAll) {
       if (!bounds.contains([lat, lon])) continue;
       if (_fr24Filtered.length >= MAX_ALL) continue;
-    } else if (prefixes.length > 0) {
+    } else {
       var match = false;
       for (var k = 0; k < prefixes.length; k++) {
         if (cs.indexOf(prefixes[k]) === 0) { match = true; break; }
@@ -324,6 +337,38 @@ function fr24ApplyFilter() {
     var cntText = _fr24Filtered.length + ' aircraft';
     if (showAll && _fr24Filtered.length >= MAX_ALL) cntText += ' (max ' + MAX_ALL + ')';
     countEl.textContent = cntText;
+  }
+
+  /* always include searched flight regardless of filter */
+  if (_fr24SearchedFlight && _fr24Filtered.indexOf(_fr24SearchedFlight) < 0) {
+    var sf = _fr24SearchedFlight;
+    if (sf.lat != null && sf.lon != null) {
+      _fr24Filtered.push(sf);
+      var sHeading = sf.hdg || 0;
+      var sIcon = L.divIcon({
+        className: 'live-plane-icon',
+        html: '<div style="transform:rotate(' + sHeading + 'deg)">\u2708</div>',
+        iconSize: [20, 20], iconAnchor: [10, 10]
+      });
+      var sMarker = L.marker([sf.lat, sf.lon], { icon: sIcon });
+      sMarker._fr24Data = sf;
+      sMarker.on('click', function(e) { _fr24ShowPopup(e.target); });
+      _fr24PlaneLayer.addLayer(sMarker);
+      if (_fr24ShowLabels) {
+        var sAlt = sf.alt != null ? Math.round(sf.alt).toLocaleString() : '';
+        var sLblHtml = '<div class="live-label">' + _fr24DisplayName(sf.cs || '') +
+          (sAlt ? '<br>' + sAlt + ' ft' : '') + '</div>';
+        _fr24LabelLayer.addLayer(L.marker([sf.lat, sf.lon], {
+          icon: L.divIcon({ className: 'live-label-icon', html: sLblHtml, iconSize: [0,0], iconAnchor: [-12,10] }),
+          interactive: false
+        }));
+      }
+    }
+  }
+
+  /* clear trail if the tracked flight is no longer visible */
+  if (_fr24TrailFlight && _fr24Filtered.indexOf(_fr24TrailFlight) < 0) {
+    _fr24ClearTrail();
   }
 
   _fr24RenderFlightList();
@@ -370,80 +415,176 @@ function _fr24ListClick(idx) {
 /* ── popup info card ── */
 function _fr24ShowPopup(marker) {
   var f = marker._fr24Data;
-  var cs = f.cs || '';
-  var display = _fr24DisplayName(cs);
-  var altFt = f.alt != null ? Math.round(f.alt).toLocaleString() + ' ft' : '\u2014';
-  var spdKt = f.spd != null ? Math.round(f.spd) + ' kt' : '\u2014';
-  var hdg = f.hdg != null ? Math.round(f.hdg) + '\u00b0' : '\u2014';
-  var vs = f.vs != null ? (f.vs >= 0 ? '+' : '') + Math.round(f.vs) + ' ft/min' : '\u2014';
-  var ground = f.gnd ? 'Yes' : 'No';
-  var squawk = f.sq || '\u2014';
-  var icao24 = f.icao24 || '\u2014';
-  var reg = f.reg || '\u2014';
-  var type = f.type || '\u2014';
-  var from = f.from || '\u2014';
-  var to = f.to || '\u2014';
-  var lat = f.lat != null ? f.lat.toFixed(4) : '\u2014';
-  var lon = f.lon != null ? f.lon.toFixed(4) : '\u2014';
-  var route = from + ' \u2192 ' + to;
 
-  var html = '<div class="live-popup">' +
-    '<div class="live-popup-title">' + display + '</div>' +
-    '<div style="font-size:.9em;color:#60a5fa;margin-bottom:6px">' + route + '</div>' +
-    '<table class="live-popup-table">' +
-    '<tr><td>Type</td><td>' + type + '</td></tr>' +
-    '<tr><td>Reg</td><td>' + reg + '</td></tr>' +
-    '<tr><td>Position</td><td>' + lat + '\u00b0, ' + lon + '\u00b0</td></tr>' +
-    '<tr><td>Altitude</td><td>' + altFt + '</td></tr>' +
-    '<tr><td>Speed</td><td>' + spdKt + '</td></tr>' +
-    '<tr><td>Heading</td><td>' + hdg + '</td></tr>' +
-    '<tr><td>V/S</td><td>' + vs + '</td></tr>' +
-    '<tr><td>On Ground</td><td>' + ground + '</td></tr>' +
-    '<tr><td>Squawk</td><td>' + squawk + '</td></tr>' +
-    '<tr><td>ICAO24</td><td>' + icao24 + '</td></tr>' +
-    '</table></div>';
+  function _buildAndOpen(detail) {
+    var cs = f.cs || '';
+    var display = _fr24DisplayName(cs);
+    var altFt = f.alt != null ? Math.round(f.alt).toLocaleString() + ' ft' : '\u2014';
+    var spdKt = f.spd != null ? Math.round(f.spd) + ' kt' : '\u2014';
+    var hdg = f.hdg != null ? Math.round(f.hdg) + '\u00b0' : '\u2014';
+    var vs = f.vs != null ? (f.vs >= 0 ? '+' : '') + Math.round(f.vs) + ' ft/min' : '\u2014';
+    var squawk = f.sq || '\u2014';
+    var icao24 = f.icao24 || '\u2014';
+    var reg = f.reg || '\u2014';
+    var type = f.type || '\u2014';
+    var from = f.from || '\u2014';
+    var to = f.to || '\u2014';
+    var lat = f.lat != null ? f.lat.toFixed(4) : '\u2014';
+    var lon = f.lon != null ? f.lon.toFixed(4) : '\u2014';
 
-  marker.unbindPopup();
-  marker.bindPopup(html, { className: 'live-popup-wrap', maxWidth: 260 }).openPopup();
+    /* extract detail fields */
+    var airline = '', origName = '', destName = '', eta = '', sta = '';
+    if (detail) {
+      airline = (detail.airline && detail.airline.name) || '';
+      origName = (detail.airport && detail.airport.origin && detail.airport.origin.name) || '';
+      destName = (detail.airport && detail.airport.destination && detail.airport.destination.name) || '';
+      /* STA (scheduled arrival) */
+      if (detail.time && detail.time.scheduled && detail.time.scheduled.arrival) {
+        var staTs = detail.time.scheduled.arrival;
+        var staDt = new Date(staTs * 1000);
+        if (staDt.getUTCFullYear() > 1970) sta = staDt.toISOString().substring(11, 16) + ' UTC';
+      }
+      /* ETA (estimated arrival) */
+      if (detail.time && detail.time.estimated && detail.time.estimated.arrival) {
+        var ts = detail.time.estimated.arrival;
+        var dt = new Date(ts * 1000);
+        if (dt.getUTCFullYear() > 1970) eta = dt.toISOString().substring(11, 16) + ' UTC';
+      }
+      if (!eta && sta) { eta = sta + ' (sched)'; sta = ''; }
+    }
 
-  /* fetch flight details for ETA */
+    /* FR24-style compact card */
+    var html = '<div class="fr24-card">' +
+      /* header: callsign + badges */
+      '<div class="fr24-card-hdr">' +
+        '<span class="fr24-card-cs">' + display + '</span>' +
+        (type !== '\u2014' ? '<span class="fr24-badge">' + type + '</span>' : '') +
+        (reg !== '\u2014' ? '<span class="fr24-badge">' + reg + '</span>' : '') +
+      '</div>' +
+      (airline ? '<div class="fr24-card-airline">' + airline + '</div>' : '') +
+      /* route: FROM ✈ TO */
+      '<div class="fr24-card-route">' +
+        '<div class="fr24-card-apt">' +
+          '<div class="fr24-card-iata">' + from + '</div>' +
+          (origName ? '<div class="fr24-card-city">' + origName + '</div>' : '') +
+        '</div>' +
+        '<div class="fr24-card-arrow">\u2708</div>' +
+        '<div class="fr24-card-apt">' +
+          '<div class="fr24-card-iata">' + to + '</div>' +
+          (destName ? '<div class="fr24-card-city">' + destName + '</div>' : '') +
+        '</div>' +
+      '</div>' +
+      /* times row */
+      ((sta || eta) ? '<div class="fr24-card-row">' +
+        (sta ? '<div class="fr24-card-cell"><div class="fr24-card-lbl">STA</div><div class="fr24-card-val">' + sta + '</div></div>' : '') +
+        (eta ? '<div class="fr24-card-cell"><div class="fr24-card-lbl">ETA</div><div class="fr24-card-val">' + eta + '</div></div>' : '') +
+      '</div>' : '') +
+      /* altitude & v/s */
+      '<div class="fr24-card-row">' +
+        '<div class="fr24-card-cell"><div class="fr24-card-lbl">ALT</div><div class="fr24-card-val">' + altFt + '</div></div>' +
+        '<div class="fr24-card-cell"><div class="fr24-card-lbl">V/S</div><div class="fr24-card-val">' + vs + '</div></div>' +
+      '</div>' +
+      /* speed & heading */
+      '<div class="fr24-card-row">' +
+        '<div class="fr24-card-cell"><div class="fr24-card-lbl">SPD</div><div class="fr24-card-val">' + spdKt + '</div></div>' +
+        '<div class="fr24-card-cell"><div class="fr24-card-lbl">HDG</div><div class="fr24-card-val">' + hdg + '</div></div>' +
+      '</div>' +
+      /* squawk & icao24 */
+      '<div class="fr24-card-row">' +
+        '<div class="fr24-card-cell"><div class="fr24-card-lbl">SQK</div><div class="fr24-card-val">' + squawk + '</div></div>' +
+        '<div class="fr24-card-cell"><div class="fr24-card-lbl">ICAO24</div><div class="fr24-card-val">' + icao24 + '</div></div>' +
+      '</div>' +
+      /* position */
+      '<div class="fr24-card-row">' +
+        '<div class="fr24-card-cell"><div class="fr24-card-lbl">LAT</div><div class="fr24-card-val">' + lat + '\u00b0</div></div>' +
+        '<div class="fr24-card-cell"><div class="fr24-card-lbl">LON</div><div class="fr24-card-val">' + lon + '\u00b0</div></div>' +
+      '</div>' +
+    '</div>';
+
+    marker.unbindPopup();
+    marker.bindPopup(html, { className: 'live-popup-wrap', maxWidth: 280, minWidth: 200 }).openPopup();
+
+    /* draw trail */
+    _fr24ClearTrail();
+    _fr24TrailFlight = f;
+    if (detail && detail.trail && detail.trail.length > 1) {
+      /* solid line: already flown */
+      var pts = detail.trail.map(function(p) { return [p.lat, p.lng]; });
+      _fr24TrailLines.push(L.polyline(pts, {
+        color: '#f59e0b', weight: 2.5, opacity: 0.85, interactive: false
+      }).addTo(_fr24Map));
+
+      /* dashed line: predicted great circle to destination */
+      var destCoord = null;
+      if (detail.airport && detail.airport.destination && detail.airport.destination.position) {
+        var dp = detail.airport.destination.position;
+        destCoord = [dp.latitude, dp.longitude];
+      } else if (f.to && _fr24AirportDb[f.to]) {
+        destCoord = _fr24AirportDb[f.to];
+      }
+      if (destCoord && f.lat != null && f.lon != null) {
+        var gcPts = _fr24GreatCircle(f.lat, f.lon, destCoord[0], destCoord[1], 60);
+        _fr24TrailLines.push(L.polyline(gcPts, {
+          color: '#f59e0b', weight: 2, opacity: 0.5,
+          dashArray: '8,6', interactive: false
+        }).addTo(_fr24Map));
+      }
+    }
+  }
+
   if (f.id) {
     fetch('/api/fr24/detail?id=' + encodeURIComponent(f.id))
       .then(function(r) { return r.ok ? r.json() : null; })
-      .then(function(d) {
-        if (!d || !marker.getPopup() || !marker.getPopup().isOpen()) return;
-        var eta = '';
-        if (d.time && d.time.estimated && d.time.estimated.arrival) {
-          var ts = d.time.estimated.arrival;
-          var dt = new Date(ts * 1000);
-          eta = dt.getUTCFullYear() > 1970 ? dt.toISOString().substring(11, 16) + ' UTC' : '';
-        }
-        if (!eta && d.time && d.time.scheduled && d.time.scheduled.arrival) {
-          var ts2 = d.time.scheduled.arrival;
-          var dt2 = new Date(ts2 * 1000);
-          eta = dt2.getUTCFullYear() > 1970 ? dt2.toISOString().substring(11, 16) + ' UTC (sched)' : '';
-        }
-        var origName = (d.airport && d.airport.origin && d.airport.origin.name) || '';
-        var destName = (d.airport && d.airport.destination && d.airport.destination.name) || '';
-        var airline = (d.airline && d.airline.name) || '';
-        var extra = '';
-        if (airline) extra += '<tr><td>Airline</td><td>' + airline + '</td></tr>';
-        if (origName) extra += '<tr><td>Origin</td><td>' + origName + '</td></tr>';
-        if (destName) extra += '<tr><td>Dest</td><td>' + destName + '</td></tr>';
-        if (eta) extra += '<tr><td>ETA</td><td>' + eta + '</td></tr>';
-        if (extra) {
-          var el = marker.getPopup().getElement();
-          if (el) {
-            var tbl = el.querySelector('.live-popup-table');
-            if (tbl) {
-              var tbody = tbl.querySelector('tbody') || tbl;
-              tbody.insertAdjacentHTML('afterbegin', extra);
-            }
-          }
-        }
-      })
-      .catch(function() {});
+      .then(function(d) { _buildAndOpen(d); })
+      .catch(function() { _buildAndOpen(null); });
+  } else {
+    _buildAndOpen(null);
   }
+}
+
+/* ── trail helpers ── */
+function _fr24ClearTrail() {
+  for (var i = 0; i < _fr24TrailLines.length; i++) {
+    if (_fr24TrailLines[i] && _fr24Map) _fr24Map.removeLayer(_fr24TrailLines[i]);
+  }
+  _fr24TrailLines = [];
+  _fr24TrailFlight = null;
+}
+
+/* great circle: interpolate N points between two lat/lon */
+function _fr24GreatCircle(lat1d, lon1d, lat2d, lon2d, n) {
+  var toRad = Math.PI / 180, toDeg = 180 / Math.PI;
+  var lat1 = lat1d * toRad, lon1 = lon1d * toRad;
+  var lat2 = lat2d * toRad, lon2 = lon2d * toRad;
+  var d = 2 * Math.asin(Math.sqrt(
+    Math.pow(Math.sin((lat2 - lat1) / 2), 2) +
+    Math.cos(lat1) * Math.cos(lat2) * Math.pow(Math.sin((lon2 - lon1) / 2), 2)
+  ));
+  if (d < 1e-10) return [[lat1d, lon1d], [lat2d, lon2d]];
+  var pts = [];
+  for (var i = 0; i <= n; i++) {
+    var f = i / n;
+    var A = Math.sin((1 - f) * d) / Math.sin(d);
+    var B = Math.sin(f * d) / Math.sin(d);
+    var x = A * Math.cos(lat1) * Math.cos(lon1) + B * Math.cos(lat2) * Math.cos(lon2);
+    var y = A * Math.cos(lat1) * Math.sin(lon1) + B * Math.cos(lat2) * Math.sin(lon2);
+    var z = A * Math.sin(lat1) + B * Math.sin(lat2);
+    pts.push([Math.atan2(z, Math.sqrt(x * x + y * y)) * toDeg, Math.atan2(y, x) * toDeg]);
+  }
+  return pts;
+}
+
+/* ── theme switch ── */
+function fr24SwitchTheme() {
+  if (!_fr24Map || !_fr24TileLayer) return;
+  var isDark = document.documentElement.dataset.theme !== 'light';
+  var tileStyle = isDark ? 'dark_all' : 'light_all';
+  _fr24Map.removeLayer(_fr24TileLayer);
+  _fr24TileLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/' + tileStyle + '/{z}/{x}/{y}{r}.png', {
+    attribution: '\u00a9 OpenStreetMap \u00a9 CARTO',
+    maxZoom: 18
+  }).addTo(_fr24Map);
+  _fr24TileLayer.bringToBack();
 }
 
 /* ── toggle labels ── */
@@ -465,28 +606,51 @@ function fr24SearchFlight() {
   var iataPrefix = match[1];
   var flightNum = match[2];
   var icaoPrefix = _fr24IataToIcao[iataPrefix] || iataPrefix;
-  var searchCallsign = icaoPrefix + flightNum;
   var displayName = iataPrefix + flightNum;
-  document.getElementById('fr24-f-custom').value = iataPrefix;
-  fr24ApplyFilter();
+
+  /* normalize: strip leading zeros for comparison */
+  var searchNumVal = parseInt(flightNum, 10);
+
+  /* search in ALL flights, ignore current filter */
   var found = null;
   for (var i = 0; i < _fr24Flights.length; i++) {
-    var cs = _fr24Flights[i].cs || '';
-    if (cs === searchCallsign || cs === searchCallsign + ' ') { found = _fr24Flights[i]; break; }
+    var cs = (_fr24Flights[i].cs || '').trim();
+    if (cs.indexOf(icaoPrefix) !== 0) continue;
+    var csNumPart = cs.substring(icaoPrefix.length).trim();
+    if (parseInt(csNumPart, 10) === searchNumVal) { found = _fr24Flights[i]; break; }
   }
-  if (found) {
-    var lat = found.lat, lon = found.lon;
-    if (lat != null && lon != null) {
-      _fr24Map.flyTo([lat, lon], 8, { duration: 0.8 });
-      _fr24PlaneLayer.eachLayer(function(layer) {
-        if (layer._fr24Data === found) _fr24ShowPopup(layer);
-      });
-    }
-  } else {
+  if (!found) {
     if (msgEl) msgEl.textContent = '\u26a0 ' + displayName + ' \u7121\u6b64\u822a\u73ed Not found';
     setTimeout(function() { if (msgEl) msgEl.textContent = ''; }, 5000);
+    return;
   }
-  document.getElementById('fr24-f-custom').value = raw;
+  var lat = found.lat, lon = found.lon;
+  if (lat == null || lon == null) return;
+
+  /* mark as searched so it survives filter reapply */
+  _fr24SearchedFlight = found;
+
+  /* fly to the flight */
+  _fr24Map.flyTo([lat, lon], 8, { duration: 0.8 });
+
+  /* find existing marker or create a temporary one */
+  var targetMarker = null;
+  _fr24PlaneLayer.eachLayer(function(layer) {
+    if (layer._fr24Data === found) targetMarker = layer;
+  });
+  if (!targetMarker) {
+    var heading = found.hdg || 0;
+    var icon = L.divIcon({
+      className: 'live-plane-icon',
+      html: '<div style="transform:rotate(' + heading + 'deg)">\u2708</div>',
+      iconSize: [20, 20], iconAnchor: [10, 10]
+    });
+    targetMarker = L.marker([lat, lon], { icon: icon });
+    targetMarker._fr24Data = found;
+    targetMarker.on('click', function(e) { _fr24ShowPopup(e.target); });
+    _fr24PlaneLayer.addLayer(targetMarker);
+  }
+  _fr24ShowPopup(targetMarker);
 }
 
 /* ── jump to airport ── */
@@ -557,20 +721,6 @@ function fr24SwitchSidebarPos() {
   _fr24SaveSettings();
 }
 
-/* ── toggle all flights ── */
-function fr24ToggleAll() {
-  var allCheck = document.getElementById('fr24-f-all');
-  var jx = document.getElementById('fr24-f-jx');
-  var br = document.getElementById('fr24-f-br');
-  var ci = document.getElementById('fr24-f-ci');
-  var custom = document.getElementById('fr24-f-custom');
-  if (allCheck.checked) {
-    jx.disabled = true; br.disabled = true; ci.disabled = true; custom.disabled = true;
-  } else {
-    jx.disabled = false; br.disabled = false; ci.disabled = false; custom.disabled = false;
-  }
-  fr24ApplyFilter();
-}
 
 /* ── save/restore settings ── */
 function _fr24SaveSettings() {
@@ -580,7 +730,6 @@ function _fr24SaveSettings() {
     jx: document.getElementById('fr24-f-jx').checked,
     br: document.getElementById('fr24-f-br').checked,
     ci: document.getElementById('fr24-f-ci').checked,
-    all: document.getElementById('fr24-f-all').checked,
     custom: document.getElementById('fr24-f-custom').value,
     labels: document.getElementById('fr24-f-labels').checked
   };
@@ -599,11 +748,9 @@ function _fr24RestoreSettings() {
       document.getElementById('fr24-f-jx').checked = !!f.jx;
       document.getElementById('fr24-f-br').checked = !!f.br;
       document.getElementById('fr24-f-ci').checked = !!f.ci;
-      document.getElementById('fr24-f-all').checked = !!f.all;
       document.getElementById('fr24-f-custom').value = f.custom || '';
       document.getElementById('fr24-f-labels').checked = !!f.labels;
       _fr24ShowLabels = !!f.labels;
-      if (f.all) fr24ToggleAll();
     }
   } catch (e) {}
 }

@@ -20,8 +20,10 @@ body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSy
 #tab-briefing.tab-active{display:block}
 .tab-bar{position:fixed;bottom:0;left:0;right:0;height:calc(56px + env(safe-area-inset-bottom,0px));background:var(--card);
   border-top:1px solid var(--dim);display:flex;z-index:200;
-  padding-bottom:env(safe-area-inset-bottom,0px)}
-.tab-btn{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  padding-bottom:env(safe-area-inset-bottom,0px);
+  overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+.tab-bar::-webkit-scrollbar{display:none}
+.tab-btn{flex:1 0 56px;display:flex;flex-direction:column;align-items:center;justify-content:center;
   gap:2px;border:none;background:none;color:var(--muted);font-size:.7em;font-weight:600;
   cursor:pointer;transition:color .15s;-webkit-appearance:none}
 .tab-btn.tab-active{color:var(--accent)}
@@ -358,7 +360,9 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
 }
 /* ── Live Radar ── */
 #briefing-live.active{display:flex;position:relative;padding:0;overflow:hidden;clip-path:inset(0)}
-#briefing-fr24.active{display:flex;position:relative;padding:0;overflow:hidden}
+#tab-fr24{display:none;flex-direction:column;position:relative;padding:0;overflow:hidden;
+  min-height:calc(100dvh - 56px)}
+#tab-fr24.tab-active{display:flex}
 #fr24-sidebar{z-index:1000}
 #live-map,#fr24-map{flex:1;width:100%;min-height:300px;z-index:1;background:#0a0e1a}
 .live-toggle-btn{position:absolute;top:8px;z-index:600;background:rgba(10,14,26,.85);
@@ -419,6 +423,26 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
 .live-popup-table{width:100%;border-collapse:collapse}
 .live-popup-table td{padding:2px 0;border-bottom:1px solid var(--dim)}
 .live-popup-table td:first-child{color:var(--muted);padding-right:10px;white-space:nowrap}
+
+/* FR24-style compact popup card */
+.fr24-card{font-size:.75em;min-width:200px;max-width:240px}
+.fr24-card-hdr{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.fr24-card-cs{font-weight:700;font-size:1.3em;color:var(--accent)}
+.fr24-badge{background:rgba(96,165,250,.2);color:#60a5fa;font-size:.75em;
+  padding:1px 5px;border-radius:3px;font-weight:600}
+.fr24-card-airline{font-size:.85em;color:var(--muted);margin:2px 0 6px}
+.fr24-card-route{display:flex;align-items:flex-start;justify-content:center;
+  gap:8px;padding:8px 0;border-top:1px solid var(--dim);border-bottom:1px solid var(--dim);text-align:center}
+.fr24-card-apt{flex:1;min-width:0}
+.fr24-card-iata{font-size:1.4em;font-weight:700;letter-spacing:.5px}
+.fr24-card-city{font-size:.7em;color:var(--muted);margin-top:1px;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.fr24-card-arrow{color:#f59e0b;font-size:1.2em;padding-top:2px}
+.fr24-card-row{display:flex;border-bottom:1px solid var(--dim)}
+.fr24-card-cell{flex:1;padding:4px 0}
+.fr24-card-lbl{font-size:.7em;color:var(--muted);text-transform:uppercase;letter-spacing:.3px}
+.fr24-card-val{font-size:.95em;font-weight:600}
+
 .live-portrait-overlay{position:absolute;inset:0;z-index:9999;
   background:rgba(10,14,26,.96);display:flex;flex-direction:column;
   align-items:center;justify-content:center;color:#e8eaed;text-align:center}
@@ -436,6 +460,14 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
   .live-sb-close-btn{display:block}
   .live-sb-pos-btn{display:none}
 }
+/* ── Live/FR24 day mode ── */
+[data-theme="light"] .live-sidebar{background:rgba(241,245,249,.95)}
+[data-theme="light"] .live-toggle-btn{background:rgba(241,245,249,.9);color:var(--text)}
+[data-theme="light"] .live-plane-icon{color:#2563eb}
+[data-theme="light"] .live-label{color:#1e293b;text-shadow:0 0 3px #fff,0 0 2px #fff}
+[data-theme="light"] #fr24-map{background:#e2e8f0}
+[data-theme="light"] #live-map{background:#e2e8f0}
+[data-theme="light"] .live-portrait-overlay{background:rgba(241,245,249,.96);color:#1e293b}
 #briefing-hf.active{padding:0;display:flex;flex-direction:column;
   height:calc(100dvh - calc(56px + env(safe-area-inset-bottom,0px)) - 40px)}
 #hf-panel-iframe{flex:1;min-height:0}
