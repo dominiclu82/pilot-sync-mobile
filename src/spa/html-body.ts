@@ -1021,7 +1021,7 @@ export function getSpaHtmlBody(): string {
       <button class="tab-util-btn tab-install-btn" id="tab-install-btn" onclick="showInstallGuide()" style="display:none">
         <span>📲</span>安裝
       </button>
-      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V6.106</span>
+      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V6.107</span>
     </div>
   </div>
 </div>
@@ -1051,17 +1051,17 @@ export function getSpaHtmlBody(): string {
       <div style="margin-bottom:4px">📱 建議使用 <b>iPad 橫向</b>操作以獲得最佳體驗</div>
       <div style="color:var(--muted)">Best experience on iPad in landscape mode</div>
     </div>
-    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V6.106</div>
+    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V6.107</div>
+    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
+      <div>iPad/平板 A-/A+ 按鈕間距加大避免誤觸</div>
+      <div>Increase A-/A+ button spacing on iPad/tablet to prevent accidental taps</div>
+    </div>
+    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V6.106</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
       <div>Duty Time 輸入格自動跳轉（HH→MM→下一組）</div>
       <div>Cold Temp 新增 FPA 低溫修正計算</div>
       <div>Duty Time auto-jump between input fields (HH→MM→next)</div>
       <div>Cold Temp: add FPA cold temperature correction</div>
-    </div>
-    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V6.105</div>
-    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
-      <div>修復實線航跡跨日期變更線方向錯誤</div>
-      <div>Fix solid trail crossing antimeridian in wrong direction</div>
     </div>
     <button class="install-close-btn" onclick="closeAbout()">關閉</button>
   </div>
