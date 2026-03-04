@@ -1021,7 +1021,7 @@ export function getSpaHtmlBody(): string {
       <button class="tab-util-btn tab-install-btn" id="tab-install-btn" onclick="showInstallGuide()" style="display:none">
         <span>📲</span>安裝
       </button>
-      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V6.101</span>
+      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V6.102</span>
     </div>
   </div>
 </div>
@@ -1051,23 +1051,15 @@ export function getSpaHtmlBody(): string {
       <div style="margin-bottom:4px">📱 建議使用 <b>iPad 橫向</b>操作以獲得最佳體驗</div>
       <div style="color:var(--muted)">Best experience on iPad in landscape mode</div>
     </div>
-    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V6.101</div>
+    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V6.102</div>
+    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
+      <div>FR24 資訊卡新增 STD/ATD 出發時間</div>
+      <div>FR24 info card: add STD/ATD departure times</div>
+    </div>
+    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V6.101</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
       <div>修復 FR24 側邊欄遮住底部 tab bar</div>
       <div>Fix FR24 sidebar overlapping bottom tab bar</div>
-    </div>
-    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V6.100</div>
-    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
-      <div>FR24 獨立為底部 tab（📡圖示），不再是 Briefing subtab</div>
-      <div>資訊卡仿 FR24 兩欄排版，新增 STA/ETA 時間</div>
-      <div>搜尋不受篩選限制，支援前導零容錯（JX2=JX002）</div>
-      <div>軌跡持續顯示直到點選空白處或其他航班</div>
-      <div>底部 tab bar 窄螢幕可左右捲動</div>
-      <div>FR24 standalone tab with 📡 icon, no longer a Briefing subtab</div>
-      <div>Info card redesigned (FR24-style 2-column), added STA/ETA</div>
-      <div>Search ignores filter, supports leading zeros (JX2=JX002)</div>
-      <div>Trail persists until clicking blank area or another flight</div>
-      <div>Tab bar horizontally scrollable on narrow screens</div>
     </div>
     <button class="install-close-btn" onclick="closeAbout()">關閉</button>
   </div>

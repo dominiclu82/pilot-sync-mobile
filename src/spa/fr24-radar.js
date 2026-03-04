@@ -433,23 +433,23 @@ function _fr24ShowPopup(marker) {
     var lon = f.lon != null ? f.lon.toFixed(4) : '\u2014';
 
     /* extract detail fields */
-    var airline = '', origName = '', destName = '', eta = '', sta = '';
+    var airline = '', origName = '', destName = '', std = '', atd = '', sta = '', eta = '';
     if (detail) {
       airline = (detail.airline && detail.airline.name) || '';
       origName = (detail.airport && detail.airport.origin && detail.airport.origin.name) || '';
       destName = (detail.airport && detail.airport.destination && detail.airport.destination.name) || '';
+      var _t = detail.time || {};
+      var _ts = _t.scheduled || {};
+      var _te = _t.estimated || {};
+      var _tr = _t.real || {};
+      /* STD (scheduled departure) */
+      if (_ts.departure) { var d = new Date(_ts.departure * 1000); if (d.getUTCFullYear() > 1970) std = d.toISOString().substring(11, 16) + ' UTC'; }
+      /* ATD (actual departure) */
+      if (_tr.departure) { var d2 = new Date(_tr.departure * 1000); if (d2.getUTCFullYear() > 1970) atd = d2.toISOString().substring(11, 16) + ' UTC'; }
       /* STA (scheduled arrival) */
-      if (detail.time && detail.time.scheduled && detail.time.scheduled.arrival) {
-        var staTs = detail.time.scheduled.arrival;
-        var staDt = new Date(staTs * 1000);
-        if (staDt.getUTCFullYear() > 1970) sta = staDt.toISOString().substring(11, 16) + ' UTC';
-      }
+      if (_ts.arrival) { var d3 = new Date(_ts.arrival * 1000); if (d3.getUTCFullYear() > 1970) sta = d3.toISOString().substring(11, 16) + ' UTC'; }
       /* ETA (estimated arrival) */
-      if (detail.time && detail.time.estimated && detail.time.estimated.arrival) {
-        var ts = detail.time.estimated.arrival;
-        var dt = new Date(ts * 1000);
-        if (dt.getUTCFullYear() > 1970) eta = dt.toISOString().substring(11, 16) + ' UTC';
-      }
+      if (_te.arrival) { var d4 = new Date(_te.arrival * 1000); if (d4.getUTCFullYear() > 1970) eta = d4.toISOString().substring(11, 16) + ' UTC'; }
       if (!eta && sta) { eta = sta + ' (sched)'; sta = ''; }
     }
 
@@ -474,7 +474,12 @@ function _fr24ShowPopup(marker) {
           (destName ? '<div class="fr24-card-city">' + destName + '</div>' : '') +
         '</div>' +
       '</div>' +
-      /* times row */
+      /* departure times row */
+      ((std || atd) ? '<div class="fr24-card-row">' +
+        (std ? '<div class="fr24-card-cell"><div class="fr24-card-lbl">STD</div><div class="fr24-card-val">' + std + '</div></div>' : '') +
+        (atd ? '<div class="fr24-card-cell"><div class="fr24-card-lbl">ATD</div><div class="fr24-card-val">' + atd + '</div></div>' : '') +
+      '</div>' : '') +
+      /* arrival times row */
       ((sta || eta) ? '<div class="fr24-card-row">' +
         (sta ? '<div class="fr24-card-cell"><div class="fr24-card-lbl">STA</div><div class="fr24-card-val">' + sta + '</div></div>' : '') +
         (eta ? '<div class="fr24-card-cell"><div class="fr24-card-lbl">ETA</div><div class="fr24-card-val">' + eta + '</div></div>' : '') +
