@@ -956,7 +956,7 @@ export function getSpaHtmlBody(): string {
       <button class="tab-util-btn tab-install-btn" id="tab-install-btn" onclick="showInstallGuide()" style="display:none">
         <span>📲</span>安裝
       </button>
-      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V6.004</span>
+      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V6.005</span>
     </div>
   </div>
 </div>
@@ -986,15 +986,15 @@ export function getSpaHtmlBody(): string {
       <div style="margin-bottom:4px">📱 建議使用 <b>iPad 橫向</b>操作以獲得最佳體驗</div>
       <div style="color:var(--muted)">Best experience on iPad in landscape mode</div>
     </div>
-    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V6.004</div>
+    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V6.005</div>
+    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
+      <div>Live Radar 自動刷新間隔調整為 15 秒</div>
+      <div>Auto-refresh interval changed to 15 seconds</div>
+    </div>
+    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V6.004</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
       <div>Live Radar 側邊欄補充說明（無起訖地及ETA、額度重置時間）</div>
       <div>Sidebar notes: no origin/destination/ETA, daily credit reset at UTC 00:00</div>
-    </div>
-    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V6.003</div>
-    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
-      <div>Live Radar 航班搜尋：輸入航班號（如 JX800）按 Enter 跳轉定位</div>
-      <div>Flight search: enter flight number (e.g. JX800) + Enter to locate</div>
     </div>
     <button class="install-close-btn" onclick="closeAbout()">關閉</button>
   </div>

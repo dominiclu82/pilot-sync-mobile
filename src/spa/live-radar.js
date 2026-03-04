@@ -15,7 +15,7 @@ var _liveInterpInterval = null;
 var _liveRateLimited = false;
 var _liveLastFetchTime = 0;
 var _liveCreditsRemaining = null;
-var LIVE_REFRESH_SEC = 10;
+var LIVE_REFRESH_SEC = 15;
 var LIVE_INTERP_MS = 1000;
 
 /* callsign prefix → IATA mapping */
