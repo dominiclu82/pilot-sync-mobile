@@ -1021,7 +1021,7 @@ export function getSpaHtmlBody(): string {
       <button class="tab-util-btn tab-install-btn" id="tab-install-btn" onclick="showInstallGuide()" style="display:none">
         <span>📲</span>安裝
       </button>
-      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V6.104</span>
+      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V6.105</span>
     </div>
   </div>
 </div>
@@ -1051,15 +1051,15 @@ export function getSpaHtmlBody(): string {
       <div style="margin-bottom:4px">📱 建議使用 <b>iPad 橫向</b>操作以獲得最佳體驗</div>
       <div style="color:var(--muted)">Best experience on iPad in landscape mode</div>
     </div>
-    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V6.104</div>
+    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V6.105</div>
+    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
+      <div>修復實線航跡跨日期變更線方向錯誤</div>
+      <div>Fix solid trail crossing antimeridian in wrong direction</div>
+    </div>
+    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V6.104</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
       <div>搜尋支援全球航班（地圖外範圍自動全域搜尋）</div>
       <div>Search supports global flights (auto global search when not in view)</div>
-    </div>
-    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V6.103</div>
-    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
-      <div>修復大圓航跡跨日期變更線方向錯誤</div>
-      <div>Fix great circle trail crossing antimeridian in wrong direction</div>
     </div>
     <button class="install-close-btn" onclick="closeAbout()">關閉</button>
   </div>

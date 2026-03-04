@@ -513,8 +513,18 @@ function _fr24ShowPopup(marker) {
     _fr24ClearTrail();
     _fr24TrailFlight = f;
     if (detail && detail.trail && detail.trail.length > 1) {
-      /* solid line: already flown */
-      var pts = detail.trail.map(function(p) { return [p.lat, p.lng]; });
+      /* solid line: already flown (fix antimeridian wrap) */
+      var pts = [];
+      var prevLon2 = null;
+      for (var ti = 0; ti < detail.trail.length; ti++) {
+        var tLat = detail.trail[ti].lat, tLon = detail.trail[ti].lng;
+        if (prevLon2 !== null) {
+          while (tLon - prevLon2 > 180) tLon -= 360;
+          while (tLon - prevLon2 < -180) tLon += 360;
+        }
+        prevLon2 = tLon;
+        pts.push([tLat, tLon]);
+      }
       _fr24TrailLines.push(L.polyline(pts, {
         color: '#f59e0b', weight: 2.5, opacity: 0.85, interactive: false
       }).addTo(_fr24Map));
