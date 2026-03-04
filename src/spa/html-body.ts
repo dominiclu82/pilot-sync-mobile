@@ -284,7 +284,8 @@ export function getSpaHtmlBody(): string {
       <button id="live-refresh-btn" class="live-refresh-btn" onclick="liveManualRefresh()">↻ Refresh</button>
       <!-- status -->
       <div id="live-status" style="font-size:.6em;margin-top:6px;line-height:1.3"></div>
-      <div style="font-size:.6em;margin-top:2px;color:var(--muted)">僅即時位置，無起訖地資訊</div>
+      <div style="font-size:.6em;margin-top:2px;color:var(--muted)">僅即時位置，無起訖地資訊及ETA</div>
+      <div style="font-size:.55em;margin-top:2px;color:var(--muted);opacity:.6">額度每日 UTC 00:00 重置</div>
       <!-- flight list -->
       <div class="live-list-header">Flights</div>
       <div id="live-flight-list" class="live-flight-list"></div>
@@ -955,7 +956,7 @@ export function getSpaHtmlBody(): string {
       <button class="tab-util-btn tab-install-btn" id="tab-install-btn" onclick="showInstallGuide()" style="display:none">
         <span>📲</span>安裝
       </button>
-      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V6.003</span>
+      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V6.004</span>
     </div>
   </div>
 </div>
@@ -985,15 +986,15 @@ export function getSpaHtmlBody(): string {
       <div style="margin-bottom:4px">📱 建議使用 <b>iPad 橫向</b>操作以獲得最佳體驗</div>
       <div style="color:var(--muted)">Best experience on iPad in landscape mode</div>
     </div>
-    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V6.003</div>
+    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V6.004</div>
+    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
+      <div>Live Radar 側邊欄補充說明（無起訖地及ETA、額度重置時間）</div>
+      <div>Sidebar notes: no origin/destination/ETA, daily credit reset at UTC 00:00</div>
+    </div>
+    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V6.003</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
       <div>Live Radar 航班搜尋：輸入航班號（如 JX800）按 Enter 跳轉定位</div>
       <div>Flight search: enter flight number (e.g. JX800) + Enter to locate</div>
-    </div>
-    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V6.002</div>
-    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
-      <div>Live Radar 狀態列格式修正（剩餘額度顯示）</div>
-      <div>Fixed status bar format (remaining credits display)</div>
     </div>
     <button class="install-close-btn" onclick="closeAbout()">關閉</button>
   </div>
