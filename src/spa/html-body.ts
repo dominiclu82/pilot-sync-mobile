@@ -188,6 +188,7 @@ export function getSpaHtmlBody(): string {
     </div>
     <div class="subtab-slot"><button class="briefing-subtab" id="subtabBtn-pa" onclick="switchBriefingTab('pa',this)">🎙️ PA</button></div>
     <div class="subtab-slot"><button class="briefing-subtab" id="subtabBtn-hf" onclick="switchBriefingTab('hf',this)">📻 Pacific HF</button></div>
+    <div class="subtab-slot"><button class="briefing-subtab" id="subtabBtn-fr24" onclick="switchBriefingTab('fr24',this)">✈️ FR24</button></div>
     <div class="subtab-slot"><button class="briefing-subtab" id="subtabBtn-live" onclick="switchBriefingTab('live',this)">📡 Live</button></div>
     <div class="subtab-slot"><button class="briefing-subtab" id="subtabBtn-coldtemp" onclick="switchBriefingTab('coldtemp',this)">❄️ Cold Temp</button></div>
     <div class="subtab-slot"><button class="briefing-subtab" id="subtabBtn-tools" onclick="switchBriefingTab('tools',this)">🗺️ Tools</button></div>
@@ -289,6 +290,69 @@ export function getSpaHtmlBody(): string {
       <!-- flight list -->
       <div class="live-list-header">Flights</div>
       <div id="live-flight-list" class="live-flight-list"></div>
+    </div>
+  </div>
+
+  <!-- ── ✈️ FR24 Radar panel ── -->
+  <div id="briefing-fr24" class="briefing-panel">
+    <div id="fr24-portrait-overlay" class="live-portrait-overlay" style="display:none">
+      <div style="font-size:2.5em;margin-bottom:12px">📱↔️</div>
+      <div style="font-weight:700;font-size:1.05em;margin-bottom:6px">請橫拿手機</div>
+      <div style="color:var(--muted);font-size:.82em">Please rotate to landscape</div>
+    </div>
+    <div id="fr24-map"></div>
+    <button id="fr24-sidebar-toggle" class="live-toggle-btn" onclick="fr24ToggleSidebar()">☰</button>
+    <div id="fr24-sidebar" class="live-sidebar live-sidebar-left">
+      <div class="live-sb-header">
+        <div id="fr24-count" style="font-weight:700;font-size:.8em"></div>
+        <div style="display:flex;gap:6px">
+          <button class="live-sb-pos-btn" onclick="fr24SwitchSidebarPos()" title="Switch side">⇄</button>
+          <button class="live-sb-close-btn" onclick="fr24ToggleSidebar()" title="Close">✕</button>
+        </div>
+      </div>
+      <div class="live-sb-section">
+        <div class="live-airline-row">
+          <label class="live-cb-label"><input type="checkbox" id="fr24-f-jx" checked onchange="fr24ApplyFilter()"><span>JX</span></label>
+          <label class="live-cb-label"><input type="checkbox" id="fr24-f-br" onchange="fr24ApplyFilter()"><span>BR</span></label>
+          <label class="live-cb-label"><input type="checkbox" id="fr24-f-ci" onchange="fr24ApplyFilter()"><span>CI</span></label>
+        </div>
+        <label class="live-cb-label" style="margin-top:4px"><input type="checkbox" id="fr24-f-all" onchange="fr24ToggleAll()"><span>All flights</span></label>
+        <div style="font-size:.65em;color:#f5a623;margin-top:1px;line-height:1.2;padding-left:21px">⚠ 顯示可視範圍，上限 500</div>
+      </div>
+      <div class="live-sb-section" style="display:flex;align-items:center;gap:6px">
+        <div style="font-size:.7em;color:var(--muted);white-space:nowrap">Search</div>
+        <input type="text" id="fr24-f-custom" class="live-custom-input" placeholder="JX / JX800" onchange="fr24ApplyFilter()" onkeydown="if(event.key==='Enter')fr24SearchFlight()" style="width:72px;flex:none">
+        <label class="live-cb-label" style="margin-left:auto"><input type="checkbox" id="fr24-f-labels" onchange="fr24ToggleLabels()"><span>Labels</span></label>
+      </div>
+      <div id="fr24-search-msg" style="font-size:.6em;color:#f87171;min-height:.8em;line-height:1.2"></div>
+      <div class="live-sb-section" style="display:flex;align-items:center;gap:4px">
+        <select id="fr24-jump" class="live-jump-select" style="flex:1;min-width:0" onchange="fr24JumpTo()">
+          <option value="">Jump to</option>
+          <option value="25.08,121.23,8">TPE</option>
+          <option value="22.57,120.35,10">KHH</option>
+          <option value="35.76,140.39,8">NRT</option>
+          <option value="34.43,135.24,10">KIX</option>
+          <option value="42.77,141.69,10">CTS</option>
+          <option value="22.31,113.91,10">HKG</option>
+          <option value="1.36,103.99,10">SIN</option>
+          <option value="13.69,100.75,10">BKK</option>
+          <option value="33.94,-118.41,8">LAX</option>
+          <option value="37.62,-122.38,10">SFO</option>
+          <option value="47.45,-122.31,10">SEA</option>
+          <option value="33.43,-112.01,10">PHX</option>
+          <option value="25.0,121.5,5">Asia</option>
+          <option value="40.0,-100.0,4">USA</option>
+          <option value="50.0,10.0,4">Europe</option>
+          <option value="0,0,2">World</option>
+        </select>
+        <input type="text" id="fr24-jump-input" class="live-custom-input" placeholder="ICAO" style="width:56px;flex:none" onkeydown="if(event.key==='Enter')fr24JumpToIcao()">
+        <button class="live-sb-pos-btn" onclick="fr24JumpToIcao()" style="padding:4px 6px;font-size:.72em">Go</button>
+      </div>
+      <button id="fr24-refresh-btn" class="live-refresh-btn" onclick="fr24ManualRefresh()">↻ Refresh</button>
+      <div id="fr24-status" style="font-size:.6em;margin-top:6px;line-height:1.3"></div>
+      <div style="font-size:.55em;margin-top:2px;color:var(--muted);opacity:.6">非官方資料源，可能隨時失效</div>
+      <div class="live-list-header">Flights</div>
+      <div id="fr24-flight-list" class="live-flight-list"></div>
     </div>
   </div>
 
@@ -956,7 +1020,7 @@ export function getSpaHtmlBody(): string {
       <button class="tab-util-btn tab-install-btn" id="tab-install-btn" onclick="showInstallGuide()" style="display:none">
         <span>📲</span>安裝
       </button>
-      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V6.005</span>
+      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V6.006</span>
     </div>
   </div>
 </div>
@@ -986,15 +1050,15 @@ export function getSpaHtmlBody(): string {
       <div style="margin-bottom:4px">📱 建議使用 <b>iPad 橫向</b>操作以獲得最佳體驗</div>
       <div style="color:var(--muted)">Best experience on iPad in landscape mode</div>
     </div>
-    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V6.005</div>
+    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V6.006</div>
+    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
+      <div>新增 ✈️ FR24 subtab（FlightRadar24 非官方資料源，含起訖地、機型）</div>
+      <div>Added FR24 subtab (unofficial FlightRadar24 data with origin/destination, aircraft type)</div>
+    </div>
+    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V6.005</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
       <div>Live Radar 自動刷新間隔調整為 15 秒</div>
       <div>Auto-refresh interval changed to 15 seconds</div>
-    </div>
-    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V6.004</div>
-    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
-      <div>Live Radar 側邊欄補充說明（無起訖地及ETA、額度重置時間）</div>
-      <div>Sidebar notes: no origin/destination/ETA, daily credit reset at UTC 00:00</div>
     </div>
     <button class="install-close-btn" onclick="closeAbout()">關閉</button>
   </div>

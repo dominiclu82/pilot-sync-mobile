@@ -17,6 +17,8 @@ import { getSpaPaJs } from './spa/js-pa.js';
 import { getSpaAirportDataJs } from './spa/js-airport-data.js';
 import { getSpaCalendarJs } from './spa/js-calendar-wrap.js';
 import { getSpaLiveRadarJs } from './spa/js-live-radar.js';
+import { getSpaFr24RadarJs } from './spa/js-fr24-radar.js';
+import FR24Pkg from 'flightradarapi';
 
 
 config({ path: path.join(ROOT, '.env') });
@@ -293,6 +295,64 @@ app.get('/api/opensky', async (req, res) => {
     res.json({ ...data, _remaining: remainNum });
   } catch (e: any) {
     console.error('OpenSky proxy error:', e.message);
+    res.status(502).json({ error: e.message });
+  }
+});
+
+// ── FR24 proxy ───────────────────────────────────────────────────────────────
+const _fr24Api = new FR24Pkg.FlightRadar24API();
+let _fr24Cache: { ts: number; data: any } = { ts: 0, data: null };
+
+app.get('/api/fr24', async (req, res) => {
+  try {
+    const now = Date.now();
+    if (_fr24Cache.data && now - _fr24Cache.ts < 8000) {
+      res.json(_fr24Cache.data);
+      return;
+    }
+    const flights = await _fr24Api.getFlights();
+    const result = flights.map((f: any) => ({
+      id: f.id || '',
+      cs: (f.callsign || '').trim(),
+      lat: f.latitude,
+      lon: f.longitude,
+      alt: f.altitude,
+      hdg: f.heading,
+      spd: f.groundSpeed,
+      vs: f.verticalSpeed,
+      sq: f.squawk || '',
+      icao24: f.icao24bit || '',
+      reg: f.registration || '',
+      type: f.aircraftCode || '',
+      from: f.originAirportIata || '',
+      to: f.destinationAirportIata || '',
+      num: f.number || '',
+      gnd: f.onGround ? 1 : 0
+    }));
+    const data = { flights: result, time: Math.floor(now / 1000) };
+    _fr24Cache = { ts: now, data };
+    res.json(data);
+  } catch (e: any) {
+    const msg = e.message || '';
+    if (msg.includes('Cloudflare') || msg.includes('unexpected')) {
+      res.status(429).json({ error: 'rate_limit' });
+    } else {
+      console.error('FR24 proxy error:', msg);
+      res.status(502).json({ error: msg });
+    }
+  }
+});
+
+app.get('/api/fr24/detail', async (req, res) => {
+  try {
+    const flightId = req.query.id as string;
+    if (!flightId) { res.status(400).json({ error: 'missing id' }); return; }
+    const { Flight } = FR24Pkg;
+    const stub = new Flight(flightId, {});
+    const details = await _fr24Api.getFlightDetails(stub);
+    res.json(details || {});
+  } catch (e: any) {
+    console.error('FR24 detail error:', e.message);
     res.status(502).json({ error: e.message });
   }
 });
@@ -645,6 +705,7 @@ ${getSpaGateInfoJs()}
 ${getSpaPaJs()}
 ${getSpaCalendarJs()}
 ${getSpaLiveRadarJs()}
+${getSpaFr24RadarJs()}
 </script>
 </body>
 </html>`;

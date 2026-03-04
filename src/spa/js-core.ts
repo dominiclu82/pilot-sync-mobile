@@ -292,6 +292,8 @@ function switchTab(tab, btn) {
   }
   if (typeof _liveUnlockOrientation === 'function') _liveUnlockOrientation();
   if (typeof liveStopAll === 'function') liveStopAll();
+  if (typeof _fr24UnlockOrientation === 'function') _fr24UnlockOrientation();
+  if (typeof fr24StopAll === 'function') fr24StopAll();
   window.scrollTo(0, 0);
 }
 
@@ -537,6 +539,12 @@ function switchBriefingTab(panel, btn) {
   } else {
     if (typeof _liveUnlockOrientation === 'function') _liveUnlockOrientation();
     if (typeof liveStopAll === 'function') liveStopAll();
+  }
+  if (panel === 'fr24') {
+    fr24Init();
+  } else {
+    if (typeof _fr24UnlockOrientation === 'function') _fr24UnlockOrientation();
+    if (typeof fr24StopAll === 'function') fr24StopAll();
   }
 }
 

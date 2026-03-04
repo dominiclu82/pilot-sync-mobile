@@ -357,8 +357,8 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
   .dt-ref-table th,.dt-ref-table td{padding:10px 14px}
 }
 /* ── Live Radar ── */
-#briefing-live.active{display:flex;position:relative;padding:0;overflow:hidden;clip-path:inset(0)}
-#live-map{flex:1;width:100%;min-height:300px;z-index:1;background:#0a0e1a}
+#briefing-live.active,#briefing-fr24.active{display:flex;position:relative;padding:0;overflow:hidden;clip-path:inset(0)}
+#live-map,#fr24-map{flex:1;width:100%;min-height:300px;z-index:1;background:#0a0e1a}
 .live-toggle-btn{position:absolute;top:8px;z-index:600;background:rgba(10,14,26,.85);
   border:1px solid var(--dim);color:var(--muted);font-size:1.1em;width:34px;height:34px;
   border-radius:6px;cursor:pointer;display:flex;align-items:center;justify-content:center;
