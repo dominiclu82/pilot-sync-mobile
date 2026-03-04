@@ -508,10 +508,20 @@ function calcColdTemp() {
     var inp = document.getElementById('ct-a'+idx);
     var res = document.getElementById('ct-r'+idx);
     if (!inp || !res) continue;
-    var alt = parseFloat(inp.value);
-    if (isNaN(alt)) continue;
-    var r = ctInterp(alt, elev, oat);
-    var corrAlt = Math.round((alt + r.corr) / 10) * 10;
+    var val = parseFloat(inp.value);
+    if (isNaN(val)) continue;
+
+    /* FPA correction (idx 3) */
+    if (idx === 3) {
+      var isaTemp = 15 - 1.98 * elev / 1000;
+      var corrFpa = Math.atan(Math.tan(val * Math.PI / 180) * (isaTemp + 273.15) / (oat + 273.15)) * 180 / Math.PI;
+      res.innerHTML = corrFpa.toFixed(2) + '\u00b0';
+      res.className = 'ct-card-result';
+      continue;
+    }
+
+    var r = ctInterp(val, elev, oat);
+    var corrAlt = Math.round((val + r.corr) / 10) * 10;
     res.innerHTML = '+' + r.corr.toLocaleString() + ' ft<br>' + corrAlt.toLocaleString() + ' ft';
     res.className = 'ct-card-result';
     // Highlight table cells (track unique cells)

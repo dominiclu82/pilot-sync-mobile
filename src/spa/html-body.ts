@@ -325,8 +325,8 @@ export function getSpaHtmlBody(): string {
             <div class="ct-card-result empty" id="ct-r2">—</div>
           </div>
           <div class="ct-card">
-            <input class="ct-label-inp" type="text" id="ct-l3" placeholder="自訂 / Custom (optional)">
-            <input class="ct-card-input" type="number" id="ct-a3" inputmode="numeric" placeholder="ft">
+            <div class="ct-card-label">FPA</div>
+            <input class="ct-card-input" type="number" id="ct-a3" inputmode="decimal" placeholder="°" step="0.01">
             <div class="ct-card-result empty" id="ct-r3">—</div>
           </div>
           <div class="ct-card">
@@ -1021,7 +1021,7 @@ export function getSpaHtmlBody(): string {
       <button class="tab-util-btn tab-install-btn" id="tab-install-btn" onclick="showInstallGuide()" style="display:none">
         <span>📲</span>安裝
       </button>
-      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V6.105</span>
+      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V6.106</span>
     </div>
   </div>
 </div>
@@ -1051,15 +1051,17 @@ export function getSpaHtmlBody(): string {
       <div style="margin-bottom:4px">📱 建議使用 <b>iPad 橫向</b>操作以獲得最佳體驗</div>
       <div style="color:var(--muted)">Best experience on iPad in landscape mode</div>
     </div>
-    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V6.105</div>
+    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V6.106</div>
+    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
+      <div>Duty Time 輸入格自動跳轉（HH→MM→下一組）</div>
+      <div>Cold Temp 新增 FPA 低溫修正計算</div>
+      <div>Duty Time auto-jump between input fields (HH→MM→next)</div>
+      <div>Cold Temp: add FPA cold temperature correction</div>
+    </div>
+    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V6.105</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
       <div>修復實線航跡跨日期變更線方向錯誤</div>
       <div>Fix solid trail crossing antimeridian in wrong direction</div>
-    </div>
-    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V6.104</div>
-    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
-      <div>搜尋支援全球航班（地圖外範圍自動全域搜尋）</div>
-      <div>Search supports global flights (auto global search when not in view)</div>
     </div>
     <button class="install-close-btn" onclick="closeAbout()">關閉</button>
   </div>

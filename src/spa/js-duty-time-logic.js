@@ -17,6 +17,40 @@ document.addEventListener('input', function(e) {
   if (el.value !== v) el.value = v;
 }, true);
 
+// ── Auto-jump: HH(2碼)→MM(2碼)→下一組 ──
+var DT_INPUT_ORDER = [
+  'dt-s-day','dt-s-h','dt-s-m',
+  'dt-e-day','dt-e-h','dt-e-m',
+  'dt-dhd-day','dt-dhd-h','dt-dhd-m',
+  'dt-ft-h','dt-ft-m',
+  'dt-n-day','dt-n-h','dt-n-m',
+  'dt-ci-day','dt-ci-h','dt-ci-m',
+  'dt-co-day','dt-co-h','dt-co-m',
+  'dt-accom-h','dt-accom-m'
+];
+function dtAutoJumpNext(currentId) {
+  var idx = DT_INPUT_ORDER.indexOf(currentId);
+  if (idx < 0) return;
+  for (var i = idx + 1; i < DT_INPUT_ORDER.length; i++) {
+    var el = document.getElementById(DT_INPUT_ORDER[i]);
+    if (!el) continue;
+    /* skip hidden fields (e.g. DHD row not visible) */
+    if (el.offsetParent === null) continue;
+    /* skip date inputs — they use date picker, not text focus */
+    if (el.type === 'date') continue;
+    el.focus();
+    el.select();
+    return;
+  }
+}
+document.addEventListener('input', function(e) {
+  var el = e.target;
+  if (!el.classList.contains('dt-time-box')) return;
+  if (el.value.length >= (parseInt(el.maxLength) || 2)) {
+    dtAutoJumpNext(el.id);
+  }
+});
+
 // ── Flight Time real-time check ──
 function dtCheckFT() {
   var err = document.getElementById('dt-ft-err');
@@ -81,6 +115,7 @@ function dtDateChanged(inp) {
   if (inp.value) {
     var parts = inp.value.split('-');
     btn.textContent = parts[1]+'/'+parts[2];
+    dtAutoJumpNext(inp.id);
   } else {
     btn.textContent = '--/--';
   }
