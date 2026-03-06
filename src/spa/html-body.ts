@@ -1104,7 +1104,7 @@ export function getSpaHtmlBody(): string {
       <button class="tab-util-btn tab-install-btn" id="tab-install-btn" onclick="showInstallGuide()" style="display:none">
         <span>📲</span>安裝
       </button>
-      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V6.108</span>
+      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V6.109</span>
     </div>
   </div>
 </div>
@@ -1134,7 +1134,12 @@ export function getSpaHtmlBody(): string {
       <div style="margin-bottom:4px">📱 建議使用 <b>iPad 橫向</b>操作以獲得最佳體驗</div>
       <div style="color:var(--muted)">Best experience on iPad in landscape mode</div>
     </div>
-    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V6.108</div>
+    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V6.109</div>
+    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
+      <div>Subtab bar 響應式顯示（手機4個/iPad橫6個/筆電全滿）</div>
+      <div>Subtab bar responsive layout (phone 4 / iPad landscape 6 / laptop all)</div>
+    </div>
+    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V6.108</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
       <div>新增 📋 提示 subtab：航班號自動查詢帶入資料、Cruise Altitude、MEL/Required Fuel 備註欄</div>
       <div>新增 ⏳ 輪休計算 subtab：三種模式（CM1/CM2個別計算、Ops Crew休一段、一段輪休）、TOD 建議休時、自動重算配對段、Enter 跳格、輸入驗證</div>
@@ -1142,11 +1147,6 @@ export function getSpaHtmlBody(): string {
       <div>New 📋 Briefing Card subtab: auto-lookup flight info, Cruise Altitude, MEL/Required Fuel notes</div>
       <div>New ⏳ Crew Rest Calculator subtab: 3 modes, TOD-based suggestion, auto-redistribute, Enter to jump, input validation</div>
       <div>Subtab bar horizontally scrollable on mobile/iPad</div>
-    </div>
-    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V6.107</div>
-    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
-      <div>iPad/平板 A-/A+ 按鈕間距加大避免誤觸</div>
-      <div>Increase A-/A+ button spacing on iPad/tablet to prevent accidental taps</div>
     </div>
     <button class="install-close-btn" onclick="closeAbout()">關閉</button>
   </div>
