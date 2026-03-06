@@ -408,9 +408,6 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
   .dt-ref-table th,.dt-ref-table td{padding:10px 14px}
 }
 @media(min-width:1024px){
-  .subtab-slot{min-width:calc(100% / 6)}
-}
-@media(min-width:1280px){
   .subtab-slot{flex:1;min-width:0}
 }
 /* ── Live Radar ── */

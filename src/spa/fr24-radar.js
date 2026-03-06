@@ -453,6 +453,21 @@ function _fr24ShowPopup(marker) {
       if (!eta && sta) { eta = sta + ' (sched)'; sta = ''; }
     }
 
+    /* time diff color: actual vs scheduled (unix timestamps) */
+    function _fr24TimeColor(actualTs, schedTs) {
+      if (!actualTs || !schedTs) return '';
+      var diff = (actualTs - schedTs) / 60; // minutes
+      if (diff > 60) return 'color:#ef4444'; // red: >1hr late
+      if (diff > 15) return 'color:#eab308'; // yellow: >15min late
+      if (diff < -15) return 'color:#22c55e'; // green: >15min early
+      return '';
+    }
+    var _trSafe = (detail && detail.time && detail.time.real) || {};
+    var _tsSafe = (detail && detail.time && detail.time.scheduled) || {};
+    var _teSafe = (detail && detail.time && detail.time.estimated) || {};
+    var atdStyle = _fr24TimeColor(_trSafe.departure, _tsSafe.departure);
+    var etaStyle = _fr24TimeColor(_teSafe.arrival, _tsSafe.arrival);
+
     /* FR24-style compact card */
     var html = '<div class="fr24-card">' +
       /* header: callsign + badges */
@@ -477,12 +492,12 @@ function _fr24ShowPopup(marker) {
       /* departure times row */
       ((std || atd) ? '<div class="fr24-card-row">' +
         (std ? '<div class="fr24-card-cell"><div class="fr24-card-lbl">STD</div><div class="fr24-card-val">' + std + '</div></div>' : '') +
-        (atd ? '<div class="fr24-card-cell"><div class="fr24-card-lbl">ATD</div><div class="fr24-card-val">' + atd + '</div></div>' : '') +
+        (atd ? '<div class="fr24-card-cell"><div class="fr24-card-lbl">ATD</div><div class="fr24-card-val"' + (atdStyle ? ' style="' + atdStyle + '"' : '') + '>' + atd + '</div></div>' : '') +
       '</div>' : '') +
       /* arrival times row */
       ((sta || eta) ? '<div class="fr24-card-row">' +
         (sta ? '<div class="fr24-card-cell"><div class="fr24-card-lbl">STA</div><div class="fr24-card-val">' + sta + '</div></div>' : '') +
-        (eta ? '<div class="fr24-card-cell"><div class="fr24-card-lbl">ETA</div><div class="fr24-card-val">' + eta + '</div></div>' : '') +
+        (eta ? '<div class="fr24-card-cell"><div class="fr24-card-lbl">ETA</div><div class="fr24-card-val"' + (etaStyle ? ' style="' + etaStyle + '"' : '') + '>' + eta + '</div></div>' : '') +
       '</div>' : '') +
       /* altitude & v/s */
       '<div class="fr24-card-row">' +
