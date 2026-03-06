@@ -180,7 +180,11 @@ export function getSpaHtmlBody(): string {
     <div class="subtab-slot"><button class="briefing-subtab active" id="subtabBtn-brief" onclick="switchBriefingTab('brief',this)">📋 提示</button></div>
     <div class="subtab-wx-wrap">
       <button class="briefing-subtab" id="subtabBtn-datis" onclick="switchBriefingTab('datis',this)">⛅ Airport WX</button>
-      <select class="wx-fleet-select" id="wx-fleet-select" onchange="wxSwitchFleet(this)">
+      <select class="wx-fleet-select" id="wx-fleet-select"
+        onfocus="this._prev=this.value;this.selectedIndex=0"
+        onchange="wxSwitchFleet(this);switchBriefingTab('datis',document.getElementById('subtabBtn-datis'))"
+        onblur="if(this.value===''){this.value=this._prev||'A350-900'}">
+        <option value="" style="display:none">選擇機型</option>
         <option value="A321">A321</option>
         <option value="A330">A330</option>
         <option value="A350-900" selected>A350-900</option>
@@ -1104,7 +1108,7 @@ export function getSpaHtmlBody(): string {
       <button class="tab-util-btn tab-install-btn" id="tab-install-btn" onclick="showInstallGuide()" style="display:none">
         <span>📲</span>安裝
       </button>
-      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V6.114</span>
+      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V6.115</span>
     </div>
   </div>
 </div>
@@ -1134,15 +1138,15 @@ export function getSpaHtmlBody(): string {
       <div style="margin-bottom:4px">📱 建議使用 <b>iPad 橫向</b>操作以獲得最佳體驗</div>
       <div style="color:var(--muted)">Best experience on iPad in landscape mode</div>
     </div>
-    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V6.114</div>
+    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V6.115</div>
+    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
+      <div>機型選單縮短置中 + 選機型即切換至 Airport WX</div>
+      <div>Fleet select compact &amp; centered + select any fleet switches to Airport WX</div>
+    </div>
+    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V6.114</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
       <div>輪休計算新增提示文字 + TOD 差 5 分鐘可整除自動延至 TOD-15</div>
       <div>Crew rest hint note + TOD auto-extend to TOD-15 when 5min makes even division</div>
-    </div>
-    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V6.113</div>
-    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
-      <div>Subtab bar 平均分配修正（iPad/筆電 8 個等寬，手機捲動）</div>
-      <div>Subtab bar evenly distributed on iPad/laptop, scrollable on phone</div>
     </div>
     <button class="install-close-btn" onclick="closeAbout()">關閉</button>
   </div>
