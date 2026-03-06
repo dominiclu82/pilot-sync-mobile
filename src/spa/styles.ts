@@ -407,8 +407,9 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
   .dt-ref-table{font-size:.95em}
   .dt-ref-table th,.dt-ref-table td{padding:10px 14px}
 }
-@media(min-width:1024px){
-  .subtab-slot{flex:1;min-width:0}
+@media(min-width:1100px){
+  .briefing-subtabs{overflow-x:visible}
+  .subtab-slot{flex:1 1 0;min-width:0}
 }
 /* ── Live Radar ── */
 #briefing-live.active{display:flex;position:relative;padding:0;overflow:hidden;clip-path:inset(0)}

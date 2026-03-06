@@ -1104,7 +1104,7 @@ export function getSpaHtmlBody(): string {
       <button class="tab-util-btn tab-install-btn" id="tab-install-btn" onclick="showInstallGuide()" style="display:none">
         <span>📲</span>安裝
       </button>
-      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V6.110</span>
+      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V6.111</span>
     </div>
   </div>
 </div>
@@ -1134,17 +1134,17 @@ export function getSpaHtmlBody(): string {
       <div style="margin-bottom:4px">📱 建議使用 <b>iPad 橫向</b>操作以獲得最佳體驗</div>
       <div style="color:var(--muted)">Best experience on iPad in landscape mode</div>
     </div>
-    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V6.110</div>
+    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V6.111</div>
+    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
+      <div>iPad subtab bar 響應式修正（Pro 11" 以上全顯示，mini 維持捲動）</div>
+      <div>Fix subtab bar responsive — full display on iPad Pro 11"+, scrollable on iPad mini</div>
+    </div>
+    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V6.110</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
       <div>FR24 資訊卡 ATD/ETA 延誤顏色提示（綠/黃/紅）</div>
       <div>Subtab bar iPad 橫拿全顯示、手機/直拿可捲動</div>
       <div>FR24 info card ATD/ETA delay color coding (green/yellow/red)</div>
       <div>Subtab bar: all visible on iPad landscape, scrollable on phone/portrait</div>
-    </div>
-    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V6.108</div>
-    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
-      <div>新增 📋 提示 subtab + ⏳ 輪休計算 subtab</div>
-      <div>New 📋 Briefing Card + ⏳ Crew Rest Calculator subtabs</div>
     </div>
     <button class="install-close-btn" onclick="closeAbout()">關閉</button>
   </div>
