@@ -291,7 +291,7 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
 .briefing-subtab{flex-shrink:0;padding:10px 12px;font-size:.84em;font-weight:700;background:none;
   border:none;border-bottom:2.5px solid transparent;color:var(--muted);cursor:pointer;
   transition:color .2s,border-color .2s;margin-bottom:-1.5px;-webkit-appearance:none;white-space:nowrap}
-.subtab-slot{display:flex;justify-content:center;align-items:center;flex-shrink:0}
+.subtab-slot{display:flex;justify-content:center;align-items:center;flex:1}
 .briefing-subtab.active{color:var(--accent);border-bottom-color:var(--accent)}
 .briefing-panel{display:none}
 .briefing-panel.active{display:block;padding:16px 16px 0}
@@ -408,7 +408,7 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
   .dt-ref-table th,.dt-ref-table td{padding:10px 14px}
 }
 @media(max-width:767px){
-  .subtab-slot{min-width:25%}
+  .subtab-slot{flex:0 0 25%}
 }
 /* ── Live Radar ── */
 #briefing-live.active{display:flex;position:relative;padding:0;overflow:hidden;clip-path:inset(0)}
