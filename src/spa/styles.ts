@@ -295,6 +295,55 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
 .briefing-subtab.active{color:var(--accent);border-bottom-color:var(--accent)}
 .briefing-panel{display:none}
 .briefing-panel.active{display:block;padding:16px 16px 0}
+
+/* ── 📋 提示卡 ── */
+.brief-search{display:flex;gap:8px;margin-bottom:12px}
+.brief-search input{flex:1;background:var(--card);border:1px solid var(--dim);border-radius:8px;padding:10px;color:var(--text);font-size:.9em}
+.brief-search input::placeholder{color:var(--muted)}
+.brief-search-btn{background:var(--accent);color:#fff;border:none;border-radius:8px;padding:8px 16px;font-weight:600;cursor:pointer;white-space:nowrap}
+.brief-section{background:var(--card);border-radius:var(--radius);padding:16px;margin-bottom:12px}
+.brief-section-header{display:flex;justify-content:space-between;align-items:center;font-weight:700;font-size:.85em;margin-bottom:12px;color:var(--text);letter-spacing:.5px}
+.brief-clear-btn{background:none;border:1px solid var(--dim);border-radius:6px;color:var(--muted);font-size:.75em;padding:4px 10px;cursor:pointer}
+.brief-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.brief-field{background:rgba(255,255,255,.06);border-radius:8px;padding:10px;text-align:center}
+.brief-field label{font-size:.7em;color:var(--muted);display:block;margin-bottom:4px}
+.brief-field input{background:transparent;border:none;color:var(--text);text-align:center;width:100%;font-size:.9em;outline:none}
+.brief-field input::placeholder{color:var(--dim)}
+.brief-note{width:100%;background:rgba(255,255,255,.06);border:none;border-radius:8px;padding:10px;color:var(--text);font-size:.85em;resize:vertical;margin-bottom:8px;outline:none;font-family:inherit}
+.brief-note::placeholder{color:var(--muted)}
+
+/* ── ⏳ 輪休計算 ── */
+.cr-wrap{max-width:800px;margin:0 auto}
+.cr-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px}
+.cr-input-row{display:flex;gap:16px;align-items:flex-end;margin-bottom:12px;flex-wrap:wrap}
+.cr-input-group{display:flex;flex-direction:column;gap:4px}
+.cr-input-group label{font-size:.75em;color:var(--muted);font-weight:600}
+.cr-input{background:var(--card);border:1px solid var(--dim);border-radius:6px;padding:8px;color:var(--text);text-align:center;width:56px;font-size:1em;outline:none}
+.cr-input::-webkit-inner-spin-button,.cr-input::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
+.cr-input[type=number]{-moz-appearance:textfield}
+.cr-select{background:var(--card);border:1px solid var(--dim);border-radius:6px;padding:8px 12px;color:var(--text);font-size:1em;outline:none;cursor:pointer}
+.cr-result-box{background:rgba(59,130,246,.12);border:1px solid rgba(59,130,246,.25);border-radius:10px;padding:6px 14px;display:flex;flex-direction:column;align-items:center;gap:2px}
+.cr-result-time{font-size:18px;font-weight:700;color:var(--text)}
+.cr-apply-btn{background:var(--accent);color:#fff;border:none;border-radius:6px;padding:6px 18px;cursor:pointer;font-weight:600;font-size:13px}
+.cr-mode-wrap{display:flex;gap:16px;margin-bottom:12px}
+.cr-mode-label{display:flex;align-items:center;gap:4px;font-size:.85em;color:var(--text);cursor:pointer}
+.cr-groups-row{display:flex;gap:12px}
+.cr-groups-row .cr-group{flex:1;min-width:0}
+@media(max-width:639px){.cr-groups-row{flex-direction:column}}
+.cr-group{background:var(--card);border-radius:var(--radius);padding:16px;margin-bottom:12px}
+.cr-group-title{font-weight:700;font-size:.9em;margin-bottom:10px;color:var(--text)}
+.cr-start-row{display:flex;align-items:center;gap:8px;margin-bottom:10px;font-size:.85em;flex-wrap:wrap}
+.cr-start-row label{color:var(--muted);font-size:.8em}
+.cr-start-input{background:rgba(255,255,255,.06);border:1px solid var(--dim);border-radius:6px;padding:6px;color:var(--text);text-align:center;width:70px;font-size:.95em;outline:none}
+.cr-table{width:100%;border-collapse:collapse}
+.cr-table th{font-size:.72em;color:var(--muted);padding:6px 4px;text-align:center;font-weight:600}
+.cr-table td{padding:5px 4px;text-align:center}
+.cr-table .cr-who{font-weight:700;font-size:.85em;color:var(--accent);text-align:left;white-space:nowrap}
+.cr-table .cr-dur-input{background:rgba(255,255,255,.06);border:1px solid var(--dim);border-radius:6px;padding:6px;color:var(--text);text-align:center;width:65px;font-size:.9em;outline:none}
+.cr-table .cr-end{color:#4ade80;font-weight:600;font-size:.9em}
+.cr-letter{color:var(--accent)}
+.cr-nm{color:var(--muted);font-weight:400;font-size:.85em}
+
 .tool-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px;margin-top:4px}
 .tool-link-btn{display:flex;align-items:center;justify-content:center;
   padding:10px 8px;background:var(--accent);color:#fff;border-radius:10px;
@@ -326,7 +375,7 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
 @media(min-width:640px){
   /* ── 預設：可捲動 ── */
   .briefing-subtabs{position:sticky;top:0;z-index:100;flex-shrink:0}
-  .subtab-slot{flex:1}
+  .subtab-slot{flex-shrink:0}
   .briefing-panel.active{padding:0}
   /* ── 所有 tab 固定高度，上下 bar 不動 ── */
   html:has(#tab-briefing.tab-active),
@@ -357,6 +406,9 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
   /* ── 桌面版表格加大 ── */
   .dt-ref-table{font-size:.95em}
   .dt-ref-table th,.dt-ref-table td{padding:10px 14px}
+}
+@media(min-width:1024px){
+  .subtab-slot{flex:1}
 }
 /* ── Live Radar ── */
 #briefing-live.active{display:flex;position:relative;padding:0;overflow:hidden;clip-path:inset(0)}

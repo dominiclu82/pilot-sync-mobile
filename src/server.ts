@@ -18,6 +18,8 @@ import { getSpaAirportDataJs } from './spa/js-airport-data.js';
 import { getSpaCalendarJs } from './spa/js-calendar-wrap.js';
 import { getSpaLiveRadarJs } from './spa/js-live-radar.js';
 import { getSpaFr24RadarJs } from './spa/js-fr24-radar.js';
+import { getSpaBriefingCardJs } from './spa/js-briefing-card.js';
+import { getSpaCrewRestJs } from './spa/js-crew-rest.js';
 import FR24Pkg from 'flightradarapi';
 
 
@@ -706,6 +708,8 @@ ${getSpaPaJs()}
 ${getSpaCalendarJs()}
 ${getSpaLiveRadarJs()}
 ${getSpaFr24RadarJs()}
+${getSpaBriefingCardJs()}
+${getSpaCrewRestJs()}
 </script>
 </body>
 </html>`;

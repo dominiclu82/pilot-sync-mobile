@@ -177,8 +177,9 @@ export function getSpaHtmlBody(): string {
 
   <!-- 子 Tab Bar -->
   <div class="briefing-subtabs">
+    <div class="subtab-slot"><button class="briefing-subtab active" id="subtabBtn-brief" onclick="switchBriefingTab('brief',this)">📋 提示</button></div>
     <div class="subtab-wx-wrap">
-      <button class="briefing-subtab active" id="subtabBtn-datis" onclick="switchBriefingTab('datis',this)">⛅ Airport WX</button>
+      <button class="briefing-subtab" id="subtabBtn-datis" onclick="switchBriefingTab('datis',this)">⛅ Airport WX</button>
       <select class="wx-fleet-select" id="wx-fleet-select" onchange="wxSwitchFleet(this)">
         <option value="A321">A321</option>
         <option value="A330">A330</option>
@@ -188,10 +189,92 @@ export function getSpaHtmlBody(): string {
     </div>
     <div class="subtab-slot"><button class="briefing-subtab" id="subtabBtn-pa" onclick="switchBriefingTab('pa',this)">🎙️ PA</button></div>
     <div class="subtab-slot"><button class="briefing-subtab" id="subtabBtn-hf" onclick="switchBriefingTab('hf',this)">📻 Pacific HF</button></div>
+    <div class="subtab-slot"><button class="briefing-subtab" id="subtabBtn-crewrest" onclick="switchBriefingTab('crewrest',this)">⏳ 輪休計算</button></div>
     <div class="subtab-slot" style="display:none"><button class="briefing-subtab" id="subtabBtn-live" onclick="switchBriefingTab('live',this)">📡 Live</button></div>
     <div class="subtab-slot"><button class="briefing-subtab" id="subtabBtn-coldtemp" onclick="switchBriefingTab('coldtemp',this)">❄️ Cold Temp</button></div>
     <div class="subtab-slot"><button class="briefing-subtab" id="subtabBtn-tools" onclick="switchBriefingTab('tools',this)">🗺️ Tools</button></div>
     <div class="subtab-slot"><button class="briefing-subtab" id="subtabBtn-duty" onclick="switchBriefingTab('duty',this)">⏱️ Duty Time</button></div>
+  </div>
+
+  <!-- ── 📋 提示 panel ── -->
+  <div id="briefing-brief" class="briefing-panel active">
+    <div class="brief-search">
+      <input type="text" id="brief-fno" placeholder="航班號 Flight No. (e.g. JX801)" oninput="_briefOnInput(this.value)">
+      <span id="brief-flt-status" class="pa-flt-status"></span>
+    </div>
+
+    <div class="brief-section">
+      <div class="brief-section-header"><span>FLIGHT INFO / DATA</span><button class="brief-clear-btn" onclick="briefClearInfo()">清除</button></div>
+      <div class="brief-grid">
+        <div class="brief-field"><label>DEP Date</label><input type="text" id="brief-dep-date" placeholder="—"></div>
+        <div class="brief-field"><label>ETD UTC</label><input type="text" id="brief-etd" placeholder="—"></div>
+        <div class="brief-field"><label>ARR Date</label><input type="text" id="brief-arr-date" placeholder="—"></div>
+        <div class="brief-field"><label>ETA UTC</label><input type="text" id="brief-eta" placeholder="—"></div>
+        <div class="brief-field"><label>Registration No.</label><input type="text" id="brief-reg" placeholder="—"></div>
+        <div class="brief-field"><label>Gate</label><input type="text" id="brief-gate" placeholder="—"></div>
+        <div class="brief-field"><label>Cruise Altitude</label><input type="text" id="brief-ofp" placeholder="—"></div>
+        <div class="brief-field"><label>Flight Time</label><input type="text" id="brief-ft" placeholder="—"></div>
+      </div>
+    </div>
+
+    <div class="brief-section">
+      <div class="brief-section-header"><span>NOTES / BRIEFING</span><button class="brief-clear-btn" onclick="briefClearNotes()">清除</button></div>
+      <textarea class="brief-note" id="brief-note1" rows="2" placeholder="亂流時間/其他提醒 (Turbulence/Notes)"></textarea>
+      <textarea class="brief-note" id="brief-note2" rows="2" placeholder="MEL"></textarea>
+      <textarea class="brief-note" id="brief-note3" rows="2" placeholder="Required Fuel"></textarea>
+    </div>
+  </div>
+
+  <!-- ── ⏳ 輪休計算 panel ── -->
+  <div id="briefing-crewrest" class="briefing-panel">
+    <div class="cr-wrap">
+      <div class="cr-header">
+        <span style="font-weight:700;font-size:1.05em">⏳ 輪休計算</span>
+        <button class="brief-clear-btn" onclick="crewrestReset()">重置</button>
+      </div>
+
+      <div class="cr-input-row">
+        <div class="cr-input-group">
+          <label>飛行時間</label>
+          <div style="display:flex;align-items:center;gap:4px">
+            <input type="number" id="cr-fh" class="cr-input" placeholder="HH" min="0" max="24" inputmode="numeric" oninput="crewrestCalc();if(String(this.value).length>=2)document.getElementById('cr-fm').focus()" onkeydown="if(event.key==='Enter'){event.preventDefault();document.getElementById('cr-fm').focus()}">
+            <span>:</span>
+            <input type="number" id="cr-fm" class="cr-input" placeholder="MM" min="0" max="59" inputmode="numeric" oninput="crewrestCalc();if(String(this.value).length>=2){var s=document.getElementById('cr-start');if(s)s.focus()}" onkeydown="if(event.key==='Enter'){event.preventDefault();var s=document.getElementById('cr-start');if(s)s.focus()}">
+          </div>
+        </div>
+        <div class="cr-input-group">
+          <label>組員人數</label>
+          <select id="cr-crew" class="cr-select" onchange="_crOnCrewChange();crewrestCalc()">
+            <option value="3">3 人</option>
+            <option value="4" selected>4 人</option>
+          </select>
+        </div>
+        <div class="cr-result-box" id="cr-result" style="display:none">
+          <div style="font-size:.72em;color:var(--accent)">建議每人休息</div>
+          <div style="display:flex;align-items:center;gap:8px">
+            <span class="cr-result-time" id="cr-result-time">—</span>
+            <button class="cr-apply-btn" onclick="crewrestApply()">帶入</button>
+          </div>
+        </div>
+        <div class="cr-result-box" id="cr-manual-wrap" style="display:none">
+          <div style="font-size:.72em;color:var(--muted)">或手動輸入每人休時</div>
+          <div style="display:flex;align-items:center;gap:8px">
+            <input type="text" id="cr-manual-rest" class="cr-start-input" placeholder="H:MM" maxlength="5" style="width:60px;font-size:1.1em;font-weight:700">
+            <button class="cr-apply-btn" onclick="crewrestApplyManual()">帶入</button>
+          </div>
+        </div>
+      </div>
+
+      <div id="cr-mode-wrap" class="cr-mode-wrap">
+        <label class="cr-mode-label"><input type="radio" name="cr-mode" value="group" checked onchange="_crModeChange()"> CM1/CM2個別計算</label>
+        <label class="cr-mode-label"><input type="radio" name="cr-mode" value="cross" onchange="_crModeChange()"> Ops Crew休一段</label>
+        <label class="cr-mode-label"><input type="radio" name="cr-mode" value="single" onchange="_crModeChange()"> 一段輪休</label>
+      </div>
+
+      <div id="cr-schedule">
+        <!-- 由 JS 動態產生 -->
+      </div>
+    </div>
   </div>
 
   <!-- ── 工具連結 panel ── -->
@@ -357,7 +440,7 @@ export function getSpaHtmlBody(): string {
   </div>
 
   <!-- ── ⛅ 航路氣象 / D-ATIS panel ── -->
-  <div id="briefing-datis" class="briefing-panel active">
+  <div id="briefing-datis" class="briefing-panel">
     <div class="wx-fixed-header">
       <div class="wx-routes">
         <button class="wx-route-btn active" onclick="selectWxRegion('taiwan',this)">台灣 TW</button>
@@ -999,7 +1082,7 @@ export function getSpaHtmlBody(): string {
     <span class="tab-btn-icon">✈️</span>Roster Sync
   </button>
   <button class="tab-btn tab-active" id="tabBtn-briefing" onclick="switchTab('briefing',this)">
-    <span class="tab-btn-icon">💼</span>Briefing
+    <span class="tab-btn-icon">💼</span>Operation
   </button>
   <button class="tab-btn" id="tabBtn-fr24" onclick="switchTab('fr24',this)">
     <span class="tab-btn-icon">📡</span>FR24
@@ -1021,7 +1104,7 @@ export function getSpaHtmlBody(): string {
       <button class="tab-util-btn tab-install-btn" id="tab-install-btn" onclick="showInstallGuide()" style="display:none">
         <span>📲</span>安裝
       </button>
-      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V6.107</span>
+      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V6.108</span>
     </div>
   </div>
 </div>
@@ -1051,17 +1134,19 @@ export function getSpaHtmlBody(): string {
       <div style="margin-bottom:4px">📱 建議使用 <b>iPad 橫向</b>操作以獲得最佳體驗</div>
       <div style="color:var(--muted)">Best experience on iPad in landscape mode</div>
     </div>
-    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V6.107</div>
+    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V6.108</div>
+    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
+      <div>新增 📋 提示 subtab：航班號自動查詢帶入資料、Cruise Altitude、MEL/Required Fuel 備註欄</div>
+      <div>新增 ⏳ 輪休計算 subtab：三種模式（CM1/CM2個別計算、Ops Crew休一段、一段輪休）、TOD 建議休時、自動重算配對段、Enter 跳格、輸入驗證</div>
+      <div>Subtab bar 可左右捲動（手機/iPad）</div>
+      <div>New 📋 Briefing Card subtab: auto-lookup flight info, Cruise Altitude, MEL/Required Fuel notes</div>
+      <div>New ⏳ Crew Rest Calculator subtab: 3 modes, TOD-based suggestion, auto-redistribute, Enter to jump, input validation</div>
+      <div>Subtab bar horizontally scrollable on mobile/iPad</div>
+    </div>
+    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V6.107</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
       <div>iPad/平板 A-/A+ 按鈕間距加大避免誤觸</div>
       <div>Increase A-/A+ button spacing on iPad/tablet to prevent accidental taps</div>
-    </div>
-    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V6.106</div>
-    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
-      <div>Duty Time 輸入格自動跳轉（HH→MM→下一組）</div>
-      <div>Cold Temp 新增 FPA 低溫修正計算</div>
-      <div>Duty Time auto-jump between input fields (HH→MM→next)</div>
-      <div>Cold Temp: add FPA cold temperature correction</div>
     </div>
     <button class="install-close-btn" onclick="closeAbout()">關閉</button>
   </div>

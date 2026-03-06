@@ -549,6 +549,12 @@ function switchBriefingTab(panel, btn) {
   if (panel === 'pa') {
     paStartTzTimer();
   }
+  if (panel === 'brief') {
+    briefInit();
+  }
+  if (panel === 'crewrest') {
+    crewrestInit();
+  }
   if (panel === 'live') {
     liveInit();
   } else {
