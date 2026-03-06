@@ -95,12 +95,14 @@ function _crBuildSchedule() {
     var mode = _crGetMode();
     if (mode === 'cross') {
       // 交叉輪休: Ops Crew 休中間一段
+      container.appendChild(_crHintNote());
       container.appendChild(_crBuildGroupTable('Ops Crew休一段', ['B+D', 'A+C', 'B+D'], 1));
     } else if (mode === 'single') {
       // 一段輪休: Group 1 → Group 2 (sequential)
       container.appendChild(_crBuildGroupTable('一段輪休', ['Group 1', 'Group 2'], 1));
     } else {
       // 分組輪休: CM1 + CM2 side by side
+      container.appendChild(_crHintNote());
       var row = document.createElement('div');
       row.className = 'cr-groups-row';
       row.appendChild(_crBuildGroupTable('CM1 (A / B)', ['A', 'B', 'A', 'B'], 1));
@@ -181,6 +183,13 @@ function _crBuildGroupTable(title, people, groupNum) {
   table.appendChild(tbody);
   div.appendChild(table);
   return div;
+}
+
+function _crHintNote() {
+  var p = document.createElement('div');
+  p.style.cssText = 'font-size:.75em;color:var(--muted);text-align:center;margin:4px 0 8px';
+  p.textContent = '可手動調整每一段休時，系統會自動計算剩餘休時';
+  return p;
 }
 
 /* ── 手動帶入休時 ── */
@@ -451,6 +460,12 @@ function _crCalcTod() {
 
   var crew = parseInt(document.getElementById('cr-crew').value) || 4;
   var groups = crew === 3 ? 3 : 2;
+
+  // 差 5 分鐘可整除 → 用 TOD-15（available+5）
+  if (available % groups !== 0 && (available + 5) % groups === 0) {
+    available = available + 5;
+  }
+
   var perPerson = Math.floor(available / groups);
   perPerson = Math.floor(perPerson / 5) * 5;
   _crTodPerPerson = perPerson;

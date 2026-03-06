@@ -1104,7 +1104,7 @@ export function getSpaHtmlBody(): string {
       <button class="tab-util-btn tab-install-btn" id="tab-install-btn" onclick="showInstallGuide()" style="display:none">
         <span>📲</span>安裝
       </button>
-      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V6.113</span>
+      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V6.114</span>
     </div>
   </div>
 </div>
@@ -1134,15 +1134,15 @@ export function getSpaHtmlBody(): string {
       <div style="margin-bottom:4px">📱 建議使用 <b>iPad 橫向</b>操作以獲得最佳體驗</div>
       <div style="color:var(--muted)">Best experience on iPad in landscape mode</div>
     </div>
-    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V6.113</div>
+    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V6.114</div>
+    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
+      <div>輪休計算新增提示文字 + TOD 差 5 分鐘可整除自動延至 TOD-15</div>
+      <div>Crew rest hint note + TOD auto-extend to TOD-15 when 5min makes even division</div>
+    </div>
+    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V6.113</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
       <div>Subtab bar 平均分配修正（iPad/筆電 8 個等寬，手機捲動）</div>
       <div>Subtab bar evenly distributed on iPad/laptop, scrollable on phone</div>
-    </div>
-    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V6.112</div>
-    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
-      <div>Subtab bar 響應式修正（手機≤767px 捲動顯示 4 個，iPad/筆電全顯示）</div>
-      <div>Fix subtab bar responsive — phone scrollable (4 visible), iPad/laptop all visible</div>
     </div>
     <button class="install-close-btn" onclick="closeAbout()">關閉</button>
   </div>
