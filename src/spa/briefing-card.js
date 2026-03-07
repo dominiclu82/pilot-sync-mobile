@@ -231,7 +231,7 @@ function _briefFillFromFids(fno, data) {
     var d = depList[i];
     if (!d.ACode || d.ACode.trim() !== 'JX') continue;
     var dNum = (d.FlightNo || '').replace(/\s/g, '').replace(/^0+/, '') || '0';
-    if (dNum === num) { depFlight = d; break; }
+    if (dNum === num) { depFlight = d; /* 不 break，取最後一筆（跨午夜取次日） */ }
   }
 
   var arrFlight = null;
@@ -239,7 +239,7 @@ function _briefFillFromFids(fno, data) {
     var a = arrList[j];
     if (!a.ACode || a.ACode.trim() !== 'JX') continue;
     var aNum = (a.FlightNo || '').replace(/\s/g, '').replace(/^0+/, '') || '0';
-    if (aNum === num) { arrFlight = a; break; }
+    if (aNum === num) { arrFlight = a; /* 不 break，取最後一筆 */ }
   }
 
   if (!depFlight && !arrFlight) { _briefFltStatus('查無此航班', 'err'); return; }
@@ -263,62 +263,10 @@ function _briefFillFromFids(fno, data) {
   }
 
   // TPE Gate (出發或抵達都顯示台北端的 Gate)
-  var _gateSet = false;
   if (depFlight && depFlight.Gate) {
     _briefSet('brief-gate', depFlight.Gate);
-    _gateSet = true;
   } else if (arrFlight && arrFlight.Gate) {
     _briefSet('brief-gate', arrFlight.Gate);
-    _gateSet = true;
-  }
-
-  /* ── 跨午夜航班 Gate 查次日：STD 00:00-01:59 且台灣時間 ≥ 21:00 ── */
-  var crossFlt = depFlight || arrFlight;
-  if (crossFlt && crossFlt.OTime) {
-    var stdHour = parseInt(crossFlt.OTime.split(':')[0], 10);
-    if (stdHour >= 0 && stdHour <= 1) {
-      var now = new Date();
-      var twNow = new Date(now.getTime() + 8 * 3600000);
-      if (twNow.getUTCHours() >= 21) {
-        var tmrw = new Date(Date.UTC(
-          twNow.getUTCFullYear(), twNow.getUTCMonth(), twNow.getUTCDate() + 1));
-        var tmrwDate = tmrw.getUTCFullYear() + '/' +
-          String(tmrw.getUTCMonth() + 1).padStart(2, '0') + '/' +
-          String(tmrw.getUTCDate()).padStart(2, '0');
-        fetch('/api/fids?date=' + encodeURIComponent(tmrwDate))
-          .then(function(r) { return r.ok ? r.json() : null; })
-          .then(function(d2) {
-            if (!d2) return;
-            var list = d2.dep || [];
-            for (var k = 0; k < list.length; k++) {
-              var f = list[k];
-              if (!f.ACode || f.ACode.trim() !== 'JX') continue;
-              var fNum = (f.FlightNo || '').replace(/\s/g, '').replace(/^0+/, '') || '0';
-              if (fNum === num) {
-                _briefSet('brief-gate', f.Gate || '');
-                _briefSave();
-                return;
-              }
-            }
-            // 次日出發沒找到，試抵達
-            var aList = d2.arr || [];
-            for (var k2 = 0; k2 < aList.length; k2++) {
-              var f2 = aList[k2];
-              if (!f2.ACode || f2.ACode.trim() !== 'JX') continue;
-              var fNum2 = (f2.FlightNo || '').replace(/\s/g, '').replace(/^0+/, '') || '0';
-              if (fNum2 === num) {
-                _briefSet('brief-gate', f2.Gate || '');
-                _briefSave();
-                return;
-              }
-            }
-            // 次日查無此航班 → 清空 Gate
-            _briefSet('brief-gate', '');
-            _briefSave();
-          })
-          .catch(function() { /* 查不到就保留今天的 */ });
-      }
-    }
   }
 
   // Origin & Dest
