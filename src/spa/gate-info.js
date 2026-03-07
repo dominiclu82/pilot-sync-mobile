@@ -579,25 +579,57 @@ function _giProcessFlights() {
   renderGateFlights();
   gateFlightsLoaded = true;
 
-  // Background fetch FA data (today only)
+  // Background fetch gate data: FR24 first, FA fallback (today only)
   var isToday = !_giSelectedDate;
   if (isToday) {
     var currentAirline = _giAirline;
     var airlines = isAll ? ['JX', 'BR', 'CI'] : [airline];
-    var faPromises = airlines.map(function(al) {
-      return fetch('/api/fids-fa?airline=' + al)
-        .then(function(r) { return r.ok ? r.json() : { flights: {} }; })
-        .catch(function() { return { flights: {} }; })
-        .then(function(data) { return { airline: al, data: data }; });
-    });
-    Promise.all(faPromises).then(function(results) {
-      if (_giAirline !== currentAirline) return; // airline changed, ignore
-      results.forEach(function(r) {
-        _giMergeFA(map, r.data, r.airline);
+    // Try FR24 first
+    fetch('/api/fids-fr24')
+      .then(function(r) { return r.ok ? r.json() : null; })
+      .then(function(fr24Data) {
+        if (_giAirline !== currentAirline) return;
+        if (fr24Data && fr24Data.count > 0) {
+          airlines.forEach(function(al) {
+            _giMergeFA(map, fr24Data, al);
+          });
+          gateFlightsList = Object.values(map);
+          renderGateFlights();
+        }
+        // Also fetch FA as supplement (may have flights FR24 missed)
+        var faPromises = airlines.map(function(al) {
+          return fetch('/api/fids-fa?airline=' + al)
+            .then(function(r) { return r.ok ? r.json() : { flights: {} }; })
+            .catch(function() { return { flights: {} }; })
+            .then(function(data) { return { airline: al, data: data }; });
+        });
+        return Promise.all(faPromises);
+      })
+      .then(function(results) {
+        if (!results || _giAirline !== currentAirline) return;
+        results.forEach(function(r) {
+          _giMergeFA(map, r.data, r.airline);
+        });
+        gateFlightsList = Object.values(map);
+        renderGateFlights();
+      })
+      .catch(function() {
+        // FR24 failed, fall back to FA only
+        var faPromises = airlines.map(function(al) {
+          return fetch('/api/fids-fa?airline=' + al)
+            .then(function(r) { return r.ok ? r.json() : { flights: {} }; })
+            .catch(function() { return { flights: {} }; })
+            .then(function(data) { return { airline: al, data: data }; });
+        });
+        Promise.all(faPromises).then(function(results) {
+          if (_giAirline !== currentAirline) return;
+          results.forEach(function(r) {
+            _giMergeFA(map, r.data, r.airline);
+          });
+          gateFlightsList = Object.values(map);
+          renderGateFlights();
+        });
       });
-      gateFlightsList = Object.values(map);
-      renderGateFlights();
-    });
   }
 }
 

@@ -359,6 +359,108 @@ app.get('/api/fr24/detail', async (req, res) => {
   }
 });
 
+// ── FR24 detail background cache (gate info) ────────────────────────────────
+const _fr24DetailCache: { flights: Record<string, any>; updatedAt: number } = { flights: {}, updatedAt: 0 };
+let _fr24DetailRefreshing = false;
+
+const _fr24AirlineConf: Record<string, { icao: string; iata: string }> = {
+  JX: { icao: 'SJX', iata: 'JX' },
+  BR: { icao: 'EVA', iata: 'BR' },
+  CI: { icao: 'CAL', iata: 'CI' }
+};
+
+async function _fr24RefreshDetails(): Promise<void> {
+  if (_fr24DetailRefreshing) return;
+  _fr24DetailRefreshing = true;
+  console.log('[FR24-Detail] Starting refresh...');
+  try {
+    // Get all flights (no bounds = worldwide)
+    const flights = await _fr24Api.getFlights(null, null);
+    // Filter JX/BR/CI flights
+    const targets: { id: string; cs: string; num: string; from: string; to: string }[] = [];
+    for (const f of flights) {
+      const cs = ((f as any).callsign || '').trim();
+      const num = (f as any).number || '';
+      const id = (f as any).id || '';
+      if (!id || !cs) continue;
+      for (const al of Object.keys(_fr24AirlineConf)) {
+        const conf = _fr24AirlineConf[al];
+        if (cs.startsWith(conf.icao)) {
+          targets.push({ id, cs, num, from: (f as any).originAirportIata || '', to: (f as any).destinationAirportIata || '' });
+          break;
+        }
+      }
+    }
+    console.log('[FR24-Detail] Found', targets.length, 'flights:', targets.map(t => t.num || t.cs).join(', '));
+
+    const newFlights: Record<string, any> = {};
+    for (const t of targets) {
+      try {
+        const detail = await _fr24Api.getFlightDetails({ id: t.id } as any);
+        if (!detail) continue;
+        const airport = (detail as any).airport || {};
+        const orig = airport.origin || {};
+        const dest = airport.destination || {};
+        const origInfo = orig.info || {};
+        const destInfo = dest.info || {};
+        const origCode = orig.code || {};
+        const destCode = dest.code || {};
+        // Convert callsign (SJX012) to IATA fno (JX12)
+        let fno = t.num || t.cs;
+        for (const al of Object.keys(_fr24AirlineConf)) {
+          const conf = _fr24AirlineConf[al];
+          if (fno.startsWith(conf.icao)) {
+            fno = fno.replace(new RegExp('^' + conf.icao + '0*'), conf.iata);
+            break;
+          }
+        }
+        // Remove leading zeros from number part: JX012 → JX12
+        fno = fno.replace(/^([A-Z]{2})0+(\d)/, '$1$2');
+        const timeInfo = (detail as any).time || {};
+        const sched = timeInfo.scheduled || {};
+        const real = timeInfo.real || {};
+        newFlights[fno] = {
+          fno,
+          origin: { iata: origCode.iata || t.from || '', gate: origInfo.gate || '', terminal: origInfo.terminal || '' },
+          destination: { iata: destCode.iata || t.to || '', gate: destInfo.gate || '', terminal: destInfo.terminal || '' },
+          scheduledDep: sched.departure ? new Date(sched.departure * 1000).toISOString() : '',
+          actualDep: real.departure ? new Date(real.departure * 1000).toISOString() : '',
+          scheduledArr: sched.arrival ? new Date(sched.arrival * 1000).toISOString() : '',
+          actualArr: real.arrival ? new Date(real.arrival * 1000).toISOString() : '',
+          status: ''
+        };
+      } catch (e: any) {
+        console.error('[FR24-Detail] Error fetching', t.num || t.cs, ':', e.message);
+      }
+      await new Promise(ok => setTimeout(ok, 300));
+    }
+
+    _fr24DetailCache.flights = newFlights;
+    _fr24DetailCache.updatedAt = Date.now();
+    console.log('[FR24-Detail] Cache updated:', Object.keys(newFlights).length, 'flights');
+  } catch (e: any) {
+    console.error('[FR24-Detail] Refresh error:', e.message);
+  } finally {
+    _fr24DetailRefreshing = false;
+  }
+}
+
+// Background refresh: immediately + every 5 minutes
+setTimeout(() => _fr24RefreshDetails(), 8000);
+setInterval(() => _fr24RefreshDetails(), 5 * 60 * 1000);
+
+app.get('/api/fids-fr24', (_req, res) => {
+  if (!_fr24DetailCache.updatedAt) {
+    _fr24RefreshDetails();
+    return res.json({ flights: {}, updatedAt: null, count: 0, refreshing: true });
+  }
+  res.json({
+    flights: _fr24DetailCache.flights,
+    updatedAt: new Date(_fr24DetailCache.updatedAt).toISOString(),
+    count: Object.keys(_fr24DetailCache.flights).length
+  });
+});
+
 // ── FlightAware background cache ─────────────────────────────────────────────
 const _faBase = Buffer.from('aHR0cHM6Ly93d3cuZmxpZ2h0YXdhcmUuY29tL2xpdmUvZmxpZ2h0Lw==', 'base64').toString();
 const _faHeaders = { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36' };

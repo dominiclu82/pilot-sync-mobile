@@ -28,6 +28,25 @@ function _syncFltNo(source, val) {
 var _briefFields = ['brief-gate','brief-origin','brief-dest','brief-ofp','brief-ft'];
 var _briefNotes = ['brief-note1','brief-note2','brief-note3'];
 
+/* ── IATA → UTC offset (hours) ── */
+var _briefTzOffset = {
+  TPE:8,KHH:8,TSA:8,RMQ:8,
+  HKG:8,MFM:8,
+  NRT:9,HND:9,KIX:9,CTS:9,FUK:9,SDJ:9,OKA:9,
+  KMJ:9,NGO:9,KOJ:9,TAK:9,UKB:9,
+  ICN:9,PUS:9,CJU:9,
+  CRK:8,MNL:8,CEB:8,DVO:8,
+  BKK:7,DMK:7,UTP:7,CNX:7,HKT:7,
+  SGN:7,HAN:7,PQC:7,PNH:7,CXR:7,DAD:7,
+  CGK:7,DPS:8,SUB:7,KCH:8,KUL:8,PEN:8,
+  SIN:8,
+  LAX:-8,SFO:-8,SEA:-8,ONT:-8,OAK:-8,PDX:-8,SMF:-8,
+  DEN:-7,TUS:-7,PHX:-7,LAS:-8,
+  ANC:-9,HNL:-10,GUM:10,SPN:10,
+  YVR:-8,
+  PRG:1,BER:1,MUC:1,WAW:1,LNZ:1,VIE:1
+};
+
 /* ── IATA → ICAO 對照 ── */
 var _briefIataToIcao = {
   TPE:'RCTP',KHH:'RCKH',TSA:'RCSS',RMQ:'RCMQ',
@@ -74,6 +93,62 @@ function briefInit() {
     var el = document.getElementById(id);
     if (el) el.addEventListener('input', _briefSave);
   });
+  // Flight Time + Altitude → PA Welcome 同步
+  var ftEl = document.getElementById('brief-ft');
+  if (ftEl) {
+    ftEl.addEventListener('input', function() { _briefSyncFtToPa(ftEl.value); });
+    if (ftEl.value) _briefSyncFtToPa(ftEl.value);
+  }
+  var altEl = document.getElementById('brief-ofp');
+  if (altEl) {
+    altEl.addEventListener('input', function() { _briefSyncAltToPa(altEl.value); });
+    if (altEl.value) _briefSyncAltToPa(altEl.value);
+  }
+}
+
+/* ── Flight Time + Altitude → PA Welcome 同步 ── */
+var _briefFltHr = '';
+var _briefFltMin = '';
+var _briefAltitude = '';
+function _briefSyncFtToPa(val) {
+  var raw = val.replace(/\s/g, '');
+  _briefFltHr = ''; _briefFltMin = '';
+  if (/^\d{1,2}:\d{2}$/.test(raw)) {
+    var parts = raw.split(':');
+    _briefFltHr = parts[0]; _briefFltMin = parts[1];
+  } else if (/^\d{3,4}$/.test(raw)) {
+    _briefFltMin = raw.slice(-2);
+    _briefFltHr = raw.slice(0, -2);
+  }
+  _briefApplyFtToPa();
+}
+function _briefSyncAltToPa(val) {
+  _briefAltitude = val.trim();
+  _briefApplyAltToPa();
+}
+function _briefApplyAltToPa() {
+  var el = document.getElementById('pa-content');
+  if (!el) return;
+  el.querySelectorAll('[data-pa="altitude"]').forEach(function(inp) { inp.value = _briefAltitude; });
+}
+function _briefApplyFtToPa() {
+  var el = document.getElementById('pa-content');
+  if (!el) return;
+  el.querySelectorAll('[data-pa="flt-hr"]').forEach(function(inp) { inp.value = _briefFltHr; });
+  el.querySelectorAll('[data-pa="flt-min"]').forEach(function(inp) { inp.value = _briefFltMin; });
+}
+
+/* ── 強制重新查詢（Enter / 查詢按鈕）── */
+function _briefForceQuery() {
+  var inp = document.getElementById('brief-fno');
+  if (!inp) return;
+  var raw = inp.value.trim().toUpperCase();
+  if (!raw) return;
+  var num = raw.replace(/^SJX|^JX/, '').replace(/\s/g, '').replace(/^0+/, '') || '0';
+  if (!/^\d+$/.test(num)) return;
+  _briefFidsCache = null;  // 清除快取，強制重新 fetch
+  _briefFltStatus('查詢中...', 'loading');
+  _briefLookup(num);
 }
 
 /* ── debounce 自動查詢 ── */
@@ -83,7 +158,7 @@ var _briefFidsCache = null;
 function _briefOnInput(val) {
   if (_briefFltTimer) clearTimeout(_briefFltTimer);
   var raw = val.trim().toUpperCase();
-  if (!raw) { _briefFltStatus('', ''); return; }
+  if (!raw) { _briefFltStatus('', ''); briefClearInfo(); return; }
   var num = raw.replace(/^SJX|^JX/, '').replace(/\s/g, '').replace(/^0+/, '') || '0';
   if (!/^\d+$/.test(num)) { _briefFltStatus('', ''); return; }
   _briefFltStatus('查詢中...', 'loading');
@@ -178,16 +253,20 @@ function _briefFillFromFids(fno, data) {
       dtEl.innerHTML = '<div style="font-size:.85em;color:var(--muted)">' + dateStr + '</div>' +
         '<div style="font-size:1.1em;font-weight:700">' + time + ' Local</div>';
     } else if (arrFlight) {
-      var atime = _briefFmtTime(arrFlight.OTime);
+      // arrFlight.OTime 是 TPE 抵達時間(STA)，不是出發地的 STD
+      // 先顯示載入中，再從 FR24/FA 取得正確出發時間
       dtEl.innerHTML = '<div style="font-size:.85em;color:var(--muted)">' + dateStr + '</div>' +
-        '<div style="font-size:1.1em;font-weight:700">' + atime + ' Local</div>' +
-        '<div style="font-size:.7em;color:var(--muted)">(STA)</div>';
+        '<div style="font-size:1.1em;font-weight:700;color:var(--muted)">查詢出發時間...</div>';
+      var originIata = arrFlight.CityCode || '';
+      _briefFetchOriginInfo(fno, dateStr, dtEl, originIata);
     }
   }
 
-  // Gate
+  // TPE Gate (出發或抵達都顯示台北端的 Gate)
   if (depFlight && depFlight.Gate) {
     _briefSet('brief-gate', depFlight.Gate);
+  } else if (arrFlight && arrFlight.Gate) {
+    _briefSet('brief-gate', arrFlight.Gate);
   }
 
   // Origin & Dest
@@ -206,6 +285,64 @@ function _briefFillFromFids(fno, data) {
   var destEl = document.getElementById('brief-dest');
   if (originEl && originEl.value) _briefFetchWx('owx', originEl.value);
   if (destEl && destEl.value) _briefFetchWx('dwx', destEl.value);
+}
+
+/* ── 外站出發資訊查詢（出發時間 + Gate，FR24 + FA 雙查）── */
+function _briefFetchOriginInfo(fno, dateStr, dtEl, originIata) {
+  var done = false;
+  var pending = 2;  // FR24 + FA
+
+  function tryUpdate(flight) {
+    if (done) return;
+    if (!flight) { pending--; if (pending <= 0) fallback(); return; }
+    var depIso = flight.scheduledDep || flight.actualDep || '';
+    var gate = (flight.origin && flight.origin.gate) || '';
+    if (!depIso && !gate) { pending--; if (pending <= 0) fallback(); return; }
+    done = true;
+    var timeStr = '';
+    var depDateStr = dateStr;
+    if (depIso) {
+      var d = new Date(depIso);
+      var offset = _briefTzOffset[originIata];
+      if (offset === undefined) offset = 8; // fallback to UTC+8
+      var local = new Date(d.getTime() + offset * 3600000);
+      var hh = String(local.getUTCHours()).padStart(2, '0');
+      var mm = String(local.getUTCMinutes()).padStart(2, '0');
+      timeStr = hh + ':' + mm;
+      // 日期也更新為出發地日期
+      var yyyy = local.getUTCFullYear();
+      var mo = String(local.getUTCMonth() + 1).padStart(2, '0');
+      var dd = String(local.getUTCDate()).padStart(2, '0');
+      depDateStr = yyyy + '/' + mo + '/' + dd;
+    }
+    var display = timeStr ? timeStr + ' Local' : '';
+    if (gate && originIata !== 'TPE') display += (display ? ' / Gate ' : 'Gate ') + gate;
+    dtEl.innerHTML = '<div style="font-size:.85em;color:var(--muted)">' + depDateStr + '</div>' +
+      '<div style="font-size:1.1em;font-weight:700">' + (display || '—') + '</div>';
+  }
+
+  function fallback() {
+    // 兩個來源都沒資料，顯示 —
+    dtEl.innerHTML = '<div style="font-size:.85em;color:var(--muted)">' + dateStr + '</div>' +
+      '<div style="font-size:1.1em;font-weight:700">—</div>';
+  }
+
+  // FR24
+  fetch('/api/fids-fr24')
+    .then(function(r) { return r.ok ? r.json() : null; })
+    .then(function(data) {
+      if (!data || !data.flights) { tryUpdate(null); return; }
+      tryUpdate(data.flights[fno] || null);
+    })
+    .catch(function() { tryUpdate(null); });
+  // FA
+  fetch('/api/fids-fa?airline=JX')
+    .then(function(r) { return r.ok ? r.json() : null; })
+    .then(function(data) {
+      if (!data || !data.flights) { tryUpdate(null); return; }
+      tryUpdate(data.flights[fno] || null);
+    })
+    .catch(function() { tryUpdate(null); });
 }
 
 function _briefFmtTime(t) {
@@ -250,7 +387,7 @@ function _briefFetchWx(target, iata) {
 
   el.innerHTML = '<span style="color:var(--muted);font-size:.8em">載入中...</span>';
 
-  fetch('/api/metar?ids=' + icao + '&hours=1')
+  fetch('/api/metar?ids=' + icao + '&hours=6')
     .then(function(r) { return r.ok ? r.text() : Promise.reject(); })
     .then(function(text) {
       var lines = text.trim().split('\n').filter(function(l) { return l.trim(); });

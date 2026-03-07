@@ -277,6 +277,9 @@ setTimeout(function() {
   }
 }, 0);
 
+// Auto-init briefing card (brief is default active subtab on page load)
+setTimeout(function() { briefInit(); }, 0);
+
 // ── Tab switching ─────────────────────────────────────────────────────────────
 function switchTab(tab, btn) {
   ['tab-sync','tab-briefing','tab-fr24','tab-gate'].forEach(function(id) {
@@ -287,6 +290,9 @@ function switchTab(tab, btn) {
   var target = document.getElementById('tab-' + tab);
   if (target) { target.style.display = ''; target.classList.add('tab-active'); }
   btn.classList.add('tab-active');
+  if (tab === 'briefing') {
+    briefInit();
+  }
   if (tab === 'gate' && !gateFlightsLoaded) {
     loadGateFlights();
   }

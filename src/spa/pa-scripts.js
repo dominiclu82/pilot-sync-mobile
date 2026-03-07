@@ -316,11 +316,11 @@ function _paFltToDest(num) {
   var dep = (_paFidsCache.dep || []).filter(function(f) { return f.ACode && f.ACode.trim() === 'JX'; });
   var arr = (_paFidsCache.arr || []).filter(function(f) { return f.ACode && f.ACode.trim() === 'JX'; });
   for (var i = 0; i < dep.length; i++) {
-    var dFlt = dep[i].FlightNo ? dep[i].FlightNo.replace(/\s/g, '') : '';
+    var dFlt = dep[i].FlightNo ? dep[i].FlightNo.replace(/\s/g, '').replace(/^0+/, '') || '0' : '';
     if (dFlt === num) return dep[i].CityCode || null;
   }
   for (var j = 0; j < arr.length; j++) {
-    var aFlt = arr[j].FlightNo ? arr[j].FlightNo.replace(/\s/g, '') : '';
+    var aFlt = arr[j].FlightNo ? arr[j].FlightNo.replace(/\s/g, '').replace(/^0+/, '') || '0' : '';
     if (aFlt === num) return 'TPE';
   }
   return null;
@@ -788,6 +788,8 @@ function paSwitchCat(cat, btn) {
   }
   _paInitListeners();
   _paRestoreValues();
+  if (typeof _briefApplyFtToPa === 'function') _briefApplyFtToPa();
+  if (typeof _briefApplyAltToPa === 'function') _briefApplyAltToPa();
   _paInjectNotes(cat);
 }
 

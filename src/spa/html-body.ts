@@ -178,6 +178,9 @@ export function getSpaHtmlBody(): string {
   <!-- 子 Tab Bar -->
   <div class="briefing-subtabs">
     <div class="subtab-slot"><button class="briefing-subtab active" id="subtabBtn-brief" onclick="switchBriefingTab('brief',this)">📋 提示</button></div>
+    <div class="subtab-slot"><button class="briefing-subtab" id="subtabBtn-pa" onclick="switchBriefingTab('pa',this)">🎙️ PA</button></div>
+    <div class="subtab-slot"><button class="briefing-subtab" id="subtabBtn-crewrest" onclick="switchBriefingTab('crewrest',this)">⏳ 輪休計算</button></div>
+    <div class="subtab-slot"><button class="briefing-subtab" id="subtabBtn-hf" onclick="switchBriefingTab('hf',this)">📻 Pacific HF</button></div>
     <div class="subtab-wx-wrap">
       <button class="briefing-subtab" id="subtabBtn-datis" onclick="switchBriefingTab('datis',this)">⛅ Airport WX</button>
       <select class="wx-fleet-select" id="wx-fleet-select"
@@ -191,9 +194,6 @@ export function getSpaHtmlBody(): string {
         <option value="A350-1000">A350-1000</option>
       </select>
     </div>
-    <div class="subtab-slot"><button class="briefing-subtab" id="subtabBtn-pa" onclick="switchBriefingTab('pa',this)">🎙️ PA</button></div>
-    <div class="subtab-slot"><button class="briefing-subtab" id="subtabBtn-hf" onclick="switchBriefingTab('hf',this)">📻 Pacific HF</button></div>
-    <div class="subtab-slot"><button class="briefing-subtab" id="subtabBtn-crewrest" onclick="switchBriefingTab('crewrest',this)">⏳ 輪休計算</button></div>
     <div class="subtab-slot" style="display:none"><button class="briefing-subtab" id="subtabBtn-live" onclick="switchBriefingTab('live',this)">📡 Live</button></div>
     <div class="subtab-slot"><button class="briefing-subtab" id="subtabBtn-coldtemp" onclick="switchBriefingTab('coldtemp',this)">❄️ Cold Temp</button></div>
     <div class="subtab-slot"><button class="briefing-subtab" id="subtabBtn-tools" onclick="switchBriefingTab('tools',this)">🗺️ Tools</button></div>
@@ -203,7 +203,8 @@ export function getSpaHtmlBody(): string {
   <!-- ── 📋 提示 panel ── -->
   <div id="briefing-brief" class="briefing-panel active">
     <div class="brief-search">
-      <input type="text" id="brief-fno" placeholder="航班號 Flight No. (e.g. JX801)" oninput="_briefOnInput(this.value);_syncFltNo('brief',this.value)">
+      <input type="text" id="brief-fno" placeholder="航班號 Flight No. (e.g. JX801)" oninput="_briefOnInput(this.value);_syncFltNo('brief',this.value)" onkeydown="if(event.key==='Enter'){event.preventDefault();_briefForceQuery()}">
+      <button class="brief-search-btn" onclick="_briefForceQuery()">查詢</button>
       <span id="brief-flt-status" class="pa-flt-status"></span>
     </div>
 
@@ -211,7 +212,7 @@ export function getSpaHtmlBody(): string {
       <div class="brief-section-header"><span>FLIGHT INFO / DATA</span><button class="brief-clear-btn" onclick="briefClearInfo()">清除</button></div>
       <div class="brief-grid">
         <div class="brief-field"><label>Dep Date/Time</label><div id="brief-dep-dt" class="brief-auto-val">—</div></div>
-        <div class="brief-field"><label>Gate</label><input type="text" id="brief-gate" placeholder="—"></div>
+        <div class="brief-field"><label>TPE Gate</label><input type="text" id="brief-gate" placeholder="—"></div>
         <div class="brief-field"><label>Origin</label><input type="text" id="brief-origin" placeholder="IATA" oninput="_briefWxRefresh('owx',this.value)"></div>
         <div class="brief-field"><label>Orig WX</label><div id="brief-owx" class="brief-wx-val">—</div></div>
         <div class="brief-field"><label>Dest.</label><input type="text" id="brief-dest" placeholder="IATA" oninput="_briefWxRefresh('dwx',this.value)"></div>
@@ -1108,7 +1109,7 @@ export function getSpaHtmlBody(): string {
       <button class="tab-util-btn tab-install-btn" id="tab-install-btn" onclick="showInstallGuide()" style="display:none">
         <span>📲</span>安裝
       </button>
-      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V6.116</span>
+      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V6.117</span>
     </div>
   </div>
 </div>
@@ -1138,15 +1139,17 @@ export function getSpaHtmlBody(): string {
       <div style="margin-bottom:4px">📱 建議使用 <b>iPad 橫向</b>操作以獲得最佳體驗</div>
       <div style="color:var(--muted)">Best experience on iPad in landscape mode</div>
     </div>
-    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V6.116</div>
+    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V6.117</div>
+    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
+      <div>提示卡手動輸入（高度/飛行時間）切換分頁不再消失；新增查詢按鈕與 Enter 重新查詢</div>
+      <div>Briefing card manual input persists across tab switches; added search button &amp; Enter to re-query</div>
+      <div>Flight Time / Cruise Altitude 自動同步至 PA Welcome；METAR 查詢範圍改為 6 小時</div>
+      <div>Flight Time / Cruise Altitude auto-syncs to PA Welcome; METAR query window extended to 6 hours</div>
+    </div>
+    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V6.116</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
       <div>提示卡欄位大改版（Dep Date/Time / Gate / Origin / Dest + 天氣自動查詢 + 航班號跨分頁同步）</div>
       <div>Briefing card revamp — Dep Date/Time, Gate, Origin, Dest with auto weather + flight no. cross-tab sync</div>
-    </div>
-    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V6.115</div>
-    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
-      <div>機型選單縮短置中 + 選機型即切換至 Airport WX</div>
-      <div>Fleet select compact &amp; centered + select any fleet switches to Airport WX</div>
     </div>
     <button class="install-close-btn" onclick="closeAbout()">關閉</button>
   </div>

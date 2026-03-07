@@ -139,7 +139,7 @@ function loadWxRegion(region) {
   renderWxList(airports, region);
   if (airports.length === 0) return;
   var icaos = airports.map(function(a) { return a.icao; }).join(',');
-  fetch('/api/metar?ids=' + icaos + '&hours=1')
+  fetch('/api/metar?ids=' + icaos + '&hours=6')
     .then(function(r) { return r.ok ? r.text() : Promise.reject(); })
     .then(function(text) {
       wxMetarMap = {};
