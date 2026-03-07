@@ -203,19 +203,19 @@ export function getSpaHtmlBody(): string {
   <!-- ── 📋 提示 panel ── -->
   <div id="briefing-brief" class="briefing-panel active">
     <div class="brief-search">
-      <input type="text" id="brief-fno" placeholder="航班號 Flight No. (e.g. JX801)" oninput="_briefOnInput(this.value)">
+      <input type="text" id="brief-fno" placeholder="航班號 Flight No. (e.g. JX801)" oninput="_briefOnInput(this.value);_syncFltNo('brief',this.value)">
       <span id="brief-flt-status" class="pa-flt-status"></span>
     </div>
 
     <div class="brief-section">
       <div class="brief-section-header"><span>FLIGHT INFO / DATA</span><button class="brief-clear-btn" onclick="briefClearInfo()">清除</button></div>
       <div class="brief-grid">
-        <div class="brief-field"><label>DEP Date</label><input type="text" id="brief-dep-date" placeholder="—"></div>
-        <div class="brief-field"><label>ETD UTC</label><input type="text" id="brief-etd" placeholder="—"></div>
-        <div class="brief-field"><label>ARR Date</label><input type="text" id="brief-arr-date" placeholder="—"></div>
-        <div class="brief-field"><label>ETA UTC</label><input type="text" id="brief-eta" placeholder="—"></div>
-        <div class="brief-field"><label>Registration No.</label><input type="text" id="brief-reg" placeholder="—"></div>
+        <div class="brief-field"><label>Dep Date/Time</label><div id="brief-dep-dt" class="brief-auto-val">—</div></div>
         <div class="brief-field"><label>Gate</label><input type="text" id="brief-gate" placeholder="—"></div>
+        <div class="brief-field"><label>Origin</label><input type="text" id="brief-origin" placeholder="IATA" oninput="_briefWxRefresh('owx',this.value)"></div>
+        <div class="brief-field"><label>Orig WX</label><div id="brief-owx" class="brief-wx-val">—</div></div>
+        <div class="brief-field"><label>Dest.</label><input type="text" id="brief-dest" placeholder="IATA" oninput="_briefWxRefresh('dwx',this.value)"></div>
+        <div class="brief-field"><label>Dest. WX</label><div id="brief-dwx" class="brief-wx-val">—</div></div>
         <div class="brief-field"><label>Cruise Altitude</label><input type="text" id="brief-ofp" placeholder="—"></div>
         <div class="brief-field"><label>Flight Time</label><input type="text" id="brief-ft" placeholder="—"></div>
       </div>
@@ -224,7 +224,7 @@ export function getSpaHtmlBody(): string {
     <div class="brief-section">
       <div class="brief-section-header"><span>NOTES / BRIEFING</span><button class="brief-clear-btn" onclick="briefClearNotes()">清除</button></div>
       <textarea class="brief-note" id="brief-note1" rows="2" placeholder="亂流時間/其他提醒 (Turbulence/Notes)"></textarea>
-      <textarea class="brief-note" id="brief-note2" rows="2" placeholder="MEL"></textarea>
+      <textarea class="brief-note" id="brief-note2" rows="2" placeholder="Tail No./MEL"></textarea>
       <textarea class="brief-note" id="brief-note3" rows="2" placeholder="Required Fuel"></textarea>
     </div>
   </div>
@@ -500,7 +500,7 @@ export function getSpaHtmlBody(): string {
           <div class="pa-section-title">🕐 Local Time Query</div>
           <div class="pa-tz-hint">👇 輸入航班號或點選場站，自動帶入目的地及當地時間<br>Enter flight number or tap a station to auto-fill destination &amp; local time</div>
           <div class="pa-lt-search">
-            <input class="pa-input" id="pa-lt-input" placeholder="e.g. JX2 / SJX002 / 002 / LAX / KLAX / 洛杉磯" oninput="_paLookupLocalTime(this.value)">
+            <input class="pa-input" id="pa-lt-input" placeholder="e.g. JX2 / SJX002 / 002 / LAX / KLAX / 洛杉磯" oninput="_paLookupLocalTime(this.value);_syncFltNo('pa',this.value)">
             <span id="pa-lt-status" class="pa-flt-status"></span>
           </div>
           <div id="pa-localtime-result"></div>
@@ -1108,7 +1108,7 @@ export function getSpaHtmlBody(): string {
       <button class="tab-util-btn tab-install-btn" id="tab-install-btn" onclick="showInstallGuide()" style="display:none">
         <span>📲</span>安裝
       </button>
-      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V6.115</span>
+      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V6.116</span>
     </div>
   </div>
 </div>
@@ -1138,15 +1138,15 @@ export function getSpaHtmlBody(): string {
       <div style="margin-bottom:4px">📱 建議使用 <b>iPad 橫向</b>操作以獲得最佳體驗</div>
       <div style="color:var(--muted)">Best experience on iPad in landscape mode</div>
     </div>
-    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V6.115</div>
+    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V6.116</div>
+    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
+      <div>提示卡欄位大改版（Dep Date/Time / Gate / Origin / Dest + 天氣自動查詢 + 航班號跨分頁同步）</div>
+      <div>Briefing card revamp — Dep Date/Time, Gate, Origin, Dest with auto weather + flight no. cross-tab sync</div>
+    </div>
+    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V6.115</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
       <div>機型選單縮短置中 + 選機型即切換至 Airport WX</div>
       <div>Fleet select compact &amp; centered + select any fleet switches to Airport WX</div>
-    </div>
-    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V6.114</div>
-    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
-      <div>輪休計算新增提示文字 + TOD 差 5 分鐘可整除自動延至 TOD-15</div>
-      <div>Crew rest hint note + TOD auto-extend to TOD-15 when 5min makes even division</div>
     </div>
     <button class="install-close-btn" onclick="closeAbout()">關閉</button>
   </div>

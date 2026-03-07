@@ -309,6 +309,8 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
 .brief-field label{font-size:.7em;color:var(--muted);display:block;margin-bottom:4px}
 .brief-field input{background:transparent;border:none;color:var(--text);text-align:center;width:100%;font-size:.9em;outline:none}
 .brief-field input::placeholder{color:var(--dim)}
+.brief-auto-val{color:var(--text);font-size:.9em;min-height:2em;display:flex;flex-direction:column;justify-content:center}
+.brief-wx-val{color:var(--text);min-height:2.5em;display:flex;align-items:center;justify-content:center}
 .brief-note{width:100%;background:rgba(255,255,255,.06);border:none;border-radius:8px;padding:10px;color:var(--text);font-size:.85em;resize:vertical;margin-bottom:8px;outline:none;font-family:inherit}
 .brief-note::placeholder{color:var(--muted)}
 

@@ -1,15 +1,75 @@
 // ── 📋 提示卡 (Flight Briefing Card) ─────────────────────────────────────────
 var _briefLoaded = false;
 
-var _briefFields = ['brief-dep-date','brief-etd','brief-arr-date','brief-eta',
-  'brief-reg','brief-gate','brief-ofp','brief-ft'];
+/* ── 航班號跨分頁同步 ── */
+var _syncFltLock = false;
+function _syncFltNo(source, val) {
+  if (_syncFltLock) return;
+  if (!/\d/.test(val)) return;
+  _syncFltLock = true;
+  if (source === 'brief') {
+    var pa = document.getElementById('pa-lt-input');
+    if (pa) {
+      pa.value = val;
+      if (_briefFidsCache && !_paFidsCache) { _paFidsCache = _briefFidsCache; _paFidsCacheTime = Date.now(); }
+      _paLookupLocalTime(val);
+    }
+  } else {
+    var br = document.getElementById('brief-fno');
+    if (br) {
+      br.value = val;
+      if (_paFidsCache && !_briefFidsCache) { _briefFidsCache = _paFidsCache; }
+      _briefOnInput(val);
+    }
+  }
+  _syncFltLock = false;
+}
+
+var _briefFields = ['brief-gate','brief-origin','brief-dest','brief-ofp','brief-ft'];
 var _briefNotes = ['brief-note1','brief-note2','brief-note3'];
+
+/* ── IATA → ICAO 對照 ── */
+var _briefIataToIcao = {
+  TPE:'RCTP',KHH:'RCKH',TSA:'RCSS',RMQ:'RCMQ',
+  HKG:'VHHH',MFM:'VMMC',
+  NRT:'RJAA',HND:'RJTT',KIX:'RJBB',CTS:'RJCC',FUK:'RJFF',SDJ:'RJSS',OKA:'ROAH',
+  KMJ:'RJFT',NGO:'RJGG',KOJ:'RJFK',TAK:'RJOT',UKB:'RJBE',
+  ICN:'RKSI',PUS:'RKPK',CJU:'RKPC',
+  CRK:'RPLC',MNL:'RPLL',CEB:'RPVM',DVO:'RPMD',
+  BKK:'VTBS',DMK:'VTBD',UTP:'VTBU',CNX:'VTCC',HKT:'VTSP',
+  SGN:'VVTS',HAN:'VVNB',PQC:'VVPQ',PNH:'VDPP',CXR:'VVCR',DAD:'VVDN',
+  CGK:'WIII',DPS:'WADD',SUB:'WARR',KCH:'WBGG',KUL:'WMKK',PEN:'WMKP',
+  SIN:'WSSS',
+  LAX:'KLAX',SFO:'KSFO',SEA:'KSEA',ONT:'KONT',OAK:'KOAK',PDX:'KPDX',SMF:'KSMF',
+  DEN:'KDEN',TUS:'KTUS',PHX:'KPHX',LAS:'KLAS',
+  ANC:'PANC',HNL:'PHNL',GUM:'PGUM',SPN:'PGSN',
+  YVR:'CYVR',
+  PRG:'LKPR',BER:'EDDB',MUC:'EDDM',WAW:'EPWA',LNZ:'LOWL',VIE:'LOWW'
+};
+
+/* ── 機場名稱查詢（從 _wxFleetData 建表）── */
+var _briefAirportNames = null;
+function _briefGetName(icao) {
+  if (!_briefAirportNames) {
+    _briefAirportNames = {};
+    if (typeof _wxFleetData !== 'undefined') {
+      for (var fleet in _wxFleetData) {
+        for (var region in _wxFleetData[fleet]) {
+          var list = _wxFleetData[fleet][region];
+          for (var i = 0; i < list.length; i++) {
+            _briefAirportNames[list[i].icao] = list[i].name;
+          }
+        }
+      }
+    }
+  }
+  return _briefAirportNames[icao] || '';
+}
 
 function briefInit() {
   if (_briefLoaded) return;
   _briefLoaded = true;
   _briefRestore();
-  // auto-save on input
   _briefFields.concat(_briefNotes).forEach(function(id) {
     var el = document.getElementById(id);
     if (el) el.addEventListener('input', _briefSave);
@@ -23,13 +83,9 @@ var _briefFidsCache = null;
 function _briefOnInput(val) {
   if (_briefFltTimer) clearTimeout(_briefFltTimer);
   var raw = val.trim().toUpperCase();
-  if (!raw) {
-    _briefFltStatus('', '');
-    return;
-  }
+  if (!raw) { _briefFltStatus('', ''); return; }
   var num = raw.replace(/^SJX|^JX/, '').replace(/\s/g, '').replace(/^0+/, '') || '0';
   if (!/^\d+$/.test(num)) { _briefFltStatus('', ''); return; }
-
   _briefFltStatus('查詢中...', 'loading');
   _briefFltTimer = setTimeout(function() { _briefLookup(num); }, 500);
 }
@@ -55,7 +111,6 @@ function _briefLookup(num) {
       _briefFillFromFids(fno, data);
     })
     .catch(function() {
-      // fallback: direct fetch
       _briefFetchDirect().then(function(data) {
         _briefFidsCache = data;
         _briefFillFromFids(fno, data);
@@ -94,10 +149,8 @@ function _briefFillFromFids(fno, data) {
   var depList = data.dep || [];
   var arrList = data.arr || [];
   var dateStr = data.date || '';
-  // extract pure number for comparison (e.g. "JX2" → "2")
   var num = fno.replace(/^JX/i, '').replace(/^0+/, '') || '0';
 
-  // find matching departure (JX only, compare numeric part)
   var depFlight = null;
   for (var i = 0; i < depList.length; i++) {
     var d = depList[i];
@@ -106,7 +159,6 @@ function _briefFillFromFids(fno, data) {
     if (dNum === num) { depFlight = d; break; }
   }
 
-  // find matching arrival
   var arrFlight = null;
   for (var j = 0; j < arrList.length; j++) {
     var a = arrList[j];
@@ -118,27 +170,46 @@ function _briefFillFromFids(fno, data) {
   if (!depFlight && !arrFlight) { _briefFltStatus('查無此航班', 'err'); return; }
   _briefFltStatus('✓', 'ok');
 
-  // format date: "2026/03/04" → "03/04" or keep as-is
-  var depDate = dateStr || '';
-
-  // fill fields
-  if (depFlight) {
-    _briefSet('brief-dep-date', depDate);
-    _briefSet('brief-etd', _briefFmtTime(depFlight.OTime));
-    _briefSet('brief-gate', depFlight.Gate || '');
+  // Dep Date/Time
+  var dtEl = document.getElementById('brief-dep-dt');
+  if (dtEl) {
+    if (depFlight) {
+      var time = _briefFmtTime(depFlight.OTime);
+      dtEl.innerHTML = '<div style="font-size:.85em;color:var(--muted)">' + dateStr + '</div>' +
+        '<div style="font-size:1.1em;font-weight:700">' + time + ' Local</div>';
+    } else if (arrFlight) {
+      var atime = _briefFmtTime(arrFlight.OTime);
+      dtEl.innerHTML = '<div style="font-size:.85em;color:var(--muted)">' + dateStr + '</div>' +
+        '<div style="font-size:1.1em;font-weight:700">' + atime + ' Local</div>' +
+        '<div style="font-size:.7em;color:var(--muted)">(STA)</div>';
+    }
   }
 
-  if (arrFlight) {
-    _briefSet('brief-arr-date', depDate); // same date by default
-    _briefSet('brief-eta', _briefFmtTime(arrFlight.OTime));
+  // Gate
+  if (depFlight && depFlight.Gate) {
+    _briefSet('brief-gate', depFlight.Gate);
+  }
+
+  // Origin & Dest
+  if (depFlight) {
+    _briefSet('brief-origin', 'TPE');
+    _briefSet('brief-dest', depFlight.CityCode || '');
+  } else if (arrFlight) {
+    _briefSet('brief-origin', arrFlight.CityCode || '');
+    _briefSet('brief-dest', 'TPE');
   }
 
   _briefSave();
+
+  // Fetch weather
+  var originEl = document.getElementById('brief-origin');
+  var destEl = document.getElementById('brief-dest');
+  if (originEl && originEl.value) _briefFetchWx('owx', originEl.value);
+  if (destEl && destEl.value) _briefFetchWx('dwx', destEl.value);
 }
 
 function _briefFmtTime(t) {
   if (!t) return '';
-  // "HH:MM:SS" → "HH:MM" or "HH:MM" → "HH:MM"
   return t.replace(/:\d{2}$/, '');
 }
 
@@ -147,12 +218,77 @@ function _briefSet(id, val) {
   if (el) el.value = val;
 }
 
+function _briefFmtSky(m) {
+  if (!m) return '';
+  if (!m.sky || m.sky.length === 0) return m.visib === '10+' ? 'CAVOK' : '';
+  var ceilings = m.sky.filter(function(s) { return s.cover === 'BKN' || s.cover === 'OVC'; });
+  if (ceilings.length > 0) {
+    var lowest = ceilings.reduce(function(a, b) { return a.base < b.base ? a : b; });
+    return lowest.cover + String(Math.round(lowest.base / 100)).padStart(3, '0');
+  }
+  var top = m.sky[m.sky.length - 1];
+  return top.cover + String(Math.round(top.base / 100)).padStart(3, '0');
+}
+
+/* ── 天氣查詢 ── */
+var _briefWxTimer = {};
+
+function _briefWxRefresh(target, iata) {
+  if (_briefWxTimer[target]) clearTimeout(_briefWxTimer[target]);
+  _briefWxTimer[target] = setTimeout(function() {
+    _briefFetchWx(target, iata.trim().toUpperCase());
+  }, 500);
+}
+
+function _briefFetchWx(target, iata) {
+  var el = document.getElementById('brief-' + target);
+  if (!el) return;
+  if (!iata || iata.length < 2) { el.innerHTML = '—'; return; }
+
+  var icao = _briefIataToIcao[iata] || iata;
+  if (!/^[A-Z]{4}$/.test(icao)) { el.innerHTML = '—'; return; }
+
+  el.innerHTML = '<span style="color:var(--muted);font-size:.8em">載入中...</span>';
+
+  fetch('/api/metar?ids=' + icao + '&hours=1')
+    .then(function(r) { return r.ok ? r.text() : Promise.reject(); })
+    .then(function(text) {
+      var lines = text.trim().split('\n').filter(function(l) { return l.trim(); });
+      if (lines.length === 0) { el.innerHTML = '<span style="color:var(--muted)">無資料</span>'; return; }
+      var raw = lines[0].replace(/^(METAR|SPECI)\s+/, '').trim();
+      var m = parseMetarLine(raw);
+      var cat = wxCalcCat(m);
+      var name = _briefGetName(icao);
+      var mins = wxMinsAgo(m);
+      var ageClass = mins > 90 ? 'color:#ef4444' : mins > 60 ? 'color:#f59e0b' : 'color:var(--muted)';
+      var ageText = mins !== null ? (mins > 90 ? 'expired' : mins + 'm') : '';
+      var skyText = _briefFmtSky(m);
+      el.innerHTML =
+        '<div style="text-align:left;font-size:.78em;line-height:1.6">' +
+        '<div><span class="wx-cat cat-' + cat + '" style="font-size:.7em;padding:1px 5px">' + cat + '</span> ' +
+        '<b>' + icao + '</b>' + (name ? ' ' + name : '') + '</div>' +
+        '<div style="color:var(--muted)">' + wxFmtWind(m) + ' &middot; ' + wxFmtVis(m) + ' &middot; ' + wxFmtTemp(m) +
+        (skyText ? ' &middot; ' + skyText : '') +
+        (ageText ? ' <span style="font-size:.85em;' + ageClass + '">' + ageText + '</span>' : '') +
+        '</div></div>';
+    })
+    .catch(function() {
+      el.innerHTML = '<span style="color:var(--muted)">查詢失敗</span>';
+    });
+}
+
 /* ── 清除 ── */
 function briefClearInfo() {
   _briefFields.forEach(function(id) {
     var el = document.getElementById(id);
     if (el) el.value = '';
   });
+  var dtEl = document.getElementById('brief-dep-dt');
+  if (dtEl) dtEl.innerHTML = '—';
+  var owx = document.getElementById('brief-owx');
+  if (owx) owx.innerHTML = '—';
+  var dwx = document.getElementById('brief-dwx');
+  if (dwx) dwx.innerHTML = '—';
   _briefSave();
 }
 
