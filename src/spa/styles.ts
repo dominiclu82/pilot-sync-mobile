@@ -285,7 +285,7 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
 .gcal-ev-loc{font-size:.75em;color:var(--muted);margin-top:4px}
 .gcal-ev-remind{font-size:.75em;color:var(--muted);margin-top:4px}
 .gcal-ev-desc{font-size:.73em;color:var(--muted);margin-top:6px;line-height:1.5;white-space:pre-wrap;word-break:break-word}
-.briefing-subtabs{position:sticky;top:env(safe-area-inset-top,0px);z-index:100;background:var(--bg);display:flex;align-items:center;justify-content:space-evenly;border-bottom:1.5px solid var(--dim);padding:6px 4px;margin-bottom:0;
+.briefing-subtabs{position:sticky;top:env(safe-area-inset-top,0px);z-index:100;background:var(--bg);display:flex;align-items:center;gap:6px;border-bottom:1.5px solid var(--dim);padding:6px 8px;margin-bottom:0;
   overflow-x:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:none;touch-action:manipulation}
 .briefing-subtabs::-webkit-scrollbar{display:none}
 .briefing-subtab{flex-shrink:0;padding:8px 10px;font-size:.84em;font-weight:700;
@@ -385,7 +385,7 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
 @media(max-width:639px){.wx-hint-desktop{display:none}.wx-hint-mobile{display:inline}}
 @media(min-width:640px){
   /* ── 預設：可捲動 ── */
-  .briefing-subtabs{position:sticky;top:0;z-index:100;flex-shrink:0}
+  .briefing-subtabs{position:sticky;top:0;z-index:100;flex-shrink:0;justify-content:space-evenly;gap:0}
   .subtab-slot{flex-shrink:0}
   .briefing-panel.active{padding:0}
   /* ── 所有 tab 固定高度，上下 bar 不動 ── */
