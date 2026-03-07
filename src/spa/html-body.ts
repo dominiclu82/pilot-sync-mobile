@@ -1109,7 +1109,7 @@ export function getSpaHtmlBody(): string {
       <button class="tab-util-btn tab-install-btn" id="tab-install-btn" onclick="showInstallGuide()" style="display:none">
         <span>📲</span>安裝
       </button>
-      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V6.121</span>
+      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V6.122</span>
     </div>
   </div>
 </div>
@@ -1139,15 +1139,15 @@ export function getSpaHtmlBody(): string {
       <div style="margin-bottom:4px">📱 建議使用 <b>iPad 橫向</b>操作以獲得最佳體驗</div>
       <div style="color:var(--muted)">Best experience on iPad in landscape mode</div>
     </div>
-    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V6.121</div>
+    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V6.122</div>
+    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
+      <div>提示卡跨午夜航班智慧切換（STD 00:00–01:59 且距起飛 <8hr 自動查次日）</div>
+      <div>Briefing card cross-midnight flight auto-switch (queries next day when STD 00:00–01:59 and <8hr before departure)</div>
+    </div>
+    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V6.121</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
       <div>修正 iPad 橫式 subtab 未均分（斷點 1100→1024px）</div>
       <div>Fix iPad landscape subtab not evenly spaced (breakpoint 1100→1024px)</div>
-    </div>
-    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V6.120</div>
-    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
-      <div>修正 WX 按鈕窄螢幕重疊（含下拉選單不壓縮）</div>
-      <div>Fix WX button overlap on narrow screens (prevent flex shrink with dropdown)</div>
     </div>
     <button class="install-close-btn" onclick="closeAbout()">關閉</button>
   </div>

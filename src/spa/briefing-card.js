@@ -220,7 +220,7 @@ function _briefFltStatus(msg, type) {
   el.className = 'pa-flt-status' + (type ? ' pa-flt-' + type : '');
 }
 
-function _briefFillFromFids(fno, data) {
+function _briefFillFromFids(fno, data, _noRecurse) {
   var depList = data.dep || [];
   var arrList = data.arr || [];
   var dateStr = data.date || '';
@@ -240,6 +240,40 @@ function _briefFillFromFids(fno, data) {
     if (!a.ACode || a.ACode.trim() !== 'JX') continue;
     var aNum = (a.FlightNo || '').replace(/\s/g, '').replace(/^0+/, '') || '0';
     if (aNum === num) { arrFlight = a; break; }
+  }
+
+  /* ── 跨午夜航班：STD 00:00-01:59 且距明天起飛 <8hr → 查隔天 ── */
+  if (!_noRecurse) {
+    var crossFlt = depFlight || arrFlight;
+    if (crossFlt && crossFlt.OTime) {
+      var stdHour = parseInt(crossFlt.OTime.split(':')[0], 10);
+      if (stdHour >= 0 && stdHour <= 1) {
+        var stdMin = parseInt(crossFlt.OTime.split(':')[1], 10) || 0;
+        var now = new Date();
+        var twNow = new Date(now.getTime() + 8 * 3600000);
+        // 計算明天同一時間與現在的差距
+        var tmrwDep = new Date(Date.UTC(
+          twNow.getUTCFullYear(), twNow.getUTCMonth(), twNow.getUTCDate() + 1,
+          stdHour, stdMin));
+        var diffHrs = (tmrwDep.getTime() - twNow.getTime()) / 3600000;
+        if (diffHrs > 0 && diffHrs < 8) {
+          var tmrwDate = tmrwDep.getUTCFullYear() + '/' +
+            String(tmrwDep.getUTCMonth() + 1).padStart(2, '0') + '/' +
+            String(tmrwDep.getUTCDate()).padStart(2, '0');
+          _briefFltStatus('查詢次日航班...', 'loading');
+          fetch('/api/fids?date=' + encodeURIComponent(tmrwDate))
+            .then(function(r) { return r.ok ? r.json() : null; })
+            .then(function(d2) {
+              if (d2) {
+                _briefFidsCache = d2;
+                _briefFillFromFids(fno, d2, true);
+              }
+            })
+            .catch(function() { /* 查不到就用今天的資料 */ });
+          return;
+        }
+      }
+    }
   }
 
   if (!depFlight && !arrFlight) { _briefFltStatus('查無此航班', 'err'); return; }
