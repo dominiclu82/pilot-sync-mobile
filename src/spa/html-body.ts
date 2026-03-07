@@ -1109,7 +1109,7 @@ export function getSpaHtmlBody(): string {
       <button class="tab-util-btn tab-install-btn" id="tab-install-btn" onclick="showInstallGuide()" style="display:none">
         <span>📲</span>安裝
       </button>
-      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V6.123</span>
+      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V6.124</span>
     </div>
   </div>
 </div>
@@ -1139,15 +1139,15 @@ export function getSpaHtmlBody(): string {
       <div style="margin-bottom:4px">📱 建議使用 <b>iPad 橫向</b>操作以獲得最佳體驗</div>
       <div style="color:var(--muted)">Best experience on iPad in landscape mode</div>
     </div>
-    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V6.123</div>
+    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V6.124</div>
+    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
+      <div>提示卡跨午夜航班 Gate 查次日（STD 00:00–01:59 且台灣時間 ≥ 21:00，僅更新 Gate）</div>
+      <div>Briefing card cross-midnight Gate lookup (fetches next day Gate when STD 00:00–01:59 and TST ≥ 21:00)</div>
+    </div>
+    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V6.123</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
       <div>提示卡跨午夜切換改用台灣時間 21:00 門檻（取代原 8 小時倒數）</div>
       <div>Briefing card cross-midnight switch now triggers at 21:00 TST (replaces 8-hour countdown)</div>
-    </div>
-    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V6.122</div>
-    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
-      <div>提示卡跨午夜航班智慧切換（STD 00:00–01:59 且距起飛 &lt;8hr 自動查次日）</div>
-      <div>Briefing card cross-midnight flight auto-switch (queries next day when STD 00:00–01:59 and &lt;8hr before departure)</div>
     </div>
     <button class="install-close-btn" onclick="closeAbout()">關閉</button>
   </div>
