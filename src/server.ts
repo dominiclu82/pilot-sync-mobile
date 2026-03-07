@@ -20,6 +20,7 @@ import { getSpaLiveRadarJs } from './spa/js-live-radar.js';
 import { getSpaFr24RadarJs } from './spa/js-fr24-radar.js';
 import { getSpaBriefingCardJs } from './spa/js-briefing-card.js';
 import { getSpaCrewRestJs } from './spa/js-crew-rest.js';
+import { getSpaSubtabReorderJs } from './spa/js-subtab-reorder.js';
 import FR24Pkg from 'flightradarapi';
 
 
@@ -812,6 +813,7 @@ ${getSpaLiveRadarJs()}
 ${getSpaFr24RadarJs()}
 ${getSpaBriefingCardJs()}
 ${getSpaCrewRestJs()}
+${getSpaSubtabReorderJs()}
 </script>
 </body>
 </html>`;

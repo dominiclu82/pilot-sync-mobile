@@ -177,27 +177,27 @@ export function getSpaHtmlBody(): string {
 
   <!-- 子 Tab Bar -->
   <div class="briefing-subtabs">
-    <div class="subtab-slot"><button class="briefing-subtab active" id="subtabBtn-brief" onclick="switchBriefingTab('brief',this)">📋 提示</button></div>
-    <div class="subtab-slot"><button class="briefing-subtab" id="subtabBtn-pa" onclick="switchBriefingTab('pa',this)">🎙️ PA</button></div>
-    <div class="subtab-slot"><button class="briefing-subtab" id="subtabBtn-crewrest" onclick="switchBriefingTab('crewrest',this)">⏳ 輪休計算</button></div>
-    <div class="subtab-slot"><button class="briefing-subtab" id="subtabBtn-hf" onclick="switchBriefingTab('hf',this)">📻 Pacific HF</button></div>
+    <div class="subtab-slot"><button class="briefing-subtab active" id="subtabBtn-brief" onclick="switchBriefingTab('brief',this)"><span class="drag-grip">≡</span>📋 提示</button></div>
+    <div class="subtab-slot"><button class="briefing-subtab" id="subtabBtn-pa" onclick="switchBriefingTab('pa',this)"><span class="drag-grip">≡</span>🎙️ PA</button></div>
+    <div class="subtab-slot"><button class="briefing-subtab" id="subtabBtn-crewrest" onclick="switchBriefingTab('crewrest',this)"><span class="drag-grip">≡</span>⏳ 輪休計算</button></div>
+    <div class="subtab-slot"><button class="briefing-subtab" id="subtabBtn-hf" onclick="switchBriefingTab('hf',this)"><span class="drag-grip">≡</span>📻 Pacific HF</button></div>
     <div class="subtab-wx-wrap">
-      <button class="briefing-subtab" id="subtabBtn-datis" onclick="switchBriefingTab('datis',this)">⛅ Airport WX</button>
-      <select class="wx-fleet-select" id="wx-fleet-select"
+      <button class="briefing-subtab" id="subtabBtn-datis" onclick="switchBriefingTab('datis',this)"><span class="drag-grip">≡</span>⛅ WX <select class="wx-fleet-inline" id="wx-fleet-select"
+        onclick="event.stopPropagation()"
         onfocus="this._prev=this.value;this.selectedIndex=0"
         onchange="wxSwitchFleet(this);switchBriefingTab('datis',document.getElementById('subtabBtn-datis'))"
         onblur="if(this.value===''){this.value=this._prev||'A350-900'}">
-        <option value="" style="display:none">選擇機型</option>
+        <option value="" style="display:none">機型</option>
         <option value="A321">A321</option>
         <option value="A330">A330</option>
         <option value="A350-900" selected>A350-900</option>
         <option value="A350-1000">A350-1000</option>
-      </select>
+      </select></button>
     </div>
-    <div class="subtab-slot" style="display:none"><button class="briefing-subtab" id="subtabBtn-live" onclick="switchBriefingTab('live',this)">📡 Live</button></div>
-    <div class="subtab-slot"><button class="briefing-subtab" id="subtabBtn-coldtemp" onclick="switchBriefingTab('coldtemp',this)">❄️ Cold Temp</button></div>
-    <div class="subtab-slot"><button class="briefing-subtab" id="subtabBtn-tools" onclick="switchBriefingTab('tools',this)">🗺️ Tools</button></div>
-    <div class="subtab-slot"><button class="briefing-subtab" id="subtabBtn-duty" onclick="switchBriefingTab('duty',this)">⏱️ Duty Time</button></div>
+    <div class="subtab-slot" style="display:none"><button class="briefing-subtab" id="subtabBtn-live" onclick="switchBriefingTab('live',this)"><span class="drag-grip">≡</span>📡 Live</button></div>
+    <div class="subtab-slot"><button class="briefing-subtab" id="subtabBtn-coldtemp" onclick="switchBriefingTab('coldtemp',this)"><span class="drag-grip">≡</span>❄️ Cold Temp</button></div>
+    <div class="subtab-slot"><button class="briefing-subtab" id="subtabBtn-tools" onclick="switchBriefingTab('tools',this)"><span class="drag-grip">≡</span>🗺️ Tools</button></div>
+    <div class="subtab-slot"><button class="briefing-subtab" id="subtabBtn-duty" onclick="switchBriefingTab('duty',this)"><span class="drag-grip">≡</span>⏱️ Duty Time</button></div>
   </div>
 
   <!-- ── 📋 提示 panel ── -->
@@ -1109,7 +1109,7 @@ export function getSpaHtmlBody(): string {
       <button class="tab-util-btn tab-install-btn" id="tab-install-btn" onclick="showInstallGuide()" style="display:none">
         <span>📲</span>安裝
       </button>
-      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V6.117</span>
+      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V6.118</span>
     </div>
   </div>
 </div>
@@ -1139,17 +1139,15 @@ export function getSpaHtmlBody(): string {
       <div style="margin-bottom:4px">📱 建議使用 <b>iPad 橫向</b>操作以獲得最佳體驗</div>
       <div style="color:var(--muted)">Best experience on iPad in landscape mode</div>
     </div>
-    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V6.117</div>
+    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V6.118</div>
+    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
+      <div>Subtab 立體按鈕樣式 + ≡ 拖曳手柄；機型選單整合進 WX 按鈕；間距平均分配</div>
+      <div>3D subtab buttons with drag grip icon; fleet selector merged into WX button; even spacing</div>
+    </div>
+    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V6.117</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
       <div>提示卡手動輸入（高度/飛行時間）切換分頁不再消失；新增查詢按鈕與 Enter 重新查詢</div>
       <div>Briefing card manual input persists across tab switches; added search button &amp; Enter to re-query</div>
-      <div>Flight Time / Cruise Altitude 自動同步至 PA Welcome；METAR 查詢範圍改為 6 小時</div>
-      <div>Flight Time / Cruise Altitude auto-syncs to PA Welcome; METAR query window extended to 6 hours</div>
-    </div>
-    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V6.116</div>
-    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
-      <div>提示卡欄位大改版（Dep Date/Time / Gate / Origin / Dest + 天氣自動查詢 + 航班號跨分頁同步）</div>
-      <div>Briefing card revamp — Dep Date/Time, Gate, Origin, Dest with auto weather + flight no. cross-tab sync</div>
     </div>
     <button class="install-close-btn" onclick="closeAbout()">關閉</button>
   </div>

@@ -285,16 +285,25 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
 .gcal-ev-loc{font-size:.75em;color:var(--muted);margin-top:4px}
 .gcal-ev-remind{font-size:.75em;color:var(--muted);margin-top:4px}
 .gcal-ev-desc{font-size:.73em;color:var(--muted);margin-top:6px;line-height:1.5;white-space:pre-wrap;word-break:break-word}
-.briefing-subtabs{position:sticky;top:env(safe-area-inset-top,0px);z-index:100;background:var(--bg);display:flex;align-items:center;border-bottom:1.5px solid var(--dim);padding:0 8px;margin-bottom:0;
+.briefing-subtabs{position:sticky;top:env(safe-area-inset-top,0px);z-index:100;background:var(--bg);display:flex;align-items:center;justify-content:space-evenly;border-bottom:1.5px solid var(--dim);padding:6px 4px;margin-bottom:0;
   overflow-x:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:none;touch-action:manipulation}
 .briefing-subtabs::-webkit-scrollbar{display:none}
-.briefing-subtab{flex-shrink:0;padding:10px 12px;font-size:.84em;font-weight:700;background:none;
-  border:none;border-bottom:2.5px solid transparent;color:var(--muted);cursor:pointer;
-  transition:color .2s,border-color .2s;margin-bottom:-1.5px;-webkit-appearance:none;white-space:nowrap}
-.subtab-slot{display:flex;justify-content:center;align-items:center;flex:1}
-.briefing-subtab.active{color:var(--accent);border-bottom-color:var(--accent)}
+.briefing-subtab{flex-shrink:0;padding:8px 10px;font-size:.84em;font-weight:700;
+  background:linear-gradient(180deg,rgba(255,255,255,.08) 0%,rgba(255,255,255,.02) 100%);
+  border:1px solid rgba(255,255,255,.1);border-bottom:2px solid rgba(0,0,0,.3);
+  border-radius:8px;color:var(--muted);cursor:pointer;
+  box-shadow:0 2px 4px rgba(0,0,0,.3),inset 0 1px 0 rgba(255,255,255,.08);
+  transition:color .2s,transform .1s,box-shadow .1s;-webkit-appearance:none;white-space:nowrap}
+.briefing-subtab:active{transform:translateY(1px);box-shadow:0 1px 2px rgba(0,0,0,.3);border-bottom-width:1px}
+.subtab-slot{display:flex;justify-content:center;align-items:center}
+.briefing-subtab.active{color:var(--accent);background:linear-gradient(180deg,rgba(59,130,246,.15) 0%,rgba(59,130,246,.05) 100%);border-color:rgba(59,130,246,.3);box-shadow:0 2px 6px rgba(59,130,246,.2),inset 0 1px 0 rgba(255,255,255,.1)}
 .briefing-panel{display:none}
 .briefing-panel.active{display:block;padding:16px 16px 0}
+/* ── subtab 拖曳排序 ── */
+.drag-grip{font-size:1em;opacity:.3;margin-right:3px;vertical-align:middle}
+.subtab-dragging{z-index:999;position:relative}
+.subtab-dragging .briefing-subtab{transform:scale(1.15);box-shadow:0 4px 16px rgba(59,130,246,.45);background:var(--card);border-radius:8px;transition:transform .15s}
+.subtab-dragging .drag-grip{opacity:.7}
 
 /* ── 📋 提示卡 ── */
 .brief-search{display:flex;gap:8px;margin-bottom:12px}
@@ -353,9 +362,9 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
   transition:opacity .15s;line-height:1.3}
 .tool-link-btn:active{opacity:.7}
 /* ── 航路氣象 ────────────────────────────────────────────────────── */
-.subtab-wx-wrap{display:flex;flex-direction:column;align-items:center;flex-shrink:0}
-.subtab-wx-wrap .briefing-subtab{width:100%}
-.wx-fleet-select{background:var(--bg);border:1px solid var(--dim);border-radius:6px;color:var(--accent);font-size:.7em;font-weight:700;padding:2px 18px 2px 6px;margin:0 8px 6px;-webkit-appearance:none;appearance:none;cursor:pointer;width:auto;max-width:fit-content;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%233b82f6'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 5px center}
+.subtab-wx-wrap{display:flex;align-items:center}
+.subtab-wx-wrap .briefing-subtab{display:flex;align-items:center;gap:4px}
+.wx-fleet-inline{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);border-radius:4px;color:var(--accent);font-size:.75em;font-weight:700;padding:1px 16px 1px 4px;-webkit-appearance:none;appearance:none;cursor:pointer;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='5'%3E%3Cpath d='M0 0l4 5 4-5z' fill='%233b82f6'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 4px center}
 .wx-routes{display:flex;flex-wrap:wrap;gap:6px;padding:10px 14px 8px;border-bottom:1px solid var(--dim)}
 .wx-route-btn{padding:4px 10px;font-size:.76em;background:none;border:1.5px solid var(--dim);
   border-radius:14px;color:var(--muted);font-weight:500;cursor:pointer;transition:all .2s;margin:0;-webkit-appearance:none}

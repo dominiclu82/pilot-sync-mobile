@@ -277,8 +277,8 @@ setTimeout(function() {
   }
 }, 0);
 
-// Auto-init briefing card (brief is default active subtab on page load)
-setTimeout(function() { briefInit(); }, 0);
+// Auto-init briefing card + subtab reorder (brief is default active subtab on page load)
+setTimeout(function() { briefInit(); subtabReorderInit(); }, 0);
 
 // ── Tab switching ─────────────────────────────────────────────────────────────
 function switchTab(tab, btn) {
