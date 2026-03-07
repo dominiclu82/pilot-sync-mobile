@@ -248,18 +248,16 @@ function _briefFillFromFids(fno, data, _noRecurse) {
     if (crossFlt && crossFlt.OTime) {
       var stdHour = parseInt(crossFlt.OTime.split(':')[0], 10);
       if (stdHour >= 0 && stdHour <= 1) {
-        var stdMin = parseInt(crossFlt.OTime.split(':')[1], 10) || 0;
         var now = new Date();
         var twNow = new Date(now.getTime() + 8 * 3600000);
-        // 計算明天同一時間與現在的差距
-        var tmrwDep = new Date(Date.UTC(
-          twNow.getUTCFullYear(), twNow.getUTCMonth(), twNow.getUTCDate() + 1,
-          stdHour, stdMin));
-        var diffHrs = (tmrwDep.getTime() - twNow.getTime()) / 3600000;
-        if (diffHrs > 0 && diffHrs < 8) {
-          var tmrwDate = tmrwDep.getUTCFullYear() + '/' +
-            String(tmrwDep.getUTCMonth() + 1).padStart(2, '0') + '/' +
-            String(tmrwDep.getUTCDate()).padStart(2, '0');
+        var twHour = twNow.getUTCHours();
+        // 台灣時間 21:00 以後 → 查隔天
+        if (twHour >= 21) {
+          var tmrw = new Date(Date.UTC(
+            twNow.getUTCFullYear(), twNow.getUTCMonth(), twNow.getUTCDate() + 1));
+          var tmrwDate = tmrw.getUTCFullYear() + '/' +
+            String(tmrw.getUTCMonth() + 1).padStart(2, '0') + '/' +
+            String(tmrw.getUTCDate()).padStart(2, '0');
           _briefFltStatus('查詢次日航班...', 'loading');
           fetch('/api/fids?date=' + encodeURIComponent(tmrwDate))
             .then(function(r) { return r.ok ? r.json() : null; })
