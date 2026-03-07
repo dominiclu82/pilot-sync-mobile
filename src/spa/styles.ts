@@ -418,7 +418,7 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
   .dt-ref-table{font-size:.95em}
   .dt-ref-table th,.dt-ref-table td{padding:10px 14px}
 }
-@media(min-width:1100px){
+@media(min-width:1024px){
   .briefing-subtabs{justify-content:space-evenly;gap:0}
 }
 /* ── Live Radar ── */
