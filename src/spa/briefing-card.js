@@ -249,16 +249,18 @@ function _briefFillFromFids(fno, data) {
   var dtEl = document.getElementById('brief-dep-dt');
   if (dtEl) {
     if (depFlight) {
+      var depDateStr = depFlight.ODate || dateStr;
       var time = _briefFmtTime(depFlight.OTime);
-      dtEl.innerHTML = '<div style="font-size:.85em;color:var(--muted)">' + dateStr + '</div>' +
+      dtEl.innerHTML = '<div style="font-size:.85em;color:var(--muted)">' + depDateStr + '</div>' +
         '<div style="font-size:1.1em;font-weight:700">' + time + ' Local</div>';
     } else if (arrFlight) {
+      var arrDateStr = arrFlight.ODate || dateStr;
       // arrFlight.OTime 是 TPE 抵達時間(STA)，不是出發地的 STD
       // 先顯示載入中，再從 FR24/FA 取得正確出發時間
-      dtEl.innerHTML = '<div style="font-size:.85em;color:var(--muted)">' + dateStr + '</div>' +
+      dtEl.innerHTML = '<div style="font-size:.85em;color:var(--muted)">' + arrDateStr + '</div>' +
         '<div style="font-size:1.1em;font-weight:700;color:var(--muted)">查詢出發時間...</div>';
       var originIata = arrFlight.CityCode || '';
-      _briefFetchOriginInfo(fno, dateStr, dtEl, originIata);
+      _briefFetchOriginInfo(fno, arrDateStr, dtEl, originIata);
     }
   }
 
