@@ -362,7 +362,7 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
   transition:opacity .15s;line-height:1.3}
 .tool-link-btn:active{opacity:.7}
 /* ── 航路氣象 ────────────────────────────────────────────────────── */
-.subtab-wx-wrap{display:flex;align-items:center}
+.subtab-wx-wrap{display:flex;align-items:center;flex-shrink:0}
 .subtab-wx-wrap .briefing-subtab{display:flex;align-items:center;gap:4px}
 .wx-fleet-inline{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);border-radius:4px;color:var(--accent);font-size:.75em;font-weight:700;padding:1px 16px 1px 4px;-webkit-appearance:none;appearance:none;cursor:pointer;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='5'%3E%3Cpath d='M0 0l4 5 4-5z' fill='%233b82f6'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 4px center}
 .wx-routes{display:flex;flex-wrap:wrap;gap:6px;padding:10px 14px 8px;border-bottom:1px solid var(--dim)}
@@ -385,7 +385,7 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
 @media(max-width:639px){.wx-hint-desktop{display:none}.wx-hint-mobile{display:inline}}
 @media(min-width:640px){
   /* ── 預設：可捲動 ── */
-  .briefing-subtabs{position:sticky;top:0;z-index:100;flex-shrink:0;justify-content:space-evenly;gap:0}
+  .briefing-subtabs{position:sticky;top:0;z-index:100;flex-shrink:0}
   .subtab-slot{flex-shrink:0}
   .briefing-panel.active{padding:0}
   /* ── 所有 tab 固定高度，上下 bar 不動 ── */
@@ -418,8 +418,8 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
   .dt-ref-table{font-size:.95em}
   .dt-ref-table th,.dt-ref-table td{padding:10px 14px}
 }
-@media(max-width:767px){
-  .subtab-slot{flex:0 0 25%}
+@media(min-width:1100px){
+  .briefing-subtabs{justify-content:space-evenly;gap:0}
 }
 /* ── Live Radar ── */
 #briefing-live.active{display:flex;position:relative;padding:0;overflow:hidden;clip-path:inset(0)}

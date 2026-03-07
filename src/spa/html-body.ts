@@ -1109,7 +1109,7 @@ export function getSpaHtmlBody(): string {
       <button class="tab-util-btn tab-install-btn" id="tab-install-btn" onclick="showInstallGuide()" style="display:none">
         <span>📲</span>安裝
       </button>
-      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V6.119</span>
+      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V6.120</span>
     </div>
   </div>
 </div>
@@ -1139,15 +1139,15 @@ export function getSpaHtmlBody(): string {
       <div style="margin-bottom:4px">📱 建議使用 <b>iPad 橫向</b>操作以獲得最佳體驗</div>
       <div style="color:var(--muted)">Best experience on iPad in landscape mode</div>
     </div>
-    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V6.119</div>
+    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V6.120</div>
+    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
+      <div>修正 WX 按鈕窄螢幕重疊（含下拉選單不壓縮）</div>
+      <div>Fix WX button overlap on narrow screens (prevent flex shrink with dropdown)</div>
+    </div>
+    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V6.119</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
       <div>Subtab 窄螢幕重疊修正（手機/iPad 直式用固定間距+捲動）</div>
       <div>Fix subtab overlap on narrow screens (gap + scroll on mobile/portrait)</div>
-    </div>
-    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V6.118</div>
-    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
-      <div>Subtab 立體按鈕樣式 + ≡ 拖曳手柄；機型選單整合進 WX 按鈕；間距平均分配</div>
-      <div>3D subtab buttons with drag grip icon; fleet selector merged into WX button; even spacing</div>
     </div>
     <button class="install-close-btn" onclick="closeAbout()">關閉</button>
   </div>
