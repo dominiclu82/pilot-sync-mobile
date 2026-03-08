@@ -1109,7 +1109,7 @@ export function getSpaHtmlBody(): string {
       <button class="tab-util-btn tab-install-btn" id="tab-install-btn" onclick="showInstallGuide()" style="display:none">
         <span>📲</span>安裝
       </button>
-      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V6.131</span>
+      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V6.132</span>
     </div>
   </div>
 </div>
@@ -1139,23 +1139,21 @@ export function getSpaHtmlBody(): string {
       <div style="margin-bottom:4px">📱 建議使用 <b>iPad 橫向</b>操作以獲得最佳體驗</div>
       <div style="color:var(--muted)">Best experience on iPad in landscape mode</div>
     </div>
-    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V6.131</div>
+    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V6.132</div>
+    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
+      <div>FR24 資訊卡 ATD/ETA 顯示時間差（如 +0:40 / -0:30）</div>
+      <div>提示卡 WX 還原為直接查詢（移除共享快取）</div>
+      <div>FR24 info card: show time diff on ATD/ETA (e.g. +0:40 / -0:30)</div>
+      <div>Briefing card: reverted WX to direct METAR query (removed shared cache)</div>
+    </div>
+    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V6.131</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
       <div>提示卡跨洋航班出發日修正：透過 FR24 Schedule API 取得正確出發日期/時間</div>
       <div>提示卡移除手動日期切換，改為自動搜尋並顯示查詢進度與結果日期</div>
-      <div>提示卡 WX 改用共享 METAR 快取，移除分鐘顯示（僅保留 expired 警告）</div>
+      <div>提示卡 WX 移除分鐘顯示（僅保留 expired 警告）</div>
       <div>Briefing card: fixed departure date for transoceanic inbound flights via FR24 Schedule API</div>
       <div>Briefing card: replaced manual date navigator with auto-search showing query progress and result date</div>
-      <div>Briefing card: WX now uses shared METAR cache; removed minutes display (kept "expired" warning only)</div>
-    </div>
-    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V6.129</div>
-    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
-      <div>提示卡日期導覽（±3天）排版優化，與查詢同行顯示</div>
-      <div>FIDS 查詢整合共用快取（提示卡/PA/Gate Info），離線時保留舊資料</div>
-      <div>PA Local Time UTC 行上方增加間距</div>
-      <div>Briefing card: date navigator inline with search bar; compact layout</div>
-      <div>Unified FIDS cache shared across Briefing/PA/Gate Info; offline-friendly (stale data preserved)</div>
-      <div>PA Local Time: spacing above UTC/TPE rows</div>
+      <div>Briefing card: WX removed minutes display (kept "expired" warning only)</div>
     </div>
     <button class="install-close-btn" onclick="closeAbout()">關閉</button>
   </div>

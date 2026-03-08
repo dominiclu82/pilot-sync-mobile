@@ -456,7 +456,7 @@ function _briefFetchWx(target, iata) {
 
   el.innerHTML = '<span style="color:var(--muted);font-size:.8em">載入中...</span>';
 
-  _metarFetch(icao).then(function(text) {
+  fetch('/api/metar?ids=' + icao + '&hours=6').then(function(r) { return r.ok ? r.text() : Promise.reject(); }).then(function(text) {
       var lines = text.trim().split('\n').filter(function(l) { return l.trim(); });
       if (lines.length === 0) { el.innerHTML = '<span style="color:var(--muted)">無資料</span>'; return; }
       var raw = lines[0].replace(/^(METAR|SPECI)\s+/, '').trim();
