@@ -66,11 +66,28 @@ setInterval(() => {
 const app = express();
 app.use(express.json());
 
-app.get('/', (_req, res) => {
+app.get('/', (_req, res) => { res.redirect('/main'); });
+
+app.get('/main', (_req, res) => {
   res.setHeader('Content-Type', 'text/html; charset=utf-8');
   res.setHeader('Cache-Control', 'no-store');
   res.send(getSPAHtml());
 });
+
+app.get('/share', (_req, res) => {
+  res.setHeader('Content-Type', 'text/html; charset=utf-8');
+  res.setHeader('Cache-Control', 'no-store');
+  res.send(getSPAHtml(undefined, ['sync']));
+});
+
+const _viewTabMap: Record<string, string> = { sync: 'sync', ops: 'briefing', fr24: 'fr24', gate: 'gate' };
+for (const [route, tab] of Object.entries(_viewTabMap)) {
+  app.get('/' + route, (_req, res) => {
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    res.setHeader('Cache-Control', 'no-store');
+    res.send(getSPAHtml(tab));
+  });
+}
 
 app.get('/icon.svg', (_req, res) => {
   res.setHeader('Content-Type', 'image/svg+xml');
@@ -86,7 +103,7 @@ app.get('/manifest.json', (_req, res) => {
     name: 'CrewSync',
     short_name: 'CrewSync',
     description: 'Crew Roster → Google Calendar',
-    start_url: '/',
+    start_url: '/main',
     display: 'standalone',
     background_color: '#0a0e1a',
     theme_color: '#1e2740',
@@ -817,7 +834,38 @@ if (REDIRECT_PORT && REDIRECT_PORT !== Number(PORT)) {
 
 
 // ── SPA HTML ─────────────────────────────────────────────────────────────────
-function getSPAHtml(): string {
+function getSPAHtml(singleTab?: string, hideTabs?: string[]): string {
+  let viewScript = '';
+  if (singleTab) {
+    viewScript = `
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  var tab = '${singleTab}';
+  var btn = document.getElementById('tabBtn-' + (tab === 'briefing' ? 'briefing' : tab));
+  if (btn) switchTab(tab, btn);
+  var bar = document.querySelector('.tab-bar');
+  if (bar) bar.style.display = 'none';
+  document.body.style.paddingBottom = '0';
+});
+</script>`;
+  } else if (hideTabs && hideTabs.length > 0) {
+    viewScript = `
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  var hide = ${JSON.stringify(hideTabs)};
+  hide.forEach(function(t) {
+    var panel = document.getElementById('tab-' + t);
+    if (panel) { panel.style.display = 'none'; panel.classList.remove('tab-active'); }
+    var btn = document.getElementById('tabBtn-' + t);
+    if (btn) btn.style.display = 'none';
+  });
+  var firstBtn = document.querySelector('.tab-btn:not([style*="display: none"])');
+  if (firstBtn && !document.querySelector('.tab-btn.tab-active:not([style*="display: none"])')) {
+    firstBtn.click();
+  }
+});
+</script>`;
+  }
   return `<!DOCTYPE html>
 <html lang="zh-TW">
 <head>
@@ -852,7 +900,7 @@ ${getSpaFr24RadarJs()}
 ${getSpaBriefingCardJs()}
 ${getSpaCrewRestJs()}
 ${getSpaSubtabReorderJs()}
-</script>
+</script>${viewScript}
 </body>
 </html>`;
 }
