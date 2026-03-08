@@ -1109,7 +1109,7 @@ export function getSpaHtmlBody(): string {
       <button class="tab-util-btn tab-install-btn" id="tab-install-btn" onclick="showInstallGuide()" style="display:none">
         <span>📲</span>安裝
       </button>
-      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V6.126</span>
+      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V6.127</span>
     </div>
   </div>
 </div>
@@ -1139,15 +1139,15 @@ export function getSpaHtmlBody(): string {
       <div style="margin-bottom:4px">📱 建議使用 <b>iPad 橫向</b>操作以獲得最佳體驗</div>
       <div style="color:var(--muted)">Best experience on iPad in landscape mode</div>
     </div>
-    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V6.126</div>
+    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V6.127</div>
+    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
+      <div>提示卡航班查詢改用今天→明天→昨天三段式查詢（與 PA 相同邏輯）</div>
+      <div>Briefing card flight lookup now tries today → tomorrow → yesterday (same logic as PA)</div>
+    </div>
+    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V6.126</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
       <div>提示卡日期改用航班實際 ODate（跨午夜航班正確顯示次日日期）</div>
       <div>Briefing card date now uses flight ODate (correctly shows next day for cross-midnight flights)</div>
-    </div>
-    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V6.125</div>
-    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
-      <div>提示卡跨午夜航班自動取次日班次（機場 API 含次日資料，改取最後一筆匹配）</div>
-      <div>Briefing card cross-midnight flight auto-selects next day (takes last matching entry from airport API)</div>
     </div>
     <button class="install-close-btn" onclick="closeAbout()">關閉</button>
   </div>

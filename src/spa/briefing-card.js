@@ -165,32 +165,47 @@ function _briefOnInput(val) {
   _briefFltTimer = setTimeout(function() { _briefLookup(num); }, 500);
 }
 
+function _briefHasFlight(num, data) {
+  var lists = (data.dep || []).concat(data.arr || []);
+  for (var i = 0; i < lists.length; i++) {
+    var f = lists[i];
+    if (!f.ACode || f.ACode.trim() !== 'JX') continue;
+    var fNum = (f.FlightNo || '').replace(/\s/g, '').replace(/^0+/, '') || '0';
+    if (fNum === num) return true;
+  }
+  return false;
+}
+
 function _briefLookup(num) {
   var fno = 'JX' + num;
   var inp = document.getElementById('brief-fno');
   if (inp) inp.value = fno;
 
-  if (_briefFidsCache) {
+  if (_briefFidsCache && _briefHasFlight(num, _briefFidsCache)) {
     _briefFillFromFids(fno, _briefFidsCache);
     return;
   }
 
-  fetch('/api/fids')
-    .then(function(r) {
-      if (!r.ok) throw new Error('HTTP ' + r.status);
-      return r.json();
-    })
-    .then(function(data) {
-      if (!data || data.error) throw new Error('no data');
-      _briefFidsCache = data;
-      _briefFillFromFids(fno, data);
-    })
-    .catch(function() {
-      _briefFetchDirect().then(function(data) {
+  // 今天 → 明天 → 昨天
+  var tryDates = [0, 1, -1];
+  var idx = 0;
+  var tryNext = function() {
+    if (idx >= tryDates.length) {
+      _briefFltStatus('查無此航班', 'err');
+      return;
+    }
+    var dateStr = _paDateOffset(tryDates[idx]);
+    idx++;
+    _paFetchByDate(dateStr).then(function(data) {
+      if (_briefHasFlight(num, data)) {
         _briefFidsCache = data;
         _briefFillFromFids(fno, data);
-      }).catch(function() { _briefFltStatus('查詢失敗', 'err'); });
-    });
+      } else {
+        tryNext();
+      }
+    }).catch(function() { tryNext(); });
+  };
+  tryNext();
 }
 
 function _briefFetchDirect() {
