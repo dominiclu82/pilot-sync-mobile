@@ -310,6 +310,10 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
 .brief-search input{flex:1;background:var(--card);border:1px solid var(--dim);border-radius:8px;padding:10px;color:var(--text);font-size:.9em}
 .brief-search input::placeholder{color:var(--muted)}
 .brief-search-btn{background:var(--accent);color:#fff;border:none;border-radius:8px;padding:8px 16px;font-weight:600;cursor:pointer;white-space:nowrap}
+.brief-date-nav{display:flex;align-items:center;justify-content:center;gap:12px;margin-bottom:12px}
+.brief-date-nav button{background:none;border:1px solid var(--dim);border-radius:6px;color:var(--text);font-size:.85em;padding:4px 10px;cursor:pointer}
+.brief-date-nav button:disabled{opacity:.3;cursor:default}
+.brief-date-nav span{font-size:.85em;color:var(--text);min-width:90px;text-align:center}
 .brief-section{background:var(--card);border-radius:var(--radius);padding:16px;margin-bottom:12px}
 .brief-section-header{display:flex;justify-content:space-between;align-items:center;font-weight:700;font-size:.85em;margin-bottom:12px;color:var(--text);letter-spacing:.5px}
 .brief-clear-btn{background:none;border:1px solid var(--dim);border-radius:6px;color:var(--muted);font-size:.75em;padding:4px 10px;cursor:pointer}
@@ -805,7 +809,7 @@ input[type=radio]{width:15px;height:15px;aspect-ratio:1;accent-color:var(--accen
 .pa-tz-time{flex:0 0 50px;color:var(--accent);font-weight:700;font-variant-numeric:tabular-nums}
 .pa-tz-utc{flex:0 0 55px;color:var(--muted);font-size:.9em}
 .pa-tz-dst{color:#f59e0b;font-size:.85em}
-.pa-tz-row.pa-tz-utc-row{background:var(--dim);font-weight:700}
+.pa-tz-row.pa-tz-utc-row{background:var(--dim);font-weight:700;margin-top:12px}
 .pa-tz-row.pa-tz-utc-row .pa-tz-stations{color:var(--accent)}
 .pa-lt-search{margin-bottom:6px;position:relative}
 .pa-lt-search input{width:100%;padding:6px 70px 6px 10px;border:1.5px solid var(--dim);border-radius:8px;background:var(--surface);color:var(--text);font-size:.82em;-webkit-appearance:none;appearance:none;box-sizing:border-box}

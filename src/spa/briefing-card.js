@@ -104,6 +104,7 @@ function briefInit() {
     altEl.addEventListener('input', function() { _briefSyncAltToPa(altEl.value); });
     if (altEl.value) _briefSyncAltToPa(altEl.value);
   }
+  _briefUpdateDateLabel();
 }
 
 /* ── Flight Time + Altitude → PA Welcome 同步 ── */
@@ -151,9 +152,36 @@ function _briefForceQuery() {
   _briefLookup(num);
 }
 
+/* ── 日期導覽 ── */
+function _briefUpdateDateLabel() {
+  var label = document.getElementById('brief-date-label');
+  var prevBtn = document.getElementById('brief-date-prev');
+  var nextBtn = document.getElementById('brief-date-next');
+  if (!label) return;
+  var dateStr = _paDateOffset(_briefDateOffset);
+  var mm = dateStr.slice(5, 7);
+  var dd = dateStr.slice(8, 10);
+  var tag = _briefDateOffset === 0 ? '今日' : _briefDateOffset === 1 ? '明日' : _briefDateOffset === -1 ? '昨日' : '';
+  label.textContent = mm + '/' + dd + (tag ? ' (' + tag + ')' : '');
+  if (prevBtn) prevBtn.disabled = _briefDateOffset <= -3;
+  if (nextBtn) nextBtn.disabled = _briefDateOffset >= 3;
+}
+
+function _briefShiftDate(dir) {
+  var next = _briefDateOffset + dir;
+  if (next < -3 || next > 3) return;
+  _briefDateOffset = next;
+  _briefFidsCache = null;
+  _briefUpdateDateLabel();
+  // 如果已有航班號，立即查詢該日期
+  var inp = document.getElementById('brief-fno');
+  if (inp && inp.value.trim()) _briefForceQuery();
+}
+
 /* ── debounce 自動查詢 ── */
 var _briefFltTimer = null;
 var _briefFidsCache = null;
+var _briefDateOffset = 0; // 0=今天, ±1~3
 
 function _briefOnInput(val) {
   if (_briefFltTimer) clearTimeout(_briefFltTimer);
@@ -186,17 +214,36 @@ function _briefLookup(num) {
     return;
   }
 
-  // 今天 → 明天 → 昨天
+  // 手動選了特定日期 → 只查該天
+  if (_briefDateOffset !== 0) {
+    var dateStr = _paDateOffset(_briefDateOffset);
+    var label = _briefDateOffset > 0 ? '+' + _briefDateOffset : String(_briefDateOffset);
+    _briefFltStatus('查詢 ' + dateStr + '...', 'loading');
+    _paFetchByDate(dateStr).then(function(data) {
+      if (_briefHasFlight(num, data)) {
+        _briefFidsCache = data;
+        _briefFillFromFids(fno, data);
+      } else {
+        _briefFltStatus('查無此航班', 'err');
+      }
+    }).catch(function() { _briefFltStatus('查詢失敗', 'err'); });
+    return;
+  }
+
+  // 預設（今日）→ 今天 → 明天 → 昨天
   var tryDates = [0, 1, -1];
+  var tryLabels = ['今日', '明日', '昨日'];
   var idx = 0;
   var tryNext = function() {
     if (idx >= tryDates.length) {
       _briefFltStatus('查無此航班', 'err');
       return;
     }
-    var dateStr = _paDateOffset(tryDates[idx]);
+    var d = _paDateOffset(tryDates[idx]);
+    var lbl = tryLabels[idx];
     idx++;
-    _paFetchByDate(dateStr).then(function(data) {
+    _briefFltStatus('查詢' + lbl + '航班...', 'loading');
+    _paFetchByDate(d).then(function(data) {
       if (_briefHasFlight(num, data)) {
         _briefFidsCache = data;
         _briefFillFromFids(fno, data);

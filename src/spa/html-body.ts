@@ -207,6 +207,11 @@ export function getSpaHtmlBody(): string {
       <button class="brief-search-btn" onclick="_briefForceQuery()">查詢</button>
       <span id="brief-flt-status" class="pa-flt-status"></span>
     </div>
+    <div class="brief-date-nav">
+      <button onclick="_briefShiftDate(-1)" id="brief-date-prev">◀</button>
+      <span id="brief-date-label"></span>
+      <button onclick="_briefShiftDate(1)" id="brief-date-next">▶</button>
+    </div>
 
     <div class="brief-section">
       <div class="brief-section-header"><span>FLIGHT INFO / DATA</span><button class="brief-clear-btn" onclick="briefClearInfo()">清除</button></div>
@@ -1109,7 +1114,7 @@ export function getSpaHtmlBody(): string {
       <button class="tab-util-btn tab-install-btn" id="tab-install-btn" onclick="showInstallGuide()" style="display:none">
         <span>📲</span>安裝
       </button>
-      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V6.127</span>
+      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V6.128</span>
     </div>
   </div>
 </div>
@@ -1139,15 +1144,17 @@ export function getSpaHtmlBody(): string {
       <div style="margin-bottom:4px">📱 建議使用 <b>iPad 橫向</b>操作以獲得最佳體驗</div>
       <div style="color:var(--muted)">Best experience on iPad in landscape mode</div>
     </div>
-    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V6.127</div>
+    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V6.128</div>
+    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
+      <div>提示卡新增日期導覽（前後三天切換），預設自動搜尋今日→明日→昨日</div>
+      <div>PA Local Time 查詢結果與 UTC/TPE 參考行增加間距區分</div>
+      <div>Briefing card: added date navigator (±3 days); default auto-searches today → tomorrow → yesterday</div>
+      <div>PA Local Time: added spacing above UTC/TPE reference rows for clarity</div>
+    </div>
+    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V6.127</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
       <div>提示卡航班查詢改用今天→明天→昨天三段式查詢（與 PA 相同邏輯）</div>
       <div>Briefing card flight lookup now tries today → tomorrow → yesterday (same logic as PA)</div>
-    </div>
-    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V6.126</div>
-    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
-      <div>提示卡日期改用航班實際 ODate（跨午夜航班正確顯示次日日期）</div>
-      <div>Briefing card date now uses flight ODate (correctly shows next day for cross-midnight flights)</div>
     </div>
     <button class="install-close-btn" onclick="closeAbout()">關閉</button>
   </div>
