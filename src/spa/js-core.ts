@@ -280,9 +280,6 @@ setTimeout(function() {
 // Auto-init briefing card + subtab reorder (brief is default active subtab on page load)
 setTimeout(function() { briefInit(); subtabReorderInit(); }, 0);
 
-// 背景預載全部機場 METAR（頁面載入 3 秒後）
-setTimeout(function() { if (typeof _metarPreloadAll === 'function') _metarPreloadAll(); }, 3000);
-
 // ── Tab switching ─────────────────────────────────────────────────────────────
 function switchTab(tab, btn) {
   ['tab-sync','tab-briefing','tab-fr24','tab-gate'].forEach(function(id) {
