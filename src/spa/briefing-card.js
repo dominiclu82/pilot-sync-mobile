@@ -496,6 +496,15 @@ function briefClearInfo() {
   _briefSave();
 }
 
+function briefClearAll() {
+  var fno = document.getElementById('brief-fno');
+  if (fno) fno.value = '';
+  _briefFltStatus('', '');
+  _briefFidsCache = null;
+  briefClearInfo();
+  briefClearNotes();
+}
+
 function briefClearNotes() {
   _briefNotes.forEach(function(id) {
     var el = document.getElementById(id);

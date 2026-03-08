@@ -310,6 +310,7 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
 .brief-search input{width:90px;flex:0 0 auto;background:var(--card);border:1px solid var(--dim);border-radius:8px;padding:8px 10px;color:var(--text);font-size:.9em}
 .brief-search input::placeholder{color:var(--muted)}
 .brief-search-btn{background:var(--accent);color:#fff;border:none;border-radius:8px;padding:8px 12px;font-weight:600;cursor:pointer;white-space:nowrap;font-size:.85em}
+.brief-clear-all-btn{background:none;border:1px solid var(--dim);border-radius:8px;color:var(--muted);font-size:.75em;padding:6px 10px;cursor:pointer;white-space:nowrap;margin-left:auto}
 
 .brief-section{background:var(--card);border-radius:var(--radius);padding:16px;margin-bottom:12px}
 .brief-section-header{display:flex;justify-content:space-between;align-items:center;font-weight:700;font-size:.85em;margin-bottom:12px;color:var(--text);letter-spacing:.5px}
