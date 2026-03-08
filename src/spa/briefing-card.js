@@ -147,9 +147,9 @@ function _briefForceQuery() {
   if (!raw) return;
   var num = raw.replace(/^SJX|^JX/, '').replace(/\s/g, '').replace(/^0+/, '') || '0';
   if (!/^\d+$/.test(num)) return;
-  _briefFidsCache = null;  // 清除快取，強制重新 fetch
+  _briefFidsCache = null;
   _briefFltStatus('查詢中...', 'loading');
-  _briefLookup(num);
+  _briefLookup(num, true);  // force=true 跳過快取
 }
 
 /* ── 日期導覽 ── */
@@ -204,12 +204,12 @@ function _briefHasFlight(num, data) {
   return false;
 }
 
-function _briefLookup(num) {
+function _briefLookup(num, force) {
   var fno = 'JX' + num;
   var inp = document.getElementById('brief-fno');
   if (inp) inp.value = fno;
 
-  if (_briefFidsCache && _briefHasFlight(num, _briefFidsCache)) {
+  if (!force && _briefFidsCache && _briefHasFlight(num, _briefFidsCache)) {
     _briefFillFromFids(fno, _briefFidsCache);
     return;
   }
@@ -219,7 +219,7 @@ function _briefLookup(num) {
     var dateStr = _paDateOffset(_briefDateOffset);
     var label = _briefDateOffset > 0 ? '+' + _briefDateOffset : String(_briefDateOffset);
     _briefFltStatus('查詢 ' + dateStr + '...', 'loading');
-    _paFetchByDate(dateStr).then(function(data) {
+    _fidsFetchByDate(dateStr, force).then(function(data) {
       if (_briefHasFlight(num, data)) {
         _briefFidsCache = data;
         _briefFillFromFids(fno, data);
@@ -243,7 +243,7 @@ function _briefLookup(num) {
     var lbl = tryLabels[idx];
     idx++;
     _briefFltStatus('查詢' + lbl + '航班...', 'loading');
-    _paFetchByDate(d).then(function(data) {
+    _fidsFetchByDate(d, force).then(function(data) {
       if (_briefHasFlight(num, data)) {
         _briefFidsCache = data;
         _briefFillFromFids(fno, data);
@@ -253,26 +253,6 @@ function _briefLookup(num) {
     }).catch(function() { tryNext(); });
   };
   tryNext();
-}
-
-function _briefFetchDirect() {
-  var ep = atob('aHR0cHM6Ly93d3cudGFveXVhbi1haXJwb3J0LmNvbS9hcGkvYXBpL2ZsaWdodC9hX2ZsaWdodA==');
-  var now = new Date();
-  var tw = new Date(now.getTime() + 8 * 3600000);
-  var odate = tw.getUTCFullYear() + '/' +
-    String(tw.getUTCMonth() + 1).padStart(2, '0') + '/' +
-    String(tw.getUTCDate()).padStart(2, '0');
-  var base = { ODate: odate, OTimeOpen: null, OTimeClose: null, BNO: null, AState: '', language: 'ch', keyword: '' };
-  var hdrs = { 'Content-Type': 'application/json', 'Accept': 'application/json, text/plain, */*' };
-  return Promise.all([
-    fetch(ep, { method: 'POST', headers: hdrs, body: JSON.stringify(Object.assign({}, base, { AState: 'D' })) }),
-    fetch(ep, { method: 'POST', headers: hdrs, body: JSON.stringify(Object.assign({}, base, { AState: 'A' })) })
-  ]).then(function(res) {
-    if (!res[0].ok || !res[1].ok) throw new Error('HTTP ' + res[0].status + '/' + res[1].status);
-    return Promise.all([res[0].json(), res[1].json()]);
-  }).then(function(data) {
-    return { dep: data[0], arr: data[1], date: odate };
-  });
 }
 
 function _briefFltStatus(msg, type) {

@@ -481,20 +481,8 @@ function loadGateFlights() {
   tableBody.innerHTML = '';
   gateFlightsList = [];
 
-  var fidsUrl = _giSelectedDate ? '/api/fids?date=' + encodeURIComponent(_giSelectedDate) : '/api/fids';
-
-  var tpePromise = fetch(fidsUrl)
-    .then(function(r) {
-      if (!r.ok) throw new Error('HTTP ' + r.status);
-      return r.json();
-    })
-    .then(function(data) {
-      if (data.error) throw new Error(data.error);
-      return data;
-    })
-    .catch(function() {
-      return _giFetchDirect(_giSelectedDate);
-    });
+  var dateStr = _giSelectedDate || _paDateOffset(0);
+  var tpePromise = _fidsFetchByDate(dateStr);
 
   tpePromise.then(function(data) {
     dateEl.textContent = data.date || '';

@@ -385,11 +385,56 @@ function _paDateOffset(days) {
     String(tw.getUTCDate()).padStart(2, '0');
 }
 
-function _paFetchByDate(dateStr) {
+/* ── 共用 FIDS 快取（提示卡 / PA / Gate Info 共用） ── */
+var _fidsCache = {};  // { 'YYYY/MM/DD': { data:{dep,arr,date}, ts:number } }
+var _FIDS_TTL = 120000; // 2 分鐘
+
+function _fidsFetchByDate(dateStr, force) {
+  // 快取檢查：有網路 → 2 分鐘過期；離線 → 不過期
+  if (!force) {
+    var cached = _fidsCache[dateStr];
+    if (cached) {
+      var expired = navigator.onLine && (Date.now() - cached.ts > _FIDS_TTL);
+      if (!expired) return Promise.resolve(cached.data);
+    }
+  }
+  // 離線且無快取 → 直接失敗
+  if (!navigator.onLine) return Promise.reject(new Error('offline'));
+  // proxy → direct fallback
   return fetch('/api/fids?date=' + encodeURIComponent(dateStr)).then(function(r) {
     if (!r.ok) throw new Error('HTTP ' + r.status);
     return r.json();
+  }).catch(function() {
+    return _fidsFetchDirect(dateStr);
+  }).then(function(data) {
+    _fidsCache[dateStr] = { data: data, ts: Date.now() };
+    return data;
   });
+}
+
+function _fidsClearCache(dateStr) {
+  if (dateStr) delete _fidsCache[dateStr];
+  else _fidsCache = {};
+}
+
+function _fidsFetchDirect(dateStr) {
+  var ep = atob('aHR0cHM6Ly93d3cudGFveXVhbi1haXJwb3J0LmNvbS9hcGkvYXBpL2ZsaWdodC9hX2ZsaWdodA==');
+  var base = { ODate: dateStr, OTimeOpen: null, OTimeClose: null, BNO: null, AState: '', language: 'ch', keyword: '' };
+  var hdrs = { 'Content-Type': 'application/json', 'Accept': 'application/json, text/plain, */*' };
+  return Promise.all([
+    fetch(ep, { method: 'POST', headers: hdrs, body: JSON.stringify(Object.assign({}, base, { AState: 'D' })) }),
+    fetch(ep, { method: 'POST', headers: hdrs, body: JSON.stringify(Object.assign({}, base, { AState: 'A' })) })
+  ]).then(function(res) {
+    if (!res[0].ok || !res[1].ok) throw new Error('HTTP ' + res[0].status + '/' + res[1].status);
+    return Promise.all([res[0].json(), res[1].json()]);
+  }).then(function(data) {
+    return { dep: data[0], arr: data[1], date: dateStr };
+  });
+}
+
+/* 向後相容 */
+function _paFetchByDate(dateStr) {
+  return _fidsFetchByDate(dateStr);
 }
 
 function _paFltLookupForLT(num) {
@@ -410,7 +455,7 @@ function _paFltLookupForLT(num) {
     }
     var dateStr = _paDateOffset(tryDates[idx]);
     idx++;
-    _paFetchByDate(dateStr).then(function(data) {
+    _fidsFetchByDate(dateStr).then(function(data) {
       _paFidsCache = data; _paFidsCacheTime = Date.now();
       var dest = _paFltToDest(num);
       if (dest) { _paLtStatus('→ ' + dest, 'ok'); _paOnDestInput(dest); _paShowLocalTime(dest); }

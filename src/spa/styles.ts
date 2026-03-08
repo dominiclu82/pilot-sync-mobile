@@ -306,14 +306,14 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
 .subtab-dragging .drag-grip{opacity:.7}
 
 /* ── 📋 提示卡 ── */
-.brief-search{display:flex;gap:8px;margin-bottom:12px}
-.brief-search input{flex:1;background:var(--card);border:1px solid var(--dim);border-radius:8px;padding:10px;color:var(--text);font-size:.9em}
+.brief-search{display:flex;align-items:center;gap:6px;margin-bottom:12px;flex-wrap:wrap}
+.brief-search input{width:90px;flex:0 0 auto;background:var(--card);border:1px solid var(--dim);border-radius:8px;padding:8px 10px;color:var(--text);font-size:.9em}
 .brief-search input::placeholder{color:var(--muted)}
-.brief-search-btn{background:var(--accent);color:#fff;border:none;border-radius:8px;padding:8px 16px;font-weight:600;cursor:pointer;white-space:nowrap}
-.brief-date-nav{display:flex;align-items:center;justify-content:center;gap:12px;margin-bottom:12px}
-.brief-date-nav button{background:none;border:1px solid var(--dim);border-radius:6px;color:var(--text);font-size:.85em;padding:4px 10px;cursor:pointer}
+.brief-search-btn{background:var(--accent);color:#fff;border:none;border-radius:8px;padding:8px 12px;font-weight:600;cursor:pointer;white-space:nowrap;font-size:.85em}
+.brief-date-nav{display:flex;align-items:center;gap:4px}
+.brief-date-nav button{background:none;border:1px solid var(--dim);border-radius:6px;color:var(--text);font-size:.75em;padding:4px 8px;cursor:pointer}
 .brief-date-nav button:disabled{opacity:.3;cursor:default}
-.brief-date-nav span{font-size:.85em;color:var(--text);min-width:90px;text-align:center}
+.brief-date-nav span{font-size:.78em;color:var(--text);min-width:70px;text-align:center}
 .brief-section{background:var(--card);border-radius:var(--radius);padding:16px;margin-bottom:12px}
 .brief-section-header{display:flex;justify-content:space-between;align-items:center;font-weight:700;font-size:.85em;margin-bottom:12px;color:var(--text);letter-spacing:.5px}
 .brief-clear-btn{background:none;border:1px solid var(--dim);border-radius:6px;color:var(--muted);font-size:.75em;padding:4px 10px;cursor:pointer}

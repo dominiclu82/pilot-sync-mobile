@@ -203,14 +203,14 @@ export function getSpaHtmlBody(): string {
   <!-- ── 📋 提示 panel ── -->
   <div id="briefing-brief" class="briefing-panel active">
     <div class="brief-search">
-      <input type="text" id="brief-fno" placeholder="航班號 Flight No. (e.g. JX801)" oninput="_briefOnInput(this.value);_syncFltNo('brief',this.value)" onkeydown="if(event.key==='Enter'){event.preventDefault();_briefForceQuery()}">
+      <input type="text" id="brief-fno" placeholder="JX801" oninput="_briefOnInput(this.value);_syncFltNo('brief',this.value)" onkeydown="if(event.key==='Enter'){event.preventDefault();_briefForceQuery()}">
       <button class="brief-search-btn" onclick="_briefForceQuery()">查詢</button>
+      <div class="brief-date-nav">
+        <button onclick="_briefShiftDate(-1)" id="brief-date-prev">◀</button>
+        <span id="brief-date-label"></span>
+        <button onclick="_briefShiftDate(1)" id="brief-date-next">▶</button>
+      </div>
       <span id="brief-flt-status" class="pa-flt-status"></span>
-    </div>
-    <div class="brief-date-nav">
-      <button onclick="_briefShiftDate(-1)" id="brief-date-prev">◀</button>
-      <span id="brief-date-label"></span>
-      <button onclick="_briefShiftDate(1)" id="brief-date-next">▶</button>
     </div>
 
     <div class="brief-section">
@@ -1114,7 +1114,7 @@ export function getSpaHtmlBody(): string {
       <button class="tab-util-btn tab-install-btn" id="tab-install-btn" onclick="showInstallGuide()" style="display:none">
         <span>📲</span>安裝
       </button>
-      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V6.128</span>
+      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V6.129</span>
     </div>
   </div>
 </div>
@@ -1144,17 +1144,19 @@ export function getSpaHtmlBody(): string {
       <div style="margin-bottom:4px">📱 建議使用 <b>iPad 橫向</b>操作以獲得最佳體驗</div>
       <div style="color:var(--muted)">Best experience on iPad in landscape mode</div>
     </div>
-    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V6.128</div>
+    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V6.129</div>
+    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
+      <div>提示卡日期導覽（±3天）排版優化，與查詢同行顯示</div>
+      <div>FIDS 查詢整合共用快取（提示卡/PA/Gate Info），離線時保留舊資料</div>
+      <div>PA Local Time UTC 行上方增加間距</div>
+      <div>Briefing card: date navigator inline with search bar; compact layout</div>
+      <div>Unified FIDS cache shared across Briefing/PA/Gate Info; offline-friendly (stale data preserved)</div>
+      <div>PA Local Time: spacing above UTC/TPE rows</div>
+    </div>
+    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V6.128</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
       <div>提示卡新增日期導覽（前後三天切換），預設自動搜尋今日→明日→昨日</div>
-      <div>PA Local Time 查詢結果與 UTC/TPE 參考行增加間距區分</div>
       <div>Briefing card: added date navigator (±3 days); default auto-searches today → tomorrow → yesterday</div>
-      <div>PA Local Time: added spacing above UTC/TPE reference rows for clarity</div>
-    </div>
-    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V6.127</div>
-    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
-      <div>提示卡航班查詢改用今天→明天→昨天三段式查詢（與 PA 相同邏輯）</div>
-      <div>Briefing card flight lookup now tries today → tomorrow → yesterday (same logic as PA)</div>
     </div>
     <button class="install-close-btn" onclick="closeAbout()">關閉</button>
   </div>
