@@ -104,7 +104,6 @@ function briefInit() {
     altEl.addEventListener('input', function() { _briefSyncAltToPa(altEl.value); });
     if (altEl.value) _briefSyncAltToPa(altEl.value);
   }
-  _briefUpdateDateLabel();
 }
 
 /* ── Flight Time + Altitude → PA Welcome 同步 ── */
@@ -152,36 +151,9 @@ function _briefForceQuery() {
   _briefLookup(num, true);  // force=true 跳過快取
 }
 
-/* ── 日期導覽 ── */
-function _briefUpdateDateLabel() {
-  var label = document.getElementById('brief-date-label');
-  var prevBtn = document.getElementById('brief-date-prev');
-  var nextBtn = document.getElementById('brief-date-next');
-  if (!label) return;
-  var dateStr = _paDateOffset(_briefDateOffset);
-  var mm = dateStr.slice(5, 7);
-  var dd = dateStr.slice(8, 10);
-  var tag = _briefDateOffset === 0 ? '今日' : _briefDateOffset === 1 ? '明日' : _briefDateOffset === -1 ? '昨日' : '';
-  label.textContent = mm + '/' + dd + (tag ? ' (' + tag + ')' : '');
-  if (prevBtn) prevBtn.disabled = _briefDateOffset <= -3;
-  if (nextBtn) nextBtn.disabled = _briefDateOffset >= 3;
-}
-
-function _briefShiftDate(dir) {
-  var next = _briefDateOffset + dir;
-  if (next < -3 || next > 3) return;
-  _briefDateOffset = next;
-  _briefFidsCache = null;
-  _briefUpdateDateLabel();
-  // 如果已有航班號，立即查詢該日期
-  var inp = document.getElementById('brief-fno');
-  if (inp && inp.value.trim()) _briefForceQuery();
-}
-
 /* ── debounce 自動查詢 ── */
 var _briefFltTimer = null;
 var _briefFidsCache = null;
-var _briefDateOffset = 0; // 0=今天, ±1~3
 
 function _briefOnInput(val) {
   if (_briefFltTimer) clearTimeout(_briefFltTimer);
@@ -210,29 +182,14 @@ function _briefLookup(num, force) {
   if (inp) inp.value = fno;
 
   if (!force && _briefFidsCache && _briefHasFlight(num, _briefFidsCache)) {
+    var cd = (_briefFidsCache.date || '').replace(/^\d{4}\//, '');
+    _briefFltStatus(cd + ' 查到航班 ✓', 'ok');
     _briefFillFromFids(fno, _briefFidsCache);
     return;
   }
 
-  // 手動選了特定日期 → 只查該天
-  if (_briefDateOffset !== 0) {
-    var dateStr = _paDateOffset(_briefDateOffset);
-    var label = _briefDateOffset > 0 ? '+' + _briefDateOffset : String(_briefDateOffset);
-    _briefFltStatus('查詢 ' + dateStr + '...', 'loading');
-    _fidsFetchByDate(dateStr, force).then(function(data) {
-      if (_briefHasFlight(num, data)) {
-        _briefFidsCache = data;
-        _briefFillFromFids(fno, data);
-      } else {
-        _briefFltStatus('查無此航班', 'err');
-      }
-    }).catch(function() { _briefFltStatus('查詢失敗', 'err'); });
-    return;
-  }
-
-  // 預設（今日）→ 今天 → 明天 → 昨天
+  // 自動搜尋：今天 → 明天 → 昨天
   var tryDates = [0, 1, -1];
-  var tryLabels = ['今日', '明日', '昨日'];
   var idx = 0;
   var tryNext = function() {
     if (idx >= tryDates.length) {
@@ -240,12 +197,14 @@ function _briefLookup(num, force) {
       return;
     }
     var d = _paDateOffset(tryDates[idx]);
-    var lbl = tryLabels[idx];
+    var dm = d.replace(/^\d{4}\//, '');
     idx++;
-    _briefFltStatus('查詢' + lbl + '航班...', 'loading');
+    _briefFltStatus('查詢 ' + dm + '...', 'loading');
     _fidsFetchByDate(d, force).then(function(data) {
       if (_briefHasFlight(num, data)) {
         _briefFidsCache = data;
+        var foundDate = (data.date || d).replace(/^\d{4}\//, '');
+        _briefFltStatus(foundDate + ' 查到航班 ✓', 'ok');
         _briefFillFromFids(fno, data);
       } else {
         tryNext();
@@ -285,7 +244,6 @@ function _briefFillFromFids(fno, data) {
   }
 
   if (!depFlight && !arrFlight) { _briefFltStatus('查無此航班', 'err'); return; }
-  _briefFltStatus('✓', 'ok');
 
   // Dep Date/Time
   var dtEl = document.getElementById('brief-dep-dt');
@@ -331,11 +289,74 @@ function _briefFillFromFids(fno, data) {
   if (destEl && destEl.value) _briefFetchWx('dwx', destEl.value);
 }
 
-/* ── 外站出發資訊查詢（出發時間 + Gate，FR24 + FA 雙查）── */
-function _briefFetchOriginInfo(fno, dateStr, dtEl, originIata) {
-  var done = false;
-  var pending = 2;  // FR24 + FA
+/* ── 外站出發資訊查詢（FR24 排程 API → FR24 即時 → FA）── */
+function _briefFetchOriginInfo(fno, arrDateStr, dtEl, originIata) {
 
+  function renderDep(depTs, gate) {
+    var timeStr = '';
+    var depDateStr = arrDateStr;
+    if (depTs) {
+      var d = new Date(depTs * 1000);
+      var offset = _briefTzOffset[originIata];
+      if (offset === undefined) offset = 8;
+      var local = new Date(d.getTime() + offset * 3600000);
+      var hh = String(local.getUTCHours()).padStart(2, '0');
+      var mm = String(local.getUTCMinutes()).padStart(2, '0');
+      timeStr = hh + ':' + mm;
+      depDateStr = local.getUTCFullYear() + '/' +
+        String(local.getUTCMonth() + 1).padStart(2, '0') + '/' +
+        String(local.getUTCDate()).padStart(2, '0');
+    }
+    var display = timeStr ? timeStr + ' Local' : '';
+    if (gate && originIata !== 'TPE') display += (display ? ' / Gate ' : 'Gate ') + gate;
+    dtEl.innerHTML = '<div style="font-size:.85em;color:var(--muted)">' + depDateStr + '</div>' +
+      '<div style="font-size:1.1em;font-weight:700">' + (display || '—') + '</div>';
+  }
+
+  // 把 FIDS 到達日 "2026/03/09" 轉成 "20260309" 用於比對
+  var arrDateClean = arrDateStr.replace(/\//g, '');
+
+  // 1) FR24 排程 API（主要來源）
+  fetch('/api/fr24-schedule?fno=' + encodeURIComponent(fno))
+    .then(function(r) { return r.ok ? r.json() : null; })
+    .then(function(data) {
+      if (!data || !data.flights || data.flights.length === 0) return null;
+      var matched = null;
+      for (var i = 0; i < data.flights.length; i++) {
+        var f = data.flights[i];
+        var arrTs = f.actualArr || f.scheduledArr;
+        if (!arrTs) continue;
+        var arrTPE = new Date(arrTs * 1000 + 8 * 3600000);
+        var y = arrTPE.getUTCFullYear();
+        var m = String(arrTPE.getUTCMonth() + 1).padStart(2, '0');
+        var d = String(arrTPE.getUTCDate()).padStart(2, '0');
+        if (y + m + d === arrDateClean) { matched = f; break; }
+      }
+      if (!matched) matched = data.flights[data.flights.length - 1];
+      return matched;
+    })
+    .then(function(sched) {
+      if (sched && (sched.actualDep || sched.scheduledDep)) {
+        var depTs = sched.actualDep || sched.scheduledDep;
+        renderDep(depTs, '');
+        // 再查 FR24 即時/FA 補 gate
+        _briefFetchGate(fno, originIata, function(gate) {
+          if (gate) renderDep(depTs, gate);
+        });
+      } else {
+        // 排程沒資料，退回即時查詢
+        _briefFetchLiveOrigin(fno, arrDateStr, dtEl, originIata);
+      }
+    })
+    .catch(function() {
+      _briefFetchLiveOrigin(fno, arrDateStr, dtEl, originIata);
+    });
+}
+
+/* ── 退回 FR24 即時 + FA 查出發資訊 ── */
+function _briefFetchLiveOrigin(fno, dateStr, dtEl, originIata) {
+  var done = false;
+  var pending = 2;
   function tryUpdate(flight) {
     if (done) return;
     if (!flight) { pending--; if (pending <= 0) fallback(); return; }
@@ -348,45 +369,49 @@ function _briefFetchOriginInfo(fno, dateStr, dtEl, originIata) {
     if (depIso) {
       var d = new Date(depIso);
       var offset = _briefTzOffset[originIata];
-      if (offset === undefined) offset = 8; // fallback to UTC+8
+      if (offset === undefined) offset = 8;
       var local = new Date(d.getTime() + offset * 3600000);
-      var hh = String(local.getUTCHours()).padStart(2, '0');
-      var mm = String(local.getUTCMinutes()).padStart(2, '0');
-      timeStr = hh + ':' + mm;
-      // 日期也更新為出發地日期
-      var yyyy = local.getUTCFullYear();
-      var mo = String(local.getUTCMonth() + 1).padStart(2, '0');
-      var dd = String(local.getUTCDate()).padStart(2, '0');
-      depDateStr = yyyy + '/' + mo + '/' + dd;
+      timeStr = String(local.getUTCHours()).padStart(2, '0') + ':' + String(local.getUTCMinutes()).padStart(2, '0');
+      depDateStr = local.getUTCFullYear() + '/' + String(local.getUTCMonth() + 1).padStart(2, '0') + '/' + String(local.getUTCDate()).padStart(2, '0');
     }
     var display = timeStr ? timeStr + ' Local' : '';
     if (gate && originIata !== 'TPE') display += (display ? ' / Gate ' : 'Gate ') + gate;
     dtEl.innerHTML = '<div style="font-size:.85em;color:var(--muted)">' + depDateStr + '</div>' +
       '<div style="font-size:1.1em;font-weight:700">' + (display || '—') + '</div>';
   }
-
   function fallback() {
-    // 兩個來源都沒資料，顯示 —
     dtEl.innerHTML = '<div style="font-size:.85em;color:var(--muted)">' + dateStr + '</div>' +
       '<div style="font-size:1.1em;font-weight:700">—</div>';
   }
-
-  // FR24
   fetch('/api/fids-fr24')
     .then(function(r) { return r.ok ? r.json() : null; })
-    .then(function(data) {
-      if (!data || !data.flights) { tryUpdate(null); return; }
-      tryUpdate(data.flights[fno] || null);
-    })
+    .then(function(data) { tryUpdate(data && data.flights && data.flights[fno] || null); })
     .catch(function() { tryUpdate(null); });
-  // FA
   fetch('/api/fids-fa?airline=JX')
     .then(function(r) { return r.ok ? r.json() : null; })
-    .then(function(data) {
-      if (!data || !data.flights) { tryUpdate(null); return; }
-      tryUpdate(data.flights[fno] || null);
-    })
+    .then(function(data) { tryUpdate(data && data.flights && data.flights[fno] || null); })
     .catch(function() { tryUpdate(null); });
+}
+
+/* ── 只查 Gate（FR24 即時 + FA）── */
+function _briefFetchGate(fno, originIata, cb) {
+  var done = false;
+  var pending = 2;
+  function tryGate(flight) {
+    if (done) return;
+    var gate = flight && flight.origin && flight.origin.gate || '';
+    if (gate && originIata !== 'TPE') { done = true; cb(gate); return; }
+    pending--;
+    if (pending <= 0) cb('');
+  }
+  fetch('/api/fids-fr24')
+    .then(function(r) { return r.ok ? r.json() : null; })
+    .then(function(data) { tryGate(data && data.flights && data.flights[fno]); })
+    .catch(function() { tryGate(null); });
+  fetch('/api/fids-fa?airline=JX')
+    .then(function(r) { return r.ok ? r.json() : null; })
+    .then(function(data) { tryGate(data && data.flights && data.flights[fno]); })
+    .catch(function() { tryGate(null); });
 }
 
 function _briefFmtTime(t) {
@@ -431,9 +456,7 @@ function _briefFetchWx(target, iata) {
 
   el.innerHTML = '<span style="color:var(--muted);font-size:.8em">載入中...</span>';
 
-  fetch('/api/metar?ids=' + icao + '&hours=6')
-    .then(function(r) { return r.ok ? r.text() : Promise.reject(); })
-    .then(function(text) {
+  _metarFetch(icao).then(function(text) {
       var lines = text.trim().split('\n').filter(function(l) { return l.trim(); });
       if (lines.length === 0) { el.innerHTML = '<span style="color:var(--muted)">無資料</span>'; return; }
       var raw = lines[0].replace(/^(METAR|SPECI)\s+/, '').trim();
@@ -442,7 +465,7 @@ function _briefFetchWx(target, iata) {
       var name = _briefGetName(icao);
       var mins = wxMinsAgo(m);
       var ageClass = mins > 90 ? 'color:#ef4444' : mins > 60 ? 'color:#f59e0b' : 'color:var(--muted)';
-      var ageText = mins !== null ? (mins > 90 ? 'expired' : mins + 'm') : '';
+      var ageText = mins !== null && mins > 90 ? 'expired' : '';
       var skyText = _briefFmtSky(m);
       el.innerHTML =
         '<div style="text-align:left;font-size:.78em;line-height:1.6">' +

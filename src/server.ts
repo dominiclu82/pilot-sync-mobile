@@ -462,6 +462,44 @@ app.get('/api/fids-fr24', (_req, res) => {
   });
 });
 
+// ── FR24 flight schedule (by flight number) ─────────────────────────────────
+const _fr24SchedCache: Record<string, { data: any[]; ts: number }> = {};
+const _FR24_SCHED_TTL = 5 * 60 * 1000; // 5 分鐘快取
+
+app.get('/api/fr24-schedule', async (req, res) => {
+  const fno = ((req.query.fno as string) || '').trim().toUpperCase();
+  if (!fno) return res.json({ flights: [] });
+
+  const cached = _fr24SchedCache[fno];
+  if (cached && Date.now() - cached.ts < _FR24_SCHED_TTL) {
+    return res.json({ flights: cached.data });
+  }
+
+  try {
+    const url = `https://api.flightradar24.com/common/v1/flight/list.json?query=${encodeURIComponent(fno)}&fetchBy=flight&page=1&limit=10&token=`;
+    const resp = await fetch(url, {
+      headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36' }
+    });
+    const json: any = await resp.json();
+    const entries: any[] = json?.result?.response?.data || [];
+    const flights = entries.map((f: any) => ({
+      origin: f.airport?.origin?.code?.iata || '',
+      destination: f.airport?.destination?.code?.iata || '',
+      scheduledDep: f.time?.scheduled?.departure || null,
+      scheduledArr: f.time?.scheduled?.arrival || null,
+      actualDep: f.time?.real?.departure || null,
+      actualArr: f.time?.real?.arrival || null,
+      status: f.status?.text || ''
+    }));
+    _fr24SchedCache[fno] = { data: flights, ts: Date.now() };
+    res.json({ flights });
+  } catch (e: any) {
+    console.error('[FR24-Schedule]', fno, e.message);
+    if (cached) return res.json({ flights: cached.data });
+    res.json({ flights: [] });
+  }
+});
+
 // ── FlightAware background cache ─────────────────────────────────────────────
 const _faBase = Buffer.from('aHR0cHM6Ly93d3cuZmxpZ2h0YXdhcmUuY29tL2xpdmUvZmxpZ2h0Lw==', 'base64').toString();
 const _faHeaders = { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36' };
