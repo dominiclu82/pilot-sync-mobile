@@ -127,34 +127,53 @@ function wxMinsAgo(m) {
 
 function loadWxRegion(region) {
   var airports = wxGetAirports(region);
-  // 嘗試從 localStorage 讀取快取
-  try {
-    var cached = localStorage.getItem('crewsync_metar_' + region);
-    if (cached) {
-      var c = JSON.parse(cached);
-      wxMetarMap = c.data || {};
-      wxCacheTime = c.time || null;
-    } else { wxMetarMap = {}; wxCacheTime = null; }
-  } catch(e) { wxMetarMap = {}; wxCacheTime = null; }
+  // 先從共用快取填入已有資料
+  wxMetarMap = {};
+  wxCacheTime = null;
+  airports.forEach(function(a) {
+    var c = _metarCache[a.icao];
+    if (c) {
+      var lines = c.text.trim().split('\\n').filter(function(l) { return l.trim(); });
+      if (lines.length > 0) {
+        var stripped = lines[0].replace(/^(METAR|SPECI)\\s+/, '').trim();
+        wxMetarMap[a.icao] = parseMetarLine(stripped);
+        if (!wxCacheTime || c.ts > wxCacheTime) wxCacheTime = c.ts;
+      }
+    }
+  });
+  // 也嘗試從 localStorage 補充（首次載入）
+  if (!wxCacheTime) {
+    try {
+      var cached = localStorage.getItem('crewsync_metar_' + region);
+      if (cached) {
+        var lc = JSON.parse(cached);
+        wxMetarMap = lc.data || {};
+        wxCacheTime = lc.time || null;
+      }
+    } catch(e) {}
+  }
   renderWxList(airports, region);
   if (airports.length === 0) return;
-  var icaos = airports.map(function(a) { return a.icao; }).join(',');
-  fetch('/api/metar?ids=' + icaos + '&hours=6')
-    .then(function(r) { return r.ok ? r.text() : Promise.reject(); })
-    .then(function(text) {
-      wxMetarMap = {};
-      text.split('\\n').forEach(function(line) {
-        line = line.trim();
-        if (!line) return;
-        var stripped = line.replace(/^(METAR|SPECI)\\s+/, '');
-        var icao = stripped.split(' ')[0].toUpperCase();
-        if (/^[A-Z]{4}$/.test(icao)) wxMetarMap[icao] = parseMetarLine(stripped);
-      });
-      wxCacheTime = Date.now();
-      try { localStorage.setItem('crewsync_metar_' + region, JSON.stringify({data: wxMetarMap, time: wxCacheTime})); } catch(e) {}
-      renderWxList(airports, region);
-    })
-    .catch(function() { renderWxList(airports, region); });
+  var icaoArr = airports.map(function(a) { return a.icao; });
+  _metarFetchBatch(icaoArr).then(function() {
+    // 從共用快取重新填入 wxMetarMap
+    wxMetarMap = {};
+    wxCacheTime = null;
+    airports.forEach(function(a) {
+      var c = _metarCache[a.icao];
+      if (c) {
+        var lines = c.text.trim().split('\\n').filter(function(l) { return l.trim(); });
+        if (lines.length > 0) {
+          var stripped = lines[0].replace(/^(METAR|SPECI)\\s+/, '').trim();
+          wxMetarMap[a.icao] = parseMetarLine(stripped);
+          wxMetarRawMap[a.icao] = c.text.trim().split('\\n').filter(function(l) { return l.trim(); });
+          if (!wxCacheTime || c.ts > wxCacheTime) wxCacheTime = c.ts;
+        }
+      }
+    });
+    try { localStorage.setItem('crewsync_metar_' + region, JSON.stringify({data: wxMetarMap, time: wxCacheTime})); } catch(e) {}
+    renderWxList(airports, region);
+  });
 }
 
 function renderWxList(airports, region) {
@@ -264,10 +283,8 @@ function setMetarMode(icao, showAll) {
 
 function fetchWxDetail(icao, name) {
   var proxy = 'https://api.codetabs.com/v1/proxy/?quest=';
-  var metarP = fetch('/api/metar?ids=' + icao + '&hours=6')
-    .then(function(r) { return r.ok ? r.text() : ''; })
-    .then(function(t) {
-      var lines = t.trim().split('\\n').filter(function(l) { return l.trim(); });
+  var metarP = _metarFetch(icao).then(function(text) {
+      var lines = text.trim().split('\\n').filter(function(l) { return l.trim(); });
       return lines.map(function(l) { return l.replace(/^(METAR|SPECI)\\s+/, '').trim(); }).filter(function(l) { return l.length > 0; });
     }).catch(function() { return []; });
   var tafP = fetch(proxy + encodeURIComponent('https://aviationweather.gov/api/data/taf?ids=' + icao + '&format=raw'))

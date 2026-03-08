@@ -1114,7 +1114,7 @@ export function getSpaHtmlBody(): string {
       <button class="tab-util-btn tab-install-btn" id="tab-install-btn" onclick="showInstallGuide()" style="display:none">
         <span>📲</span>安裝
       </button>
-      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V6.129</span>
+      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V6.130</span>
     </div>
   </div>
 </div>
@@ -1144,19 +1144,19 @@ export function getSpaHtmlBody(): string {
       <div style="margin-bottom:4px">📱 建議使用 <b>iPad 橫向</b>操作以獲得最佳體驗</div>
       <div style="color:var(--muted)">Best experience on iPad in landscape mode</div>
     </div>
-    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V6.129</div>
+    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V6.130</div>
+    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
+      <div>提示卡到達航班改用 FR24 排程 API 查詢正確出發日期與時間（修正跨洋航班顯示 TPE 到達日的問題）</div>
+      <div>METAR 天氣共用快取 + 頁面載入自動背景預載全部機場</div>
+      <div>Briefing card uses FR24 schedule API for correct departure date/time on inbound flights</div>
+      <div>Shared METAR cache with auto background preload for all airports</div>
+    </div>
+    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V6.129</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
       <div>提示卡日期導覽（±3天）排版優化，與查詢同行顯示</div>
       <div>FIDS 查詢整合共用快取（提示卡/PA/Gate Info），離線時保留舊資料</div>
-      <div>PA Local Time UTC 行上方增加間距</div>
       <div>Briefing card: date navigator inline with search bar; compact layout</div>
       <div>Unified FIDS cache shared across Briefing/PA/Gate Info; offline-friendly (stale data preserved)</div>
-      <div>PA Local Time: spacing above UTC/TPE rows</div>
-    </div>
-    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V6.128</div>
-    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
-      <div>提示卡新增日期導覽（前後三天切換），預設自動搜尋今日→明日→昨日</div>
-      <div>Briefing card: added date navigator (±3 days); default auto-searches today → tomorrow → yesterday</div>
     </div>
     <button class="install-close-btn" onclick="closeAbout()">關閉</button>
   </div>
