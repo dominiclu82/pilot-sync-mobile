@@ -437,6 +437,78 @@ function _paFetchByDate(dateStr) {
   return _fidsFetchByDate(dateStr);
 }
 
+/* ── 共用 METAR 快取 ── */
+var _metarCache = {};  // { 'ICAO': { text:string, ts:number } }
+var _METAR_TTL = 120000; // 2 分鐘
+
+function _metarFetch(icao, force) {
+  if (!force) {
+    var cached = _metarCache[icao];
+    if (cached) {
+      var expired = navigator.onLine && (Date.now() - cached.ts > _METAR_TTL);
+      if (!expired) return Promise.resolve(cached.text);
+    }
+  }
+  if (!navigator.onLine) {
+    var stale = _metarCache[icao];
+    if (stale) return Promise.resolve(stale.text);
+    return Promise.reject(new Error('offline'));
+  }
+  return fetch('/api/metar?ids=' + icao + '&hours=6')
+    .then(function(r) { return r.ok ? r.text() : Promise.reject(); })
+    .then(function(text) {
+      _metarCache[icao] = { text: text, ts: Date.now() };
+      return text;
+    });
+}
+
+/* 批次抓取並存入快取（用於預載） */
+function _metarFetchBatch(icaos, force) {
+  // 篩出需要抓的（過期或沒快取的）
+  var toFetch = force ? icaos : icaos.filter(function(ic) {
+    var c = _metarCache[ic];
+    return !c || (navigator.onLine && Date.now() - c.ts > _METAR_TTL);
+  });
+  if (toFetch.length === 0) return Promise.resolve();
+  if (!navigator.onLine) return Promise.resolve();
+  return fetch('/api/metar?ids=' + toFetch.join(',') + '&hours=6')
+    .then(function(r) { return r.ok ? r.text() : Promise.reject(); })
+    .then(function(text) {
+      var now = Date.now();
+      // 逐行解析，按 ICAO 分組存入快取
+      var byIcao = {};
+      text.split('\n').forEach(function(line) {
+        line = line.trim();
+        if (!line) return;
+        var stripped = line.replace(/^(METAR|SPECI)\s+/, '');
+        var ic = stripped.split(' ')[0].toUpperCase();
+        if (/^[A-Z]{4}$/.test(ic)) {
+          if (!byIcao[ic]) byIcao[ic] = [];
+          byIcao[ic].push(line);
+        }
+      });
+      Object.keys(byIcao).forEach(function(ic) {
+        _metarCache[ic] = { text: byIcao[ic].join('\n'), ts: now };
+      });
+    })
+    .catch(function() {});
+}
+
+/* 背景預載全部機場 METAR */
+function _metarPreloadAll() {
+  if (!navigator.onLine) return;
+  if (typeof _wxFleetData === 'undefined') return;
+  var allIcaos = {};
+  for (var fleet in _wxFleetData) {
+    for (var region in _wxFleetData[fleet]) {
+      var list = _wxFleetData[fleet][region];
+      for (var i = 0; i < list.length; i++) allIcaos[list[i].icao] = true;
+    }
+  }
+  var icaoArr = Object.keys(allIcaos);
+  if (icaoArr.length > 0) _metarFetchBatch(icaoArr);
+}
+
 function _paFltLookupForLT(num) {
   if (_paFidsCache && Date.now() - _paFidsCacheTime < 120000) {
     var dest = _paFltToDest(num);
@@ -744,6 +816,18 @@ function _paRestoreValues() {
     var zhName = _paIataToName[_paGlobalDest.toUpperCase().trim()] || _paGlobalDest;
     el.querySelectorAll('[data-pa="dest-zh"]').forEach(function(inp) { inp.value = zhName; });
   }
+  // 機長姓名從 localStorage 還原
+  var savedName = localStorage.getItem('crewsync_captain_name') || '';
+  var savedNameZh = localStorage.getItem('crewsync_captain_name_zh') || '';
+  if (savedName) el.querySelectorAll('[data-pa="captain-name"]').forEach(function(inp) { inp.value = savedName; });
+  if (savedNameZh) el.querySelectorAll('[data-pa="captain-name-zh"]').forEach(function(inp) { inp.value = savedNameZh; });
+  // 輸入時存入
+  el.querySelectorAll('[data-pa="captain-name"]').forEach(function(inp) {
+    inp.addEventListener('input', function() { localStorage.setItem('crewsync_captain_name', inp.value); });
+  });
+  el.querySelectorAll('[data-pa="captain-name-zh"]').forEach(function(inp) {
+    inp.addEventListener('input', function() { localStorage.setItem('crewsync_captain_name_zh', inp.value); });
+  });
   if (_paCurrentCat === 'descent') {
     _paSyncTempToContent();
     if (_paGlobalDest) _paFillDescentTime();
@@ -756,9 +840,9 @@ var _paScripts = {};
 
 _paScripts.welcome = '<div class="pa-note">When all passengers are boarded, the CIC will inform the PIC to make a brief welcome PA.</div>' +
   '<div class="pa-lang">English</div>' +
-  '<div>"Hello everyone, this is Captain <input class="pa-input" placeholder="Full Name"> speaking. On behalf of <span class="pa-choice">[the cockpit crew / all the crew]</span>, welcome onboard STARLUX flight number <input class="pa-input" data-pa="flt" placeholder="e.g. JX2"> <span id="pa-flt-status" class="pa-flt-status"></span> to <input class="pa-input" data-pa="dest" placeholder="e.g. LAX">. We should be ready for departure in <input class="pa-input pa-input-num" data-pa="dep-min" inputmode="numeric"> minutes. Our flight time is <input class="pa-input pa-input-num" data-pa="flt-hr" inputmode="numeric"> hours and <input class="pa-input pa-input-num" data-pa="flt-min" inputmode="numeric"> minutes, with an initial cruising altitude of <input class="pa-input" data-pa="altitude" inputmode="numeric" style="min-width:70px" placeholder="XX,XXX"> feet. Once again, please make yourself comfortable and enjoy the flight with us. Thank you."</div>' +
+  '<div>"Hello everyone, this is Captain <input class="pa-input" data-pa="captain-name" placeholder="Full Name"> speaking. On behalf of <span class="pa-choice">[the cockpit crew / all the crew]</span>, welcome onboard STARLUX flight number <input class="pa-input" data-pa="flt" placeholder="e.g. JX2"> <span id="pa-flt-status" class="pa-flt-status"></span> to <input class="pa-input" data-pa="dest" placeholder="e.g. LAX">. We should be ready for departure in <input class="pa-input pa-input-num" data-pa="dep-min" inputmode="numeric"> minutes. Our flight time is <input class="pa-input pa-input-num" data-pa="flt-hr" inputmode="numeric"> hours and <input class="pa-input pa-input-num" data-pa="flt-min" inputmode="numeric"> minutes, with an initial cruising altitude of <input class="pa-input" data-pa="altitude" inputmode="numeric" style="min-width:70px" placeholder="XX,XXX"> feet. Once again, please make yourself comfortable and enjoy the flight with us. Thank you."</div>' +
   '<div class="pa-lang">中文</div>' +
-  '<div>「各位旅客大家好，我是機長 <input class="pa-input" placeholder="姓名">。代表<span class="pa-choice">[駕駛艙組員 / 全體組員]</span>，歡迎搭乘星宇航空 <input class="pa-input" data-pa="flt" placeholder="e.g. JX2"> 班機前往 <input class="pa-input" data-pa="dest-zh" placeholder="e.g. 洛杉磯">。我們預計在 <input class="pa-input pa-input-num" data-pa="dep-min" inputmode="numeric"> 分鐘後出發。飛行時間約 <input class="pa-input pa-input-num" data-pa="flt-hr" inputmode="numeric"> 小時 <input class="pa-input pa-input-num" data-pa="flt-min" inputmode="numeric"> 分鐘，初始巡航高度 <input class="pa-input" data-pa="altitude" inputmode="numeric" style="min-width:70px"> 呎。再次祝您旅途愉快，謝謝。」</div>';
+  '<div>「各位旅客大家好，我是機長 <input class="pa-input" data-pa="captain-name-zh" placeholder="姓名">。代表<span class="pa-choice">[駕駛艙組員 / 全體組員]</span>，歡迎搭乘星宇航空 <input class="pa-input" data-pa="flt" placeholder="e.g. JX2"> 班機前往 <input class="pa-input" data-pa="dest-zh" placeholder="e.g. 洛杉磯">。我們預計在 <input class="pa-input pa-input-num" data-pa="dep-min" inputmode="numeric"> 分鐘後出發。飛行時間約 <input class="pa-input pa-input-num" data-pa="flt-hr" inputmode="numeric"> 小時 <input class="pa-input pa-input-num" data-pa="flt-min" inputmode="numeric"> 分鐘，初始巡航高度 <input class="pa-input" data-pa="altitude" inputmode="numeric" style="min-width:70px"> 呎。再次祝您旅途愉快，謝謝。」</div>';
 
 _paScripts.delay = '<div class="pa-note">If ground delay is expected to be more than 15 minutes before pushback, a ground delay PA should be delivered.</div>' +
   '<div class="pa-lang">English</div>' +
