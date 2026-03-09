@@ -277,8 +277,24 @@ setTimeout(function() {
   }
 }, 0);
 
+// 24 小時自動清除航班資料（保留機長姓名、機隊、自訂筆記、FR24 設定）
+(function() {
+  try {
+    var now = Date.now();
+    var last = parseInt(localStorage.getItem('crewsync_last_visit') || '0');
+    if (last && now - last > 24 * 3600000) {
+      ['crewsync_brief_data','crewsync_pa_flt','crewsync_pa_dest',
+       'crewsync_pa_inputs','crewsync_pa_manual_flags','crewsync_cr_data',
+       'crewsync_ct_data','crewsync_dt_data'].forEach(function(k) {
+        localStorage.removeItem(k);
+      });
+    }
+    localStorage.setItem('crewsync_last_visit', String(now));
+  } catch(e){}
+})();
+
 // Auto-init briefing card + subtab reorder (brief is default active subtab on page load)
-setTimeout(function() { briefInit(); subtabReorderInit(); }, 0);
+setTimeout(function() { briefInit(); subtabReorderInit(); _ctRestore(); _dtRestore(); }, 0);
 
 // ── Tab switching ─────────────────────────────────────────────────────────────
 function switchTab(tab, btn) {
@@ -539,6 +555,46 @@ function calcColdTemp() {
       }
     });
   }
+  _ctSave();
+}
+
+/* ── Cold Temp 持久化 ── */
+function _ctSave() {
+  try {
+    var obj = {};
+    ['ct-elev','ct-oat','ct-a0','ct-a1','ct-a2','ct-a3','ct-a4','ct-a5','ct-l4','ct-l5'].forEach(function(id) {
+      var el = document.getElementById(id);
+      if (el && el.value) obj[id] = el.value;
+    });
+    localStorage.setItem('crewsync_ct_data', JSON.stringify(obj));
+  } catch(e){}
+}
+
+function _ctRestore() {
+  try {
+    var s = localStorage.getItem('crewsync_ct_data');
+    if (!s) return;
+    var obj = JSON.parse(s);
+    Object.keys(obj).forEach(function(id) {
+      var el = document.getElementById(id);
+      if (el) el.value = obj[id] || '';
+    });
+  } catch(e){}
+}
+
+function ctReset() {
+  ['ct-elev','ct-oat','ct-a0','ct-a1','ct-a2','ct-a3','ct-a4','ct-a5','ct-l4','ct-l5'].forEach(function(id) {
+    var el = document.getElementById(id);
+    if (el) el.value = '';
+  });
+  for (var i = 0; i < 6; i++) {
+    var rs = document.getElementById('ct-r'+i);
+    if (rs) { rs.textContent = '—'; rs.className = 'ct-card-result empty'; }
+  }
+  document.querySelectorAll('.ct-hi').forEach(function(el) { el.classList.remove('ct-hi'); });
+  var noCorr = document.getElementById('ct-no-corr');
+  if (noCorr) noCorr.style.display = 'none';
+  try { localStorage.removeItem('crewsync_ct_data'); } catch(e){}
 }
 
 // ── Briefing sub-tab ──────────────────────────────────────────────────────────

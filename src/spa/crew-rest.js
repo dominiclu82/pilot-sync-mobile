@@ -5,7 +5,24 @@ var _crPerPerson = 0; // minutes
 function crewrestInit() {
   if (_crLoaded) return;
   _crLoaded = true;
-  _crOnCrewChange();
+  var restored = _crRestore();
+  if (!restored) {
+    _crOnCrewChange();
+    // 從提示卡帶入飛行時間（如果輪休欄位為空）
+    _crSyncFtFromBrief();
+  }
+}
+
+/* ── 從提示卡帶入飛行時間 ── */
+function _crSyncFtFromBrief() {
+  var fhEl = document.getElementById('cr-fh');
+  var fmEl = document.getElementById('cr-fm');
+  if (!fhEl || !fmEl) return;
+  if (fhEl.value || fmEl.value) return; // 已有值不覆蓋
+  if (typeof _briefFltHr === 'undefined' || typeof _briefFltMin === 'undefined') return;
+  if (_briefFltHr) fhEl.value = _briefFltHr;
+  if (_briefFltMin) fmEl.value = _briefFltMin;
+  if (_briefFltHr || _briefFltMin) crewrestCalc();
 }
 
 /* ── 計算建議休時 ── */
@@ -21,6 +38,7 @@ function crewrestCalc() {
     var mw0 = document.getElementById('cr-manual-wrap');
     if (mw0) mw0.style.display = 'none';
     _crPerPerson = 0;
+    _crSave();
     return;
   }
 
@@ -69,12 +87,12 @@ function _crBuildSchedule() {
   var startRow = document.createElement('div');
   startRow.className = 'cr-start-row';
   startRow.innerHTML =
-    '<label>開始休息時間 (UTC)</label><input type="text" class="cr-start-input" id="cr-start" placeholder="HHMM" maxlength="4" inputmode="numeric">' +
+    '<label>Rest Start (UTC)</label><input type="text" class="cr-start-input" id="cr-start" placeholder="HHMM" maxlength="4" inputmode="numeric">' +
     '<label style="margin-left:12px">TOD (UTC)</label><input type="text" class="cr-start-input" id="cr-tod" placeholder="HHMM" maxlength="4" inputmode="numeric">' +
     '<div class="cr-result-box" id="cr-tod-box" style="display:none;flex-direction:row;align-items:center;gap:8px;padding:4px 12px">' +
-      '<span style="font-size:10px;color:var(--accent);white-space:nowrap">建議每人休時</span>' +
+      '<span style="font-size:10px;color:var(--accent);white-space:nowrap">Per Person</span>' +
       '<span class="cr-result-time" id="cr-tod-result">—</span>' +
-      '<button class="cr-apply-btn" onclick="crewrestApplyTod()">帶入</button>' +
+      '<button class="cr-apply-btn" onclick="crewrestApplyTod()">Apply</button>' +
     '</div>';
   container.appendChild(startRow);
 
@@ -96,10 +114,10 @@ function _crBuildSchedule() {
     if (mode === 'cross') {
       // 交叉輪休: Ops Crew 休中間一段
       container.appendChild(_crHintNote());
-      container.appendChild(_crBuildGroupTable('Ops Crew休一段', ['B+D', 'A+C', 'B+D'], 1));
+      container.appendChild(_crBuildGroupTable('Ops Crew Single Rest', ['B+D', 'A+C', 'B+D'], 1));
     } else if (mode === 'single') {
       // 一段輪休: Group 1 → Group 2 (sequential)
-      container.appendChild(_crBuildGroupTable('一段輪休', ['Group 1', 'Group 2'], 1));
+      container.appendChild(_crBuildGroupTable('Sequential Rest', ['Group 1', 'Group 2'], 1));
     } else {
       // 分組輪休: CM1 + CM2 side by side
       container.appendChild(_crHintNote());
@@ -137,7 +155,7 @@ function _crBuildGroupTable(title, people, groupNum) {
   table.className = 'cr-table';
 
   var thead = document.createElement('thead');
-  thead.innerHTML = '<tr><th></th><th>開始休息</th><th>休息長度</th><th>結束時間</th></tr>';
+  thead.innerHTML = '<tr><th></th><th>Start</th><th>Duration</th><th>End</th></tr>';
   table.appendChild(thead);
 
   var tbody = document.createElement('tbody');
@@ -188,7 +206,7 @@ function _crBuildGroupTable(title, people, groupNum) {
 function _crHintNote() {
   var p = document.createElement('div');
   p.style.cssText = 'font-size:.75em;color:var(--muted);text-align:center;margin:4px 0 8px';
-  p.textContent = '可手動調整每一段休時，系統會自動計算剩餘休時';
+  p.textContent = 'Adjust duration manually; remaining time auto-calculated';
   return p;
 }
 
@@ -275,6 +293,7 @@ function _crRecalcAll() {
       _crRecalcGroup(2, 4, startMin);
     }
   }
+  _crSave();
 }
 
 function _crParseStart() {
@@ -344,12 +363,15 @@ function crewrestReset() {
   for (var i = 0; i < radios.length; i++) {
     if (radios[i].value === 'group') radios[i].checked = true;
   }
+  // 清除 localStorage
+  try { localStorage.removeItem('crewsync_cr_data'); } catch(e){}
   _crOnCrewChange();
 }
 
 /* ── 自動重算配對段 ── */
 function _crAutoRedistribute(editedId) {
-  if (_crPerPerson <= 0) return;
+  var pp = _crTodPerPerson > 0 ? _crTodPerPerson : _crPerPerson;
+  if (pp <= 0) return;
   var m = editedId.match(/^cr-d-g(\d+)-(\d+)$/);
   if (!m) return;
   var g = parseInt(m[1]);
@@ -381,10 +403,48 @@ function _crAutoRedistribute(editedId) {
   var editedMin = _crParseDur(editedEl.value);
   if (editedMin <= 0) return;
 
-  var remain = _crPerPerson - editedMin;
+  var remain = pp - editedMin;
   if (remain < 0) remain = 0;
   pairedEl.value = _crFmtMin(remain);
   _crValidateDurInput(pairedEl);
+
+  // group mode: 如果 A 全休（配對段=0），合併成 A/B 兩段；反之恢復四段
+  if (mode === 'group') {
+    _crCheckCollapse(g, pp);
+  }
+}
+
+/* ── 檢查是否應合併/展開分組輪休 ── */
+function _crCheckCollapse(groupNum, pp) {
+  var tbody = document.getElementById('cr-tbody-g' + groupNum);
+  if (!tbody) return;
+  var rows = tbody.querySelectorAll('tr');
+  if (rows.length !== 4) return; // 已經是2段或非4段，不處理
+
+  // 檢查 seg0 和 seg1（A和B的第一段）
+  var d0 = document.getElementById('cr-d-g' + groupNum + '-0');
+  var d1 = document.getElementById('cr-d-g' + groupNum + '-1');
+  var dur0 = _crParseDur(d0 ? d0.value : '');
+  var dur1 = _crParseDur(d1 ? d1.value : '');
+
+  // A 全休（dur0 >= pp）或 B 全休（dur1 >= pp）→ 合併
+  if (dur0 >= pp || dur1 >= pp) {
+    // 隱藏第3、4行
+    rows[2].style.display = 'none';
+    rows[3].style.display = 'none';
+    // B 也設為全休
+    if (dur0 >= pp && d1) { d1.value = _crFmtMin(pp); }
+    if (dur1 >= pp && d0) { d0.value = _crFmtMin(pp); }
+    // 清空隱藏段的值
+    var d2 = document.getElementById('cr-d-g' + groupNum + '-2');
+    var d3 = document.getElementById('cr-d-g' + groupNum + '-3');
+    if (d2) d2.value = '00:00';
+    if (d3) d3.value = '00:00';
+  } else {
+    // 恢復顯示
+    rows[2].style.display = '';
+    rows[3].style.display = '';
+  }
 }
 
 /* ── auto-jump to next duration input ── */
@@ -568,4 +628,82 @@ function _crParseDur(val) {
     return hh * 60 + mm;
   }
   return 0;
+}
+
+/* ── 持久化 ── */
+function _crSave() {
+  try {
+    var obj = {};
+    var fh = document.getElementById('cr-fh');
+    var fm = document.getElementById('cr-fm');
+    var crew = document.getElementById('cr-crew');
+    var start = document.getElementById('cr-start');
+    var tod = document.getElementById('cr-tod');
+    if (fh) obj.fh = fh.value;
+    if (fm) obj.fm = fm.value;
+    if (crew) obj.crew = crew.value;
+    if (start) obj.start = start.value;
+    if (tod) obj.tod = tod.value;
+    // mode
+    var radios = document.getElementsByName('cr-mode');
+    for (var i = 0; i < radios.length; i++) {
+      if (radios[i].checked) { obj.mode = radios[i].value; break; }
+    }
+    // duration inputs
+    obj.durs = {};
+    document.querySelectorAll('.cr-dur-input').forEach(function(el) {
+      if (el.id && el.value) obj.durs[el.id] = el.value;
+    });
+    localStorage.setItem('crewsync_cr_data', JSON.stringify(obj));
+  } catch(e){}
+}
+
+function _crRestore() {
+  try {
+    var s = localStorage.getItem('crewsync_cr_data');
+    if (!s) return false;
+    var obj = JSON.parse(s);
+    var fh = document.getElementById('cr-fh');
+    var fm = document.getElementById('cr-fm');
+    var crew = document.getElementById('cr-crew');
+    if (fh && obj.fh) fh.value = obj.fh;
+    if (fm && obj.fm) fm.value = obj.fm;
+    if (crew && obj.crew) crew.value = obj.crew;
+    // mode
+    if (obj.mode) {
+      var radios = document.getElementsByName('cr-mode');
+      for (var i = 0; i < radios.length; i++) {
+        radios[i].checked = radios[i].value === obj.mode;
+      }
+    }
+    // 先重算建議休時
+    if ((fh && fh.value) || (fm && fm.value)) crewrestCalc();
+    // rebuild schedule（會用到 crew + mode）
+    _crBuildSchedule();
+    // restore start/tod after rebuild
+    var startEl = document.getElementById('cr-start');
+    var todEl = document.getElementById('cr-tod');
+    if (startEl && obj.start) startEl.value = obj.start;
+    if (todEl && obj.tod) todEl.value = obj.tod;
+    // restore durations
+    if (obj.durs) {
+      Object.keys(obj.durs).forEach(function(id) {
+        var el = document.getElementById(id);
+        if (el) el.value = obj.durs[id];
+      });
+    }
+    _crCalcTod();
+    _crRecalcAll();
+    // 還原後檢查是否需要合併
+    var mode = _crGetMode();
+    if (mode === 'group') {
+      var pp = _crTodPerPerson > 0 ? _crTodPerPerson : _crPerPerson;
+      if (pp > 0) {
+        _crCheckCollapse(1, pp);
+        _crCheckCollapse(2, pp);
+      }
+    }
+    return true;
+  } catch(e){}
+  return false;
 }

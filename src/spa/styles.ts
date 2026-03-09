@@ -562,7 +562,7 @@ html:has(#tab-briefing.tab-active #briefing-coldtemp.active) #tab-briefing.tab-a
 .ct-table-wrap .ct-table th:first-child,.ct-table-wrap .ct-table td:first-child{width:auto}
 .ct-table td{background:var(--card)}
 }
-.ct-inputs{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px}
+.ct-inputs{display:grid;grid-template-columns:1fr 1fr auto;gap:8px;margin-bottom:12px;align-items:end}
 .ct-input-group label{font-size:.72em;color:var(--muted);font-weight:600;display:block;margin-bottom:3px}
 .ct-input-group input{width:100%;padding:7px 10px;background:var(--surface);border:1.5px solid var(--dim);
   border-radius:9px;color:var(--text);font-size:.9em;outline:none;-webkit-appearance:none}
@@ -834,17 +834,24 @@ input[type=radio]{width:15px;height:15px;aspect-ratio:1;accent-color:var(--accen
 .pa-cat-btn{padding:6px 12px;border:1.5px solid var(--dim);border-radius:8px;background:none;
   color:var(--muted);font-size:.75em;font-weight:600;cursor:pointer;white-space:nowrap;-webkit-appearance:none}
 .pa-cat-btn.active{border-color:var(--accent);color:var(--accent);background:rgba(99,102,241,.08)}
+.pa-reset-btn{padding:6px 12px;border:1px solid #ef4444;border-radius:8px;background:none;
+  color:#ef4444;font-size:.75em;font-weight:600;cursor:pointer;white-space:nowrap;margin-left:auto}
 .pa-content{flex:1;overflow-y:auto;padding:14px 14px 40px;min-height:0;overscroll-behavior:none}
 .pa-placeholder{text-align:center;color:var(--muted);font-size:.85em;padding:40px 20px;line-height:1.8}
 .pa-script{font-size:.85em;line-height:2;color:var(--text)}
 .pa-script .pa-lang{font-weight:700;color:var(--accent);margin:14px 0 6px;font-size:.9em}
 .pa-script .pa-lang:first-child{margin-top:0}
 .pa-script .pa-note{font-size:.82em;color:var(--muted);font-style:italic;margin-bottom:10px;line-height:1.5}
+.pa-wx-refresh{padding:4px 10px;border:1px solid var(--accent);border-radius:6px;background:none;
+  color:var(--accent);font-size:.9em;font-style:normal;cursor:pointer;margin-left:8px;white-space:nowrap}
 .pa-script .pa-sub{font-weight:600;color:var(--muted);margin:12px 0 4px;font-size:.9em}
 .pa-script .pa-choice{color:var(--muted);font-style:italic}
 .pa-note-toggle{background:none;border:none;color:var(--muted);font-size:.7em;
   cursor:pointer;padding:0 0 0 8px;-webkit-appearance:none;vertical-align:middle;opacity:.6}
 .pa-note-toggle:active{opacity:1}
+.pa-note-clear{background:none;border:none;color:#ef4444;font-size:.7em;
+  cursor:pointer;padding:0 0 0 6px;-webkit-appearance:none;vertical-align:middle;opacity:.6}
+.pa-note-clear:active{opacity:1}
 .pa-note-area{width:100%;min-height:60px;padding:8px;margin-top:4px;box-sizing:border-box;
   background:var(--surface);border:1px solid var(--dim);border-radius:6px;
   color:var(--text);font-size:.82em;line-height:1.5;resize:vertical;

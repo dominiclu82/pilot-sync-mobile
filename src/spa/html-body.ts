@@ -204,13 +204,13 @@ export function getSpaHtmlBody(): string {
   <div id="briefing-brief" class="briefing-panel active">
     <div class="brief-search">
       <input type="text" id="brief-fno" placeholder="JX801" oninput="_briefOnInput(this.value);_syncFltNo('brief',this.value)" onkeydown="if(event.key==='Enter'){event.preventDefault();_briefForceQuery()}">
-      <button class="brief-search-btn" onclick="_briefForceQuery()">查詢</button>
+      <button class="brief-search-btn" onclick="_briefForceQuery()">查詢 Query</button>
       <span id="brief-flt-status" class="pa-flt-status"></span>
-      <button class="brief-clear-all-btn" onclick="briefClearAll()">全部清除</button>
+      <button class="pa-reset-btn" onclick="briefClearAll()">重設 Reset</button>
     </div>
 
     <div class="brief-section">
-      <div class="brief-section-header"><span>FLIGHT INFO / DATA</span><button class="brief-clear-btn" onclick="briefClearInfo()">清除</button></div>
+      <div class="brief-section-header"><span>FLIGHT INFO / DATA</span><button class="brief-clear-btn" onclick="briefClearInfo()">清除 Clear</button></div>
       <div class="brief-grid">
         <div class="brief-field"><label>Dep Date/Time</label><div id="brief-dep-dt" class="brief-auto-val">—</div></div>
         <div class="brief-field"><label>TPE Gate</label><input type="text" id="brief-gate" placeholder="—"></div>
@@ -224,10 +224,10 @@ export function getSpaHtmlBody(): string {
     </div>
 
     <div class="brief-section">
-      <div class="brief-section-header"><span>NOTES / BRIEFING</span><button class="brief-clear-btn" onclick="briefClearNotes()">清除</button></div>
+      <div class="brief-section-header"><span>NOTES / BRIEFING</span><button class="brief-clear-btn" onclick="briefClearNotes()">清除 Clear</button></div>
       <textarea class="brief-note" id="brief-note1" rows="2" placeholder="亂流時間/其他提醒 (Turbulence/Notes)"></textarea>
       <textarea class="brief-note" id="brief-note2" rows="2" placeholder="Tail No./MEL"></textarea>
-      <textarea class="brief-note" id="brief-note3" rows="2" placeholder="Required Fuel"></textarea>
+      <textarea class="brief-note" id="brief-note3" rows="2" placeholder="Fuel Required/min. water"></textarea>
     </div>
   </div>
 
@@ -235,13 +235,13 @@ export function getSpaHtmlBody(): string {
   <div id="briefing-crewrest" class="briefing-panel">
     <div class="cr-wrap">
       <div class="cr-header">
-        <span style="font-weight:700;font-size:1.05em">⏳ 輪休計算</span>
-        <button class="brief-clear-btn" onclick="crewrestReset()">重置</button>
+        <span style="font-weight:700;font-size:1.05em">⏳ 輪休計算 Crew Rest</span>
+        <button class="pa-reset-btn" onclick="crewrestReset()">重設 Reset</button>
       </div>
 
       <div class="cr-input-row">
         <div class="cr-input-group">
-          <label>飛行時間</label>
+          <label>飛行時間 Flight Time</label>
           <div style="display:flex;align-items:center;gap:4px">
             <input type="number" id="cr-fh" class="cr-input" placeholder="HH" min="0" max="24" inputmode="numeric" oninput="crewrestCalc();if(String(this.value).length>=2)document.getElementById('cr-fm').focus()" onkeydown="if(event.key==='Enter'){event.preventDefault();document.getElementById('cr-fm').focus()}">
             <span>:</span>
@@ -249,32 +249,31 @@ export function getSpaHtmlBody(): string {
           </div>
         </div>
         <div class="cr-input-group">
-          <label>組員人數</label>
+          <label>組員人數 Crew</label>
           <select id="cr-crew" class="cr-select" onchange="_crOnCrewChange();crewrestCalc()">
-            <option value="3">3 人</option>
-            <option value="4" selected>4 人</option>
+            <option value="3">3P</option>
+            <option value="4" selected>4P</option>
           </select>
         </div>
         <div class="cr-result-box" id="cr-result" style="display:none">
-          <div style="font-size:.72em;color:var(--accent)">建議每人休息</div>
+          <div style="font-size:.72em;color:var(--accent)">建議每人休時 Per Person</div>
           <div style="display:flex;align-items:center;gap:8px">
             <span class="cr-result-time" id="cr-result-time">—</span>
-            <button class="cr-apply-btn" onclick="crewrestApply()">帶入</button>
+            <button class="cr-apply-btn" onclick="crewrestApply()">Apply</button>
           </div>
         </div>
         <div class="cr-result-box" id="cr-manual-wrap" style="display:none">
-          <div style="font-size:.72em;color:var(--muted)">或手動輸入每人休時</div>
+          <div style="font-size:.72em;color:var(--muted)">或手動輸入 Manual Input</div>
           <div style="display:flex;align-items:center;gap:8px">
             <input type="text" id="cr-manual-rest" class="cr-start-input" placeholder="H:MM" maxlength="5" style="width:60px;font-size:1.1em;font-weight:700">
-            <button class="cr-apply-btn" onclick="crewrestApplyManual()">帶入</button>
+            <button class="cr-apply-btn" onclick="crewrestApplyManual()">Apply</button>
           </div>
         </div>
       </div>
 
       <div id="cr-mode-wrap" class="cr-mode-wrap">
-        <label class="cr-mode-label"><input type="radio" name="cr-mode" value="group" checked onchange="_crModeChange()"> CM1/CM2個別計算</label>
-        <label class="cr-mode-label"><input type="radio" name="cr-mode" value="cross" onchange="_crModeChange()"> Ops Crew休一段</label>
-        <label class="cr-mode-label"><input type="radio" name="cr-mode" value="single" onchange="_crModeChange()"> 一段輪休</label>
+        <label class="cr-mode-label"><input type="radio" name="cr-mode" value="group" checked onchange="_crModeChange()"> CM1/CM2 個別計算 Individual</label>
+        <label class="cr-mode-label"><input type="radio" name="cr-mode" value="cross" onchange="_crModeChange()"> Ops Crew 休一段 Single Rest</label>
       </div>
 
       <div id="cr-schedule">
@@ -395,6 +394,7 @@ export function getSpaHtmlBody(): string {
             <label>OAT (°C)</label>
             <input type="text" id="ct-oat" placeholder="e.g. −20" inputmode="text">
           </div>
+          <button class="pa-reset-btn" onclick="ctReset()" style="margin-bottom:1px">重設 Reset</button>
         </div>
         <!-- 高度輸入卡片格 -->
         <div class="ct-grid">
@@ -521,6 +521,7 @@ export function getSpaHtmlBody(): string {
           <button class="pa-cat-btn" onclick="paSwitchCat('diversion',this)">Diversion</button>
           <button class="pa-cat-btn" onclick="paSwitchCat('modsevcat',this)">MOD SEV CAT</button>
           <button class="pa-cat-btn" onclick="paSwitchCat('unrulypax',this)">Unruly Pax</button>
+          <button class="pa-reset-btn" onclick="paReset()">重設 Reset</button>
         </div>
         <div class="pa-content" id="pa-content">
           <div class="pa-placeholder">選擇分類以查看廣播詞範本<br>Select a category to view PA scripts</div>
@@ -546,8 +547,9 @@ export function getSpaHtmlBody(): string {
     <div class="dt-wrap" style="flex:1">
 
       <!-- Placeholder hint -->
-      <div id="dt-placeholder" style="padding:10px 14px 4px;text-align:center;color:var(--text);font-size:.82em">
+      <div id="dt-placeholder" style="padding:10px 14px 4px;text-align:center;color:var(--text);font-size:.82em;position:relative">
         選好人數並輸入 FDP Start，按「Calculate」即可查看最大限制時間<br><span style="opacity:.7;font-size:.9em">Select crew config, enter FDP Start, then press "Calculate" to view max limits</span>
+        <button class="pa-reset-btn" onclick="dtReset()" style="position:absolute;right:0;top:50%;transform:translateY(-50%)">重設 Reset</button>
       </div>
 
       <!-- Config -->
@@ -1110,7 +1112,7 @@ export function getSpaHtmlBody(): string {
       <button class="tab-util-btn tab-install-btn" id="tab-install-btn" onclick="showInstallGuide()" style="display:none">
         <span>📲</span>安裝
       </button>
-      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V6.135</span>
+      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V6.136</span>
     </div>
   </div>
 </div>
@@ -1140,15 +1142,19 @@ export function getSpaHtmlBody(): string {
       <div style="margin-bottom:4px">📱 建議使用 <b>iPad 橫向</b>操作以獲得最佳體驗</div>
       <div style="color:var(--muted)">Best experience on iPad in landscape mode</div>
     </div>
-    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V6.135</div>
+    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V6.136</div>
+    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
+      <div>輪休計算：全休自動合併（A/B/A/B → A/B）、持久化修復、UI 雙語化</div>
+      <div>Crew Rest: auto-collapse when full rest (A/B/A/B → A/B), persistence fix, bilingual UI</div>
+      <div>Cold Temp / Duty Time：Reset 按鈕位置調整、TS 語法修復</div>
+      <div>Cold Temp / Duty Time: Reset button repositioned, TS syntax fix</div>
+      <div>提示卡 / PA：標籤中英對照、狀態訊息英文化</div>
+      <div>Briefing / PA: bilingual labels, English status messages</div>
+    </div>
+    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V6.135</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
       <div>PA Welcome 機長姓名自動記憶（英文/中文各自儲存，下次自動帶入）</div>
       <div>PA Welcome: captain name auto-saved to localStorage (EN/ZH stored separately)</div>
-    </div>
-    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V6.134</div>
-    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
-      <div>提示卡查詢列新增「全部清除」按鈕，一鍵清除航班號及所有欄位</div>
-      <div>Briefing card: added "Clear All" button to reset flight number and all fields at once</div>
     </div>
     <button class="install-close-btn" onclick="closeAbout()">關閉</button>
   </div>

@@ -3,10 +3,14 @@
 // ── 全域狀態 ─────────────────────────────────────────────────────────────────
 var _paGlobalDest = '';
 var _paGlobalFlt = '';
+try { _paGlobalFlt = localStorage.getItem('crewsync_pa_flt') || ''; } catch(e){}
+try { _paGlobalDest = localStorage.getItem('crewsync_pa_dest') || ''; } catch(e){}
 var _paGlobalTempC = '';
 var _paGlobalTempF = '';
 var _paSelectedStation = '';
 var _paListenersReady = false;
+var _paManualFlags = {};  // 手動修改 flag：{ 'flt-hr': true, ... }
+try { _paManualFlags = JSON.parse(localStorage.getItem('crewsync_pa_manual_flags') || '{}'); } catch(e){}
 var _paFidsCache = null;
 var _paFidsCacheTime = 0;
 var _paFltTimer = null;
@@ -363,12 +367,12 @@ function _paLookupLocalTime(input) {
     var num = _paNormalizeFlt(input);
     if (num && /^\d+$/.test(num)) {
       _paOnFltInput('JX' + num);
-      _paLtStatus('查詢中...', 'loading');
+      _paLtStatus('Loading...', 'loading');
       if (_paFidsCache) {
         var dest = _paFltToDest(num);
         if (dest) { _paLtStatus('→ ' + dest, 'ok'); _paOnDestInput(dest); _paShowLocalTime(dest); return; }
       }
-      resultEl.innerHTML = '<div class="pa-lt-loading">查詢中...</div>';
+      resultEl.innerHTML = '<div class="pa-lt-loading">Loading...</div>';
       _paFltLookupForLT(num);
     } else {
       resultEl.innerHTML = '';
@@ -519,7 +523,7 @@ function _paFltLookupForLT(num) {
   var idx = 0;
   var tryNext = function() {
     if (idx >= tryDates.length) {
-      _paLtStatus('查無 JX' + num, 'warn');
+      _paLtStatus('JX' + num + ' not found', 'warn');
       var resultEl = document.getElementById('pa-localtime-result');
       if (resultEl) resultEl.innerHTML = '';
       _paOnDestInput('');
@@ -597,9 +601,9 @@ function _paCalcLocalTime(tz) {
   return {
     time12: String(h12).padStart(2, '0') + ':' + String(m).padStart(2, '0'),
     ampm: h >= 12 ? 'p.m.' : 'a.m.',
-    ampmCn: h >= 12 ? '下午' : '上午',
+    ampmCn: h >= 18 ? '晚上' : h >= 12 ? '下午' : h >= 6 ? '上午' : '凌晨',
     dayEn: days[local.getUTCDay()] + ' ' + mm + '/' + dd,
-    dayCn: daysCn[local.getUTCDay()] + ' ' + mm + '/' + dd
+    dayCn: (local.getUTCMonth() + 1) + '月' + local.getUTCDate() + '號' + daysCn[local.getUTCDay()]
   };
 }
 
@@ -636,6 +640,7 @@ function _paFltStatus(msg, type) {
 
 function _paOnFltInput(val) {
   _paGlobalFlt = val;
+  try { localStorage.setItem('crewsync_pa_flt', val); } catch(e){}
   // Sync across all data-pa="flt" fields in PA content
   var el = document.getElementById('pa-content');
   if (el) {
@@ -649,7 +654,7 @@ function _paOnFltInput(val) {
   if (_paFltTimer) clearTimeout(_paFltTimer);
   var num = _paNormalizeFlt(val);
   if (num && /^\d+$/.test(num)) {
-    _paFltStatus('查詢中...', 'loading');
+    _paFltStatus('Loading...', 'loading');
     _paFltTimer = setTimeout(function() { _paFltLookup(num); }, 500);
   } else {
     _paFltStatus('', '');
@@ -705,19 +710,19 @@ function _paFltLookup(num) {
       _paMatchFlight(num);
     }).catch(function(err2) {
       console.error('[PA-FLT] Direct also failed:', err2);
-      _paFltStatus('連線失敗: ' + (err2.message || err2), 'error');
+      _paFltStatus('Connection failed: ' + (err2.message || err2), 'error');
     });
   });
 }
 
 function _paMatchFlight(num) {
-  if (!_paFidsCache) { _paFltStatus('無資料', 'error'); return; }
+  if (!_paFidsCache) { _paFltStatus('No data', 'error'); return; }
   var dest = _paFltToDest(num);
   if (dest) {
     _paFltStatus('→ ' + dest, 'ok');
     _paOnDestInput(dest);
   } else {
-    _paFltStatus('查無 JX' + num, 'warn');
+    _paFltStatus('JX' + num + ' not found', 'warn');
     _paOnDestInput('');
   }
 }
@@ -725,6 +730,7 @@ function _paMatchFlight(num) {
 // ── 自動同步邏輯 ─────────────────────────────────────────────────────────────
 function _paOnDestInput(val) {
   _paGlobalDest = val;
+  try { localStorage.setItem('crewsync_pa_dest', val); } catch(e){}
   _paSelectedStation = val.toUpperCase().trim();
   var el = document.getElementById('pa-content');
   if (!el) return;
@@ -764,6 +770,118 @@ function _paFillDescentTime() {
   var dyCn = q('local-day-cn'); if (dyCn) dyCn.value = t.dayCn;
 }
 
+/* ── METAR → 簡單天氣描述 ── */
+var _paWxPhenomena = {
+  'TS':   { en: 'Thunderstorm', zh: '雷陣雨' },
+  'TSRA': { en: 'Thunderstorm', zh: '雷陣雨' },
+  '+RA':  { en: 'Heavy Rain', zh: '大雨' },
+  'RA':   { en: 'Rain', zh: '下雨' },
+  '-RA':  { en: 'Light Rain', zh: '小雨' },
+  '+SHRA':{ en: 'Heavy Showers', zh: '大陣雨' },
+  'SHRA': { en: 'Showers', zh: '陣雨' },
+  '-SHRA':{ en: 'Light Showers', zh: '小陣雨' },
+  'DZ':   { en: 'Drizzle', zh: '毛毛雨' },
+  '-DZ':  { en: 'Light Drizzle', zh: '毛毛雨' },
+  '+SN':  { en: 'Heavy Snow', zh: '大雪' },
+  'SN':   { en: 'Snow', zh: '下雪' },
+  '-SN':  { en: 'Light Snow', zh: '小雪' },
+  'FG':   { en: 'Fog', zh: '霧' },
+  'BR':   { en: 'Mist', zh: '薄霧' },
+  'HZ':   { en: 'Haze', zh: '霾' },
+  'SQ':   { en: 'Squall', zh: '暴風' },
+  'GR':   { en: 'Hail', zh: '冰雹' }
+};
+
+function _paMetarToWx(raw, isNight) {
+  if (!raw) return { en: '', zh: '' };
+  var tokens = raw.split(/\s+/);
+  // 找天氣現象
+  var wxFound = null;
+  for (var i = 0; i < tokens.length; i++) {
+    var t = tokens[i];
+    if (_paWxPhenomena[t]) { wxFound = _paWxPhenomena[t]; break; }
+    // 帶強度前綴
+    if (t.length > 1 && _paWxPhenomena[t]) { wxFound = _paWxPhenomena[t]; break; }
+  }
+  // 找雲層（取最高覆蓋）
+  var skyOrder = { SKC: 0, CLR: 0, NSC: 0, FEW: 1, SCT: 2, BKN: 3, OVC: 4 };
+  var skyNames = {
+    0: { en: 'Sky Clear', zh: '晴天', zhNight: '好天氣' },
+    1: { en: 'Few Clouds', zh: '疏雲' },
+    2: { en: 'Partly Cloudy', zh: '局部有雲' },
+    3: { en: 'Mostly Cloudy', zh: '多雲' },
+    4: { en: 'Overcast', zh: '陰天' }
+  };
+  var maxSky = -1;
+  for (var i = 0; i < tokens.length; i++) {
+    var prefix = tokens[i].substring(0, 3);
+    if (skyOrder[prefix] !== undefined && skyOrder[prefix] > maxSky) maxSky = skyOrder[prefix];
+  }
+  var skyRaw = maxSky >= 0 ? skyNames[maxSky] : null;
+  var sky = null;
+  if (skyRaw) {
+    var zhText = (isNight && skyRaw.zhNight) ? skyRaw.zhNight : skyRaw.zh;
+    sky = { en: skyRaw.en, zh: zhText };
+  }
+
+  if (wxFound && sky) {
+    return { en: sky.en + ', ' + wxFound.en, zh: sky.zh + '，' + wxFound.zh };
+  } else if (wxFound) {
+    return wxFound;
+  } else if (sky) {
+    return sky;
+  }
+  return { en: '', zh: '' };
+}
+
+function _paFetchDescentWx() {
+  var el = document.getElementById('pa-content');
+  if (!el) return;
+  // 取目的地 IATA
+  var destInp = el.querySelector('[data-pa="dest"]');
+  var iata = destInp ? destInp.value.trim().toUpperCase() : '';
+  if (!iata && _paGlobalDest) iata = _paGlobalDest.trim().toUpperCase();
+  if (!iata) { alert('請先填入目的地 / Enter destination first'); return; }
+
+  var icao = (typeof _briefIataToIcao !== 'undefined' && _briefIataToIcao[iata]) || iata;
+  if (!/^[A-Z]{4}$/.test(icao)) { alert('無法辨識機場代碼 / Unknown airport code'); return; }
+
+  // 顯示載入中
+  var wxEn = el.querySelector('[data-pa="wx-en"]');
+  var wxZh = el.querySelector('[data-pa="wx-zh"]');
+  if (wxEn) wxEn.value = '...';
+  if (wxZh) wxZh.value = '...';
+
+  fetch('/api/metar?ids=' + icao + '&hours=6').then(function(r) {
+    return r.ok ? r.text() : Promise.reject();
+  }).then(function(text) {
+    var lines = text.trim().split('\n').filter(function(l) { return l.trim(); });
+    if (lines.length === 0) throw new Error('no data');
+    var raw = lines[0].replace(/^(METAR|SPECI)\s+/, '').trim();
+    // 判斷目的地是否為晚上（18:00–06:00）
+    var isNight = false;
+    var destTz = _paGetDestTz(iata);
+    if (destTz !== null) {
+      var localH = new Date(Date.now() + destTz * 3600000).getUTCHours();
+      isNight = localH >= 18 || localH < 6;
+    }
+    var wx = _paMetarToWx(raw, isNight);
+    if (wxEn) wxEn.value = wx.en || 'N/A';
+    if (wxZh) wxZh.value = wx.zh || 'N/A';
+    // 帶入溫度
+    if (typeof parseMetarLine === 'function') {
+      var m = parseMetarLine(raw);
+      if (m && m.temp !== null && m.temp !== undefined) {
+        _paOnTempInput('c', String(m.temp));
+      }
+    }
+  }).catch(function() {
+    if (wxEn) wxEn.value = '';
+    if (wxZh) wxZh.value = '';
+    alert('天氣查詢失敗 / Weather fetch failed');
+  });
+}
+
 function _paOnTempInput(from, val) {
   var num = parseFloat(val);
   if (from === 'c') {
@@ -801,6 +919,11 @@ function _paInitListeners() {
     else if (attr === 'temp-c') _paOnTempInput('c', e.target.value);
     else if (attr === 'temp-f') _paOnTempInput('f', e.target.value);
     else _paSyncField(attr, e.target);
+    // 手動修改 flag（flt-hr / flt-min / altitude）
+    if (attr === 'flt-hr' || attr === 'flt-min' || attr === 'altitude') {
+      _paManualFlags[attr] = true;
+    }
+    _paSaveInputs();
   });
   _paListenersReady = true;
 }
@@ -828,10 +951,61 @@ function _paRestoreValues() {
   el.querySelectorAll('[data-pa="captain-name-zh"]').forEach(function(inp) {
     inp.addEventListener('input', function() { localStorage.setItem('crewsync_captain_name_zh', inp.value); });
   });
+  // 還原手動 flag 中有值的欄位（flt-hr / flt-min / altitude）
+  try {
+    var savedPaInputs = JSON.parse(localStorage.getItem('crewsync_pa_inputs') || '{}');
+    ['flt-hr','flt-min','altitude'].forEach(function(attr) {
+      if (_paManualFlags[attr] && savedPaInputs[attr]) {
+        el.querySelectorAll('[data-pa="' + attr + '"]').forEach(function(inp) { inp.value = savedPaInputs[attr]; });
+      }
+    });
+  } catch(e){}
   if (_paCurrentCat === 'descent') {
     _paSyncTempToContent();
     if (_paGlobalDest) _paFillDescentTime();
   }
+}
+
+/* ── PA 手動值持久化 ── */
+function _paSaveInputs() {
+  try {
+    var el = document.getElementById('pa-content');
+    if (!el) return;
+    var obj = {};
+    el.querySelectorAll('.pa-input[data-pa]').forEach(function(inp) {
+      var attr = inp.getAttribute('data-pa');
+      if (attr && inp.value) obj[attr] = inp.value;
+    });
+    localStorage.setItem('crewsync_pa_inputs', JSON.stringify(obj));
+    localStorage.setItem('crewsync_pa_manual_flags', JSON.stringify(_paManualFlags));
+  } catch(e){}
+}
+
+/* ── PA 重設（清除全部，只留機長姓名 + 自訂筆記）── */
+function paReset() {
+  _paGlobalFlt = '';
+  _paGlobalDest = '';
+  _paGlobalTempC = '';
+  _paGlobalTempF = '';
+  _paSelectedStation = '';
+  _paManualFlags = {};
+  try {
+    localStorage.removeItem('crewsync_pa_flt');
+    localStorage.removeItem('crewsync_pa_dest');
+    localStorage.removeItem('crewsync_pa_inputs');
+    localStorage.removeItem('crewsync_pa_manual_flags');
+  } catch(e){}
+  var cEl = document.getElementById('pa-temp-c');
+  var fEl = document.getElementById('pa-temp-f');
+  if (cEl) cEl.value = '';
+  if (fEl) fEl.value = '';
+  var fltInput = document.getElementById('pa-lt-input');
+  if (fltInput) fltInput.value = '';
+  var statusEl = document.getElementById('pa-flt-status');
+  if (statusEl) { statusEl.textContent = ''; statusEl.className = 'pa-flt-status'; }
+  // 重新渲染當前分類（名字會自動還原，跳過提示卡同步）
+  _paSkipBriefSync = true;
+  paSwitchCat(_paCurrentCat, document.querySelector('.pa-cat-btn.active'));
 }
 
 // ── PA 廣播詞內容 ────────────────────────────────────────────────────────────
@@ -850,11 +1024,11 @@ _paScripts.delay = '<div class="pa-note">If ground delay is expected to be more 
   '<div class="pa-lang">中文</div>' +
   '<div>「各位旅客大家好，這裡是機長廣播。由於 <input class="pa-input" placeholder="延誤原因">，我們可能需要延遲約 <input class="pa-input pa-input-num" data-pa="delay-min" inputmode="numeric"> 分鐘後才能起飛。如有更長時間的延誤，我會再向各位報告。感謝您的耐心等候。」</div>';
 
-_paScripts.descent = '<div class="pa-note">The PA shall be given around 10 minutes before top of descent.</div>' +
+_paScripts.descent = '<div class="pa-note">The PA shall be given around 10 minutes before top of descent. <button class="pa-wx-refresh" onclick="_paFetchDescentWx()">Refresh WX</button></div>' +
   '<div class="pa-lang">English</div>' +
-  '<div>"Hello everyone, this is your captain speaking. We are approaching <input class="pa-input" data-pa="dest" placeholder="e.g. LAX"> and expect to start our descent in 10 minutes. We estimate landing at <input class="pa-input pa-input-num" data-pa="eta" inputmode="numeric" style="min-width:50px" placeholder="HH:MM"> <span class="pa-choice">[a.m. / p.m.]</span>. The current local time in <input class="pa-input" data-pa="dest" placeholder="e.g. LAX"> is <input class="pa-input pa-input-num" data-pa="local-time" inputmode="numeric" style="min-width:50px" placeholder="HH:MM"> <span class="pa-choice" data-pa="ampm-local">[a.m. / p.m.]</span> on <input class="pa-input" data-pa="local-day" placeholder="Day and Date">. The present weather at the airport is <input class="pa-input" placeholder="Weather Condition"> with a temperature of <input class="pa-input pa-input-num" data-pa="temp-c" inputmode="numeric"> degree Celsius, which is <input class="pa-input pa-input-num" data-pa="temp-f" inputmode="numeric"> degree Fahrenheit. We certainly hope that you have enjoyed the flight with us, and we look forward to having you onboard another STARLUX flight again very soon. Thank you, and we wish you all a very pleasant journey."</div>' +
+  '<div>"Hello everyone, this is your captain speaking. We are approaching <input class="pa-input" data-pa="dest" placeholder="e.g. LAX"> and expect to start our descent in 10 minutes. We estimate landing at <input class="pa-input pa-input-num" data-pa="eta" inputmode="numeric" style="min-width:50px" placeholder="HH:MM"> <span class="pa-choice">[a.m. / p.m.]</span>. The current local time in <input class="pa-input" data-pa="dest" placeholder="e.g. LAX"> is <input class="pa-input pa-input-num" data-pa="local-time" inputmode="numeric" style="min-width:50px" placeholder="HH:MM"> <span class="pa-choice" data-pa="ampm-local">[a.m. / p.m.]</span> on <input class="pa-input" data-pa="local-day" placeholder="Day and Date">. The present weather at the airport is <input class="pa-input" data-pa="wx-en" placeholder="Weather Condition"> with a temperature of <input class="pa-input pa-input-num" data-pa="temp-c" inputmode="numeric"> degree Celsius, which is <input class="pa-input pa-input-num" data-pa="temp-f" inputmode="numeric"> degree Fahrenheit. We certainly hope that you have enjoyed the flight with us, and we look forward to having you onboard another STARLUX flight again very soon. Thank you, and we wish you all a very pleasant journey."</div>' +
   '<div class="pa-lang">中文</div>' +
-  '<div>「各位旅客大家好，這裡是機長廣播。我們即將接近 <input class="pa-input" data-pa="dest-zh" placeholder="e.g. 洛杉磯">，預計在 10 分鐘後開始下降。預計落地時間為 <span class="pa-choice">[上午 / 下午]</span> <input class="pa-input pa-input-num" data-pa="eta" inputmode="numeric" style="min-width:50px" placeholder="HH:MM">。<input class="pa-input" data-pa="dest-zh" placeholder="e.g. 洛杉磯"> 當地時間為 <input class="pa-input" data-pa="local-day-cn" placeholder="星期與日期"> <span class="pa-choice" data-pa="ampm-local-cn">[上午 / 下午]</span> <input class="pa-input pa-input-num" data-pa="local-time-cn" inputmode="numeric" style="min-width:50px" placeholder="HH:MM">。目前機場天氣為 <input class="pa-input" placeholder="天氣狀況">，氣溫攝氏 <input class="pa-input pa-input-num" data-pa="temp-c" inputmode="numeric"> 度，華氏 <input class="pa-input pa-input-num" data-pa="temp-f" inputmode="numeric"> 度。非常感謝各位搭乘星宇航空，期待再次為您服務。祝各位旅途愉快。」</div>';
+  '<div>「各位旅客大家好，這裡是機長廣播。我們即將接近 <input class="pa-input" data-pa="dest-zh" placeholder="e.g. 洛杉磯">，預計在 10 分鐘後開始下降。預計落地時間為 <span class="pa-choice">[上午 / 下午]</span> <input class="pa-input pa-input-num" data-pa="eta" inputmode="numeric" style="min-width:50px" placeholder="HH:MM">。<input class="pa-input" data-pa="dest-zh" placeholder="e.g. 洛杉磯"> 當地時間為 <input class="pa-input" data-pa="local-day-cn" placeholder="星期與日期"> <span class="pa-choice" data-pa="ampm-local-cn">[上午 / 下午]</span> <input class="pa-input pa-input-num" data-pa="local-time-cn" inputmode="numeric" style="min-width:50px" placeholder="HH:MM">。目前機場天氣為 <input class="pa-input" data-pa="wx-zh" placeholder="天氣狀況">，氣溫攝氏 <input class="pa-input pa-input-num" data-pa="temp-c" inputmode="numeric"> 度，華氏 <input class="pa-input pa-input-num" data-pa="temp-f" inputmode="numeric"> 度。非常感謝各位搭乘星宇航空，期待再次為您服務。祝各位旅途愉快。」</div>';
 
 _paScripts.turbulence = '<div class="pa-sub">i. Approaching an Area of Known or Forecast Turbulence</div>' +
   '<div class="pa-lang">English</div>' +
@@ -905,6 +1079,7 @@ _paScripts.unrulypax = '<div class="pa-lang">English</div>' +
   '<div>「各位女士、各位先生，這裡是機長廣播，我現在鄭重的對座位在 <input class="pa-input" data-pa="seat" placeholder="座位號碼">（及其附近）的乘客提出警告，您現在的行為已經嚴重的違反了中華民國民用航空法。現在請您立即停止滋擾他人及破壞客艙安寧的行為，並依照空服人員的指示配合執行！若因您的行為而造成飛機的延誤、轉降或公司任何損失，公司將依法向您個人提出求償！感謝您們的理解與配合，謝謝！」</div>';
 
 // ── PA 分類切換 ──────────────────────────────────────────────────────────────
+var _paSkipBriefSync = false;
 function paSwitchCat(cat, btn) {
   _paCurrentCat = cat;
   document.querySelectorAll('.pa-cat-btn').forEach(function(b) { b.classList.remove('active'); });
@@ -917,8 +1092,11 @@ function paSwitchCat(cat, btn) {
   }
   _paInitListeners();
   _paRestoreValues();
-  if (typeof _briefApplyFtToPa === 'function') _briefApplyFtToPa();
-  if (typeof _briefApplyAltToPa === 'function') _briefApplyAltToPa();
+  if (!_paSkipBriefSync) {
+    if (typeof _briefApplyFtToPa === 'function' && !_paManualFlags['flt-hr'] && !_paManualFlags['flt-min']) _briefApplyFtToPa();
+    if (typeof _briefApplyAltToPa === 'function' && !_paManualFlags['altitude']) _briefApplyAltToPa();
+  }
+  _paSkipBriefSync = false;
   _paInjectNotes(cat);
 }
 
@@ -951,11 +1129,25 @@ function _paAttachNote(langEl, cat, lang, label, placeholder) {
   ta.placeholder = placeholder;
   ta.value = saved;
   ta.style.display = saved ? 'block' : 'none';
+  // 清除按鈕
+  var clearBtn = document.createElement('button');
+  clearBtn.className = 'pa-note-clear';
+  clearBtn.textContent = '✕';
+  clearBtn.title = 'Clear / 清除';
+  clearBtn.style.display = saved ? 'inline' : 'none';
+  clearBtn.addEventListener('click', function() {
+    ta.value = '';
+    ta.style.display = 'none';
+    clearBtn.style.display = 'none';
+    try { localStorage.removeItem(key); } catch(e){}
+  });
+  langEl.appendChild(clearBtn);
   btn.addEventListener('click', function() {
     ta.style.display = ta.style.display === 'none' ? 'block' : 'none';
   });
   ta.addEventListener('input', function() {
     try { localStorage.setItem(key, ta.value); } catch(e){}
+    clearBtn.style.display = ta.value ? 'inline' : 'none';
   });
   langEl.after(ta);
 }

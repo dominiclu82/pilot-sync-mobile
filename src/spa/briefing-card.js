@@ -89,6 +89,14 @@ function briefInit() {
   if (_briefLoaded) return;
   _briefLoaded = true;
   _briefRestore();
+  // 還原後同步航班號到 PA
+  var _rFno = document.getElementById('brief-fno');
+  if (_rFno && _rFno.value) _syncFltNo('brief', _rFno.value);
+  // 還原後自動載入天氣
+  var _rOrigin = document.getElementById('brief-origin');
+  var _rDest = document.getElementById('brief-dest');
+  if (_rOrigin && _rOrigin.value) _briefFetchWx('owx', _rOrigin.value);
+  if (_rDest && _rDest.value) _briefFetchWx('dwx', _rDest.value);
   _briefFields.concat(_briefNotes).forEach(function(id) {
     var el = document.getElementById(id);
     if (el) el.addEventListener('input', _briefSave);
@@ -129,11 +137,13 @@ function _briefSyncAltToPa(val) {
 function _briefApplyAltToPa() {
   var el = document.getElementById('pa-content');
   if (!el) return;
+  if (typeof _paManualFlags !== 'undefined') delete _paManualFlags['altitude'];
   el.querySelectorAll('[data-pa="altitude"]').forEach(function(inp) { inp.value = _briefAltitude; });
 }
 function _briefApplyFtToPa() {
   var el = document.getElementById('pa-content');
   if (!el) return;
+  if (typeof _paManualFlags !== 'undefined') { delete _paManualFlags['flt-hr']; delete _paManualFlags['flt-min']; }
   el.querySelectorAll('[data-pa="flt-hr"]').forEach(function(inp) { inp.value = _briefFltHr; });
   el.querySelectorAll('[data-pa="flt-min"]').forEach(function(inp) { inp.value = _briefFltMin; });
 }
@@ -523,6 +533,8 @@ function _briefSave() {
     });
     var fno = document.getElementById('brief-fno');
     if (fno) obj['brief-fno'] = fno.value;
+    var depDt = document.getElementById('brief-dep-dt');
+    if (depDt) obj['brief-dep-dt'] = depDt.innerHTML;
     localStorage.setItem('crewsync_brief_data', JSON.stringify(obj));
   } catch(e) {}
 }
@@ -534,7 +546,9 @@ function _briefRestore() {
     var obj = JSON.parse(s);
     Object.keys(obj).forEach(function(id) {
       var el = document.getElementById(id);
-      if (el) el.value = obj[id] || '';
+      if (!el) return;
+      if (id === 'brief-dep-dt') { el.innerHTML = obj[id] || '—'; }
+      else { el.value = obj[id] || ''; }
     });
   } catch(e) {}
 }

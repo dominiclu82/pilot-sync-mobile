@@ -603,6 +603,81 @@ function dtCalculate() {
 
   // CSS percentages recalculate on reflow, no timing hacks needed
   dtRenderTimeline(startMin, endMin, maxFdp, restStart, restEnd, minRest, tz, disc, accomExt, accomType, dhdEndMin);
+  _dtSave();
+}
+
+/* ── Duty Time 持久化 ── */
+var _dtInputIds = [
+  'dt-tz','dt-s-day','dt-s-h','dt-s-m','dt-e-day','dt-e-h','dt-e-m',
+  'dt-ft-h','dt-ft-m','dt-n-day','dt-n-h','dt-n-m',
+  'dt-ci-day','dt-ci-h','dt-ci-m','dt-co-day','dt-co-h','dt-co-m',
+  'dt-dhd-day','dt-dhd-h','dt-dhd-m','dt-accom-h','dt-accom-m'
+];
+var _dtCheckIds = ['dt-c1','dt-disc','dt-td6','dt-accom','dt-dhd'];
+
+function _dtSave() {
+  try {
+    var obj = { mode: dtMode, inputs: {}, checks: {} };
+    _dtInputIds.forEach(function(id) {
+      var el = document.getElementById(id);
+      if (el) obj.inputs[id] = el.value || '';
+    });
+    _dtCheckIds.forEach(function(id) {
+      var el = document.getElementById(id);
+      if (el) obj.checks[id] = el.checked;
+    });
+    localStorage.setItem('crewsync_dt_data', JSON.stringify(obj));
+  } catch(e){}
+}
+
+function _dtRestore() {
+  try {
+    var s = localStorage.getItem('crewsync_dt_data');
+    if (!s) return;
+    var obj = JSON.parse(s);
+    if (obj.mode) dtSetMode(obj.mode);
+    if (obj.inputs) {
+      Object.keys(obj.inputs).forEach(function(id) {
+        var el = document.getElementById(id);
+        if (el) {
+          el.value = obj.inputs[id] || '';
+          // 更新日期顯示
+          if (id.match(/-day$/) && el.value) dtDateChanged(el);
+        }
+      });
+    }
+    if (obj.checks) {
+      Object.keys(obj.checks).forEach(function(id) {
+        var el = document.getElementById(id);
+        if (el) el.checked = !!obj.checks[id];
+      });
+      // 觸發相關顯示邏輯
+      if (obj.checks['dt-dhd']) dtToggleDhd();
+      if (obj.checks['dt-accom']) dtToggleAccom();
+    }
+  } catch(e){}
+}
+
+function dtReset() {
+  _dtInputIds.forEach(function(id) {
+    var el = document.getElementById(id);
+    if (el) el.value = '';
+  });
+  _dtCheckIds.forEach(function(id) {
+    var el = document.getElementById(id);
+    if (el) el.checked = false;
+  });
+  dtMode = 'home';
+  document.getElementById('dt-mode-home').classList.add('active');
+  document.getElementById('dt-mode-out').classList.remove('active');
+  document.getElementById('dt-hotel-section').style.display = 'none';
+  document.getElementById('dt-dhd-section').style.display = 'none';
+  document.getElementById('dt-accom-detail').style.display = 'none';
+  document.getElementById('dt-results-area').style.display = 'none';
+  var crew3 = document.querySelector('.dt-crew-btn[data-crew="3"]');
+  if (crew3) { document.querySelectorAll('.dt-crew-btn').forEach(function(b) { b.classList.remove('active'); }); crew3.classList.add('active'); }
+  dtInitDates();
+  try { localStorage.removeItem('crewsync_dt_data'); } catch(e){}
 }
 
 // ── Boot ─────────────────────────────────────────────────────────────────────
