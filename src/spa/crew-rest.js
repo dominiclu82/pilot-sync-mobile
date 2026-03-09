@@ -8,9 +8,9 @@ function crewrestInit() {
   var restored = _crRestore();
   if (!restored) {
     _crOnCrewChange();
-    // 從提示卡帶入飛行時間（如果輪休欄位為空）
-    _crSyncFtFromBrief();
   }
+  // 提示卡飛行時間永遠覆蓋（source of truth）
+  _crSyncFtFromBrief();
 }
 
 /* ── 從提示卡帶入飛行時間 ── */
@@ -18,11 +18,11 @@ function _crSyncFtFromBrief() {
   var fhEl = document.getElementById('cr-fh');
   var fmEl = document.getElementById('cr-fm');
   if (!fhEl || !fmEl) return;
-  if (fhEl.value || fmEl.value) return; // 已有值不覆蓋
   if (typeof _briefFltHr === 'undefined' || typeof _briefFltMin === 'undefined') return;
-  if (_briefFltHr) fhEl.value = _briefFltHr;
-  if (_briefFltMin) fmEl.value = _briefFltMin;
-  if (_briefFltHr || _briefFltMin) crewrestCalc();
+  if (!_briefFltHr && !_briefFltMin) return; // 提示卡無資料則不動
+  fhEl.value = _briefFltHr || '';
+  fmEl.value = _briefFltMin || '';
+  crewrestCalc();
 }
 
 /* ── 計算建議休時 ── */
@@ -359,6 +359,13 @@ function crewrestReset() {
   if (mrI) mrI.value = '';
   _crPerPerson = 0;
   _crTodPerPerson = 0;
+  // 清除 Rest Start / TOD
+  var startEl = document.getElementById('cr-start');
+  if (startEl) startEl.value = '';
+  var todEl = document.getElementById('cr-tod');
+  if (todEl) todEl.value = '';
+  var todBox = document.getElementById('cr-tod-box');
+  if (todBox) todBox.style.display = 'none';
   var radios = document.getElementsByName('cr-mode');
   for (var i = 0; i < radios.length; i++) {
     if (radios[i].value === 'group') radios[i].checked = true;

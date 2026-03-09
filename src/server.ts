@@ -151,8 +151,8 @@ app.get('/sw.js', (_req, res) => {
   res.setHeader('Content-Type', 'application/javascript');
   res.setHeader('Service-Worker-Allowed', '/');
   res.send(`
-const CACHE = 'crewsync-v1';
-const SHELL = ['/'];
+const CACHE = 'crewsync-v2';
+const SHELL = ['/', '/main', '/share'];
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL)));
   self.skipWaiting();
@@ -161,10 +161,11 @@ self.addEventListener('activate', e => {
   e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k=>k!==CACHE).map(k=>caches.delete(k)))));
   self.clients.claim();
 });
+const _offlinePage = '<html><body style="background:#111;color:#aaa;display:flex;align-items:center;justify-content:center;height:100vh;font-family:sans-serif"><div style="text-align:center"><h2>Offline</h2><p>Please connect to the internet and reload.</p></div></body></html>';
 self.addEventListener('fetch', e => {
   const url = e.request.url;
   if (url.includes('/api/fids')) {
-    e.respondWith(fetch(e.request).catch(() => caches.match(e.request)));
+    e.respondWith(fetch(e.request).catch(() => caches.match(e.request).then(r => r || new Response('', {status:503}))));
     return;
   }
   if (url.includes('/api/metar')) {
@@ -172,7 +173,7 @@ self.addEventListener('fetch', e => {
       const clone = r.clone();
       caches.open(CACHE).then(c => c.put(e.request, clone));
       return r;
-    }).catch(() => caches.match(e.request)));
+    }).catch(() => caches.match(e.request).then(r => r || new Response('', {status:503}))));
     return;
   }
   if (e.request.method !== 'GET') return;
@@ -180,7 +181,7 @@ self.addEventListener('fetch', e => {
     e.respondWith(fetch(e.request).then(r => {
       caches.open(CACHE).then(c => c.put(e.request, r.clone()));
       return r;
-    }).catch(() => caches.match(e.request)));
+    }).catch(() => caches.match(e.request).then(r => r || caches.match('/main').then(r2 => r2 || new Response(_offlinePage, {headers:{'Content-Type':'text/html'}})))));
     return;
   }
   e.respondWith(caches.match(e.request).then(cached => {

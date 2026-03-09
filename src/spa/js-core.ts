@@ -616,6 +616,7 @@ function switchBriefingTab(panel, btn) {
   }
   if (panel === 'crewrest') {
     crewrestInit();
+    if (typeof _crSyncFtFromBrief === 'function') _crSyncFtFromBrief();
   }
   if (panel === 'live') {
     liveInit();

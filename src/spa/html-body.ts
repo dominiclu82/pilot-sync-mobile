@@ -1113,7 +1113,7 @@ export function getSpaHtmlBody(): string {
       <button class="tab-util-btn tab-install-btn" id="tab-install-btn" onclick="showInstallGuide()" style="display:none">
         <span>📲</span>安裝
       </button>
-      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V6.138</span>
+      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V6.139</span>
     </div>
   </div>
 </div>
@@ -1143,7 +1143,16 @@ export function getSpaHtmlBody(): string {
       <div style="margin-bottom:4px">📱 建議使用 <b>iPad 橫向</b>操作以獲得最佳體驗</div>
       <div style="color:var(--muted)">Best experience on iPad in landscape mode</div>
     </div>
-    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V6.138</div>
+    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V6.139</div>
+    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
+      <div>輪休 Reset 修正：清除 Rest Start / TOD 欄位</div>
+      <div>Crew Rest Reset fix: now clears Rest Start / TOD fields</div>
+      <div>輪休飛行時間：提示卡資料為優先，切換 tab 時自動同步</div>
+      <div>Crew Rest flight time: briefing card data takes priority, auto-syncs on tab switch</div>
+      <div>離線支援：Service Worker 預快取主頁面，離線可開啟</div>
+      <div>Offline support: Service Worker pre-caches main pages for offline access</div>
+    </div>
+    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V6.138</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
       <div>Airport WX 新增「Refresh All」一鍵更新所有地區 METAR/TAF/ATIS</div>
       <div>Airport WX: added "Refresh All" button to update all regions' METAR/TAF/ATIS at once</div>
@@ -1151,13 +1160,6 @@ export function getSpaHtmlBody(): string {
       <div>Airport WX: region ↺ button now refreshes all airports in region (incl. TAF/ATIS)</div>
       <div>所有 WX 詳細資料快取 24 小時（localStorage 持久化）</div>
       <div>All WX detail data cached for 24 hours (localStorage persistence)</div>
-    </div>
-    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V6.137</div>
-    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
-      <div>FR24 資訊卡修正：刷新時不再消失，同時僅顯示一個彈窗</div>
-      <div>FR24 info card fix: popup survives auto-refresh, only one popup at a time</div>
-      <div>Airport WX 機場列表修正：METAR 時間顯示改用最新觀測資料</div>
-      <div>Airport WX list fix: use latest METAR observation instead of oldest</div>
     </div>
     <button class="install-close-btn" onclick="closeAbout()">關閉</button>
   </div>
