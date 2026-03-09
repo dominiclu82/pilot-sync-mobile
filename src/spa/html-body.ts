@@ -449,6 +449,7 @@ export function getSpaHtmlBody(): string {
   <div id="briefing-datis" class="briefing-panel">
     <div class="wx-fixed-header">
       <div class="wx-routes">
+        <button class="wx-refresh-all-btn" onclick="wxRefreshAll()" id="wx-refresh-all-btn" title="Refresh All METAR / TAF / ATIS">&#x21ba; Refresh All</button>
         <button class="wx-route-btn active" onclick="selectWxRegion('taiwan',this)">台灣 TW</button>
         <button class="wx-route-btn" onclick="selectWxRegion('hkmacao',this)">港澳 HK/MO</button>
         <button class="wx-route-btn" onclick="selectWxRegion('japan',this)">日本 JP</button>
@@ -1112,7 +1113,7 @@ export function getSpaHtmlBody(): string {
       <button class="tab-util-btn tab-install-btn" id="tab-install-btn" onclick="showInstallGuide()" style="display:none">
         <span>📲</span>安裝
       </button>
-      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V6.137</span>
+      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V6.138</span>
     </div>
   </div>
 </div>
@@ -1142,21 +1143,21 @@ export function getSpaHtmlBody(): string {
       <div style="margin-bottom:4px">📱 建議使用 <b>iPad 橫向</b>操作以獲得最佳體驗</div>
       <div style="color:var(--muted)">Best experience on iPad in landscape mode</div>
     </div>
-    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V6.137</div>
+    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V6.138</div>
+    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
+      <div>Airport WX 新增「Refresh All」一鍵更新所有地區 METAR/TAF/ATIS</div>
+      <div>Airport WX: added "Refresh All" button to update all regions' METAR/TAF/ATIS at once</div>
+      <div>Airport WX 區域 ↺ 按鈕改為更新該區所有機場（含 TAF/ATIS）</div>
+      <div>Airport WX: region ↺ button now refreshes all airports in region (incl. TAF/ATIS)</div>
+      <div>所有 WX 詳細資料快取 24 小時（localStorage 持久化）</div>
+      <div>All WX detail data cached for 24 hours (localStorage persistence)</div>
+    </div>
+    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V6.137</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
       <div>FR24 資訊卡修正：刷新時不再消失，同時僅顯示一個彈窗</div>
       <div>FR24 info card fix: popup survives auto-refresh, only one popup at a time</div>
       <div>Airport WX 機場列表修正：METAR 時間顯示改用最新觀測資料</div>
       <div>Airport WX list fix: use latest METAR observation instead of oldest</div>
-    </div>
-    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V6.136</div>
-    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
-      <div>輪休計算：全休自動合併（A/B/A/B → A/B）、持久化修復、UI 雙語化</div>
-      <div>Crew Rest: auto-collapse when full rest (A/B/A/B → A/B), persistence fix, bilingual UI</div>
-      <div>Cold Temp / Duty Time：Reset 按鈕位置調整、TS 語法修復</div>
-      <div>Cold Temp / Duty Time: Reset button repositioned, TS syntax fix</div>
-      <div>提示卡 / PA：標籤中英對照、狀態訊息英文化</div>
-      <div>Briefing / PA: bilingual labels, English status messages</div>
     </div>
     <button class="install-close-btn" onclick="closeAbout()">關閉</button>
   </div>

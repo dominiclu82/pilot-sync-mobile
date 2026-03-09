@@ -691,6 +691,10 @@ input[type=radio]{width:15px;height:15px;aspect-ratio:1;accent-color:var(--accen
   background:var(--surface);position:sticky;top:0;z-index:10}
 .wx-list-ts{font-size:.72em;color:var(--muted);flex:1}
 .wx-refresh-btn{background:none;border:none;color:var(--accent);font-size:.82em;cursor:pointer;padding:4px 6px}
+.wx-refresh-btn.done{color:#22c55e}
+.wx-refresh-all-btn{background:var(--accent);color:#fff;border:none;border-radius:6px;font-size:.72em;cursor:pointer;padding:4px 10px;white-space:nowrap;font-weight:600}
+.wx-refresh-all-btn:disabled{opacity:.5;cursor:default}
+.wx-refresh-all-btn.done{background:#22c55e}
 .wx-empty{text-align:center;padding:40px 20px;color:var(--muted);font-size:.88em;line-height:2}
 .wx-detail-hdr{display:flex;align-items:center;gap:8px;margin-bottom:12px;padding-bottom:10px;border-bottom:1px solid var(--dim)}
 .wx-detail-title{font-weight:700;font-size:1em;color:var(--accent-light);flex:1}

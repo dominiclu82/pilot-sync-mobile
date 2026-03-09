@@ -9,9 +9,11 @@ var wxCacheTime = null;   // timestamp of last successful fetch (ms)
 var wxMetarRawMap = {};   // icao -> string[] of 6h METAR lines
 var wxMetarShowAll = {};  // icao -> bool (true = show all 6h, false = latest 1)
 var wxDetailCache = {};   // icao -> rendered HTML string (persists across airport switches)
+var wxDetailRawCache = {}; // icao -> { metar:[], taf:'', atis:[], time:number }
 var wxSelectedIcao = '';
 var wxSelectedName = '';
 var wxLoaded = false;
+var _wxRefreshing = false;
 
 function wxGetAirports(region) {
   return ((_wxFleetData[wxCurrentFleet] || {})[region]) || [];
@@ -167,7 +169,7 @@ function renderWxList(airports, region) {
   var cacheAge = wxCacheTime ? Math.round((Date.now() - wxCacheTime) / 60000) : null;
   var cacheNote = cacheAge !== null && cacheAge > 5 ? ' <span style="color:#f59e0b;font-size:.85em">(' + cacheAge + 'm ago)</span>' : '';
   var hdr = '<div class="wx-list-hdr"><span class="wx-list-ts">METAR ' + ts + cacheNote + '</span>'
-    + '<button class="wx-refresh-btn" onclick="loadWxRegion(\\'' + region + '\\')">\\u21ba</button></div>';
+    + '<button class="wx-refresh-btn" id="wx-region-refresh-btn" onclick="wxRefreshRegion()">\\u21ba</button></div>';
   var cards = airports.map(function(a) {
     var m = wxMetarMap[a.icao];
     var cat = wxCalcCat(m);
@@ -262,7 +264,35 @@ function setMetarMode(icao, showAll) {
   }
 }
 
+function _wxBuildDetailHtml(icao, metarLines, tafText, atisSections) {
+  var noData = '<span style="color:var(--muted);font-style:italic">\\u7121\\u8cc7\\u6599</span>';
+  wxMetarRawMap[icao] = metarLines;
+  if (wxMetarShowAll[icao] === undefined) wxMetarShowAll[icao] = false;
+  var cards = buildMetarCard(icao);
+  cards += '<div class="atis-card"><div class="atis-card-title">\\ud83d\\udcc5 TAF</div><pre>' + (tafText || noData) + '</pre></div>';
+  var atisOnly = atisSections.filter(function(s) {
+    var t = s.title.toLowerCase(); return !t.includes('metar') && !t.includes('taf');
+  });
+  if (atisOnly.length > 0) {
+    cards += atisOnly.map(function(s) {
+      return '<div class="atis-card"><div class="atis-card-title">' + s.title + '</div><pre>' + s.text + '</pre></div>';
+    }).join('');
+  } else {
+    cards += '<div class="atis-card"><div class="atis-card-title">\\ud83d\\udcfb ATIS</div><pre>' + noData + '</pre></div>';
+  }
+  return cards;
+}
+
 function fetchWxDetail(icao, name) {
+  /* check 24hr cache first */
+  var cached = wxDetailRawCache[icao];
+  if (cached && (Date.now() - cached.time) < 86400000) {
+    var html = _wxBuildDetailHtml(icao, cached.metar, cached.taf, cached.atis);
+    wxDetailCache[icao] = html;
+    var content = document.getElementById('wx-detail-content');
+    if (content && wxSelectedIcao === icao) content.innerHTML = html;
+    return;
+  }
   var proxy = 'https://api.codetabs.com/v1/proxy/?quest=';
   var metarP = fetch('/api/metar?ids=' + icao + '&hours=6')
     .then(function(r) { return r.ok ? r.text() : ''; })
@@ -276,26 +306,201 @@ function fetchWxDetail(icao, name) {
     .then(function(r) { return r.ok ? r.text() : ''; }).then(parseAtisHtml).catch(function() { return []; });
   Promise.all([metarP, tafP, atisP]).then(function(res) {
     var metarLines = res[0], tafText = res[1], atisSections = res[2];
+    /* save to 24hr cache */
+    wxDetailRawCache[icao] = { metar: metarLines, taf: tafText, atis: atisSections, time: Date.now() };
+    _wxSaveDetailCache();
     var content = document.getElementById('wx-detail-content');
     if (!content || wxSelectedIcao !== icao) return;
-    var noData = '<span style="color:var(--muted);font-style:italic">\\u7121\\u8cc7\\u6599</span>';
-    wxMetarRawMap[icao] = metarLines;
-    if (wxMetarShowAll[icao] === undefined) wxMetarShowAll[icao] = false;
-    var cards = buildMetarCard(icao);
-    cards += '<div class="atis-card"><div class="atis-card-title">\\ud83d\\udcc5 TAF</div><pre>' + (tafText || noData) + '</pre></div>';
-    var atisOnly = atisSections.filter(function(s) {
-      var t = s.title.toLowerCase(); return !t.includes('metar') && !t.includes('taf');
-    });
-    if (atisOnly.length > 0) {
-      cards += atisOnly.map(function(s) {
-        return '<div class="atis-card"><div class="atis-card-title">' + s.title + '</div><pre>' + s.text + '</pre></div>';
-      }).join('');
-    } else {
-      cards += '<div class="atis-card"><div class="atis-card-title">\\ud83d\\udcfb ATIS</div><pre>' + noData + '</pre></div>';
-    }
-    wxDetailCache[icao] = cards;
-    content.innerHTML = cards;
+    var html = _wxBuildDetailHtml(icao, metarLines, tafText, atisSections);
+    wxDetailCache[icao] = html;
+    content.innerHTML = html;
   });
+}
+
+/* ── 24hr detail cache persistence ── */
+function _wxSaveDetailCache() {
+  try { localStorage.setItem('crewsync_wx_detail', JSON.stringify(wxDetailRawCache)); } catch(e) {}
+}
+function _wxLoadDetailCache() {
+  try {
+    var raw = localStorage.getItem('crewsync_wx_detail');
+    if (raw) {
+      var parsed = JSON.parse(raw);
+      var now = Date.now();
+      Object.keys(parsed).forEach(function(k) {
+        if (parsed[k] && parsed[k].time && (now - parsed[k].time) < 86400000) {
+          wxDetailRawCache[k] = parsed[k];
+        }
+      });
+    }
+  } catch(e) {}
+}
+_wxLoadDetailCache();
+
+var _wxAllRegions = ['taiwan','hkmacao','japan','korea','philippines','thailand','vietnam','seasia','usa','pacific','canada','europe'];
+
+/* ── shared batch refresh core ── */
+/* btn can be a DOM element or a string (element ID) — re-queried each time to survive re-renders */
+function _wxGetBtn(btn) { return typeof btn === 'string' ? document.getElementById(btn) : btn; }
+function _wxBatchRefresh(icaos, updateListRegion, btn, btnLabel) {
+  var proxy = 'https://api.codetabs.com/v1/proxy/?quest=';
+  var doneCount = 0;
+  var total = icaos.length;
+
+  /* batch METAR (all at once) */
+  var metarAllP = fetch('/api/metar?ids=' + icaos.join(',') + '&hours=6')
+    .then(function(r) { return r.ok ? r.text() : ''; })
+    .then(function(text) {
+      var result = {};
+      text.split('\\n').forEach(function(line) {
+        line = line.trim(); if (!line) return;
+        var stripped = line.replace(/^(METAR|SPECI)\\s+/, '');
+        var icao = stripped.split(' ')[0].toUpperCase();
+        if (!/^[A-Z]{4}$/.test(icao)) return;
+        if (!result[icao]) result[icao] = [];
+        result[icao].push(stripped);
+      });
+      return result;
+    }).catch(function() { return {}; });
+
+  /* batch TAF (all at once) */
+  var tafAllP = fetch(proxy + encodeURIComponent('https://aviationweather.gov/api/data/taf?ids=' + icaos.join(',') + '&format=raw'))
+    .then(function(r) { return r.ok ? r.text() : ''; })
+    .then(function(text) {
+      var result = {};
+      var blocks = text.trim().split(/(?=TAF\\s)/);
+      blocks.forEach(function(b) {
+        b = b.trim(); if (!b) return;
+        var m = b.match(/^TAF\\s+(?:AMD\\s+|COR\\s+)?([A-Z]{4})/);
+        if (m) result[m[1]] = b;
+      });
+      return result;
+    }).catch(function() { return {}; });
+
+  Promise.all([metarAllP, tafAllP]).then(function(batchRes) {
+    var metarAll = batchRes[0];
+    var tafAll = batchRes[1];
+
+    /* update left list METAR for the visible region */
+    if (updateListRegion) {
+      var listAirports = wxGetAirports(updateListRegion);
+      wxMetarMap = {};
+      listAirports.forEach(function(a) {
+        var lines = metarAll[a.icao] || [];
+        if (lines.length > 0) wxMetarMap[a.icao] = parseMetarLine(lines[0]);
+      });
+      wxCacheTime = Date.now();
+      try { localStorage.setItem('crewsync_metar_' + updateListRegion, JSON.stringify({data: wxMetarMap, time: wxCacheTime})); } catch(e) {}
+      renderWxList(listAirports, updateListRegion);
+    }
+
+    /* also update METAR cache for other regions involved */
+    if (!updateListRegion) {
+      _wxAllRegions.forEach(function(reg) {
+        var regAirports = wxGetAirports(reg);
+        if (regAirports.length === 0) return;
+        var regMap = {};
+        regAirports.forEach(function(a) {
+          var lines = metarAll[a.icao] || [];
+          if (lines.length > 0) regMap[a.icao] = parseMetarLine(lines[0]);
+        });
+        try { localStorage.setItem('crewsync_metar_' + reg, JSON.stringify({data: regMap, time: Date.now()})); } catch(e) {}
+      });
+      /* update current region display */
+      var curAirports = wxGetAirports(wxCurrentRegion);
+      wxMetarMap = {};
+      curAirports.forEach(function(a) {
+        var lines = metarAll[a.icao] || [];
+        if (lines.length > 0) wxMetarMap[a.icao] = parseMetarLine(lines[0]);
+      });
+      wxCacheTime = Date.now();
+      renderWxList(curAirports, wxCurrentRegion);
+    }
+
+    /* staggered ATIS fetch (300ms interval) */
+    var idx = 0;
+    function fetchNextAtis() {
+      if (idx >= icaos.length) {
+        _wxSaveDetailCache();
+        _wxRefreshDone(btn, total, btnLabel);
+        /* re-render selected airport detail if applicable */
+        if (wxSelectedIcao && wxDetailRawCache[wxSelectedIcao]) {
+          var c = wxDetailRawCache[wxSelectedIcao];
+          var html = _wxBuildDetailHtml(wxSelectedIcao, c.metar, c.taf, c.atis);
+          wxDetailCache[wxSelectedIcao] = html;
+          var el = document.getElementById('wx-detail-content');
+          if (el) el.innerHTML = html;
+        }
+        return;
+      }
+      var icao = icaos[idx];
+      var metarLines = metarAll[icao] || [];
+      var tafText = tafAll[icao] || '';
+
+      fetch(proxy + encodeURIComponent('https://atis.guru/atis/' + icao))
+        .then(function(r) { return r.ok ? r.text() : ''; })
+        .then(parseAtisHtml)
+        .catch(function() { return []; })
+        .then(function(atisSections) {
+          wxDetailRawCache[icao] = { metar: metarLines, taf: tafText, atis: atisSections, time: Date.now() };
+          wxMetarRawMap[icao] = metarLines;
+          delete wxDetailCache[icao];
+          doneCount++;
+          var _b = _wxGetBtn(btn); if (_b) _b.textContent = '\\u21ba ' + doneCount + '/' + total;
+          idx++;
+          setTimeout(fetchNextAtis, 300);
+        });
+    }
+    fetchNextAtis();
+  }).catch(function() {
+    _wxRefreshDone(btn, 0, btnLabel);
+  });
+}
+
+function _wxRefreshDone(btn, count, label) {
+  _wxRefreshing = false;
+  var el = _wxGetBtn(btn);
+  if (el) {
+    el.disabled = false;
+    el.textContent = '\\u21ba Done (' + count + ')';
+    el.classList.add('done');
+    setTimeout(function() {
+      var el2 = _wxGetBtn(btn);
+      if (el2) { el2.textContent = label || '\\u21ba'; el2.classList.remove('done'); }
+    }, 2000);
+  }
+}
+
+/* ── Refresh All (all regions) ── */
+function wxRefreshAll() {
+  if (_wxRefreshing) return;
+  _wxRefreshing = true;
+  var btn = document.getElementById('wx-refresh-all-btn');
+  if (btn) { btn.disabled = true; btn.textContent = '\\u21ba Refreshing...'; }
+
+  /* collect all unique ICAOs across all regions */
+  var seen = {};
+  var allIcaos = [];
+  _wxAllRegions.forEach(function(reg) {
+    wxGetAirports(reg).forEach(function(a) {
+      if (!seen[a.icao]) { seen[a.icao] = true; allIcaos.push(a.icao); }
+    });
+  });
+  if (allIcaos.length === 0) { _wxRefreshDone('wx-refresh-all-btn', 0, '\\u21ba Refresh All'); return; }
+  _wxBatchRefresh(allIcaos, null, 'wx-refresh-all-btn', '\\u21ba Refresh All');
+}
+
+/* ── Refresh Region (current region only) ── */
+function wxRefreshRegion() {
+  if (_wxRefreshing) return;
+  _wxRefreshing = true;
+  var btn = document.getElementById('wx-region-refresh-btn');
+  if (btn) { btn.disabled = true; btn.textContent = '\\u21ba ...'; }
+
+  var airports = wxGetAirports(wxCurrentRegion);
+  if (airports.length === 0) { _wxRefreshDone(btn, 0, '\\u21ba'); return; }
+  var icaos = airports.map(function(a) { return a.icao; });
+  _wxBatchRefresh(icaos, wxCurrentRegion, 'wx-region-refresh-btn', '\\u21ba');
 }
 
 `;
