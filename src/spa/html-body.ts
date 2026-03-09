@@ -1112,7 +1112,7 @@ export function getSpaHtmlBody(): string {
       <button class="tab-util-btn tab-install-btn" id="tab-install-btn" onclick="showInstallGuide()" style="display:none">
         <span>📲</span>安裝
       </button>
-      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V6.136</span>
+      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V6.137</span>
     </div>
   </div>
 </div>
@@ -1142,7 +1142,14 @@ export function getSpaHtmlBody(): string {
       <div style="margin-bottom:4px">📱 建議使用 <b>iPad 橫向</b>操作以獲得最佳體驗</div>
       <div style="color:var(--muted)">Best experience on iPad in landscape mode</div>
     </div>
-    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V6.136</div>
+    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V6.137</div>
+    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
+      <div>FR24 資訊卡修正：刷新時不再消失，同時僅顯示一個彈窗</div>
+      <div>FR24 info card fix: popup survives auto-refresh, only one popup at a time</div>
+      <div>Airport WX 機場列表修正：METAR 時間顯示改用最新觀測資料</div>
+      <div>Airport WX list fix: use latest METAR observation instead of oldest</div>
+    </div>
+    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V6.136</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
       <div>輪休計算：全休自動合併（A/B/A/B → A/B）、持久化修復、UI 雙語化</div>
       <div>Crew Rest: auto-collapse when full rest (A/B/A/B → A/B), persistence fix, bilingual UI</div>
@@ -1150,11 +1157,6 @@ export function getSpaHtmlBody(): string {
       <div>Cold Temp / Duty Time: Reset button repositioned, TS syntax fix</div>
       <div>提示卡 / PA：標籤中英對照、狀態訊息英文化</div>
       <div>Briefing / PA: bilingual labels, English status messages</div>
-    </div>
-    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V6.135</div>
-    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
-      <div>PA Welcome 機長姓名自動記憶（英文/中文各自儲存，下次自動帶入）</div>
-      <div>PA Welcome: captain name auto-saved to localStorage (EN/ZH stored separately)</div>
     </div>
     <button class="install-close-btn" onclick="closeAbout()">關閉</button>
   </div>

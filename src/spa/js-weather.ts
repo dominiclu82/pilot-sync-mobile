@@ -148,7 +148,7 @@ function loadWxRegion(region) {
         if (!line) return;
         var stripped = line.replace(/^(METAR|SPECI)\\s+/, '');
         var icao = stripped.split(' ')[0].toUpperCase();
-        if (/^[A-Z]{4}$/.test(icao)) wxMetarMap[icao] = parseMetarLine(stripped);
+        if (/^[A-Z]{4}$/.test(icao) && !wxMetarMap[icao]) wxMetarMap[icao] = parseMetarLine(stripped);
       });
       wxCacheTime = Date.now();
       try { localStorage.setItem('crewsync_metar_' + region, JSON.stringify({data: wxMetarMap, time: wxCacheTime})); } catch(e) {}

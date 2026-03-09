@@ -9,6 +9,7 @@ var _fr24ShowLabels = false;
 var _fr24TrailLines = [];  /* [solid trail, dashed predicted] */
 var _fr24TrailFlight = null; /* flight object with active trail */
 var _fr24SearchedFlight = null; /* flight found by search (survives filter) */
+var _fr24PopupCs = null; /* callsign of currently open popup (survives re-render) */
 var _fr24TileLayer = null;
 
 /* auto-refresh & interpolation */
@@ -264,6 +265,7 @@ function _fr24DisplayName(cs) {
 /* ── apply filter & render ── */
 function fr24ApplyFilter() {
   if (!_fr24Map) return;
+  var reopenCs = _fr24PopupCs;   /* save before clearLayers triggers popupclose */
   _fr24PlaneLayer.clearLayers();
   _fr24LabelLayer.clearLayers();
 
@@ -369,6 +371,15 @@ function fr24ApplyFilter() {
   /* clear trail if the tracked flight is no longer visible */
   if (_fr24TrailFlight && _fr24Filtered.indexOf(_fr24TrailFlight) < 0) {
     _fr24ClearTrail();
+  }
+
+  /* re-open popup if it was open before re-render */
+  if (reopenCs) {
+    _fr24PlaneLayer.eachLayer(function(layer) {
+      if (layer._fr24Data && layer._fr24Data.cs === reopenCs) {
+        _fr24ShowPopup(layer);
+      }
+    });
   }
 
   _fr24RenderFlightList();
@@ -531,6 +542,8 @@ function _fr24ShowPopup(marker) {
 
     marker.unbindPopup();
     marker.bindPopup(html, { className: 'live-popup-wrap', maxWidth: 280, minWidth: 200 }).openPopup();
+    _fr24PopupCs = f.cs || null;
+    marker.on('popupclose', function() { _fr24PopupCs = null; });
 
     /* draw trail */
     _fr24ClearTrail();
