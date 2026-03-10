@@ -20,8 +20,12 @@ function _crSyncFtFromBrief() {
   if (!fhEl || !fmEl) return;
   if (typeof _briefFltHr === 'undefined' || typeof _briefFltMin === 'undefined') return;
   if (!_briefFltHr && !_briefFltMin) return; // 提示卡無資料則不動
-  fhEl.value = _briefFltHr || '';
-  fmEl.value = _briefFltMin || '';
+  // 只在值真的改變時才覆蓋並重算
+  var newHr = _briefFltHr || '';
+  var newMin = _briefFltMin || '';
+  if (fhEl.value === newHr && fmEl.value === newMin) return;
+  fhEl.value = newHr;
+  fmEl.value = newMin;
   crewrestCalc();
 }
 
