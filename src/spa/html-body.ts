@@ -1113,7 +1113,7 @@ export function getSpaHtmlBody(): string {
       <button class="tab-util-btn tab-install-btn" id="tab-install-btn" onclick="showInstallGuide()" style="display:none">
         <span>📲</span>安裝
       </button>
-      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V6.141</span>
+      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V6.142</span>
     </div>
   </div>
 </div>
@@ -1143,17 +1143,17 @@ export function getSpaHtmlBody(): string {
       <div style="margin-bottom:4px">📱 建議使用 <b>iPad 橫向</b>操作以獲得最佳體驗</div>
       <div style="color:var(--muted)">Best experience on iPad in landscape mode</div>
     </div>
-    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V6.141</div>
+    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V6.142</div>
+    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
+      <div>新增 Google Search Console 網域驗證標記</div>
+      <div>Added Google Search Console domain verification meta tag</div>
+    </div>
+    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V6.141</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
       <div>新增隱私權政策、服務條款、FAQ 頁面（支援 Google OAuth 驗證申請）</div>
       <div>Added Privacy Policy, Terms of Service, and FAQ pages (for Google OAuth verification)</div>
       <div>隱私與安全彈窗改為三個連結入口（FAQ / Privacy Policy / Terms）</div>
       <div>Privacy & Security popup now shows three link buttons (FAQ / Privacy Policy / Terms)</div>
-    </div>
-    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V6.140</div>
-    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
-      <div>輪休修正：切換 subtab 再切回時，計算結果不再消失</div>
-      <div>Crew Rest fix: calculation results no longer disappear when switching subtabs</div>
     </div>
     <div style="font-size:.68em;color:var(--muted);margin-top:12px;margin-bottom:10px;display:flex;gap:16px;justify-content:center">
       <a href="/privacy" target="_blank" style="color:var(--muted);text-decoration:underline">Privacy Policy 隱私權政策</a>

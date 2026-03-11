@@ -1023,6 +1023,7 @@ document.addEventListener('DOMContentLoaded', function() {
 <link rel="apple-touch-icon" href="/icon.svg">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.min.css"/>
 <title>CrewSync</title>
+<meta name="google-site-verification" content="Fq2L0COUDj6prZMQ2jsTL5T1ZSRF_nmQoPzmbOlOras" />
 <style>
 ${getSpaStyles()}
 </style>
