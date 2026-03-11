@@ -80,6 +80,148 @@ app.get('/share', (_req, res) => {
   res.send(getSPAHtml(undefined, ['sync']));
 });
 
+// ── Privacy Policy & Terms ───────────────────────────────────────────────────
+const _legalPageStyle = `
+  body{background:#111;color:#e0e0e0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;margin:0;padding:24px;max-width:720px;margin:0 auto;line-height:1.7;font-size:15px}
+  h1{color:#60b0ff;font-size:1.4em;margin-bottom:4px}
+  h2{color:#88c8ff;font-size:1.1em;margin-top:28px}
+  p,li{color:#ccc}
+  .zh{color:#999;font-size:.92em}
+  a{color:#60b0ff}
+  .updated{font-size:.8em;color:#888;margin-bottom:24px}
+`;
+
+app.get('/faq', (_req, res) => {
+  res.setHeader('Content-Type', 'text/html; charset=utf-8');
+  res.send(`<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>CrewSync – FAQ 隱私與安全</title><style>${_legalPageStyle}
+  .q{color:#60b0ff;font-weight:700;margin-top:24px;font-size:1em}
+  .a{margin-top:6px}
+  .a-zh{color:#999;font-size:.92em;margin-top:4px}
+</style></head><body>
+<h1>🔒 Privacy &amp; Security FAQ 隱私與安全</h1>
+<div class="updated">Last updated 最後更新: 2026-03-11</div>
+
+<div class="q">Are My Credentials Safe? 你的帳號密碼安全嗎？</div>
+<div class="a">Your employee ID and password are only used for a few seconds during sync to log into the roster system. Once complete, the server discards them immediately. Your employee ID is stored locally in your browser for convenience; your password is never stored.</div>
+<div class="a-zh">安全。你輸入的員工編號和密碼只會在同步的那幾秒鐘內使用，用來登入班表系統擷取資料。同步完成後，伺服器立即丟棄，不留任何紀錄。你的員工編號會存在你自己的瀏覽器裡（方便下次自動填入），密碼則完全不儲存，由瀏覽器的密碼管理器自行處理。</div>
+
+<div class="q">What Does Google Authorization Do? Google 日曆授權做了什麼？</div>
+<div class="a">One thing only: writing your roster into your Google Calendar. We do not read, modify, or share any existing data in your calendar. The authorization token is stored only in your browser and is never uploaded to the server.</div>
+<div class="a-zh">只做一件事：把你的班表寫進你的 Google 日曆。我們不會讀取、修改或分享你日曆裡的任何現有資料。授權產生的令牌只存在你自己的瀏覽器裡，不會上傳到伺服器。</div>
+
+<div class="q">Is This Tool Free? 這個工具收費嗎？</div>
+<div class="a">Completely free. This tool is independently developed solely to help crew members sync their roster — no commercial purpose whatsoever.</div>
+<div class="a-zh">完全免費。本工具由個人開發者獨立開發，純粹為了方便機組人員同步班表，沒有任何商業目的。</div>
+
+<div class="q">Disclaimer 免責聲明</div>
+<div class="a">The developer has taken reasonable measures to ensure data security. However, this is not an official company application. Please assess the risks before use; if you have any privacy concerns, do not use this tool.</div>
+<div class="a-zh">開發者已盡合理努力確保資料安全，但本工具並非公司官方應用程式。使用前請自行評估風險；若對隱私有任何疑慮，請勿使用。</div>
+
+<div style="margin-top:36px;font-size:.85em;display:flex;gap:16px">
+  <a href="/privacy">Privacy Policy 隱私權政策</a>
+  <a href="/terms">Terms of Service 服務條款</a>
+</div>
+</body></html>`);
+});
+
+app.get('/privacy', (_req, res) => {
+  res.setHeader('Content-Type', 'text/html; charset=utf-8');
+  res.send(`<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>CrewSync – Privacy Policy 隱私權政策</title><style>${_legalPageStyle}</style></head><body>
+<h1>Privacy Policy 隱私權政策</h1>
+<div class="updated">Last updated 最後更新: 2026-03-11</div>
+
+<h2>Overview 概述</h2>
+<p>CrewSync is a flight operations toolkit for pilots. We respect your privacy and are committed to protecting your personal data.</p>
+<p class="zh">CrewSync 是一款飛行組員操作工具。我們尊重您的隱私，並致力於保護您的個人資料。</p>
+
+<h2>Data We Access 我們存取的資料</h2>
+<ul>
+  <li><strong>Google Calendar：</strong>With your explicit authorization, CrewSync reads and writes events to your Google Calendar for roster synchronization. This access is granted through Google OAuth 2.0.</li>
+  <li class="zh">經您明確授權後，CrewSync 透過 Google OAuth 2.0 讀取及寫入您的 Google 日曆事件，用於班表同步。</li>
+</ul>
+
+<h2>Data Storage 資料儲存</h2>
+<ul>
+  <li>All data (roster, weather, settings) is stored <strong>locally on your device</strong> using browser localStorage.</li>
+  <li class="zh">所有資料（班表、天氣、設定）皆透過瀏覽器 localStorage <strong>儲存在您的裝置上</strong>。</li>
+  <li>CrewSync does <strong>not</strong> store any personal data on its servers.</li>
+  <li class="zh">CrewSync <strong>不會</strong>在伺服器上儲存任何個人資料。</li>
+  <li>Google Calendar tokens are stored only in your browser's localStorage and are never transmitted to or stored on our servers.</li>
+  <li class="zh">Google 日曆的授權 token 僅儲存於您瀏覽器的 localStorage，絕不會傳輸至或儲存於我們的伺服器。</li>
+</ul>
+
+<h2>Data Sharing 資料分享</h2>
+<p>CrewSync does <strong>not</strong> sell, share, or transfer your personal data to any third party.</p>
+<p class="zh">CrewSync <strong>不會</strong>出售、分享或轉移您的個人資料給任何第三方。</p>
+
+<h2>Third-Party Services 第三方服務</h2>
+<ul>
+  <li><strong>Google Calendar API：</strong>Used solely for roster synchronization as authorized by you.</li>
+  <li class="zh">僅用於您授權的班表同步功能。</li>
+  <li><strong>Aviation weather APIs：</strong>CrewSync fetches METAR/TAF data from public aviation weather services. No personal data is sent in these requests.</li>
+  <li class="zh">CrewSync 從公開的航空氣象服務取得 METAR/TAF 資料，這些請求不包含任何個人資料。</li>
+</ul>
+
+<h2>Revoking Access 撤銷授權</h2>
+<p>You can revoke CrewSync's access to your Google Calendar at any time through your <a href="https://myaccount.google.com/permissions" target="_blank">Google Account permissions</a>.</p>
+<p class="zh">您可以隨時透過 <a href="https://myaccount.google.com/permissions" target="_blank">Google 帳戶權限設定</a> 撤銷 CrewSync 的 Google 日曆存取權。</p>
+
+<h2>Contact 聯繫方式</h2>
+<p>If you have questions about this privacy policy, please contact us via <a href="https://github.com/dominiclu82/pilot-sync-mobile/issues" target="_blank">GitHub Issues</a>.</p>
+<p class="zh">如有任何關於本隱私權政策的問題，請透過 <a href="https://github.com/dominiclu82/pilot-sync-mobile/issues" target="_blank">GitHub Issues</a> 聯繫我們。</p>
+
+<div style="margin-top:36px;font-size:.85em;display:flex;gap:16px">
+  <a href="/faq">FAQ 隱私與安全問答</a>
+  <a href="/terms">Terms of Service 服務條款</a>
+</div>
+</body></html>`);
+});
+
+app.get('/terms', (_req, res) => {
+  res.setHeader('Content-Type', 'text/html; charset=utf-8');
+  res.send(`<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>CrewSync – Terms of Service 服務條款</title><style>${_legalPageStyle}</style></head><body>
+<h1>Terms of Service 服務條款</h1>
+<div class="updated">Last updated 最後更新: 2026-03-11</div>
+
+<h2>Acceptance 接受條款</h2>
+<p>By using CrewSync, you agree to these terms. If you do not agree, please do not use the service.</p>
+<p class="zh">使用 CrewSync 即表示您同意本條款。若不同意，請勿使用本服務。</p>
+
+<h2>Description of Service 服務說明</h2>
+<p>CrewSync is a free flight operations toolkit that provides roster synchronization, weather briefing, crew rest calculation, and related aviation utilities for pilots.</p>
+<p class="zh">CrewSync 是一款免費的飛行操作工具，提供班表同步、天氣簡報、輪休計算及相關航空工具。</p>
+
+<h2>Use at Your Own Risk 風險自負</h2>
+<p>CrewSync is provided as a supplementary tool only. All information (weather, duty time calculations, crew rest schedules, etc.) is for <strong>reference purposes only</strong> and must not be used as the sole basis for operational decisions. Always refer to official sources and company procedures.</p>
+<p class="zh">CrewSync 僅為輔助工具。所有資訊（天氣、工時計算、輪休排程等）<strong>僅供參考</strong>，不得作為操作決策的唯一依據。請務必參照官方資料及公司程序。</p>
+
+<h2>No Warranty 無擔保</h2>
+<p>CrewSync is provided "as is" without warranty of any kind. We do not guarantee the accuracy, completeness, or availability of any data or functionality.</p>
+<p class="zh">CrewSync 以「現況」提供，不附帶任何擔保。我們不保證任何資料或功能的準確性、完整性或可用性。</p>
+
+<h2>Google Calendar Integration Google 日曆整合</h2>
+<p>CrewSync accesses your Google Calendar only with your explicit consent via Google OAuth. You may revoke this access at any time.</p>
+<p class="zh">CrewSync 僅在您透過 Google OAuth 明確同意後存取您的 Google 日曆。您可以隨時撤銷此授權。</p>
+
+<h2>Limitation of Liability 責任限制</h2>
+<p>CrewSync and its developers shall not be liable for any damages arising from the use of this service.</p>
+<p class="zh">CrewSync 及其開發者對因使用本服務而產生的任何損害不承擔責任。</p>
+
+<h2>Changes 條款變更</h2>
+<p>We may update these terms from time to time. Continued use of CrewSync after changes constitutes acceptance of the updated terms.</p>
+<p class="zh">我們可能不定期更新本條款。條款變更後繼續使用 CrewSync 即視為接受更新後的條款。</p>
+
+<h2>Contact 聯繫方式</h2>
+<p>Questions about these terms can be directed to <a href="https://github.com/dominiclu82/pilot-sync-mobile/issues" target="_blank">GitHub Issues</a>.</p>
+<p class="zh">如有任何關於本條款的問題，請透過 <a href="https://github.com/dominiclu82/pilot-sync-mobile/issues" target="_blank">GitHub Issues</a> 聯繫我們。</p>
+
+<div style="margin-top:36px;font-size:.85em;display:flex;gap:16px">
+  <a href="/faq">FAQ 隱私與安全問答</a>
+  <a href="/privacy">Privacy Policy 隱私權政策</a>
+</div>
+</body></html>`);
+});
+
 const _viewTabMap: Record<string, string> = { sync: 'sync', ops: 'briefing', fr24: 'fr24', gate: 'gate' };
 for (const [route, tab] of Object.entries(_viewTabMap)) {
   app.get('/' + route, (_req, res) => {
