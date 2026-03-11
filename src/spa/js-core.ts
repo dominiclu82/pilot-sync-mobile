@@ -680,6 +680,16 @@ function showPrivacy() {
 function closePrivacy() {
   document.getElementById('privacy-overlay').style.display = 'none';
 }
+function openLegal(url) {
+  var ov = document.getElementById('legal-overlay');
+  document.getElementById('legal-iframe').src = url;
+  ov.style.display = 'flex';
+}
+function closeLegal() {
+  var ov = document.getElementById('legal-overlay');
+  ov.style.display = 'none';
+  document.getElementById('legal-iframe').src = '';
+}
 function copyLog() {
   var log = document.getElementById('done-log');
   var text = log ? log.innerText : '';

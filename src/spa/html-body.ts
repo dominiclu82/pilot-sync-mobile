@@ -1117,7 +1117,7 @@ export function getSpaHtmlBody(): string {
       <button class="tab-util-btn tab-install-btn" id="tab-install-btn" onclick="showInstallGuide()" style="display:none">
         <span>📲</span>安裝
       </button>
-      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V6.143</span>
+      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V6.144</span>
     </div>
   </div>
 </div>
@@ -1147,19 +1147,19 @@ export function getSpaHtmlBody(): string {
       <div style="margin-bottom:4px">📱 建議使用 <b>iPad 橫向</b>操作以獲得最佳體驗</div>
       <div style="color:var(--muted)">Best experience on iPad in landscape mode</div>
     </div>
-    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V6.143</div>
+    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V6.144</div>
+    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
+      <div>Privacy / Terms / FAQ 改用 iframe 彈窗顯示，修正 PWA 模式無法返回的問題</div>
+      <div>Privacy / Terms / FAQ now open in iframe overlay, fixing PWA navigation issue</div>
+    </div>
+    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V6.143</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
       <div>預設頁面改為 Roster Sync，新增首頁 app 用途說明（Google OAuth 品牌驗證）</div>
       <div>Default tab changed to Roster Sync, added app description tagline (for Google OAuth brand verification)</div>
     </div>
-    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V6.142</div>
-    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
-      <div>新增 Google Search Console 網域驗證標記</div>
-      <div>Added Google Search Console domain verification meta tag</div>
-    </div>
     <div style="font-size:.68em;color:var(--muted);margin-top:12px;margin-bottom:10px;display:flex;gap:16px;justify-content:center">
-      <a href="/privacy" target="_blank" style="color:var(--muted);text-decoration:underline">Privacy Policy 隱私權政策</a>
-      <a href="/terms" target="_blank" style="color:var(--muted);text-decoration:underline">Terms of Service 服務條款</a>
+      <a href="#" onclick="openLegal('/privacy');return false" style="color:var(--muted);text-decoration:underline">Privacy Policy 隱私權政策</a>
+      <a href="#" onclick="openLegal('/terms');return false" style="color:var(--muted);text-decoration:underline">Terms of Service 服務條款</a>
     </div>
     <button class="install-close-btn" onclick="closeAbout()">關閉</button>
   </div>
@@ -1171,11 +1171,19 @@ export function getSpaHtmlBody(): string {
     <div style="font-size:1.5em;margin-bottom:6px">🔒</div>
     <div style="font-weight:700;font-size:1em;margin-bottom:18px">隱私與安全 / Privacy & Security</div>
     <div style="display:flex;flex-direction:column;gap:12px;margin-bottom:18px">
-      <a href="/faq" target="_blank" style="display:block;padding:12px 16px;background:var(--card);border:1px solid var(--border);border-radius:10px;color:var(--text);text-decoration:none;font-size:.88em;font-weight:600">❓ FAQ 隱私與安全問答</a>
-      <a href="/privacy" target="_blank" style="display:block;padding:12px 16px;background:var(--card);border:1px solid var(--border);border-radius:10px;color:var(--text);text-decoration:none;font-size:.88em;font-weight:600">📋 Privacy Policy 隱私權政策</a>
-      <a href="/terms" target="_blank" style="display:block;padding:12px 16px;background:var(--card);border:1px solid var(--border);border-radius:10px;color:var(--text);text-decoration:none;font-size:.88em;font-weight:600">📄 Terms of Service 服務條款</a>
+      <a href="#" onclick="openLegal('/faq');return false" style="display:block;padding:12px 16px;background:var(--card);border:1px solid var(--border);border-radius:10px;color:var(--text);text-decoration:none;font-size:.88em;font-weight:600">❓ FAQ 隱私與安全問答</a>
+      <a href="#" onclick="openLegal('/privacy');return false" style="display:block;padding:12px 16px;background:var(--card);border:1px solid var(--border);border-radius:10px;color:var(--text);text-decoration:none;font-size:.88em;font-weight:600">📋 Privacy Policy 隱私權政策</a>
+      <a href="#" onclick="openLegal('/terms');return false" style="display:block;padding:12px 16px;background:var(--card);border:1px solid var(--border);border-radius:10px;color:var(--text);text-decoration:none;font-size:.88em;font-weight:600">📄 Terms of Service 服務條款</a>
     </div>
     <button class="install-close-btn" onclick="closePrivacy()">關閉</button>
+  </div>
+</div>
+
+<!-- iframe 彈窗（Privacy / Terms / FAQ） -->
+<div id="legal-overlay" style="display:none;position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,.7);display:none;align-items:center;justify-content:center" onclick="if(event.target===this)closeLegal()">
+  <div style="position:relative;width:94vw;max-width:600px;height:85vh;background:var(--bg,#0a0e1a);border-radius:14px;overflow:hidden">
+    <button onclick="closeLegal()" style="position:absolute;top:8px;right:12px;z-index:1;background:none;border:none;color:var(--text,#fff);font-size:1.5em;cursor:pointer">✕</button>
+    <iframe id="legal-iframe" src="" style="width:100%;height:100%;border:none"></iframe>
   </div>
 </div>
 
