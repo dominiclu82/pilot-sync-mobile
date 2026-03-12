@@ -181,9 +181,9 @@ export function getSpaHtmlBody(): string {
 
   <!-- 子 Tab Bar -->
   <div class="briefing-subtabs">
-    <div class="subtab-slot"><button class="briefing-subtab active" id="subtabBtn-brief" onclick="switchBriefingTab('brief',this)"><span class="drag-grip">≡</span>📋 提示</button></div>
+    <div class="subtab-slot"><button class="briefing-subtab active" id="subtabBtn-brief" onclick="switchBriefingTab('brief',this)"><span class="drag-grip">≡</span>📋 Briefing</button></div>
     <div class="subtab-slot"><button class="briefing-subtab" id="subtabBtn-pa" onclick="switchBriefingTab('pa',this)"><span class="drag-grip">≡</span>🎙️ PA</button></div>
-    <div class="subtab-slot"><button class="briefing-subtab" id="subtabBtn-crewrest" onclick="switchBriefingTab('crewrest',this)"><span class="drag-grip">≡</span>⏳ 輪休計算</button></div>
+    <div class="subtab-slot"><button class="briefing-subtab" id="subtabBtn-crewrest" onclick="switchBriefingTab('crewrest',this)"><span class="drag-grip">≡</span>⏳ Rest Calc</button></div>
     <div class="subtab-slot"><button class="briefing-subtab" id="subtabBtn-hf" onclick="switchBriefingTab('hf',this)"><span class="drag-grip">≡</span>📻 Pacific HF</button></div>
     <div class="subtab-wx-wrap">
       <button class="briefing-subtab" id="subtabBtn-datis" onclick="switchBriefingTab('datis',this)"><span class="drag-grip">≡</span>⛅ WX <select class="wx-fleet-inline" id="wx-fleet-select"
@@ -214,16 +214,16 @@ export function getSpaHtmlBody(): string {
     </div>
 
     <div class="brief-section">
-      <div class="brief-section-header"><span>FLIGHT INFO / DATA</span><button class="brief-clear-btn" onclick="briefClearInfo()">清除 Clear</button></div>
+      <div class="brief-section-header"><span>FLIGHT INFO / DATA <span style="font-size:.75em;color:var(--muted);font-weight:400;opacity:.8">auto-filled · editable</span></span><button class="brief-clear-btn" onclick="briefClearInfo()">清除 Clear</button></div>
       <div class="brief-grid">
-        <div class="brief-field"><label>Dep Date/Time</label><div id="brief-dep-dt" class="brief-auto-val">—</div></div>
+        <div class="brief-field"><label>Dep Date/Time</label><input type="text" id="brief-dep-dt" class="brief-auto-val" placeholder="—"></div>
         <div class="brief-field"><label>TPE Gate</label><input type="text" id="brief-gate" placeholder="—"></div>
         <div class="brief-field"><label>Origin</label><input type="text" id="brief-origin" placeholder="IATA" oninput="_briefWxRefresh('owx',this.value)"></div>
         <div class="brief-field"><label>Orig WX</label><div id="brief-owx" class="brief-wx-val">—</div></div>
         <div class="brief-field"><label>Dest.</label><input type="text" id="brief-dest" placeholder="IATA" oninput="_briefWxRefresh('dwx',this.value)"></div>
         <div class="brief-field"><label>Dest. WX</label><div id="brief-dwx" class="brief-wx-val">—</div></div>
-        <div class="brief-field"><label>Cruise Altitude</label><input type="text" id="brief-ofp" placeholder="—"></div>
-        <div class="brief-field"><label>Flight Time</label><input type="text" id="brief-ft" placeholder="—"></div>
+        <div class="brief-field"><label>Cruise Altitude</label><input type="text" id="brief-ofp" placeholder="manual input"></div>
+        <div class="brief-field"><label>Flight Time</label><input type="text" id="brief-ft" placeholder="manual input"></div>
       </div>
     </div>
 
@@ -1117,7 +1117,7 @@ export function getSpaHtmlBody(): string {
       <button class="tab-util-btn tab-install-btn" id="tab-install-btn" onclick="showInstallGuide()" style="display:none">
         <span>📲</span>安裝
       </button>
-      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V6.146</span>
+      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V6.147</span>
     </div>
   </div>
 </div>
@@ -1147,15 +1147,15 @@ export function getSpaHtmlBody(): string {
       <div style="margin-bottom:4px">📱 建議使用 <b>iPad 橫向</b>操作以獲得最佳體驗</div>
       <div style="color:var(--muted)">Best experience on iPad in landscape mode</div>
     </div>
-    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V6.146</div>
+    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V6.147</div>
+    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
+      <div>PA 問候語改為「各位貴賓」；Welcome/Descent 加早安/午安/晚安自動亮藍；Briefing/Rest Calc subtab 改名；Dep Date/Time 可編輯</div>
+      <div>PA greeting updated; time-of-day auto-highlight for Welcome/Descent; subtabs renamed; Dep Date/Time editable</div>
+    </div>
+    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V6.146</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
       <div>隱私政策／條款／FAQ 連結改用真實 URL，修正 Google 掃描器無法偵測連結的問題</div>
       <div>Fixed privacy/terms/FAQ links to use real URLs so Google's scanner can detect them</div>
-    </div>
-    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V6.145</div>
-    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
-      <div>OAuth 授權流程加入 PKCE (S256)，符合 Google 安全 OAuth 規範</div>
-      <div>Added PKCE (S256) to OAuth flow to comply with Google secure OAuth requirements</div>
     </div>
     <div style="font-size:.68em;color:var(--muted);margin-top:12px;margin-bottom:10px;display:flex;gap:16px;justify-content:center">
       <a href="/privacy" onclick="openLegal('/privacy');return false" style="color:var(--muted);text-decoration:underline">Privacy Policy 隱私權政策</a>

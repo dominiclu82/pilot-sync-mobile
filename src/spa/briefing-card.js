@@ -261,14 +261,12 @@ function _briefFillFromFids(fno, data) {
     if (depFlight) {
       var depDateStr = depFlight.ODate || dateStr;
       var time = _briefFmtTime(depFlight.OTime);
-      dtEl.innerHTML = '<div style="font-size:.85em;color:var(--muted)">' + depDateStr + '</div>' +
-        '<div style="font-size:1.1em;font-weight:700">' + time + ' Local</div>';
+      dtEl.value = depDateStr + ' ' + time + ' Local';
     } else if (arrFlight) {
       var arrDateStr = arrFlight.ODate || dateStr;
       // arrFlight.OTime 是 TPE 抵達時間(STA)，不是出發地的 STD
       // 先顯示載入中，再從 FR24/FA 取得正確出發時間
-      dtEl.innerHTML = '<div style="font-size:.85em;color:var(--muted)">' + arrDateStr + '</div>' +
-        '<div style="font-size:1.1em;font-weight:700;color:var(--muted)">查詢出發時間...</div>';
+      dtEl.value = arrDateStr + ' 查詢出發時間...';
       var originIata = arrFlight.CityCode || '';
       _briefFetchOriginInfo(fno, arrDateStr, dtEl, originIata);
     }
@@ -319,8 +317,7 @@ function _briefFetchOriginInfo(fno, arrDateStr, dtEl, originIata) {
     }
     var display = timeStr ? timeStr + ' Local' : '';
     if (gate && originIata !== 'TPE') display += (display ? ' / Gate ' : 'Gate ') + gate;
-    dtEl.innerHTML = '<div style="font-size:.85em;color:var(--muted)">' + depDateStr + '</div>' +
-      '<div style="font-size:1.1em;font-weight:700">' + (display || '—') + '</div>';
+    dtEl.value = depDateStr + ' ' + (display || '—');
   }
 
   // 把 FIDS 到達日 "2026/03/09" 轉成 "20260309" 用於比對
@@ -386,12 +383,10 @@ function _briefFetchLiveOrigin(fno, dateStr, dtEl, originIata) {
     }
     var display = timeStr ? timeStr + ' Local' : '';
     if (gate && originIata !== 'TPE') display += (display ? ' / Gate ' : 'Gate ') + gate;
-    dtEl.innerHTML = '<div style="font-size:.85em;color:var(--muted)">' + depDateStr + '</div>' +
-      '<div style="font-size:1.1em;font-weight:700">' + (display || '—') + '</div>';
+    dtEl.value = depDateStr + ' ' + (display || '—');
   }
   function fallback() {
-    dtEl.innerHTML = '<div style="font-size:.85em;color:var(--muted)">' + dateStr + '</div>' +
-      '<div style="font-size:1.1em;font-weight:700">—</div>';
+    dtEl.value = dateStr + ' —';
   }
   fetch('/api/fids-fr24')
     .then(function(r) { return r.ok ? r.json() : null; })
@@ -498,7 +493,7 @@ function briefClearInfo() {
     if (el) el.value = '';
   });
   var dtEl = document.getElementById('brief-dep-dt');
-  if (dtEl) dtEl.innerHTML = '—';
+  if (dtEl) dtEl.value = '';
   var owx = document.getElementById('brief-owx');
   if (owx) owx.innerHTML = '—';
   var dwx = document.getElementById('brief-dwx');
@@ -534,7 +529,7 @@ function _briefSave() {
     var fno = document.getElementById('brief-fno');
     if (fno) obj['brief-fno'] = fno.value;
     var depDt = document.getElementById('brief-dep-dt');
-    if (depDt) obj['brief-dep-dt'] = depDt.innerHTML;
+    if (depDt) obj['brief-dep-dt'] = depDt.value;
     localStorage.setItem('crewsync_brief_data', JSON.stringify(obj));
   } catch(e) {}
 }
@@ -547,8 +542,7 @@ function _briefRestore() {
     Object.keys(obj).forEach(function(id) {
       var el = document.getElementById(id);
       if (!el) return;
-      if (id === 'brief-dep-dt') { el.innerHTML = obj[id] || '—'; }
-      else { el.value = obj[id] || ''; }
+      el.value = obj[id] || '';
     });
   } catch(e) {}
 }

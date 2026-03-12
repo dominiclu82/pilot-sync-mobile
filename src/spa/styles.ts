@@ -850,6 +850,9 @@ input[type=radio]{width:15px;height:15px;aspect-ratio:1;accent-color:var(--accen
   color:var(--accent);font-size:.9em;font-style:normal;cursor:pointer;margin-left:8px;white-space:nowrap}
 .pa-script .pa-sub{font-weight:600;color:var(--muted);margin:12px 0 4px;font-size:.9em}
 .pa-script .pa-choice{color:var(--muted);font-style:italic}
+.pa-greeting{color:var(--muted);font-style:italic}
+.pa-greet-opt{cursor:pointer}
+.pa-greet-opt.pa-greet-active{color:var(--accent);font-style:normal;font-weight:600}
 .pa-note-toggle{background:none;border:none;color:var(--muted);font-size:.7em;
   cursor:pointer;padding:0 0 0 8px;-webkit-appearance:none;vertical-align:middle;opacity:.6}
 .pa-note-toggle:active{opacity:1}
