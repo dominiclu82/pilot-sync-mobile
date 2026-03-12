@@ -1117,7 +1117,7 @@ export function getSpaHtmlBody(): string {
       <button class="tab-util-btn tab-install-btn" id="tab-install-btn" onclick="showInstallGuide()" style="display:none">
         <span>📲</span>安裝
       </button>
-      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V6.145</span>
+      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V6.146</span>
     </div>
   </div>
 </div>
@@ -1147,19 +1147,19 @@ export function getSpaHtmlBody(): string {
       <div style="margin-bottom:4px">📱 建議使用 <b>iPad 橫向</b>操作以獲得最佳體驗</div>
       <div style="color:var(--muted)">Best experience on iPad in landscape mode</div>
     </div>
-    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V6.145</div>
+    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V6.146</div>
+    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
+      <div>隱私政策／條款／FAQ 連結改用真實 URL，修正 Google 掃描器無法偵測連結的問題</div>
+      <div>Fixed privacy/terms/FAQ links to use real URLs so Google's scanner can detect them</div>
+    </div>
+    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V6.145</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
       <div>OAuth 授權流程加入 PKCE (S256)，符合 Google 安全 OAuth 規範</div>
       <div>Added PKCE (S256) to OAuth flow to comply with Google secure OAuth requirements</div>
     </div>
-    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V6.144</div>
-    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
-      <div>Privacy / Terms / FAQ 改用 iframe 彈窗顯示，修正 PWA 模式無法返回的問題</div>
-      <div>Privacy / Terms / FAQ now open in iframe overlay, fixing PWA navigation issue</div>
-    </div>
     <div style="font-size:.68em;color:var(--muted);margin-top:12px;margin-bottom:10px;display:flex;gap:16px;justify-content:center">
-      <a href="#" onclick="openLegal('/privacy');return false" style="color:var(--muted);text-decoration:underline">Privacy Policy 隱私權政策</a>
-      <a href="#" onclick="openLegal('/terms');return false" style="color:var(--muted);text-decoration:underline">Terms of Service 服務條款</a>
+      <a href="/privacy" onclick="openLegal('/privacy');return false" style="color:var(--muted);text-decoration:underline">Privacy Policy 隱私權政策</a>
+      <a href="/terms" onclick="openLegal('/terms');return false" style="color:var(--muted);text-decoration:underline">Terms of Service 服務條款</a>
     </div>
     <button class="install-close-btn" onclick="closeAbout()">關閉</button>
   </div>
@@ -1171,9 +1171,9 @@ export function getSpaHtmlBody(): string {
     <div style="font-size:1.5em;margin-bottom:6px">🔒</div>
     <div style="font-weight:700;font-size:1em;margin-bottom:18px">隱私與安全 / Privacy & Security</div>
     <div style="display:flex;flex-direction:column;gap:12px;margin-bottom:18px">
-      <a href="#" onclick="openLegal('/faq');return false" style="display:block;padding:12px 16px;background:var(--card);border:1px solid var(--border);border-radius:10px;color:var(--text);text-decoration:none;font-size:.88em;font-weight:600">❓ FAQ 隱私與安全問答</a>
-      <a href="#" onclick="openLegal('/privacy');return false" style="display:block;padding:12px 16px;background:var(--card);border:1px solid var(--border);border-radius:10px;color:var(--text);text-decoration:none;font-size:.88em;font-weight:600">📋 Privacy Policy 隱私權政策</a>
-      <a href="#" onclick="openLegal('/terms');return false" style="display:block;padding:12px 16px;background:var(--card);border:1px solid var(--border);border-radius:10px;color:var(--text);text-decoration:none;font-size:.88em;font-weight:600">📄 Terms of Service 服務條款</a>
+      <a href="/faq" onclick="openLegal('/faq');return false" style="display:block;padding:12px 16px;background:var(--card);border:1px solid var(--border);border-radius:10px;color:var(--text);text-decoration:none;font-size:.88em;font-weight:600">❓ FAQ 隱私與安全問答</a>
+      <a href="/privacy" onclick="openLegal('/privacy');return false" style="display:block;padding:12px 16px;background:var(--card);border:1px solid var(--border);border-radius:10px;color:var(--text);text-decoration:none;font-size:.88em;font-weight:600">📋 Privacy Policy 隱私權政策</a>
+      <a href="/terms" onclick="openLegal('/terms');return false" style="display:block;padding:12px 16px;background:var(--card);border:1px solid var(--border);border-radius:10px;color:var(--text);text-decoration:none;font-size:.88em;font-weight:600">📄 Terms of Service 服務條款</a>
     </div>
     <button class="install-close-btn" onclick="closePrivacy()">關閉</button>
   </div>
