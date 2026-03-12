@@ -261,12 +261,12 @@ function _briefFillFromFids(fno, data) {
     if (depFlight) {
       var depDateStr = depFlight.ODate || dateStr;
       var time = _briefFmtTime(depFlight.OTime);
-      dtEl.value = depDateStr + ' ' + time + ' Local';
+      dtEl.textContent = depDateStr + '\n' + time + ' Local';
     } else if (arrFlight) {
       var arrDateStr = arrFlight.ODate || dateStr;
       // arrFlight.OTime 是 TPE 抵達時間(STA)，不是出發地的 STD
       // 先顯示載入中，再從 FR24/FA 取得正確出發時間
-      dtEl.value = arrDateStr + ' 查詢出發時間...';
+      dtEl.textContent = arrDateStr + ' 查詢出發時間...';
       var originIata = arrFlight.CityCode || '';
       _briefFetchOriginInfo(fno, arrDateStr, dtEl, originIata);
     }
@@ -317,7 +317,7 @@ function _briefFetchOriginInfo(fno, arrDateStr, dtEl, originIata) {
     }
     var display = timeStr ? timeStr + ' Local' : '';
     if (gate && originIata !== 'TPE') display += (display ? ' / Gate ' : 'Gate ') + gate;
-    dtEl.value = depDateStr + ' ' + (display || '—');
+    dtEl.textContent = depDateStr + '\n' + (display || '—');
   }
 
   // 把 FIDS 到達日 "2026/03/09" 轉成 "20260309" 用於比對
@@ -383,10 +383,10 @@ function _briefFetchLiveOrigin(fno, dateStr, dtEl, originIata) {
     }
     var display = timeStr ? timeStr + ' Local' : '';
     if (gate && originIata !== 'TPE') display += (display ? ' / Gate ' : 'Gate ') + gate;
-    dtEl.value = depDateStr + ' ' + (display || '—');
+    dtEl.textContent = depDateStr + '\n' + (display || '—');
   }
   function fallback() {
-    dtEl.value = dateStr + ' —';
+    dtEl.textContent = dateStr + '\n—';
   }
   fetch('/api/fids-fr24')
     .then(function(r) { return r.ok ? r.json() : null; })
@@ -493,7 +493,7 @@ function briefClearInfo() {
     if (el) el.value = '';
   });
   var dtEl = document.getElementById('brief-dep-dt');
-  if (dtEl) dtEl.value = '';
+  if (dtEl) dtEl.textContent = '—';
   var owx = document.getElementById('brief-owx');
   if (owx) owx.innerHTML = '—';
   var dwx = document.getElementById('brief-dwx');
@@ -529,7 +529,7 @@ function _briefSave() {
     var fno = document.getElementById('brief-fno');
     if (fno) obj['brief-fno'] = fno.value;
     var depDt = document.getElementById('brief-dep-dt');
-    if (depDt) obj['brief-dep-dt'] = depDt.value;
+    if (depDt) obj['brief-dep-dt'] = depDt.textContent;
     localStorage.setItem('crewsync_brief_data', JSON.stringify(obj));
   } catch(e) {}
 }
@@ -542,7 +542,9 @@ function _briefRestore() {
     Object.keys(obj).forEach(function(id) {
       var el = document.getElementById(id);
       if (!el) return;
-      el.value = obj[id] || '';
+      if (id === 'brief-dep-dt') { el.textContent = obj[id] || '—'; }
+      else { el.value = obj[id] || ''; }
+      if (el.tagName === 'TEXTAREA') { el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; }
     });
   } catch(e) {}
 }
