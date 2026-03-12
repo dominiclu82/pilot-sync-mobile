@@ -1117,7 +1117,7 @@ export function getSpaHtmlBody(): string {
       <button class="tab-util-btn tab-install-btn" id="tab-install-btn" onclick="showInstallGuide()" style="display:none">
         <span>📲</span>安裝
       </button>
-      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V6.144</span>
+      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V6.145</span>
     </div>
   </div>
 </div>
@@ -1147,15 +1147,15 @@ export function getSpaHtmlBody(): string {
       <div style="margin-bottom:4px">📱 建議使用 <b>iPad 橫向</b>操作以獲得最佳體驗</div>
       <div style="color:var(--muted)">Best experience on iPad in landscape mode</div>
     </div>
-    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V6.144</div>
+    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V6.145</div>
+    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
+      <div>OAuth 授權流程加入 PKCE (S256)，符合 Google 安全 OAuth 規範</div>
+      <div>Added PKCE (S256) to OAuth flow to comply with Google secure OAuth requirements</div>
+    </div>
+    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V6.144</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
       <div>Privacy / Terms / FAQ 改用 iframe 彈窗顯示，修正 PWA 模式無法返回的問題</div>
       <div>Privacy / Terms / FAQ now open in iframe overlay, fixing PWA navigation issue</div>
-    </div>
-    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V6.143</div>
-    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
-      <div>預設頁面改為 Roster Sync，新增首頁 app 用途說明（Google OAuth 品牌驗證）</div>
-      <div>Default tab changed to Roster Sync, added app description tagline (for Google OAuth brand verification)</div>
     </div>
     <div style="font-size:.68em;color:var(--muted);margin-top:12px;margin-bottom:10px;display:flex;gap:16px;justify-content:center">
       <a href="#" onclick="openLegal('/privacy');return false" style="color:var(--muted);text-decoration:underline">Privacy Policy 隱私權政策</a>

@@ -2,7 +2,7 @@ import express from 'express';
 import { google } from 'googleapis';
 import fs from 'fs';
 import path from 'path';
-import { randomUUID } from 'crypto';
+import { randomUUID, randomBytes, createHash } from 'crypto';
 import { config } from 'dotenv';
 import { OUTPUT_DIR, ROOT, loadCredentials } from './config.js';
 import { generateICSHeadless } from './generate-ics-headless.js';
@@ -36,6 +36,19 @@ const REDIRECT_URI: string = process.env.REDIRECT_URI
 const _ru = new URL(REDIRECT_URI);
 const REDIRECT_PORT = parseInt(_ru.port) || (REDIRECT_URI.startsWith('https') ? 443 : 80);
 const REDIRECT_PATH = _ru.pathname;
+
+// ── PKCE store ───────────────────────────────────────────────────────────────
+const _pkceStore = new Map<string, { codeVerifier: string; expires: number }>();
+function _pkceCleanup() {
+  const now = Date.now();
+  for (const [k, v] of _pkceStore) if (now > v.expires) _pkceStore.delete(k);
+}
+function _pkceGenerate() {
+  const codeVerifier = randomBytes(32).toString('base64url');
+  const codeChallenge = createHash('sha256').update(codeVerifier).digest('base64url');
+  const state = randomBytes(16).toString('hex');
+  return { codeVerifier, codeChallenge, state };
+}
 
 // ── Job state ────────────────────────────────────────────────────────────────
 
@@ -257,12 +270,18 @@ app.get('/manifest.json', (_req, res) => {
 
 app.get('/oauth/url', (_req, res) => {
   try {
+    _pkceCleanup();
+    const { codeVerifier, codeChallenge, state } = _pkceGenerate();
+    _pkceStore.set(state, { codeVerifier, expires: Date.now() + 5 * 60 * 1000 });
     const creds = loadCredentials();
     const client = new google.auth.OAuth2(creds.web.client_id, creds.web.client_secret, REDIRECT_URI);
     const url = client.generateAuthUrl({
       access_type: 'offline',
       prompt: 'select_account consent',
       scope: ['https://www.googleapis.com/auth/calendar'],
+      code_challenge: codeChallenge,
+      code_challenge_method: 'S256' as any,
+      state,
     });
     res.json({ url });
   } catch (err: any) {
@@ -840,12 +859,16 @@ app.get('/api/fids-fa', (req, res) => {
 });
 
 async function oauthCallback(req: express.Request, res: express.Response) {
-  const { code } = req.query;
+  const { code, state } = req.query;
   if (!code) { res.status(400).send('Missing code'); return; }
+  const pkceEntry = state ? _pkceStore.get(state as string) : undefined;
+  if (pkceEntry) _pkceStore.delete(state as string);
   try {
     const creds = loadCredentials();
     const client = new google.auth.OAuth2(creds.web.client_id, creds.web.client_secret, REDIRECT_URI);
-    const { tokens } = await client.getToken(code as string);
+    const { tokens } = await client.getToken(
+      pkceEntry ? { code: code as string, codeVerifier: pkceEntry.codeVerifier } as any : (code as string)
+    );
     const rt = tokens.refresh_token ?? '';
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
     res.send(`<!DOCTYPE html><html><head><meta charset="utf-8">
