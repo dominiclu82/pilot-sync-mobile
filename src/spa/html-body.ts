@@ -1117,7 +1117,7 @@ export function getSpaHtmlBody(): string {
       <button class="tab-util-btn tab-install-btn" id="tab-install-btn" onclick="showInstallGuide()" style="display:none">
         <span>📲</span>安裝
       </button>
-      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V6.148</span>
+      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V6.149</span>
     </div>
   </div>
 </div>
@@ -1147,15 +1147,15 @@ export function getSpaHtmlBody(): string {
       <div style="margin-bottom:4px">📱 建議使用 <b>iPad 橫向</b>操作以獲得最佳體驗</div>
       <div style="color:var(--muted)">Best experience on iPad in landscape mode</div>
     </div>
-    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V6.148</div>
+    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V6.149</div>
+    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
+      <div>隱私政策頁面依 Google 審核要求重寫，新增五大段落並加入 Google API Limited Use 聲明</div>
+      <div>Rewrote privacy policy per Google review requirements with 5 required sections and Google API Limited Use disclosure</div>
+    </div>
+    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V6.148</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
       <div>Dep Date/Time 改為可編輯並分行顯示；Notes 自動隨行數增高</div>
       <div>Dep Date/Time now editable with two-line display; Notes auto-grow with content</div>
-    </div>
-    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V6.147</div>
-    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
-      <div>PA 問候語改為「各位貴賓」；Welcome/Descent 加早安/午安/晚安自動亮藍；Briefing/Rest Calc subtab 改名；Dep Date/Time 可編輯</div>
-      <div>PA greeting updated; time-of-day auto-highlight for Welcome/Descent; subtabs renamed; Dep Date/Time editable</div>
     </div>
     <div style="font-size:.68em;color:var(--muted);margin-top:12px;margin-bottom:10px;display:flex;gap:16px;justify-content:center">
       <a href="/privacy" onclick="openLegal('/privacy');return false" style="color:var(--muted);text-decoration:underline">Privacy Policy 隱私權政策</a>
