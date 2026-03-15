@@ -146,9 +146,11 @@ export function getSpaHtmlBody(): string {
           <option value="month" selected>Month</option>
           <option value="schedule">Schedule</option>
         </select>
-        <button class="gcal-nav" onclick="gcalPrev()">◀</button>
-        <button class="gcal-nav" onclick="gcalNext()">▶</button>
-        <span class="gcal-title" id="gcal-title"></span>
+        <div style="display:flex;align-items:center;gap:4px;margin-left:auto">
+          <button class="gcal-nav" onclick="gcalPrev()">◀</button>
+          <span class="gcal-title" id="gcal-title" style="min-width:120px;text-align:center"></span>
+          <button class="gcal-nav" onclick="gcalNext()">▶</button>
+        </div>
       </div>
       <div class="gcal-weekdays" id="gcal-weekdays"></div>
       <div class="gcal-grid" id="gcal-grid"></div>
@@ -1106,7 +1108,7 @@ export function getSpaHtmlBody(): string {
       <button class="tab-util-btn tab-install-btn" id="tab-install-btn" onclick="showInstallGuide()" style="display:none">
         <span>📲</span>安裝
       </button>
-      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V6.151</span>
+      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V6.152</span>
     </div>
   </div>
 </div>
@@ -1136,15 +1138,15 @@ export function getSpaHtmlBody(): string {
       <div style="margin-bottom:4px">📱 建議使用 <b>iPad 橫向</b>操作以獲得最佳體驗</div>
       <div style="color:var(--muted)">Best experience on iPad in landscape mode</div>
     </div>
-    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V6.151</div>
+    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V6.152</div>
+    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
+      <div>Calendar 月份導航箭頭固定在月份兩側，不再與標題重疊</div>
+      <div>Fixed calendar month navigation arrows to stay on both sides of the title</div>
+    </div>
+    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V6.151</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
       <div>Briefing 新增 Today/Tomorrow 日期切換及 Turbli 亂流預報按鈕；Tools 新增 Turbli 連結</div>
       <div>Added Today/Tomorrow date selector and Turbli turbulence button to Briefing; added Turbli link to Tools</div>
-    </div>
-    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V6.150</div>
-    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
-      <div>因通過 Google 認證，拿掉「未經驗證的應用程式」提示；預設頁面改為 Operation/WX；標題加 JX</div>
-      <div>Passed Google OAuth verification; removed unverified app warning; default tab changed to Operation/WX; added JX to title</div>
     </div>
     <div style="font-size:.68em;color:var(--muted);margin-top:12px;margin-bottom:10px;display:flex;gap:16px;justify-content:center">
       <a href="/privacy" onclick="openLegal('/privacy');return false" style="color:var(--muted);text-decoration:underline">Privacy Policy 隱私權政策</a>
