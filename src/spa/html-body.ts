@@ -3,11 +3,11 @@ export function getSpaHtmlBody(): string {
 <body>
 
 <div style="text-align:center;padding:6px 12px;font-size:.72em;color:var(--muted);letter-spacing:.3px">
-  <span style="font-weight:700;color:var(--text)">CrewSync</span> — 航空組員班表同步與飛行資訊工具 / Airline crew roster sync & flight info tool
+  <span style="font-weight:700;color:var(--text)">CrewSync</span> — JX航空組員班表同步與飛行資訊工具 / JX crew roster sync & flight info tool
 </div>
 
 <!-- ══ Tab: 同步 ═════════════════════════════════════════════════════ -->
-<div id="tab-sync" class="tab-active">
+<div id="tab-sync">
 
 <!-- Roster Subtab Bar -->
 <div class="roster-subtabs">
@@ -34,23 +34,6 @@ export function getSpaHtmlBody(): string {
         <button class="btn btn-secondary btn-sm" id="google-auth-btn"
           onclick="doGoogleAuth()" style="width:auto;padding:6px 12px;font-size:.82em">授權</button>
       </div>
-      <details class="how-to" style="background:var(--surface);border-radius:8px">
-        <summary>🔐 首次授權出現警告？/ Warning on first authorization?</summary>
-        <div class="how-to-body">
-          <div class="how-to-os">
-            Google 會顯示「這個應用程式未經驗證」的警告畫面，這是正常的：<br><br>
-            1. 點左下角「<b>進階</b>」<br>
-            2. 點「<b>前往 crew-sync.onrender.com（不安全）</b>」<br>
-            3. 點「<b>繼續</b>」完成授權<br><br>
-            <span style="color:var(--muted)">
-            Google may show a "Google hasn't verified this app" warning — this is normal:<br><br>
-            1. Click "<b>Advanced</b>" at bottom-left<br>
-            2. Click "<b>Go to crew-sync.onrender.com (unsafe)</b>"<br>
-            3. Click "<b>Continue</b>" to complete authorization
-            </span>
-          </div>
-        </div>
-      </details>
     </div>
     <div id="cred-error" class="alert alert-error" style="display:none"></div>
 
@@ -177,16 +160,16 @@ export function getSpaHtmlBody(): string {
 </div><!-- end tab-sync -->
 
 <!-- ══ Tab: A350簡報箱 ══════════════════════════════════════════════ -->
-<div id="tab-briefing">
+<div id="tab-briefing" class="tab-active">
 
   <!-- 子 Tab Bar -->
   <div class="briefing-subtabs">
-    <div class="subtab-slot"><button class="briefing-subtab active" id="subtabBtn-brief" onclick="switchBriefingTab('brief',this)"><span class="drag-grip">≡</span>📋 Briefing</button></div>
+    <div class="subtab-slot"><button class="briefing-subtab" id="subtabBtn-brief" onclick="switchBriefingTab('brief',this)"><span class="drag-grip">≡</span>📋 Briefing</button></div>
     <div class="subtab-slot"><button class="briefing-subtab" id="subtabBtn-pa" onclick="switchBriefingTab('pa',this)"><span class="drag-grip">≡</span>🎙️ PA</button></div>
     <div class="subtab-slot"><button class="briefing-subtab" id="subtabBtn-crewrest" onclick="switchBriefingTab('crewrest',this)"><span class="drag-grip">≡</span>⏳ Rest Calc</button></div>
     <div class="subtab-slot"><button class="briefing-subtab" id="subtabBtn-hf" onclick="switchBriefingTab('hf',this)"><span class="drag-grip">≡</span>📻 Pacific HF</button></div>
     <div class="subtab-wx-wrap">
-      <button class="briefing-subtab" id="subtabBtn-datis" onclick="switchBriefingTab('datis',this)"><span class="drag-grip">≡</span>⛅ WX <select class="wx-fleet-inline" id="wx-fleet-select"
+      <button class="briefing-subtab active" id="subtabBtn-datis" onclick="switchBriefingTab('datis',this)"><span class="drag-grip">≡</span>⛅ WX <select class="wx-fleet-inline" id="wx-fleet-select"
         onclick="event.stopPropagation()"
         onfocus="this._prev=this.value;this.selectedIndex=0"
         onchange="wxSwitchFleet(this);switchBriefingTab('datis',document.getElementById('subtabBtn-datis'))"
@@ -205,7 +188,7 @@ export function getSpaHtmlBody(): string {
   </div>
 
   <!-- ── 📋 提示 panel ── -->
-  <div id="briefing-brief" class="briefing-panel active">
+  <div id="briefing-brief" class="briefing-panel">
     <div class="brief-search">
       <input type="text" id="brief-fno" placeholder="JX801" oninput="_briefOnInput(this.value);_syncFltNo('brief',this.value)" onkeydown="if(event.key==='Enter'){event.preventDefault();_briefForceQuery()}">
       <button class="brief-search-btn" onclick="_briefForceQuery()">查詢 Query</button>
@@ -450,7 +433,7 @@ export function getSpaHtmlBody(): string {
   </div>
 
   <!-- ── ⛅ 航路氣象 / D-ATIS panel ── -->
-  <div id="briefing-datis" class="briefing-panel">
+  <div id="briefing-datis" class="briefing-panel active">
     <div class="wx-fixed-header">
       <div class="wx-routes">
         <button class="wx-refresh-all-btn" onclick="wxRefreshAll()" id="wx-refresh-all-btn" title="Refresh All METAR / TAF / ATIS">&#x21ba; Refresh All</button>
@@ -1091,10 +1074,10 @@ export function getSpaHtmlBody(): string {
 
 <!-- ══ Tab Bar ═══════════════════════════════════════════════════════ -->
 <div class="tab-bar">
-  <button class="tab-btn tab-active" id="tabBtn-sync" onclick="switchTab('sync',this)">
+  <button class="tab-btn" id="tabBtn-sync" onclick="switchTab('sync',this)">
     <span class="tab-btn-icon">✈️</span>Roster Sync
   </button>
-  <button class="tab-btn" id="tabBtn-briefing" onclick="switchTab('briefing',this)">
+  <button class="tab-btn tab-active" id="tabBtn-briefing" onclick="switchTab('briefing',this)">
     <span class="tab-btn-icon">💼</span>Operation
   </button>
   <button class="tab-btn" id="tabBtn-fr24" onclick="switchTab('fr24',this)">
@@ -1117,7 +1100,7 @@ export function getSpaHtmlBody(): string {
       <button class="tab-util-btn tab-install-btn" id="tab-install-btn" onclick="showInstallGuide()" style="display:none">
         <span>📲</span>安裝
       </button>
-      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V6.149</span>
+      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V6.150</span>
     </div>
   </div>
 </div>
@@ -1147,15 +1130,15 @@ export function getSpaHtmlBody(): string {
       <div style="margin-bottom:4px">📱 建議使用 <b>iPad 橫向</b>操作以獲得最佳體驗</div>
       <div style="color:var(--muted)">Best experience on iPad in landscape mode</div>
     </div>
-    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V6.149</div>
+    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V6.150</div>
+    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
+      <div>因通過 Google 認證，拿掉「未經驗證的應用程式」提示；預設頁面改為 Operation/WX；標題加 JX</div>
+      <div>Passed Google OAuth verification; removed unverified app warning; default tab changed to Operation/WX; added JX to title</div>
+    </div>
+    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V6.149</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
       <div>隱私政策頁面依 Google 審核要求重寫，新增五大段落並加入 Google API Limited Use 聲明</div>
       <div>Rewrote privacy policy per Google review requirements with 5 required sections and Google API Limited Use disclosure</div>
-    </div>
-    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V6.148</div>
-    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
-      <div>Dep Date/Time 改為可編輯並分行顯示；Notes 自動隨行數增高</div>
-      <div>Dep Date/Time now editable with two-line display; Notes auto-grow with content</div>
     </div>
     <div style="font-size:.68em;color:var(--muted);margin-top:12px;margin-bottom:10px;display:flex;gap:16px;justify-content:center">
       <a href="/privacy" onclick="openLegal('/privacy');return false" style="color:var(--muted);text-decoration:underline">Privacy Policy 隱私權政策</a>
