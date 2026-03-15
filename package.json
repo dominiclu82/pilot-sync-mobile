@@ -7,7 +7,8 @@
     "start": "tsx src/server.ts",
     "build": "npx playwright install chromium",
     "auth": "tsx src/auth.ts",
-    "dev": "tsx watch src/server.ts"
+    "dev": "tsx watch src/server.ts",
+    "test": "tsx test/smoke.ts"
   },
   "dependencies": {
     "cors": "^2.8.5",
