@@ -198,8 +198,8 @@ function _briefLookup(num, force) {
     return;
   }
 
-  // 自動搜尋：今天 → 明天 → 昨天
-  var tryDates = [0, 1, -1];
+  // 只查詢選定的日期
+  var tryDates = [_briefDateOffset];
   var idx = 0;
   var tryNext = function() {
     if (idx >= tryDates.length) {
@@ -547,4 +547,55 @@ function _briefRestore() {
       if (el.tagName === 'TEXTAREA') { el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; }
     });
   } catch(e) {}
+}
+
+/* ── 日期切換 Today / Tomorrow ── */
+var _briefDateOffset = 0; // 0=today, 1=tomorrow
+function _briefSetDate(which) {
+  _briefDateOffset = (which === 'tomorrow') ? 1 : 0;
+  var btnT = document.getElementById('brief-date-today');
+  var btnM = document.getElementById('brief-date-tmr');
+  if (btnT && btnM) {
+    btnT.style.background = _briefDateOffset === 0 ? 'var(--accent)' : '#2d3748';
+    btnT.style.color = _briefDateOffset === 0 ? '#fff' : '#e2e8f0';
+    btnM.style.background = _briefDateOffset === 1 ? 'var(--accent)' : '#2d3748';
+    btnM.style.color = _briefDateOffset === 1 ? '#fff' : '#e2e8f0';
+  }
+  // 切換日期後自動重新查詢
+  var inp = document.getElementById('brief-fno');
+  if (inp && inp.value.trim()) {
+    briefClearInfo();
+    _briefFidsCache = null;
+    _briefForceQuery();
+  }
+}
+function _briefGetDate() {
+  var d = new Date();
+  d.setDate(d.getDate() + _briefDateOffset);
+  var y = d.getFullYear();
+  var m = String(d.getMonth() + 1).padStart(2, '0');
+  var day = String(d.getDate()).padStart(2, '0');
+  return y + '-' + m + '-' + day;
+}
+
+/* ── Turbli 亂流預報 ── */
+function openTurbli(autoFill) {
+  if (!autoFill) { window.open('https://turbli.com/', '_blank'); return; }
+  var orig = (document.getElementById('brief-origin') || {}).value || '';
+  var dest = (document.getElementById('brief-dest') || {}).value || '';
+  var dt = _briefGetDate();
+  var fltEl = document.getElementById('brief-fno');
+  var flt = (fltEl ? fltEl.value : '').trim().toUpperCase();
+  var fn = flt.replace(/([A-Z]{2})(\d+)/, '$1-$2');
+  if (orig && dest && fn) {
+    window.open('https://turbli.com/' + orig + '/' + dest + '/' + dt + '/' + fn + '/', '_blank');
+  } else {
+    var missing = [];
+    if (!orig) missing.push('Origin');
+    if (!dest) missing.push('Dest');
+    if (!fn) missing.push('Flight');
+    if (confirm('缺少：' + missing.join(', ') + '\n開啟 Turbli 首頁？')) {
+      window.open('https://turbli.com/', '_blank');
+    }
+  }
 }

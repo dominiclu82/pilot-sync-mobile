@@ -191,8 +191,13 @@ export function getSpaHtmlBody(): string {
   <div id="briefing-brief" class="briefing-panel">
     <div class="brief-search">
       <input type="text" id="brief-fno" placeholder="JX801" oninput="_briefOnInput(this.value);_syncFltNo('brief',this.value)" onkeydown="if(event.key==='Enter'){event.preventDefault();_briefForceQuery()}">
+      <div style="display:inline-flex;border:1px solid #4a5568;border-radius:8px;overflow:hidden;margin:0 4px">
+        <button id="brief-date-today" class="brief-date-btn brief-date-active" onclick="_briefSetDate('today')" style="padding:4px 8px;font-size:.75em;border:none;cursor:pointer;background:var(--accent);color:#fff">Today</button>
+        <button id="brief-date-tmr" class="brief-date-btn" onclick="_briefSetDate('tomorrow')" style="padding:4px 8px;font-size:.75em;border:none;cursor:pointer;background:#2d3748;color:#e2e8f0">Tomorrow</button>
+      </div>
       <button class="brief-search-btn" onclick="_briefForceQuery()">查詢 Query</button>
       <span id="brief-flt-status" class="pa-flt-status"></span>
+      <button style="background:#2d3748;color:#e2e8f0;border:1px solid #4a5568;border-radius:8px;padding:4px 10px;font-size:.8em;cursor:pointer" onclick="openTurbli(true)">🌪️ Turbli</button>
       <button class="pa-reset-btn" onclick="briefClearAll()">重設 Reset</button>
     </div>
 
@@ -281,6 +286,7 @@ export function getSpaHtmlBody(): string {
         <a class="tool-link-btn" href="https://www.skyinfo.jp" target="_blank" onclick="return loadTool(event,this)">🇯🇵 日本NOTAM地圖</a>
         <a class="tool-link-btn" href="https://app.cwa.gov.tw/web/obsmap/typhoon.html" target="_blank" onclick="return loadTool(event,this)">🌀 颱風路徑圖</a>
         <a class="tool-link-btn" href="https://gpsjam.org/" target="_blank" onclick="return loadTool(event,this)">🛰️ GPS干擾區域</a>
+        <a class="tool-link-btn" href="https://turbli.com/" target="_blank">🌪️ Turbli 亂流預報</a>
       </div>
       <!-- 內嵌 iframe -->
       <div id="tool-frame-wrap" style="display:none;margin-top:16px">
@@ -1100,7 +1106,7 @@ export function getSpaHtmlBody(): string {
       <button class="tab-util-btn tab-install-btn" id="tab-install-btn" onclick="showInstallGuide()" style="display:none">
         <span>📲</span>安裝
       </button>
-      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V6.150</span>
+      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V6.151</span>
     </div>
   </div>
 </div>
@@ -1130,15 +1136,15 @@ export function getSpaHtmlBody(): string {
       <div style="margin-bottom:4px">📱 建議使用 <b>iPad 橫向</b>操作以獲得最佳體驗</div>
       <div style="color:var(--muted)">Best experience on iPad in landscape mode</div>
     </div>
-    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V6.150</div>
+    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V6.151</div>
+    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
+      <div>Briefing 新增 Today/Tomorrow 日期切換及 Turbli 亂流預報按鈕；Tools 新增 Turbli 連結</div>
+      <div>Added Today/Tomorrow date selector and Turbli turbulence button to Briefing; added Turbli link to Tools</div>
+    </div>
+    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V6.150</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
       <div>因通過 Google 認證，拿掉「未經驗證的應用程式」提示；預設頁面改為 Operation/WX；標題加 JX</div>
       <div>Passed Google OAuth verification; removed unverified app warning; default tab changed to Operation/WX; added JX to title</div>
-    </div>
-    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V6.149</div>
-    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
-      <div>隱私政策頁面依 Google 審核要求重寫，新增五大段落並加入 Google API Limited Use 聲明</div>
-      <div>Rewrote privacy policy per Google review requirements with 5 required sections and Google API Limited Use disclosure</div>
     </div>
     <div style="font-size:.68em;color:var(--muted);margin-top:12px;margin-bottom:10px;display:flex;gap:16px;justify-content:center">
       <a href="/privacy" onclick="openLegal('/privacy');return false" style="color:var(--muted);text-decoration:underline">Privacy Policy 隱私權政策</a>
