@@ -35,6 +35,11 @@ function crewrestCalc() {
   var fm = parseInt(document.getElementById('cr-fm').value) || 0;
   var crew = parseInt(document.getElementById('cr-crew').value) || 4;
   var groups = crew === 3 ? 3 : 2;
+  // 飛行時間變更時清掉下面的 duration 結果
+  document.querySelectorAll('.cr-dur-input').forEach(function(el) { el.value = ''; });
+  document.querySelectorAll('.cr-end-val').forEach(function(el) { el.textContent = '—'; });
+  document.querySelectorAll('.cr-start-val').forEach(function(el, i) { if (i > 0) el.textContent = el.dataset.default || el.textContent; });
+  _crModeDurations = { group: {}, cross: {} };
 
   var totalMin = fh * 60 + fm;
   if (totalMin <= 60) {
@@ -77,13 +82,17 @@ function _crBuildSchedule() {
   var container = document.getElementById('cr-schedule');
   if (!container) return;
 
-  // preserve start / TOD values across rebuild (duration resets on mode change)
+  // preserve start / TOD / duration values across rebuild
   var prevStart = '';
   var prevTod = '';
+  var prevDurations = {};
   var oldStartEl = document.getElementById('cr-start');
   var oldTodEl = document.getElementById('cr-tod');
   if (oldStartEl) prevStart = oldStartEl.value;
   if (oldTodEl) prevTod = oldTodEl.value;
+  container.querySelectorAll('input[id^="cr-d-"]').forEach(function(inp) {
+    if (inp.value) prevDurations[inp.id] = inp.value;
+  });
 
   container.innerHTML = '';
 
@@ -133,6 +142,11 @@ function _crBuildSchedule() {
     }
   }
 
+  // restore preserved duration values
+  Object.keys(prevDurations).forEach(function(id) {
+    var el = document.getElementById(id);
+    if (el) el.value = prevDurations[id];
+  });
   // re-evaluate TOD after rebuild
   _crCalcTod();
   _crRecalcAll();
@@ -346,9 +360,29 @@ function _crRecalcGroup(groupNum, segCount, startMin) {
   }
 }
 
-/* ── 模式切換 ── */
+/* ── 模式切換（保留各模式的 duration 值）── */
+var _crModeDurations = { group: {}, cross: {} };
+var _crPrevMode = 'group';
 function _crModeChange() {
+  // 存下目前模式的 duration 值
+  var container = document.getElementById('cr-schedule');
+  if (container) {
+    var saved = {};
+    container.querySelectorAll('input[id^="cr-d-"]').forEach(function(inp) {
+      if (inp.value) saved[inp.id] = inp.value;
+    });
+    _crModeDurations[_crPrevMode] = saved;
+  }
+  var newMode = _crGetMode();
+  _crPrevMode = newMode;
   _crBuildSchedule();
+  // 還原新模式之前存的 duration 值
+  var prev = _crModeDurations[newMode] || {};
+  Object.keys(prev).forEach(function(id) {
+    var el = document.getElementById(id);
+    if (el) el.value = prev[id];
+  });
+  _crRecalcAll();
 }
 
 /* ── 重置 ── */

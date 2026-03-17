@@ -294,7 +294,26 @@ setTimeout(function() {
 })();
 
 // Auto-init briefing card + subtab reorder (brief is default active subtab on page load)
-setTimeout(function() { briefInit(); subtabReorderInit(); _ctRestore(); _dtRestore(); }, 0);
+setTimeout(function() {
+  briefInit(); subtabReorderInit(); _ctRestore(); _dtRestore();
+  // 頁面載入時還原 PA 溫度換算欄
+  try {
+    var pi = JSON.parse(localStorage.getItem('crewsync_pa_inputs') || '{}');
+    var tcE = document.getElementById('pa-temp-c');
+    var tfE = document.getElementById('pa-temp-f');
+    if (tcE && pi['temp-c']) tcE.value = pi['temp-c'];
+    if (tfE && pi['temp-f']) tfE.value = pi['temp-f'];
+  } catch(e){}
+}, 0);
+
+// 預設頁面：有 token → Operation/WX，沒有 → Roster Sync/Crew Sync
+setTimeout(function() {
+  if (!localStorage.getItem('crewsync_rt')) {
+    var syncBtn = document.getElementById('tabBtn-sync');
+    if (syncBtn) switchTab('sync', syncBtn);
+  }
+  // 有 token 時 HTML 預設就是 tab-briefing (Operation)，不需要切換
+}, 0);
 
 // ── Tab switching ─────────────────────────────────────────────────────────────
 function switchTab(tab, btn) {

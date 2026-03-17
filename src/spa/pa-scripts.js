@@ -913,6 +913,7 @@ function _paFetchDescentWx() {
         _paOnTempInput('c', String(m.temp));
       }
     }
+    _paSaveInputs();
   }).catch(function() {
     if (wxEn) wxEn.value = '';
     if (wxZh) wxZh.value = '';
@@ -989,7 +990,7 @@ function _paRestoreValues() {
   el.querySelectorAll('[data-pa="captain-name-zh"]').forEach(function(inp) {
     inp.addEventListener('input', function() { localStorage.setItem('crewsync_captain_name_zh', inp.value); });
   });
-  // 還原手動 flag 中有值的欄位（flt-hr / flt-min / altitude）
+  // 還原手動 flag 中有值的欄位（flt-hr / flt-min / altitude + descent 天氣）
   try {
     var savedPaInputs = JSON.parse(localStorage.getItem('crewsync_pa_inputs') || '{}');
     ['flt-hr','flt-min','altitude'].forEach(function(attr) {
@@ -997,6 +998,19 @@ function _paRestoreValues() {
         el.querySelectorAll('[data-pa="' + attr + '"]').forEach(function(inp) { inp.value = savedPaInputs[attr]; });
       }
     });
+    // 還原 descent 天氣欄位
+    ['wx-en','wx-zh','temp-c','temp-f'].forEach(function(attr) {
+      if (savedPaInputs[attr]) {
+        el.querySelectorAll('[data-pa="' + attr + '"]').forEach(function(inp) { inp.value = savedPaInputs[attr]; });
+      }
+    });
+    if (savedPaInputs['temp-c']) _paGlobalTempC = savedPaInputs['temp-c'];
+    if (savedPaInputs['temp-f']) _paGlobalTempF = savedPaInputs['temp-f'];
+    // 還原左邊溫度換算欄
+    var tcEl = document.getElementById('pa-temp-c');
+    var tfEl = document.getElementById('pa-temp-f');
+    if (tcEl && _paGlobalTempC) tcEl.value = _paGlobalTempC;
+    if (tfEl && _paGlobalTempF) tfEl.value = _paGlobalTempF;
   } catch(e){}
   if (_paCurrentCat === 'descent') {
     _paSyncTempToContent();
@@ -1004,15 +1018,17 @@ function _paRestoreValues() {
   }
 }
 
-/* ── PA 手動值持久化 ── */
+/* ── PA 手動值持久化（合併而非覆蓋，避免切換 category 時丟失其他 category 的值） ── */
 function _paSaveInputs() {
   try {
     var el = document.getElementById('pa-content');
     if (!el) return;
     var obj = {};
+    try { obj = JSON.parse(localStorage.getItem('crewsync_pa_inputs') || '{}'); } catch(e2){}
     el.querySelectorAll('.pa-input[data-pa]').forEach(function(inp) {
       var attr = inp.getAttribute('data-pa');
       if (attr && inp.value) obj[attr] = inp.value;
+      else if (attr && !inp.value && obj[attr]) { /* 保留舊值，不清掉 */ }
     });
     localStorage.setItem('crewsync_pa_inputs', JSON.stringify(obj));
     localStorage.setItem('crewsync_pa_manual_flags', JSON.stringify(_paManualFlags));
@@ -1119,6 +1135,8 @@ _paScripts.unrulypax = '<div class="pa-lang">English</div>' +
 // ── PA 分類切換 ──────────────────────────────────────────────────────────────
 var _paSkipBriefSync = false;
 function paSwitchCat(cat, btn) {
+  // 切走前先存當前 category 的所有輸入值
+  _paSaveInputs();
   _paCurrentCat = cat;
   document.querySelectorAll('.pa-cat-btn').forEach(function(b) { b.classList.remove('active'); });
   if (btn) btn.classList.add('active');
