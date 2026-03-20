@@ -58,10 +58,10 @@ function showMain() {
   const mo = document.getElementById('sync-month');
   yr.innerHTML = '';
   for (let y = now.getFullYear() - 1; y <= now.getFullYear() + 1; y++) {
-    yr.innerHTML += '<option value="' + y + '"' + (y === now.getFullYear() ? ' selected' : '') + '>' + y + ' 年</option>';
+    yr.innerHTML += '<option value="' + y + '"' + (y === now.getFullYear() ? ' selected' : '') + '>' + y + '</option>';
   }
   mo.innerHTML = '';
-  ['1月','2月','3月','4月','5月','6月','7月','8月','9月','10月','11月','12月'].forEach((m, i) => {
+  ['1月 Jan','2月 Feb','3月 Mar','4月 Apr','5月 May','6月 Jun','7月 Jul','8月 Aug','9月 Sep','10月 Oct','11月 Nov','12月 Dec'].forEach((m, i) => {
     mo.innerHTML += '<option value="' + (i+1) + '"' + (i+1 === now.getMonth()+1 ? ' selected' : '') + '>' + m + '</option>';
   });
   // Pre-fill saved values
@@ -77,14 +77,14 @@ function updateGoogleBadge() {
   const text = document.getElementById('google-badge-text');
   const btn  = document.getElementById('google-auth-btn');
   dot.className  = 'dot ' + (hasToken ? 'dot-ok' : 'dot-no');
-  text.textContent = hasToken ? '✅ 已授權 Google 日曆' : '尚未授權 Google 日曆（首次需要）';
+  text.textContent = hasToken ? '✅ 已授權 Google 日曆 Authorized' : '尚未授權 Google 日曆 Google Calendar not authorized';
   text.style.color = hasToken ? 'var(--success)' : 'var(--muted)';
-  btn.textContent  = hasToken ? '重新授權' : '授權';
+  btn.textContent  = hasToken ? '重新授權 Re-auth' : '授權 Auth';
 }
 
 async function doGoogleAuth() {
   const btn = document.getElementById('google-auth-btn');
-  btn.disabled = true; btn.textContent = '等待中...';
+  btn.disabled = true; btn.textContent = '等待中 Waiting...';
   try {
     const res = await fetch('/oauth/url');
     const { url, error } = await res.json();
@@ -112,7 +112,7 @@ async function doGoogleAuth() {
     document.getElementById('cred-error').textContent = err.message;
     document.getElementById('cred-error').style.display = '';
   } finally {
-    btn.disabled = false; btn.textContent = refreshToken ? '重新授權' : '授權';
+    btn.disabled = false; btn.textContent = refreshToken ? '重新授權 Re-auth' : '授權 Auth';
   }
 }
 
@@ -141,7 +141,7 @@ async function doGoogleAuthFromSettings() {
       }
       window.addEventListener('message', onMsg);
     });
-    msgEl.className = 'alert alert-success'; msgEl.textContent = '✅ 重新授權成功！';
+    msgEl.className = 'alert alert-success'; msgEl.textContent = '✅ 重新授權成功 Re-authorized!';
     updateSettingsPage();
   } catch (err) {
     msgEl.className = 'alert alert-error'; msgEl.textContent = err.message;
@@ -151,7 +151,7 @@ async function doGoogleAuthFromSettings() {
 function updateSettingsPage() {
   const hasToken = !!refreshToken;
   document.getElementById('settings-google-dot').className = 'dot ' + (hasToken ? 'dot-ok' : 'dot-no');
-  document.getElementById('settings-google-text').textContent = hasToken ? '已授權 Google 日曆' : '尚未授權';
+  document.getElementById('settings-google-text').textContent = hasToken ? '已授權 Google 日曆 Authorized' : '尚未授權 Not authorized';
   document.getElementById('settings-google-text').style.color = hasToken ? 'var(--success)' : 'var(--muted)';
 }
 

@@ -30,7 +30,7 @@ export function getSpaHtmlBody(): string {
     <div class="auth-group">
       <div id="google-badge" class="google-badge" style="padding:0">
         <div class="dot dot-no" id="google-dot"></div>
-        <div id="google-badge-text" style="flex:1;color:var(--muted)">尚未授權 Google 日曆（第一次需要）</div>
+        <div id="google-badge-text" style="flex:1;color:var(--muted)">尚未授權 Google 日曆 Google Calendar not authorized</div>
         <button class="btn btn-secondary btn-sm" id="google-auth-btn"
           onclick="doGoogleAuth()" style="width:auto;padding:6px 12px;font-size:.82em">授權</button>
       </div>
@@ -40,15 +40,15 @@ export function getSpaHtmlBody(): string {
     <form id="cred-form" autocomplete="on" onsubmit="submitCredentials(event)">
       <div class="sync-cred-row">
         <div class="field">
-          <label>班表帳號</label>
+          <label>班表帳號 ID</label>
           <input type="text" id="jx-user" name="username"
-            autocomplete="username" inputmode="numeric" placeholder="員工編號" required>
+            autocomplete="username" inputmode="numeric" placeholder="ID" required>
         </div>
         <div class="field">
-          <label>班表密碼</label>
+          <label>班表密碼 Password</label>
           <div class="pw-input-wrap">
             <input type="password" id="jx-pass" name="password"
-              autocomplete="current-password" placeholder="班表登入密碼">
+              autocomplete="current-password" placeholder="Password">
             <button type="button" class="pw-eye-btn" id="pw-eye-btn" onclick="togglePwVisibility()">&#9673;</button>
           </div>
         </div>
@@ -56,24 +56,24 @@ export function getSpaHtmlBody(): string {
       <hr class="sep" style="margin:4px 0">
       <div class="sync-month-row">
         <div>
-          <div style="font-weight:600;font-size:.9em">同步月份</div>
+          <div style="font-weight:600;font-size:.9em">同步月份 Select Month</div>
           <div class="month-row">
             <div class="field">
-              <label>年</label>
+              <label>年 Year</label>
               <select id="sync-year"></select>
             </div>
             <div class="field">
-              <label>月</label>
+              <label>月 Month</label>
               <select id="sync-month"></select>
             </div>
           </div>
         </div>
-        <button type="submit" class="btn btn-primary sync-submit-btn">🚀 開始同步</button>
+        <button type="submit" class="btn btn-primary sync-submit-btn">🚀 開始同步 Start Sync</button>
       </div>
     </form>
     <div style="display:flex;justify-content:center;gap:16px;margin-top:10px">
-      <button class="link-btn" onclick="showSettings()">⚙️ 設定</button>
-      <button class="link-btn" onclick="showPrivacy()">🔒 隱私與安全</button>
+      <button class="link-btn" onclick="showSettings()">⚙️ 設定 Settings</button>
+      <button class="link-btn" onclick="showPrivacy()">🔒 隱私與安全 Privacy & Security</button>
     </div>
   </div>
 </div>
@@ -86,9 +86,9 @@ export function getSpaHtmlBody(): string {
   <div class="card">
     <div style="display:flex;align-items:center;gap:12px">
       <div class="spinner"></div>
-      <div id="sync-status-text" style="font-size:.9em;color:var(--muted)">正在同步...</div>
+      <div id="sync-status-text" style="font-size:.9em;color:var(--muted)">正在同步 Syncing...</div>
     </div>
-    <div id="sync-log" class="log-box">等待開始...</div>
+    <div id="sync-log" class="log-box">等待開始 Waiting...</div>
   </div>
 </div>
 
@@ -102,8 +102,8 @@ export function getSpaHtmlBody(): string {
     <div id="done-stats" class="stats"></div>
     <div id="done-log" class="log-box" style="max-height:25vh"></div>
     <div style="display:flex;gap:10px">
-      <button class="btn btn-secondary" onclick="showMain()" style="flex:1">← 返回</button>
-      <button class="btn btn-secondary" id="copy-log-btn" onclick="copyLog()" style="flex:1">📋 複製紀錄</button>
+      <button class="btn btn-secondary" onclick="showMain()" style="flex:1">← 返回 Back</button>
+      <button class="btn btn-secondary" id="copy-log-btn" onclick="copyLog()" style="flex:1">📋 複製紀錄 Copy Log</button>
     </div>
   </div>
 </div>
@@ -112,19 +112,19 @@ export function getSpaHtmlBody(): string {
 <div id="screen-settings" class="screen">
   <div class="logo">
     <span class="logo-icon">⚙️</span>
-    <div class="logo-title">設定</div>
+    <div class="logo-title">設定 Settings</div>
   </div>
   <div class="card">
-    <div style="font-weight:600;font-size:.9em;color:var(--muted)">Google 日曆授權狀態</div>
+    <div style="font-weight:600;font-size:.9em;color:var(--muted)">Google 日曆授權狀態 Authorization Status</div>
     <div id="settings-google-badge" class="google-badge">
       <div class="dot" id="settings-google-dot"></div>
       <div id="settings-google-text" style="flex:1;color:var(--muted)"></div>
     </div>
-    <button class="btn btn-secondary btn-sm" onclick="doGoogleAuthFromSettings()">🔄 重新授權 Google 日曆</button>
+    <button class="btn btn-secondary btn-sm" onclick="doGoogleAuthFromSettings()">🔄 重新授權 Re-authorize Google Calendar</button>
     <hr class="sep">
     <div id="settings-msg" class="alert" style="display:none"></div>
-    <button class="btn btn-danger btn-sm" onclick="clearSavedData()">🗑️ 清除已儲存的資料</button>
-    <button class="btn btn-secondary" onclick="showMain()">← 返回</button>
+    <button class="btn btn-danger btn-sm" onclick="clearSavedData()">🗑️ 清除已儲存的資料 Clear Saved Data</button>
+    <button class="btn btn-secondary" onclick="showMain()">← 返回 Back</button>
   </div>
 </div>
 
@@ -1108,7 +1108,7 @@ export function getSpaHtmlBody(): string {
       <button class="tab-util-btn tab-install-btn" id="tab-install-btn" onclick="showInstallGuide()" style="display:none">
         <span>📲</span>安裝
       </button>
-      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V6.154</span>
+      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V6.155</span>
     </div>
   </div>
 </div>
@@ -1138,15 +1138,15 @@ export function getSpaHtmlBody(): string {
       <div style="margin-bottom:4px">📱 建議使用 <b>iPad 橫向</b>操作以獲得最佳體驗</div>
       <div style="color:var(--muted)">Best experience on iPad in landscape mode</div>
     </div>
-    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V6.154</div>
+    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V6.155</div>
+    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
+      <div>Roster Sync / 設定頁面全面加入英文雙語標示</div>
+      <div>Added bilingual labels to Roster Sync and Settings pages</div>
+    </div>
+    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V6.154</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
       <div>預設頁面依 token 判斷；PA Descent 天氣及溫度換算保存還原；Rest Calc 切換模式保留計算結果</div>
       <div>Default tab based on token; PA descent weather persisted; Rest Calc preserves results on mode switch</div>
-    </div>
-    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V6.153</div>
-    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
-      <div>Crew Sync 頁面內容上下置中</div>
-      <div>Centered Crew Sync page content vertically</div>
     </div>
     <div style="font-size:.68em;color:var(--muted);margin-top:12px;margin-bottom:10px;display:flex;gap:16px;justify-content:center">
       <a href="/privacy" onclick="openLegal('/privacy');return false" style="color:var(--muted);text-decoration:underline">Privacy Policy 隱私權政策</a>
