@@ -13,12 +13,12 @@ document.addEventListener('visibilitychange', function() {
 // ── Font Scale ───────────────────────────────────────────────────────────────
 var _fontScale = (function(){
   try { var s = parseInt(localStorage.getItem('crewsync_font_scale'));
-  return (s >= -2 && s <= 3) ? s : 0; } catch(e){} return 0;
+  return (s >= -2 && s <= 17) ? s : 0; } catch(e){} return 0;
 })();
 (function(){ if(_fontScale !== 0) document.documentElement.style.fontSize = (100 + _fontScale * 8) + '%'; })();
 
 function adjustFontSize(dir) {
-  _fontScale = Math.max(-2, Math.min(7, _fontScale + dir));
+  _fontScale = Math.max(-2, Math.min(17, _fontScale + dir));
   document.documentElement.style.fontSize = (100 + _fontScale * 8) + '%';
   try { localStorage.setItem('crewsync_font_scale', String(_fontScale)); } catch(e){}
 }
