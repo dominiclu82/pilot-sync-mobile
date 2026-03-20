@@ -18,7 +18,7 @@ var _fontScale = (function(){
 (function(){ if(_fontScale !== 0) document.documentElement.style.fontSize = (100 + _fontScale * 8) + '%'; })();
 
 function adjustFontSize(dir) {
-  _fontScale = Math.max(-2, Math.min(3, _fontScale + dir));
+  _fontScale = Math.max(-2, Math.min(7, _fontScale + dir));
   document.documentElement.style.fontSize = (100 + _fontScale * 8) + '%';
   try { localStorage.setItem('crewsync_font_scale', String(_fontScale)); } catch(e){}
 }
