@@ -444,7 +444,7 @@ function _rgShowDay(dateKey) {
   detailEl.innerHTML = html;
   detailEl.style.display = 'block';
   _rgRenderPairingTab();
-  detailEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  detailEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 
 function _rgSwitchDetailTab(tab) {
