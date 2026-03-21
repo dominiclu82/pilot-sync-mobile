@@ -429,7 +429,7 @@ div.brief-auto-val[contenteditable]{outline:none;white-space:pre-wrap;cursor:tex
   .dt-ref-table th,.dt-ref-table td{padding:10px 14px}
 }
 @media(min-width:700px){
-  .roster-subtabs{justify-content:space-evenly;gap:0}
+  .roster-subtabs{justify-content:space-evenly;gap:0;overflow-x:visible}
 }
 @media(min-width:1024px){
   .briefing-subtabs{justify-content:space-evenly;gap:0}
