@@ -922,6 +922,26 @@ async function oauthCallback(req: express.Request, res: express.Response) {
       pkceEntry ? { code: code as string, codeVerifier: pkceEntry.codeVerifier } as any : (code as string)
     );
     const rt = tokens.refresh_token ?? '';
+    // Save user email to database
+    if (_pool && tokens.access_token) {
+      try {
+        client.setCredentials(tokens);
+        const oauth2 = google.oauth2({ version: 'v2', auth: client });
+        const userInfo = await oauth2.userinfo.get();
+        const email = userInfo.data.email || '';
+        const name = userInfo.data.name || '';
+        if (email) {
+          await _pool.query(
+            `INSERT INTO cs_users (email, name) VALUES ($1, $2)
+             ON CONFLICT (email) DO UPDATE SET name = $2, updated_at = NOW()`,
+            [email, name]
+          );
+          console.log(`[DB] User saved: ${email}`);
+        }
+      } catch (dbErr: any) {
+        console.error('[DB] Save user error:', dbErr.message);
+      }
+    }
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
     res.send(`<!DOCTYPE html><html><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
