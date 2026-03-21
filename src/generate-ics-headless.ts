@@ -30,13 +30,41 @@ const parseFullDateTime = (fullDateTimeStr: string): string => {
   return `${dateObj.getFullYear()}.${formattedMonth}.${formattedDay} ${timePart}L`;
 };
 
+export interface CrewMember {
+  workCode: string;
+  position: string;
+  staffId: string;
+  rank: string;
+  name: string;
+}
+
+export interface FlightDetail {
+  flightNo: string;
+  date: string;
+  origin: string;
+  dest: string;
+  depTime: string;
+  arrTime: string;
+  depTimeUtc?: string;
+  arrTimeUtc?: string;
+  position?: string;
+  flightTime?: string;
+  workCode?: string;
+  crew: CrewMember[];
+}
+
+export interface RosterResult {
+  employeeId: string;
+  duties: { duty: string; reportTime: string; endTime: string; flights: FlightDetail[] }[];
+}
+
 export async function generateICSHeadless(
   targetYear: number,
   targetMonth: number,
   jxCredentials: { username: string; password: string },
   icsPath: string,
   onLog?: (msg: string) => void
-): Promise<void> {
+): Promise<RosterResult> {
   const log = (msg: string) => { console.log(msg); onLog?.(msg); };
   const { username, password } = jxCredentials;
 
@@ -165,9 +193,27 @@ export async function generateICSHeadless(
     } catch { /* 非致命 */ }
 
     // ── 抓取班表 ───────────────────────────────────────────
-    interface DutyDetail { duty: string; reportTime: string; endTime: string; }
+    interface DutyDetail { duty: string; reportTime: string; endTime: string; flights: FlightDetail[] }
     const dutyDetails: DutyDetail[] = [];
     const processedDuties = new Set<string>();
+
+    // ── 抓取員工編號 ─────────────────────────────────────────
+    let employeeId = '';
+    try {
+      employeeId = await page.evaluate(() => {
+        const body = document.body.innerText;
+        const m = body.match(/Close Menu\n(\d{5,})/);
+        return m ? m[1] : '';
+      });
+      if (!employeeId) {
+        // fallback: 找頁面上的 7 位數字
+        employeeId = await page.evaluate(() => {
+          const m = document.body.innerText.match(/\b(\d{7})\b/);
+          return m ? m[1] : '';
+        });
+      }
+      if (employeeId) log(`🪪 員工編號: ${employeeId}`);
+    } catch { /* non-fatal */ }
     let i = 0;
     const SKIP = new Set([
       'DO',  'HDO', 'BDO', 'MDO',
@@ -222,6 +268,8 @@ export async function generateICSHeadless(
       const endTime = parseFullDateTime(endTimeStr);
       let finalDutyName = dutyText;
 
+      const flights: FlightDetail[] = [];
+
       if (isFlightDuty) {
         const items = await page.$$('.tripActivityItem');
         const flightNos: string[] = [];
@@ -229,10 +277,27 @@ export async function generateICSHeadless(
 
         for (const item of items) {
           const d = await item.evaluate((el) => ({
-            flightNo: el.querySelector('.RosterAllocationView_flightId__dvh72')?.textContent?.trim() ?? '',
-            dest: el.querySelector('.RosterAllocationView_endLocnId__XVqIa')?.textContent?.trim() ?? '',
+            flightNo: el.querySelector('.flightId')?.textContent?.trim() ?? '',
+            origin: (el.querySelector('.startLocnId') as HTMLElement)?.textContent?.trim() ?? '',
+            dest: (el.querySelector('.endLocnId') as HTMLElement)?.textContent?.trim() ?? '',
+            depTimeLocal: (el.querySelector('.startTimeLocal') as HTMLElement)?.textContent?.trim() ?? '',
+            depTimeUtc: (el.querySelector('.startTimeUTC, .startTimeUtc') as HTMLElement)?.textContent?.trim() ?? '',
+            arrTimeLocal: (el.querySelector('.endTimeLocal') as HTMLElement)?.textContent?.trim() ?? '',
+            arrTimeUtc: (el.querySelector('.endTimeUTC, .endTimeUtc') as HTMLElement)?.textContent?.trim() ?? '',
+            position: (el.querySelector('.position') as HTMLElement)?.textContent?.trim() ?? '',
+            flightTime: (el.querySelector('.flightTime') as HTMLElement)?.textContent?.trim().replace(/^FT\s*/, '') ?? '',
+            workCode: (el.querySelector('.workDuty') as HTMLElement)?.firstChild?.textContent?.trim() ?? '',
           }));
-          if (d.flightNo) flightNos.push(d.flightNo);
+          if (d.flightNo) {
+            flightNos.push(d.flightNo);
+            flights.push({
+              flightNo: d.flightNo, date: '', origin: d.origin, dest: d.dest,
+              depTime: d.depTimeLocal, arrTime: d.arrTimeLocal,
+              depTimeUtc: d.depTimeUtc, arrTimeUtc: d.arrTimeUtc,
+              position: d.position, flightTime: d.flightTime, workCode: d.workCode,
+              crew: []
+            });
+          }
           if (d.dest && d.dest !== 'TPE') outstation = d.dest;
         }
         if (!outstation && flightNos.length) outstation = 'TPE';
@@ -246,9 +311,71 @@ export async function generateICSHeadless(
           i++; continue;
         }
         processedDuties.add(dutyKey);
+
       }
 
-      dutyDetails.push({ duty: finalDutyName, reportTime, endTime });
+      // ── 抓取組員名單（CREW tab）── 航班和訓練都抓
+      try {
+        const crewTab = page.locator('#rosterAllocationView-tab-Crew, a[href*="Crew"].nav-link').first();
+        if (await crewTab.count() > 0) {
+          await crewTab.click();
+          await page.waitForTimeout(1200);
+          const flightHeaders = await page.$$('#rosterAllocationView-tabpane-Crew .accordion-button, #rosterAllocationView-tabpane-Crew [class*="accordion"] > [class*="header"], #rosterAllocationView-tabpane-Crew [class*="card-header"]');
+          const crewData: Record<string, Array<{workCode:string;position:string;staffId:string;rank:string;name:string}>> = {};
+
+          const parseCrewText = `(function() {
+            var pane = document.querySelector('#rosterAllocationView-tabpane-Crew') || document.body;
+            var text = pane.innerText;
+            var result = {};
+            var sections = text.split(/((?:JX\\d+|Training) - [A-Za-z]+\\.\\d+)/);
+            for (var s = 1; s < sections.length; s += 2) {
+              var header = sections[s].trim();
+              var label = header.split(' - ')[0].trim();
+              var tableText = sections[s + 1] || '';
+              var rows = tableText.split('\\n').filter(function(r) { return r.includes('\\t'); });
+              var crew = [];
+              for (var ri = 0; ri < rows.length; ri++) {
+                var c = rows[ri].split('\\t');
+                if (c[0] === 'Work Code' || c[0] === 'Position') continue;
+                if (c.length >= 5) {
+                  crew.push({workCode:c[0],position:c[1],staffId:c[2],rank:c[3],name:c[4]});
+                } else if (c.length >= 4) {
+                  crew.push({workCode:'--',position:c[0],staffId:c[1],rank:c[2],name:c[3]});
+                }
+              }
+              if (crew.length) result[label] = crew;
+            }
+            return result;
+          })()`;
+
+          if (flightHeaders.length === 0) {
+            const data = await page.evaluate(parseCrewText) as Record<string, Array<{workCode:string;position:string;staffId:string;rank:string;name:string}>>;
+            Object.assign(crewData, data);
+          } else {
+            for (const header of flightHeaders) {
+              await header.click();
+              await page.waitForTimeout(600);
+              const data = await page.evaluate(parseCrewText) as Record<string, Array<{workCode:string;position:string;staffId:string;rank:string;name:string}>>;
+              Object.assign(crewData, data);
+            }
+          }
+          // Match crew to flights (for JX flights)
+          for (const f of flights) {
+            if (crewData[f.flightNo]) f.crew = crewData[f.flightNo];
+          }
+          // For training/non-flight duties, store crew in a dummy flight entry
+          if (!isFlightDuty && Object.keys(crewData).length > 0) {
+            for (const [label, crew] of Object.entries(crewData)) {
+              flights.push({ flightNo: label, date: '', origin: '', dest: '', depTime: '', arrTime: '', crew });
+            }
+          }
+          log(`👥 組員名單已擷取（${Object.keys(crewData).length} 個項目）`);
+        }
+      } catch (crewErr: any) {
+        log(`⚠️ 組員名單擷取失敗: ${crewErr.message}`);
+      }
+
+      dutyDetails.push({ duty: finalDutyName, reportTime, endTime, flights });
       log(`✅ [${i}] ${finalDutyName}`);
 
       await page.goBack({ waitUntil: 'domcontentloaded' });
@@ -291,6 +418,7 @@ export async function generateICSHeadless(
     fs.writeFileSync(icsPath, ics, 'utf8');
     log(`✅ ICS 已生成（${dutyDetails.length} 筆）`);
 
+    return { employeeId, duties: dutyDetails };
   } finally {
     await browser.close();
   }

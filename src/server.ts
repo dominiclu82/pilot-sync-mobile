@@ -21,6 +21,7 @@ import { getSpaFr24RadarJs } from './spa/js-fr24-radar.js';
 import { getSpaBriefingCardJs } from './spa/js-briefing-card.js';
 import { getSpaCrewRestJs } from './spa/js-crew-rest.js';
 import { getSpaSubtabReorderJs } from './spa/js-subtab-reorder.js';
+import { getSpaRosterGridJs } from './spa/js-roster-grid.js';
 import FR24Pkg from 'flightradarapi';
 import pg from 'pg';
 
@@ -42,6 +43,7 @@ async function _dbInit() {
       CREATE TABLE IF NOT EXISTS cs_users (
         email TEXT PRIMARY KEY,
         name TEXT,
+        employee_id TEXT,
         rank TEXT CHECK (rank IN ('CAP','SFO','FO')),
         sharing BOOLEAN DEFAULT false,
         created_at TIMESTAMPTZ DEFAULT NOW(),
@@ -49,13 +51,17 @@ async function _dbInit() {
       );
       CREATE TABLE IF NOT EXISTS cs_rosters (
         id SERIAL PRIMARY KEY,
-        email TEXT NOT NULL REFERENCES cs_users(email) ON DELETE CASCADE,
+        employee_id TEXT NOT NULL,
         month TEXT NOT NULL,
         roster_data JSONB NOT NULL,
         updated_at TIMESTAMPTZ DEFAULT NOW(),
-        UNIQUE(email, month)
+        UNIQUE(employee_id, month)
       );
     `);
+    // Add columns if not exist (for existing tables)
+    await _pool.query(`ALTER TABLE cs_users ADD COLUMN IF NOT EXISTS employee_id TEXT`).catch(() => {});
+    await _pool.query(`ALTER TABLE cs_users ADD COLUMN IF NOT EXISTS picture TEXT`).catch(() => {});
+    await _pool.query(`ALTER TABLE cs_rosters ADD COLUMN IF NOT EXISTS employee_id TEXT`).catch(() => {});
     console.log('✅ Database connected & tables ready');
   } catch (e: any) {
     console.error('❌ Database init error:', e.message);
@@ -91,6 +97,7 @@ interface SyncJob {
   logs: string[];
   result?: SyncResult;
   newRefreshToken?: string;
+  employeeId?: string;
   error?: string;
   startedAt: Date;
   icsPath: string;
@@ -350,6 +357,19 @@ app.get('/api/metar', async (req, res) => {
   try {
     const { ids, hours } = req.query;
     const url = `https://aviationweather.gov/api/data/metar?ids=${ids}&format=raw&hours=${hours || 1}`;
+    const r = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0' } });
+    const text = await r.text();
+    res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+    res.send(text);
+  } catch (e: any) {
+    res.status(502).send('');
+  }
+});
+
+app.get('/api/taf', async (req, res) => {
+  try {
+    const { ids } = req.query;
+    const url = `https://aviationweather.gov/api/data/taf?ids=${ids}&format=raw`;
     const r = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0' } });
     const text = await r.text();
     res.setHeader('Content-Type', 'text/plain; charset=utf-8');
@@ -928,11 +948,12 @@ async function oauthCallback(req: express.Request, res: express.Response) {
         const payload = JSON.parse(Buffer.from(tokens.id_token.split('.')[1], 'base64').toString());
         const email = payload.email || '';
         const name = payload.name || '';
+        const picture = payload.picture || '';
         if (email) {
           await _pool.query(
-            `INSERT INTO cs_users (email, name) VALUES ($1, $2)
-             ON CONFLICT (email) DO UPDATE SET name = $2, updated_at = NOW()`,
-            [email, name]
+            `INSERT INTO cs_users (email, name, picture) VALUES ($1, $2, $3)
+             ON CONFLICT (email) DO UPDATE SET name = $2, picture = $3, updated_at = NOW()`,
+            [email, name, picture]
           );
           console.log(`[DB] User saved: ${email}`);
         }
@@ -975,6 +996,25 @@ app.get('/api/users', async (req, res) => {
   try {
     const r = await _pool.query('SELECT email, name, rank, sharing, created_at, updated_at FROM cs_users ORDER BY created_at DESC');
     res.json({ count: r.rows.length, users: r.rows });
+  } catch (e: any) {
+    res.json({ error: e.message });
+  }
+});
+
+// ── Roster data API ──────────────────────────────────────────────────────────
+app.get('/api/roster-data', async (req, res) => {
+  if (!_pool) return res.json({ error: 'No database' });
+  const { eid, month } = req.query;
+  if (!eid) return res.status(400).json({ error: 'Missing eid' });
+  try {
+    const q = month
+      ? await _pool.query('SELECT month, roster_data, updated_at FROM cs_rosters WHERE employee_id = $1 AND month = $2', [eid, month])
+      : await _pool.query('SELECT month, roster_data, updated_at FROM cs_rosters WHERE employee_id = $1 ORDER BY month DESC LIMIT 3', [eid]);
+    // Get crew pictures from cs_users (match by employee_id)
+    const picQ = await _pool.query('SELECT employee_id, picture, name FROM cs_users WHERE employee_id IS NOT NULL AND picture IS NOT NULL');
+    const picMap: Record<string, { picture: string; name: string }> = {};
+    for (const r of picQ.rows) picMap[r.employee_id] = { picture: r.picture, name: r.name };
+    res.json({ rosters: q.rows, pictures: picMap });
   } catch (e: any) {
     res.json({ error: e.message });
   }
@@ -1054,11 +1094,42 @@ app.post('/sync', async (req, res) => {
 
   (async () => {
     try {
-      await generateICSHeadless(Number(year), Number(month), { username: jxUsername, password: jxPassword }, icsPath, onLog);
+      const rosterResult = await generateICSHeadless(Number(year), Number(month), { username: jxUsername, password: jxPassword }, icsPath, onLog);
       const { result, newRefreshToken } = await syncICS({ refreshToken, calendarId, icsPath, onLog });
       job.result = result;
       if (newRefreshToken) job.newRefreshToken = newRefreshToken;
       job.status = 'done';
+
+      // Save employee ID to job for frontend
+      const eid = rosterResult.employeeId || jxUsername;
+      job.employeeId = eid;
+      if (_pool && eid) {
+        try {
+          const monthKey = `${year}-${String(month).padStart(2, '0')}`;
+          // Link employee_id to user (jxUsername = employee ID = login username)
+          await _pool.query(
+            `UPDATE cs_users SET employee_id = $1, updated_at = NOW()
+             WHERE employee_id IS NULL
+             ORDER BY updated_at DESC LIMIT 1`,
+            [eid]
+          ).catch(() => {});
+          // Also update if already linked
+          await _pool.query(
+            `UPDATE cs_users SET updated_at = NOW() WHERE employee_id = $1`,
+            [eid]
+          ).catch(() => {});
+          // Save roster data
+          await _pool.query(
+            `INSERT INTO cs_rosters (employee_id, month, roster_data, updated_at)
+             VALUES ($1, $2, $3, NOW())
+             ON CONFLICT (employee_id, month) DO UPDATE SET roster_data = $3, updated_at = NOW()`,
+            [eid, monthKey, JSON.stringify(rosterResult.duties)]
+          );
+          onLog(`💾 班表已儲存至資料庫（員工 ${eid}，${monthKey}）`);
+        } catch (dbErr: any) {
+          onLog(`⚠️ 資料庫儲存失敗: ${dbErr.message}`);
+        }
+      }
     } catch (err: any) {
       job.error = err.message;
       job.status = 'error';
@@ -1074,7 +1145,7 @@ app.post('/sync', async (req, res) => {
 app.get('/status/:jobId', (req, res) => {
   const job = jobs.get(req.params.jobId);
   if (!job) { res.status(404).json({ error: '找不到此工作' }); return; }
-  res.json({ status: job.status, logs: job.logs, result: job.result, newRefreshToken: job.newRefreshToken, error: job.error });
+  res.json({ status: job.status, logs: job.logs, result: job.result, newRefreshToken: job.newRefreshToken, employeeId: job.employeeId, error: job.error });
 });
 
 app.listen(Number(PORT), '0.0.0.0', () => {
@@ -1159,6 +1230,7 @@ ${getSpaFr24RadarJs()}
 ${getSpaBriefingCardJs()}
 ${getSpaCrewRestJs()}
 ${getSpaSubtabReorderJs()}
+${getSpaRosterGridJs()}
 </script>${viewScript}
 </body>
 </html>`;

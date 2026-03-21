@@ -231,6 +231,11 @@ function pollStatus() {
           refreshToken = data.newRefreshToken;
           localStorage.setItem('crewsync_rt', refreshToken);
         }
+        if (data.employeeId) {
+          localStorage.setItem('crewsync_eid', data.employeeId);
+          // 同步完成後立刻快取 roster 到 localStorage（離線用）
+          _cacheRosterData(data.employeeId);
+        }
         showDone(data.status === 'done', data.logs, data.result, data.error);
       }
     } catch (err) {
@@ -258,6 +263,23 @@ function showDone(success, logs, result, error) {
 
 function mkStat(n, label) {
   return '<div class="stat-item"><div class="stat-num">' + n + '</div><div class="stat-lbl">' + label + '</div></div>';
+}
+
+function _cacheRosterData(eid) {
+  // 同步的是當前選擇的月份
+  var selMonth = document.getElementById('sel-month');
+  if (!selMonth) return;
+  var monthKey = selMonth.value; // YYYY-MM
+  if (!monthKey) return;
+  fetch('/api/roster-data?eid=' + encodeURIComponent(eid) + '&month=' + monthKey)
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (!data.error && data.rosters && data.rosters.length > 0) {
+        var cacheData = { duties: data.rosters[0].roster_data, pictures: data.pictures || {} };
+        try { localStorage.setItem('crewsync_roster_' + eid + '_' + monthKey, JSON.stringify(cacheData)); } catch(e){}
+      }
+    })
+    .catch(function() {});
 }
 
 // ── Roster sub-tab ───────────────────────────────────────────────────────────
@@ -290,6 +312,7 @@ function switchRosterTab(panel, btn) {
   btn.classList.add('active');
   document.getElementById('roster-' + panel).classList.add('active');
   if (panel === 'cal' && !gcalInited) { gcalInited = true; gcalInit(); }
+  if (panel === 'roster' && !_rgInited) { _rgInited = true; _rgInit(); }
 }
 // Auto-switch to Calendar if user already authorized (setTimeout to wait for calendar JS)
 setTimeout(function() {

@@ -163,16 +163,23 @@ export function getSpaHtmlBody(): string {
 
 <!-- ── Roster panel ── -->
 <div id="roster-roster" class="roster-panel">
-  <div id="roster-roster-coming" style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:300px;color:var(--muted);text-align:center;padding:40px 20px">
-    <div style="font-size:3em;margin-bottom:16px">📋</div>
-    <div style="font-size:1.1em;font-weight:700;color:var(--text);margin-bottom:8px">Roster 月班表</div>
-    <div style="font-size:.85em;margin-bottom:4px">Coming Soon 敬請期待</div>
-    <div style="font-size:.75em;opacity:.6">格狀月班表顯示 + 當班組員名單</div>
-    <div style="font-size:.75em;opacity:.6">Grid roster view + crew list per flight</div>
-    <div style="margin-top:24px"><input type="password" id="roster-dev-pw" placeholder="開發者密碼 Dev Password" style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 12px;color:var(--text);text-align:center;font-size:.85em;width:200px" onkeydown="if(event.key==='Enter')_rosterDevUnlock('roster')"></div>
-  </div>
-  <div id="roster-roster-dev" style="display:none">
-    <div style="padding:16px;text-align:center;color:var(--muted);font-size:.85em">Roster 開發區域 (dev mode)</div>
+  <div>
+    <!-- Roster header -->
+    <div id="rg-header" style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;border-bottom:1px solid var(--dim)">
+      <button onclick="_rgPrevMonth()" style="background:none;border:none;color:var(--muted);font-size:1.2em;cursor:pointer;padding:4px 12px">◀</button>
+      <div style="display:flex;flex-direction:column;align-items:center;gap:4px">
+        <span id="rg-month-title" style="font-weight:700;font-size:1em;color:var(--text)"></span>
+        <div style="display:flex;gap:4px">
+          <button id="rg-view-cal" onclick="_rgSetView('calendar')" style="background:var(--accent);color:#fff;border:none;border-radius:6px;padding:3px 10px;font-size:.72em;font-weight:600;cursor:pointer">Calendar</button>
+          <button id="rg-view-grid" onclick="_rgSetView('grid')" style="background:#2d3748;color:#e2e8f0;border:1px solid #4a5568;border-radius:6px;padding:3px 10px;font-size:.72em;font-weight:600;cursor:pointer">Grid</button>
+        </div>
+      </div>
+      <button onclick="_rgNextMonth()" style="background:none;border:none;color:var(--muted);font-size:1.2em;cursor:pointer;padding:4px 12px">▶</button>
+    </div>
+    <!-- Roster content -->
+    <div id="rg-grid" style="overflow-x:auto;-webkit-overflow-scrolling:touch;padding:0"></div>
+    <!-- Flight detail / crew panel -->
+    <div id="rg-detail" style="display:none;padding:16px"></div>
   </div>
 </div>
 
@@ -1140,7 +1147,7 @@ export function getSpaHtmlBody(): string {
       <button class="tab-util-btn tab-install-btn" id="tab-install-btn" onclick="showInstallGuide()" style="display:none">
         <span>📲</span>安裝
       </button>
-      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V6.161</span>
+      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V6.162</span>
     </div>
   </div>
 </div>
@@ -1170,15 +1177,15 @@ export function getSpaHtmlBody(): string {
       <div style="margin-bottom:4px">📱 建議使用 <b>iPad 橫向</b>操作以獲得最佳體驗</div>
       <div style="color:var(--muted)">Best experience on iPad in landscape mode</div>
     </div>
-    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V6.161</div>
+    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V6.162</div>
+    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
+      <div>Roster 天氣顯示改版：點任一 WX 按鈕同時顯示兩機場 METAR/TAF，全寬並排於航班卡片底部；Calendar View 月曆補齊非當月日期與班務；Roster tab 密碼鎖移除；Roster 班表離線快取</div>
+      <div>Roster WX revamp: tapping either WX button fetches both airports' METAR/TAF, displayed side-by-side at full width; Calendar view now shows prev/next month dates with duties; Roster tab password lock removed; Roster offline cache via localStorage</div>
+    </div>
+    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V6.161</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
       <div>iPad 寬螢幕 Roster Sync subtab 平均分散；OAuth 授權自動記錄使用者；新增使用者查詢端點</div>
       <div>iPad Roster subtabs evenly spaced; OAuth auto-saves user email; added admin user list endpoint</div>
-    </div>
-    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V6.160</div>
-    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
-      <div>Roster Sync subtab 樣式統一為卡片式按鈕，支援左右滑動及長按排序</div>
-      <div>Roster Sync subtabs: card-style buttons with horizontal scroll and drag-to-reorder</div>
     </div>
     <div style="font-size:.68em;color:var(--muted);margin-top:12px;margin-bottom:10px;display:flex;gap:16px;justify-content:center">
       <a href="/privacy" onclick="openLegal('/privacy');return false" style="color:var(--muted);text-decoration:underline">Privacy Policy 隱私權政策</a>
