@@ -382,12 +382,17 @@ app.get('/api/taf', async (req, res) => {
 // ── Service Worker ────────────────────────────────────────────────────────────
 app.get('/sw.js', (_req, res) => {
   res.setHeader('Content-Type', 'application/javascript');
+  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
   res.setHeader('Service-Worker-Allowed', '/');
   res.send(`
-const CACHE = 'crewsync-v164';
+const CACHE = 'crewsync-v165';
 const SHELL = ['/', '/main', '/share'];
 self.addEventListener('install', e => {
-  e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL)));
+  e.waitUntil(
+    caches.open(CACHE).then(c => Promise.all(SHELL.map(url =>
+      fetch(url, {cache:'no-store'}).then(r => c.put(url, r))
+    )))
+  );
   self.skipWaiting();
 });
 self.addEventListener('activate', e => {
@@ -396,34 +401,13 @@ self.addEventListener('activate', e => {
 });
 const _offlinePage = '<html><body style="background:#111;color:#aaa;display:flex;align-items:center;justify-content:center;height:100vh;font-family:sans-serif"><div style="text-align:center"><h2>Offline</h2><p>Please connect to the internet and reload.</p></div></body></html>';
 self.addEventListener('fetch', e => {
-  const url = e.request.url;
-  if (url.includes('/api/fids')) {
-    e.respondWith(fetch(e.request).catch(() => caches.match(e.request).then(r => r || new Response('', {status:503}))));
-    return;
-  }
-  if (url.includes('/api/metar')) {
-    e.respondWith(fetch(e.request).then(r => {
-      const clone = r.clone();
-      caches.open(CACHE).then(c => c.put(e.request, clone));
-      return r;
-    }).catch(() => caches.match(e.request).then(r => r || new Response('', {status:503}))));
-    return;
-  }
   if (e.request.method !== 'GET') return;
-  if (e.request.mode === 'navigate') {
-    e.respondWith(fetch(e.request).then(r => {
+  e.respondWith(
+    fetch(e.request).then(r => {
       caches.open(CACHE).then(c => c.put(e.request, r.clone()));
       return r;
-    }).catch(() => caches.match(e.request).then(r => r || caches.match('/main').then(r2 => r2 || new Response(_offlinePage, {headers:{'Content-Type':'text/html'}})))));
-    return;
-  }
-  e.respondWith(caches.match(e.request).then(cached => {
-    const net = fetch(e.request).then(r => {
-      caches.open(CACHE).then(c => c.put(e.request, r.clone()));
-      return r;
-    });
-    return cached || net;
-  }));
+    }).catch(() => caches.match(e.request).then(r => r || new Response(_offlinePage, {headers:{'Content-Type':'text/html'}})))
+  );
 });
 `);
 });
