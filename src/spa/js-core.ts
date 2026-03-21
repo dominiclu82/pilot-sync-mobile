@@ -262,6 +262,28 @@ function mkStat(n, label) {
 
 // ── Roster sub-tab ───────────────────────────────────────────────────────────
 var gcalInited = false;
+function _rosterDevUnlock(tab) {
+  var pw = document.getElementById(tab === 'friends' ? 'friends-dev-pw' : 'roster-dev-pw').value;
+  if (pw === 'qwertyui') {
+    document.getElementById('roster-' + tab + '-coming').style.display = 'none';
+    document.getElementById('roster-' + tab + '-dev').style.display = 'block';
+    try { localStorage.setItem('crewsync_dev_' + tab, '1'); } catch(e){}
+  } else {
+    alert('密碼錯誤 Wrong password');
+  }
+}
+// Auto-unlock dev panels if previously unlocked
+setTimeout(function() {
+  ['roster','friends'].forEach(function(tab) {
+    if (localStorage.getItem('crewsync_dev_' + tab) === '1') {
+      var coming = document.getElementById('roster-' + tab + '-coming');
+      var dev = document.getElementById('roster-' + tab + '-dev');
+      if (coming) coming.style.display = 'none';
+      if (dev) dev.style.display = 'block';
+    }
+  });
+}, 0);
+
 function switchRosterTab(panel, btn) {
   document.querySelectorAll('.roster-subtab').forEach(b => b.classList.remove('active'));
   document.querySelectorAll('.roster-panel').forEach(p => p.classList.remove('active'));

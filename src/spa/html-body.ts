@@ -13,6 +13,8 @@ export function getSpaHtmlBody(): string {
 <div class="roster-subtabs">
   <button class="roster-subtab active" onclick="switchRosterTab('crew',this)">✈️ Crew Sync</button>
   <button class="roster-subtab" onclick="switchRosterTab('cal',this)">📅 Calendar</button>
+  <button class="roster-subtab" onclick="switchRosterTab('roster',this)">📋 Roster</button>
+  <button class="roster-subtab" onclick="switchRosterTab('friends',this)">👥 Friends</button>
 </div>
 
 <!-- ── Crew Sync panel ── -->
@@ -156,6 +158,36 @@ export function getSpaHtmlBody(): string {
       <div class="gcal-grid" id="gcal-grid"></div>
     </div>
     <div class="gcal-events" id="gcal-events"></div>
+  </div>
+</div>
+
+<!-- ── Roster panel ── -->
+<div id="roster-roster" class="roster-panel">
+  <div id="roster-roster-coming" style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:300px;color:var(--muted);text-align:center;padding:40px 20px">
+    <div style="font-size:3em;margin-bottom:16px">📋</div>
+    <div style="font-size:1.1em;font-weight:700;color:var(--text);margin-bottom:8px">Roster 月班表</div>
+    <div style="font-size:.85em;margin-bottom:4px">Coming Soon 敬請期待</div>
+    <div style="font-size:.75em;opacity:.6">格狀月班表顯示 + 當班組員名單</div>
+    <div style="font-size:.75em;opacity:.6">Grid roster view + crew list per flight</div>
+    <div style="margin-top:24px"><input type="password" id="roster-dev-pw" placeholder="開發者密碼 Dev Password" style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 12px;color:var(--text);text-align:center;font-size:.85em;width:200px" onkeydown="if(event.key==='Enter')_rosterDevUnlock('roster')"></div>
+  </div>
+  <div id="roster-roster-dev" style="display:none">
+    <div style="padding:16px;text-align:center;color:var(--muted);font-size:.85em">Roster 開發區域 (dev mode)</div>
+  </div>
+</div>
+
+<!-- ── Friends panel ── -->
+<div id="roster-friends" class="roster-panel">
+  <div id="roster-friends-coming" style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:300px;color:var(--muted);text-align:center;padding:40px 20px">
+    <div style="font-size:3em;margin-bottom:16px">👥</div>
+    <div style="font-size:1.1em;font-weight:700;color:var(--text);margin-bottom:8px">Friends 班表分享</div>
+    <div style="font-size:.85em;margin-bottom:4px">Coming Soon 敬請期待</div>
+    <div style="font-size:.75em;opacity:.6">分享你的班表，查看同事的排班</div>
+    <div style="font-size:.75em;opacity:.6">Share your roster & view colleagues' schedules</div>
+    <div style="margin-top:24px"><input type="password" id="friends-dev-pw" placeholder="開發者密碼 Dev Password" style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 12px;color:var(--text);text-align:center;font-size:.85em;width:200px" onkeydown="if(event.key==='Enter')_rosterDevUnlock('friends')"></div>
+  </div>
+  <div id="roster-friends-dev" style="display:none">
+    <div style="padding:16px;text-align:center;color:var(--muted);font-size:.85em">Friends 開發區域 (dev mode)</div>
   </div>
 </div>
 
@@ -1108,7 +1140,7 @@ export function getSpaHtmlBody(): string {
       <button class="tab-util-btn tab-install-btn" id="tab-install-btn" onclick="showInstallGuide()" style="display:none">
         <span>📲</span>安裝
       </button>
-      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V6.157</span>
+      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V6.158</span>
     </div>
   </div>
 </div>
@@ -1138,15 +1170,15 @@ export function getSpaHtmlBody(): string {
       <div style="margin-bottom:4px">📱 建議使用 <b>iPad 橫向</b>操作以獲得最佳體驗</div>
       <div style="color:var(--muted)">Best experience on iPad in landscape mode</div>
     </div>
-    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V6.157</div>
+    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V6.158</div>
+    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
+      <div>Roster Sync 新增 Roster / Friends subtab（Coming Soon 預告）</div>
+      <div>Added Roster & Friends subtabs to Roster Sync (Coming Soon preview)</div>
+    </div>
+    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V6.157</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
       <div>字型大小調整擴大至 20 段（最大 236%）</div>
       <div>Extended font size to 20 levels (max 236%)</div>
-    </div>
-    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V6.156</div>
-    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
-      <div>字型大小調整範圍擴大至 10 段（最大 156%）</div>
-      <div>Extended font size adjustment to 10 levels (max 156%)</div>
     </div>
     <div style="font-size:.68em;color:var(--muted);margin-top:12px;margin-bottom:10px;display:flex;gap:16px;justify-content:center">
       <a href="/privacy" onclick="openLegal('/privacy');return false" style="color:var(--muted);text-decoration:underline">Privacy Policy 隱私權政策</a>
