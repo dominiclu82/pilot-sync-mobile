@@ -444,7 +444,12 @@ function _rgShowDay(dateKey) {
   detailEl.innerHTML = html;
   detailEl.style.display = 'block';
   _rgRenderPairingTab();
-  detailEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  // 用 panel 容器的 scrollTop 捲動，避免影響外層 subtab
+  var panel = detailEl.closest('.roster-panel');
+  if (panel) {
+    var detailTop = detailEl.offsetTop - panel.offsetTop;
+    panel.scrollTo({ top: detailTop, behavior: 'smooth' });
+  }
 }
 
 function _rgSwitchDetailTab(tab) {
