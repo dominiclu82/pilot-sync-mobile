@@ -22,12 +22,46 @@ import { getSpaBriefingCardJs } from './spa/js-briefing-card.js';
 import { getSpaCrewRestJs } from './spa/js-crew-rest.js';
 import { getSpaSubtabReorderJs } from './spa/js-subtab-reorder.js';
 import FR24Pkg from 'flightradarapi';
+import pg from 'pg';
 
 
 config({ path: path.join(ROOT, '.env') });
 
 const PORT = process.env.PORT || 3000;
 const BASE_URL = process.env.BASE_URL || `http://localhost:${PORT}`;
+
+// ── Database ─────────────────────────────────────────────────────────────────
+const _pool = process.env.DATABASE_URL
+  ? new pg.Pool({ connectionString: process.env.DATABASE_URL, ssl: process.env.DATABASE_URL.includes('localhost') ? false : { rejectUnauthorized: false } })
+  : null;
+
+async function _dbInit() {
+  if (!_pool) return;
+  try {
+    await _pool.query(`
+      CREATE TABLE IF NOT EXISTS cs_users (
+        email TEXT PRIMARY KEY,
+        name TEXT,
+        rank TEXT CHECK (rank IN ('CAP','SFO','FO')),
+        sharing BOOLEAN DEFAULT false,
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+      );
+      CREATE TABLE IF NOT EXISTS cs_rosters (
+        id SERIAL PRIMARY KEY,
+        email TEXT NOT NULL REFERENCES cs_users(email) ON DELETE CASCADE,
+        month TEXT NOT NULL,
+        roster_data JSONB NOT NULL,
+        updated_at TIMESTAMPTZ DEFAULT NOW(),
+        UNIQUE(email, month)
+      );
+    `);
+    console.log('✅ Database connected & tables ready');
+  } catch (e: any) {
+    console.error('❌ Database init error:', e.message);
+  }
+}
+_dbInit();
 
 // Determine redirect URI: env var > BASE_URL-derived > credentials.json
 const _creds = loadCredentials();
@@ -914,6 +948,17 @@ app.get('/debug/screenshot', (_req, res) => {
     if (!files.length) { res.status(404).send('No screenshot yet. Run a sync first.'); return; }
     res.sendFile(path.join(OUTPUT_DIR, files[0].f));
   } catch (err: any) { res.status(500).send(err.message); }
+});
+
+// ── Database test endpoint ────────────────────────────────────────────────────
+app.get('/api/db-test', async (_req, res) => {
+  if (!_pool) return res.json({ ok: false, error: 'No DATABASE_URL' });
+  try {
+    const r = await _pool.query('SELECT NOW() as time, current_database() as db');
+    res.json({ ok: true, time: r.rows[0].time, db: r.rows[0].db });
+  } catch (e: any) {
+    res.json({ ok: false, error: e.message });
+  }
 });
 
 app.get('/api/calendar-events', async (req, res) => {
