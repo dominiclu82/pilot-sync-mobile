@@ -89,6 +89,13 @@ function briefInit() {
   if (_briefLoaded) return;
   _briefLoaded = true;
   _briefRestore();
+  // 還原後等渲染完成再重新計算 textarea 高度
+  setTimeout(function() {
+    _briefNotes.forEach(function(id) {
+      var el = document.getElementById(id);
+      if (el && el.value) { el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; }
+    });
+  }, 50);
   // 還原後同步航班號到 PA
   var _rFno = document.getElementById('brief-fno');
   if (_rFno && _rFno.value) _syncFltNo('brief', _rFno.value);
