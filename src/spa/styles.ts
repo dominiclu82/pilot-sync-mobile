@@ -149,11 +149,17 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
   --text:#1e293b;--muted:#64748b;--dim:#cbd5e1;
   --success:#15803d;--error:#dc2626;--sort:#16a34a
 }
-.roster-subtabs{position:sticky;top:env(safe-area-inset-top,0px);z-index:100;background:var(--bg);display:flex;align-items:center;border-bottom:1.5px solid var(--dim);padding:0 8px;width:100%}
-.roster-subtab{flex:1;padding:10px 12px;font-size:.84em;font-weight:700;background:none;
-  border:none;border-bottom:2.5px solid transparent;color:var(--muted);cursor:pointer;
-  transition:color .2s,border-color .2s;margin-bottom:-1.5px;-webkit-appearance:none;white-space:nowrap;text-align:center}
-.roster-subtab.active{color:var(--accent);border-bottom-color:var(--accent)}
+.roster-subtabs{position:sticky;top:env(safe-area-inset-top,0px);z-index:100;background:var(--bg);display:flex;align-items:center;gap:6px;border-bottom:1.5px solid var(--dim);padding:6px 8px;width:100%;
+  overflow-x:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:none;touch-action:manipulation;scrollbar-width:none}
+.roster-subtabs::-webkit-scrollbar{display:none}
+.roster-subtab{flex-shrink:0;padding:8px 10px;font-size:.84em;font-weight:700;
+  background:linear-gradient(180deg,rgba(255,255,255,.08) 0%,rgba(255,255,255,.02) 100%);
+  border:1px solid rgba(255,255,255,.1);border-bottom:2px solid rgba(0,0,0,.3);
+  border-radius:8px;color:var(--muted);cursor:pointer;
+  box-shadow:0 2px 4px rgba(0,0,0,.3),inset 0 1px 0 rgba(255,255,255,.08);
+  transition:color .2s,transform .1s,box-shadow .1s;-webkit-appearance:none;white-space:nowrap}
+.roster-subtab:active{transform:translateY(1px);box-shadow:0 1px 2px rgba(0,0,0,.3);border-bottom-width:1px}
+.roster-subtab.active{color:var(--accent);background:linear-gradient(180deg,rgba(59,130,246,.15) 0%,rgba(59,130,246,.05) 100%);border-color:rgba(59,130,246,.3);box-shadow:0 2px 6px rgba(59,130,246,.2),inset 0 1px 0 rgba(255,255,255,.1)}
 .roster-panel{display:none}
 .roster-panel.active{display:flex;flex-direction:column;width:100%}
 #roster-crew.active{align-items:center;justify-content:center;flex:1}
@@ -303,7 +309,7 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
 /* ── subtab 拖曳排序 ── */
 .drag-grip{font-size:1em;opacity:.3;margin-right:3px;vertical-align:middle}
 .subtab-dragging{z-index:999;position:relative}
-.subtab-dragging .briefing-subtab{transform:scale(1.15);box-shadow:0 4px 16px rgba(59,130,246,.45);background:var(--card);border-radius:8px;transition:transform .15s}
+.subtab-dragging .briefing-subtab,.subtab-dragging .roster-subtab{transform:scale(1.15);box-shadow:0 4px 16px rgba(59,130,246,.45);background:var(--card);border-radius:8px;transition:transform .15s}
 .subtab-dragging .drag-grip{opacity:.7}
 
 /* ── 📋 提示卡 ── */

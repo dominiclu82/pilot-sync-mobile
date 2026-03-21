@@ -11,10 +11,10 @@ export function getSpaHtmlBody(): string {
 
 <!-- Roster Subtab Bar -->
 <div class="roster-subtabs">
-  <button class="roster-subtab active" onclick="switchRosterTab('crew',this)">✈️ Crew Sync</button>
-  <button class="roster-subtab" onclick="switchRosterTab('cal',this)">📅 Calendar</button>
-  <button class="roster-subtab" onclick="switchRosterTab('roster',this)">📋 Roster</button>
-  <button class="roster-subtab" onclick="switchRosterTab('friends',this)">👥 Friends</button>
+  <div class="subtab-slot"><button class="roster-subtab active" onclick="switchRosterTab('crew',this)"><span class="drag-grip">≡</span>✈️ Crew Sync</button></div>
+  <div class="subtab-slot"><button class="roster-subtab" onclick="switchRosterTab('cal',this)"><span class="drag-grip">≡</span>📅 Calendar</button></div>
+  <div class="subtab-slot"><button class="roster-subtab" onclick="switchRosterTab('roster',this)"><span class="drag-grip">≡</span>📋 Roster</button></div>
+  <div class="subtab-slot"><button class="roster-subtab" onclick="switchRosterTab('friends',this)"><span class="drag-grip">≡</span>👥 Friends</button></div>
 </div>
 
 <!-- ── Crew Sync panel ── -->
@@ -1140,7 +1140,7 @@ export function getSpaHtmlBody(): string {
       <button class="tab-util-btn tab-install-btn" id="tab-install-btn" onclick="showInstallGuide()" style="display:none">
         <span>📲</span>安裝
       </button>
-      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V6.159</span>
+      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V6.160</span>
     </div>
   </div>
 </div>
@@ -1170,15 +1170,15 @@ export function getSpaHtmlBody(): string {
       <div style="margin-bottom:4px">📱 建議使用 <b>iPad 橫向</b>操作以獲得最佳體驗</div>
       <div style="color:var(--muted)">Best experience on iPad in landscape mode</div>
     </div>
-    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V6.159</div>
+    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V6.160</div>
+    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
+      <div>Roster Sync subtab 樣式統一為卡片式按鈕，支援左右滑動及長按排序</div>
+      <div>Roster Sync subtabs: card-style buttons with horizontal scroll and drag-to-reorder</div>
+    </div>
+    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V6.159</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
       <div>連接 PostgreSQL 資料庫，建立使用者與班表資料表（Roster/Friends 功能基礎）</div>
       <div>Connected PostgreSQL database, created users & rosters tables</div>
-    </div>
-    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V6.158</div>
-    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
-      <div>Roster Sync 新增 Roster / Friends subtab（Coming Soon 預告）</div>
-      <div>Added Roster & Friends subtabs to Roster Sync (Coming Soon preview)</div>
     </div>
     <div style="font-size:.68em;color:var(--muted);margin-top:12px;margin-bottom:10px;display:flex;gap:16px;justify-content:center">
       <a href="/privacy" onclick="openLegal('/privacy');return false" style="color:var(--muted);text-decoration:underline">Privacy Policy 隱私權政策</a>

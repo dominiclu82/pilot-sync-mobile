@@ -6,12 +6,12 @@ var _stStartX = 0;
 var _stStartY = 0;
 
 function _stSlotId(slot) {
-  var btn = slot.querySelector('.briefing-subtab');
-  return btn ? btn.id : '';
+  var btn = slot.querySelector('.briefing-subtab, .roster-subtab');
+  return btn ? (btn.id || btn.textContent.trim()) : '';
 }
 
 function _stVisibleSlots() {
-  var bar = document.querySelector('.briefing-subtabs');
+  var bar = _stDragSlot ? _stDragSlot.closest('.briefing-subtabs, .roster-subtabs') : document.querySelector('.briefing-subtabs');
   if (!bar) return [];
   return Array.from(bar.children).filter(function(el) {
     return el.style.display !== 'none' &&
@@ -21,22 +21,27 @@ function _stVisibleSlots() {
 
 /* ── 儲存 / 還原順序 ── */
 function _stSaveOrder() {
-  var bar = document.querySelector('.briefing-subtabs');
+  var bar = _stDragSlot ? _stDragSlot.closest('.briefing-subtabs, .roster-subtabs') : null;
   if (!bar) return;
+  var key = bar.classList.contains('roster-subtabs') ? 'crewsync_roster_subtab_order' : 'crewsync_subtab_order';
   var order = Array.from(bar.children)
     .filter(function(el) { return el.classList.contains('subtab-slot') || el.classList.contains('subtab-wx-wrap'); })
     .map(function(el) { return _stSlotId(el); })
     .filter(Boolean);
-  try { localStorage.setItem('crewsync_subtab_order', JSON.stringify(order)); } catch(e) {}
+  try { localStorage.setItem(key, JSON.stringify(order)); } catch(e) {}
 }
 
 function _stRestoreOrder() {
+  _stRestoreBar('.briefing-subtabs', 'crewsync_subtab_order');
+  _stRestoreBar('.roster-subtabs', 'crewsync_roster_subtab_order');
+}
+function _stRestoreBar(selector, key) {
   try {
-    var s = localStorage.getItem('crewsync_subtab_order');
+    var s = localStorage.getItem(key);
     if (!s) return;
     var order = JSON.parse(s);
     if (!Array.isArray(order) || order.length === 0) return;
-    var bar = document.querySelector('.briefing-subtabs');
+    var bar = document.querySelector(selector);
     if (!bar) return;
     var slotMap = {};
     Array.from(bar.children).forEach(function(el) {
@@ -47,7 +52,6 @@ function _stRestoreOrder() {
     order.forEach(function(id) {
       if (slotMap[id]) { frag.appendChild(slotMap[id]); delete slotMap[id]; }
     });
-    // 新增的 tab（不在儲存順序中）放最後
     Object.keys(slotMap).forEach(function(id) { frag.appendChild(slotMap[id]); });
     bar.appendChild(frag);
   } catch(e) {}
@@ -97,7 +101,7 @@ function _stEnd() {
 
 /* ── Touch 事件 ── */
 function _stTouchStart(e) {
-  var btn = e.target.closest('.briefing-subtab');
+  var btn = e.target.closest('.briefing-subtab, .roster-subtab');
   if (!btn) return;
   var slot = btn.closest('.subtab-slot, .subtab-wx-wrap');
   if (!slot || slot.style.display === 'none') return;
@@ -119,7 +123,7 @@ function _stTouchMove(e) {
   e.preventDefault();
   _stSwapCheck(e.touches[0].clientX);
   // 自動捲動 subtab bar（手指靠近邊緣時）
-  var bar = document.querySelector('.briefing-subtabs');
+  var bar = _stDragSlot ? _stDragSlot.closest('.briefing-subtabs, .roster-subtabs') : null;
   if (bar) {
     var br = bar.getBoundingClientRect();
     var x = e.touches[0].clientX;
@@ -141,7 +145,7 @@ function _stTouchCleanup() {
 /* ── Mouse 事件（桌面測試用）── */
 function _stMouseDown(e) {
   if (e.button !== 0) return;
-  var btn = e.target.closest('.briefing-subtab');
+  var btn = e.target.closest('.briefing-subtab, .roster-subtab');
   if (!btn) return;
   var slot = btn.closest('.subtab-slot, .subtab-wx-wrap');
   if (!slot || slot.style.display === 'none') return;
@@ -184,8 +188,10 @@ function _stPreventClick(e) {
 /* ── 初始化 ── */
 function subtabReorderInit() {
   _stRestoreOrder();
-  var bar = document.querySelector('.briefing-subtabs');
-  if (!bar) return;
-  bar.addEventListener('touchstart', _stTouchStart, { passive: true });
-  bar.addEventListener('mousedown', _stMouseDown);
+  ['.briefing-subtabs', '.roster-subtabs'].forEach(function(sel) {
+    var bar = document.querySelector(sel);
+    if (!bar) return;
+    bar.addEventListener('touchstart', _stTouchStart, { passive: true });
+    bar.addEventListener('mousedown', _stMouseDown);
+  });
 }
