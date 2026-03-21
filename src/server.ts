@@ -330,7 +330,7 @@ app.get('/oauth/url', (_req, res) => {
     const url = client.generateAuthUrl({
       access_type: 'offline',
       prompt: 'select_account consent',
-      scope: ['https://www.googleapis.com/auth/calendar'],
+      scope: ['https://www.googleapis.com/auth/calendar', 'openid', 'email', 'profile'],
       code_challenge: codeChallenge,
       code_challenge_method: 'S256' as any,
       state,
@@ -922,14 +922,12 @@ async function oauthCallback(req: express.Request, res: express.Response) {
       pkceEntry ? { code: code as string, codeVerifier: pkceEntry.codeVerifier } as any : (code as string)
     );
     const rt = tokens.refresh_token ?? '';
-    // Save user email to database
-    if (_pool && tokens.access_token) {
+    // Save user email to database (decode id_token, no extra scope needed)
+    if (_pool && tokens.id_token) {
       try {
-        client.setCredentials(tokens);
-        const oauth2 = google.oauth2({ version: 'v2', auth: client });
-        const userInfo = await oauth2.userinfo.get();
-        const email = userInfo.data.email || '';
-        const name = userInfo.data.name || '';
+        const payload = JSON.parse(Buffer.from(tokens.id_token.split('.')[1], 'base64').toString());
+        const email = payload.email || '';
+        const name = payload.name || '';
         if (email) {
           await _pool.query(
             `INSERT INTO cs_users (email, name) VALUES ($1, $2)
