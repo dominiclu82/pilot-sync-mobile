@@ -429,7 +429,7 @@ div.brief-auto-val[contenteditable]{outline:none;white-space:pre-wrap;cursor:tex
   .dt-ref-table th,.dt-ref-table td{padding:10px 14px}
 }
 @media(min-width:1024px){
-  .briefing-subtabs{justify-content:space-evenly;gap:0}
+  .briefing-subtabs,.roster-subtabs{justify-content:space-evenly;gap:0}
 }
 /* ── Live Radar ── */
 #briefing-live.active{display:flex;position:relative;padding:0;overflow:hidden;clip-path:inset(0)}
