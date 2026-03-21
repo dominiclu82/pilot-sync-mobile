@@ -267,10 +267,11 @@ function mkStat(n, label) {
 
 function _cacheRosterData(eid) {
   // 同步的是當前選擇的月份
-  var selMonth = document.getElementById('sel-month');
-  if (!selMonth) return;
-  var monthKey = selMonth.value; // YYYY-MM
-  if (!monthKey) return;
+  var selYear = document.getElementById('sync-year');
+  var selMonth = document.getElementById('sync-month');
+  if (!selYear || !selMonth) return;
+  var monthKey = selYear.value + '-' + String(selMonth.value).padStart(2, '0');
+  if (!monthKey || monthKey.length < 7) return;
   fetch('/api/roster-data?eid=' + encodeURIComponent(eid) + '&month=' + monthKey)
     .then(function(r) { return r.json(); })
     .then(function(data) {
