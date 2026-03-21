@@ -970,7 +970,18 @@ app.get('/debug/screenshot', (_req, res) => {
   } catch (err: any) { res.status(500).send(err.message); }
 });
 
-// ── Database test endpoint ────────────────────────────────────────────────────
+// ── Database admin endpoints ──────────────────────────────────────────────────
+app.get('/api/users', async (req, res) => {
+  if (req.query.pw !== 'qwertyui') return res.status(403).json({ error: 'Forbidden' });
+  if (!_pool) return res.json({ error: 'No database' });
+  try {
+    const r = await _pool.query('SELECT email, name, rank, sharing, created_at, updated_at FROM cs_users ORDER BY created_at DESC');
+    res.json({ count: r.rows.length, users: r.rows });
+  } catch (e: any) {
+    res.json({ error: e.message });
+  }
+});
+
 app.get('/api/db-test', async (_req, res) => {
   if (!_pool) return res.json({ ok: false, error: 'No DATABASE_URL' });
   try {
