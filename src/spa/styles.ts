@@ -411,7 +411,7 @@ div.brief-auto-val[contenteditable]{outline:none;white-space:pre-wrap;cursor:tex
   #tab-sync.tab-active{display:flex;flex-direction:column;
     height:calc(100dvh - calc(56px + env(safe-area-inset-bottom,0px)));
     min-height:unset;overflow:hidden;padding:0}
-  .roster-subtabs{position:sticky;top:0;z-index:100;flex-shrink:0}
+  .roster-subtabs{position:sticky;top:0;z-index:100;flex-shrink:0;justify-content:space-evenly;gap:0;overflow-x:visible}
   .roster-panel.active{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;min-height:0}
   #roster-cal.active{overflow:hidden}
   .gcal-wrap{flex-direction:row}
@@ -427,9 +427,6 @@ div.brief-auto-val[contenteditable]{outline:none;white-space:pre-wrap;cursor:tex
   /* ── 桌面版表格加大 ── */
   .dt-ref-table{font-size:.95em}
   .dt-ref-table th,.dt-ref-table td{padding:10px 14px}
-}
-@media(min-width:700px){
-  .roster-subtabs{justify-content:space-evenly;gap:0;overflow-x:visible}
 }
 @media(min-width:1024px){
   .briefing-subtabs{justify-content:space-evenly;gap:0}
