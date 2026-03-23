@@ -208,7 +208,10 @@ function _startQueueCountdown(secs) {
     _queueCountdown--;
     if (_queueCountdown < 0) _queueCountdown = 0;
     var logEl = document.getElementById('sync-log');
-    if (logEl && _queueCountdown > 0) logEl.textContent = '預估等待 ' + _queueCountdown + ' 秒，您可以等待或稍後再試';
+    if (logEl) {
+      if (_queueCountdown > 0) logEl.textContent = '預估等待 ' + _queueCountdown + ' 秒，您可以等待或稍後再試';
+      else logEl.textContent = '即將輪到，請稍候...';
+    }
   }, 1000);
 }
 

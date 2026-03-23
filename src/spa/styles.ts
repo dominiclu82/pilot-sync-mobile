@@ -203,7 +203,9 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
   .roster-panel.active{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;min-height:0;overscroll-behavior:none}
   #roster-crew.active{justify-content:flex-start}
   #roster-cal.active{overflow:hidden}
-  .gcal-events{flex:1;min-height:0;max-height:none;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:none}
+  .gcal-wrap{height:100%;overflow:hidden}
+  .gcal-main{flex:3;min-height:0;overflow-y:auto}
+  .gcal-events{flex:2;min-height:0;max-height:none;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:none}
 }
 .gcal-weekdays{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));text-align:center;flex-shrink:0;
   border-bottom:1px solid var(--dim)}
@@ -211,7 +213,7 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
 .gcal-grid{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;min-height:0}
 /* week row */
 .gcal-week-row{flex:1;display:grid;grid-template-columns:repeat(7,minmax(0,1fr));
-  border-bottom:1px solid var(--dim);min-height:130px;align-content:start;overflow:hidden}
+  border-bottom:1px solid var(--dim);min-height:0;align-content:start;overflow:hidden}
 .gcal-day-num{padding:4px 6px;text-align:right;cursor:pointer}
 .gcal-day-num:active{background:var(--surface)}
 .gcal-day-other{cursor:default}
