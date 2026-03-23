@@ -558,15 +558,15 @@ html:has(#tab-briefing.tab-active #briefing-coldtemp.active) #tab-briefing.tab-a
   display:flex;flex-direction:column;
   height:calc(100dvh - calc(56px + env(safe-area-inset-bottom,0px)));
   min-height:unset;overflow:hidden;padding:0}
-#briefing-coldtemp.active{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:none;padding:0}
-.ct-panel{display:flex;gap:12px;align-items:flex-start;padding:8px 12px;min-height:100%}
+#briefing-coldtemp.active{flex:1;overflow:hidden;padding:0}
+.ct-panel{display:flex;gap:12px;align-items:stretch;padding:8px 12px;height:100%;overflow:hidden}
 .ct-form{flex:0 0 30%;min-width:0;margin-bottom:0;padding:8px 10px;
-  display:flex;flex-direction:column;justify-content:flex-start;gap:6px;overflow-y:auto;overscroll-behavior:none}
+  display:flex;flex-direction:column;justify-content:flex-start;gap:6px;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:none}
 .ct-form .ct-inputs{flex-shrink:0;gap:4px;margin-bottom:6px}
 .ct-form .ct-grid{display:grid;grid-template-columns:repeat(2,1fr);grid-template-rows:repeat(3,auto);
   grid-auto-flow:column;gap:4px;margin-bottom:6px}
 .ct-form .ct-calc-btn{flex-shrink:0;padding:8px;font-size:.9em}
-.ct-table-wrap{flex:1;min-width:0;min-height:0;margin-bottom:0;overflow-y:auto;overscroll-behavior:none;padding:0}
+.ct-table-wrap{flex:1;min-width:0;min-height:0;margin-bottom:0;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:none;padding:0 0 60px}
 .ct-table-wrap h3{display:none}
 .ct-table{display:grid;grid-template-columns:auto repeat(6,1fr);grid-auto-rows:minmax(0,1fr);
   height:100%;width:100%;gap:1px;background:var(--dim);min-width:unset}
