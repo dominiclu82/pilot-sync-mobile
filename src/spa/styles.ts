@@ -203,6 +203,7 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
   .roster-panel.active{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;min-height:0;overscroll-behavior:none}
   #roster-crew.active{justify-content:flex-start}
   #roster-cal.active{overflow:hidden}
+  .gcal-events{flex:1;min-height:0;max-height:none;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:none}
 }
 .gcal-weekdays{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));text-align:center;flex-shrink:0;
   border-bottom:1px solid var(--dim)}
