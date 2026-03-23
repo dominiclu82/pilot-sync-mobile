@@ -197,6 +197,24 @@ function submitCredentials(e) {
   startSyncJob(params);
 }
 
+var _queueCountdown = 0;
+var _queueCountdownTimer = null;
+
+function _startQueueCountdown(secs) {
+  _queueCountdown = secs;
+  if (_queueCountdownTimer) clearInterval(_queueCountdownTimer);
+  _queueCountdownTimer = setInterval(function() {
+    _queueCountdown--;
+    if (_queueCountdown < 0) _queueCountdown = 0;
+    var logEl = document.getElementById('sync-log');
+    if (logEl && _queueCountdown > 0) logEl.textContent = '預估等待 ' + _queueCountdown + ' 秒，您可以等待或稍後再試';
+  }, 1000);
+}
+
+function _stopQueueCountdown() {
+  if (_queueCountdownTimer) { clearInterval(_queueCountdownTimer); _queueCountdownTimer = null; }
+}
+
 async function startSyncJob(params) {
   const { year, month, jxUsername, jxPassword, calendarId } = params;
   document.getElementById('sync-log').textContent = '準備中...';
@@ -213,7 +231,7 @@ async function startSyncJob(params) {
     currentJobId = data.jobId;
     if (data.queue > 0) {
       document.getElementById('sync-status-text').textContent = '⏳ 排隊中，前面有 ' + data.queue + ' 人...';
-      document.getElementById('sync-log').textContent = '預估等待 ' + (data.queue * 45) + ' 秒，您可以等待或稍後再試';
+      _startQueueCountdown(data.queue * 60);
     }
     pollStatus();
   } catch (err) {
@@ -230,10 +248,15 @@ function pollStatus() {
       const statusEl = document.getElementById('sync-status-text');
       if (data.status === 'queued' && data.queue > 0) {
         statusEl.textContent = '⏳ 排隊中，前面有 ' + data.queue + ' 人...';
-        logEl.textContent = '預估等待 ' + (data.queue * 45) + ' 秒，您可以等待或稍後再試';
+        // 更新倒數（如果 queue 位置變了就重算）
+        var newEta = data.queue * 60;
+        if (newEta < _queueCountdown - 5 || newEta > _queueCountdown + 5) _startQueueCountdown(newEta);
       } else {
+        _stopQueueCountdown();
         if (data.status === 'running') statusEl.textContent = '正在同步中...';
-        logEl.textContent = data.logs.join('\\n') || '等待中...';
+        // 過濾掉排隊訊息
+        var logs = data.logs.filter(function(l) { return l.indexOf('排隊中') < 0; });
+        logEl.textContent = logs.join('\\n') || '等待中...';
         logEl.scrollTop = logEl.scrollHeight;
       }
       if (data.status === 'done' || data.status === 'error') {

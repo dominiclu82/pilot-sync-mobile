@@ -385,7 +385,7 @@ app.get('/sw.js', (_req, res) => {
   res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
   res.setHeader('Service-Worker-Allowed', '/');
   res.send(`
-const CACHE = 'crewsync-v176';
+const CACHE = 'crewsync-v177';
 const SHELL = ['/', '/main', '/share'];
 self.addEventListener('install', e => {
   e.waitUntil(
@@ -1141,7 +1141,7 @@ app.post('/sync', async (req, res) => {
 
   const queuePos = _syncQueue.length + (_syncRunning ? 1 : 0);
   _syncQueue.push({ jobId, params: { year: Number(year), month: Number(month), jxUsername, jxPassword, refreshToken, calendarId } });
-  job.logs.push(queuePos > 0 ? `⏳ 排隊中，前面有 ${queuePos} 人（預估等待 ${queuePos * 45} 秒）` : '🚀 開始同步...');
+  job.logs.push(queuePos > 0 ? `⏳ 排隊中，前面有 ${queuePos} 人（預估等待 ${queuePos * 60} 秒）` : '🚀 開始同步...');
   _syncNext();
 
   res.json({ jobId, queue: queuePos });

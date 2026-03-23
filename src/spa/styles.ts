@@ -281,7 +281,7 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
 .gcal-sch-nowline{height:2px;background:var(--error);margin:0 8px;border-radius:1px}
 /* events detail panel — mobile: bottom; desktop: right side */
 .gcal-events{flex-shrink:0;border-top:1px solid var(--dim);padding:10px 12px;
-  height:160px;overflow-y:auto}
+  max-height:40vh;overflow-y:auto;overscroll-behavior:none}
 .gcal-ev-header{font-size:.82em;font-weight:700;color:var(--text);padding:0 0 6px}
 .gcal-ev-empty{font-size:.8em;color:var(--muted);padding:8px 0;text-align:center}
 .gcal-ev-item{display:flex;align-items:flex-start;gap:10px;padding:6px 4px;border-radius:8px}
@@ -305,7 +305,7 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
 .subtab-slot{display:flex;justify-content:center;align-items:center}
 .briefing-subtab.active{color:var(--accent);background:linear-gradient(180deg,rgba(59,130,246,.15) 0%,rgba(59,130,246,.05) 100%);border-color:rgba(59,130,246,.3);box-shadow:0 2px 6px rgba(59,130,246,.2),inset 0 1px 0 rgba(255,255,255,.1)}
 .briefing-panel{display:none}
-.briefing-panel.active{display:block;padding:16px 16px 0}
+.briefing-panel.active{display:block;padding:16px 16px 0;overscroll-behavior:none}
 /* ── subtab 拖曳排序 ── */
 .drag-grip{font-size:1em;opacity:.3;margin-right:3px;vertical-align:middle}
 .subtab-dragging{z-index:999;position:relative}
