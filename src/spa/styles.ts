@@ -558,8 +558,8 @@ html:has(#tab-briefing.tab-active #briefing-coldtemp.active) #tab-briefing.tab-a
   display:flex;flex-direction:column;
   height:calc(100dvh - calc(56px + env(safe-area-inset-bottom,0px)));
   min-height:unset;overflow:hidden;padding:0}
-#briefing-coldtemp.active{flex:1;overflow:hidden;padding:0}
-.ct-panel{display:flex;gap:12px;align-items:stretch;padding:8px 12px;height:100%;overflow-y:auto;overscroll-behavior:none}
+#briefing-coldtemp.active{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:none;padding:0}
+.ct-panel{display:flex;gap:12px;align-items:flex-start;padding:8px 12px;min-height:100%}
 .ct-form{flex:0 0 30%;min-width:0;margin-bottom:0;padding:8px 10px;
   display:flex;flex-direction:column;justify-content:flex-start;gap:6px;overflow-y:auto;overscroll-behavior:none}
 .ct-form .ct-inputs{flex-shrink:0;gap:4px;margin-bottom:6px}
