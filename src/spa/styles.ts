@@ -166,7 +166,7 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
 #roster-crew .screen.active{flex:1;justify-content:center;padding-bottom:60px}
 #roster-cal.active{flex:1;min-height:0;overflow:hidden}
 /* ── Calendar ─────────────────────────────────────────────────────── */
-.gcal-wrap{display:flex;flex-direction:column;width:100%;height:100%;padding:0;overflow:hidden}
+.gcal-wrap{display:flex;flex-direction:column;width:100%;height:100%;padding:0;overflow-y:auto;-webkit-overflow-scrolling:touch}
 .gcal-main{display:flex;flex-direction:column;flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:none}
 .gcal-header{display:flex;align-items:center;gap:6px;padding:6px 8px;flex-shrink:0;position:relative}
 .gcal-title{font-size:1em;font-weight:700;color:var(--text);white-space:nowrap;
@@ -207,10 +207,10 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
 .gcal-weekdays{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));text-align:center;flex-shrink:0;
   border-bottom:1px solid var(--dim)}
 .gcal-wk-cell{font-size:.75em;font-weight:600;color:var(--muted);padding:6px 0}
-.gcal-grid{flex:1;display:flex;flex-direction:column;overflow:hidden}
+.gcal-grid{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;min-height:0}
 /* week row */
 .gcal-week-row{flex:1;display:grid;grid-template-columns:repeat(7,minmax(0,1fr));
-  border-bottom:1px solid var(--dim);min-height:0;align-content:start;overflow:hidden}
+  border-bottom:1px solid var(--dim);min-height:130px;align-content:start;overflow:hidden}
 .gcal-day-num{padding:4px 6px;text-align:right;cursor:pointer}
 .gcal-day-num:active{background:var(--surface)}
 .gcal-day-other{cursor:default}
@@ -330,12 +330,11 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
 .brief-auto-val{color:var(--text);font-size:.9em;min-height:2em;display:flex;flex-direction:column;justify-content:center}
 div.brief-auto-val[contenteditable]{outline:none;white-space:pre-wrap;cursor:text}
 .brief-wx-val{color:var(--text);min-height:2.5em;display:flex;align-items:center;justify-content:center}
-.brief-wrap{display:flex;flex-direction:column;flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:none;padding:16px 16px 0}
 .brief-note{width:100%;background:rgba(255,255,255,.06);border:none;border-radius:8px;padding:10px;color:var(--text);font-size:.85em;resize:none;overflow:hidden;margin-bottom:8px;outline:none;font-family:inherit;min-height:3.5em}
 .brief-note::placeholder{color:var(--muted)}
 
 /* ── ⏳ 輪休計算 ── */
-.cr-wrap{max-width:800px;margin:0 auto;display:flex;flex-direction:column;flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:none}
+.cr-wrap{max-width:800px;margin:0 auto;padding-bottom:60px}
 .cr-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px}
 .cr-input-row{display:flex;gap:16px;align-items:flex-end;margin-bottom:12px;flex-wrap:wrap}
 .cr-input-group{display:flex;flex-direction:column;gap:4px}
@@ -419,7 +418,7 @@ div.brief-auto-val[contenteditable]{outline:none;white-space:pre-wrap;cursor:tex
   .gcal-main{flex:3;min-width:0}
   .gcal-events{flex:1;height:auto;border-top:none;border-left:1px solid var(--dim);
     overflow-y:auto;padding:16px 14px;max-height:none}
-  #briefing-datis.active,#briefing-pa.active,#briefing-duty.active,#briefing-crewrest.active,#briefing-brief.active,#briefing-coldtemp.active{display:flex;flex-direction:column;flex:1;min-height:0;overflow:hidden}
+  #briefing-datis.active,#briefing-pa.active,#briefing-duty.active{display:flex;flex-direction:column;flex:1;min-height:0;overflow:hidden}
   #briefing-hf.active{display:flex;flex-direction:column;flex:1;overflow:hidden;padding:0}
   .wx-fixed-header{position:static;flex-shrink:0}
   .wx-split{flex-direction:row;overflow:hidden;flex:1}
@@ -545,7 +544,7 @@ div.brief-auto-val[contenteditable]{outline:none;white-space:pre-wrap;cursor:tex
 #briefing-hf.active{padding:0;display:flex;flex-direction:column;
   height:calc(100dvh - calc(56px + env(safe-area-inset-bottom,0px)) - 40px)}
 #hf-panel-iframe{flex:1;min-height:0}
-.ct-panel{padding:16px;flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:none}
+.ct-panel{padding:16px;overflow-y:auto}
 .ct-form{background:var(--card);border-radius:var(--radius);padding:16px;margin-bottom:16px}
 @media(orientation:landscape) and (min-width:640px){
 html:has(#tab-briefing.tab-active #briefing-coldtemp.active),

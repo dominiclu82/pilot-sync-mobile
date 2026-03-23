@@ -12,7 +12,7 @@ export function getSpaHtmlBody(): string {
 <!-- Roster Subtab Bar -->
 <div class="roster-subtabs">
   <div class="subtab-slot"><button class="roster-subtab active" onclick="switchRosterTab('crew',this)"><span class="drag-grip">≡</span>✈️ Crew Sync</button></div>
-  <div class="subtab-slot"><button class="roster-subtab" onclick="switchRosterTab('cal',this)"><span class="drag-grip">≡</span>📅 Google Cal</button></div>
+  <div class="subtab-slot"><button class="roster-subtab" onclick="switchRosterTab('cal',this)"><span class="drag-grip">≡</span>📅 Google Calendar</button></div>
   <div class="subtab-slot"><button class="roster-subtab" onclick="switchRosterTab('roster',this)"><span class="drag-grip">≡</span>📋 Roster</button></div>
   <div class="subtab-slot"><button class="roster-subtab" onclick="switchRosterTab('friends',this)"><span class="drag-grip">≡</span>👥 Friends</button></div>
 </div>
@@ -230,7 +230,6 @@ export function getSpaHtmlBody(): string {
 
   <!-- ── 📋 提示 panel ── -->
   <div id="briefing-brief" class="briefing-panel">
-    <div class="brief-wrap">
     <div class="brief-search">
       <input type="text" id="brief-fno" placeholder="JX801" oninput="_briefOnInput(this.value);_syncFltNo('brief',this.value)" onkeydown="if(event.key==='Enter'){event.preventDefault();_briefForceQuery()}">
       <div style="display:inline-flex;border:1px solid #4a5568;border-radius:8px;overflow:hidden;margin:0 4px">
@@ -262,7 +261,6 @@ export function getSpaHtmlBody(): string {
       <textarea class="brief-note" id="brief-note1" rows="2" placeholder="亂流時間/其他提醒 (Turbulence/Notes)" oninput="this.style.height='auto';this.style.height=this.scrollHeight+'px'"></textarea>
       <textarea class="brief-note" id="brief-note2" rows="2" placeholder="Tail No./MEL" oninput="this.style.height='auto';this.style.height=this.scrollHeight+'px'"></textarea>
       <textarea class="brief-note" id="brief-note3" rows="2" placeholder="Fuel Required/min. water" oninput="this.style.height='auto';this.style.height=this.scrollHeight+'px'"></textarea>
-    </div>
     </div>
   </div>
 
@@ -1149,7 +1147,7 @@ export function getSpaHtmlBody(): string {
       <button class="tab-util-btn tab-install-btn" id="tab-install-btn" onclick="showInstallGuide()" style="display:none">
         <span>📲</span>安裝
       </button>
-      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V6.172</span>
+      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V6.173</span>
     </div>
   </div>
 </div>
@@ -1179,15 +1177,15 @@ export function getSpaHtmlBody(): string {
       <div style="margin-bottom:4px">📱 建議使用 <b>iPad 橫向</b>操作以獲得最佳體驗</div>
       <div style="color:var(--muted)">Best experience on iPad in landscape mode</div>
     </div>
-    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V6.172</div>
+    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V6.173</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
-      <div>修正 Operation 各 subtab 底部被切掉無法捲動；Google Calendar 月曆可捲動；Calendar 改名 Google Cal</div>
-      <div>Fix Operation subtabs content cut off at bottom; Google Calendar scrollable; renamed Calendar to Google Cal</div>
+      <div>修正 Operation subtab 底部被切掉；Google Calendar 月曆固定週高度可捲動；改名 Google Calendar；Rest Calc 底部間距</div>
+      <div>Fix Operation subtab content cut off; Google Calendar fixed week height with scroll; renamed to Google Calendar; Rest Calc bottom padding</div>
     </div>
-    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V6.171</div>
+    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V6.172</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
-      <div>Notes/Briefing textarea 切換 tab 時自動展開顯示完整內容</div>
-      <div>Notes/Briefing textarea auto-expands on tab switch to show full content</div>
+      <div>修正 Operation 各 subtab 底部被切掉無法捲動；Calendar 改名 Google Cal</div>
+      <div>Fix Operation subtabs content cut off at bottom; renamed Calendar to Google Cal</div>
     </div>
     <div style="font-size:.68em;color:var(--muted);margin-top:12px;margin-bottom:10px;display:flex;gap:16px;justify-content:center">
       <a href="/privacy" onclick="openLegal('/privacy');return false" style="color:var(--muted);text-decoration:underline">Privacy Policy 隱私權政策</a>
