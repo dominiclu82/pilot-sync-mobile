@@ -385,7 +385,7 @@ app.get('/sw.js', (_req, res) => {
   res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
   res.setHeader('Service-Worker-Allowed', '/');
   res.send(`
-const CACHE = 'crewsync-v182';
+const CACHE = 'crewsync-v183';
 const SHELL = ['/', '/main', '/share'];
 self.addEventListener('install', e => {
   e.waitUntil(

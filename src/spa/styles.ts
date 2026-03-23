@@ -417,6 +417,7 @@ div.brief-auto-val[contenteditable]{outline:none;white-space:pre-wrap;cursor:tex
   .roster-subtabs{position:sticky;top:0;z-index:100;flex-shrink:0;justify-content:space-evenly;gap:0;overflow-x:visible}
   .roster-panel.active{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;min-height:0;overscroll-behavior:none}
   #roster-cal.active{overflow:hidden}
+  .gcal-week-row{min-height:100px}
   .gcal-wrap{flex-direction:row}
   .gcal-main{flex:3;min-width:0}
   .gcal-events{flex:1;height:auto;border-top:none;border-left:1px solid var(--dim);
