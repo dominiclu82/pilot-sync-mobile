@@ -1149,7 +1149,7 @@ export function getSpaHtmlBody(): string {
       <button class="tab-util-btn tab-install-btn" id="tab-install-btn" onclick="showInstallGuide()" style="display:none">
         <span>📲</span>安裝
       </button>
-      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V6.175</span>
+      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V6.176</span>
     </div>
   </div>
 </div>
@@ -1179,14 +1179,14 @@ export function getSpaHtmlBody(): string {
       <div style="margin-bottom:4px">📱 建議使用 <b>iPad 橫向</b>操作以獲得最佳體驗</div>
       <div style="color:var(--muted)">Best experience on iPad in landscape mode</div>
     </div>
-    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V6.175</div>
+    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V6.176</div>
+    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
+      <div>修正同步完成後 server 崩潰（排隊機制殘留變數）</div>
+      <div>Fix server crash after sync completion (stale variable in queue function)</div>
+    </div>
+    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V6.175</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
       <div>同步排隊機制（同時一人，顯示排隊人數與預估時間）；Roster 取消 iOS 回彈；Google Calendar 週高度固定可捲動；改名 Google Calendar；Roster 班表不再存資料庫；Roster 加提示語</div>
-      <div>Sync queue (one at a time, shows queue position &amp; ETA); Roster disable iOS bounce; Google Calendar fixed week height with scroll; renamed Google Calendar; roster no longer saved to DB; Roster warning notice</div>
-    </div>
-    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V6.174</div>
-    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
-      <div>Roster 取消 iOS 回彈；Google Calendar 週高度固定可捲動；改名 Google Calendar</div>
       <div>Roster disable iOS overscroll bounce; Google Calendar fixed week height with scroll; renamed to Google Calendar</div>
     </div>
     <div style="font-size:.68em;color:var(--muted);margin-top:12px;margin-bottom:10px;display:flex;gap:16px;justify-content:center">
