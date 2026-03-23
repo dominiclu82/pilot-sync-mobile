@@ -164,7 +164,7 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
 .roster-panel.active{display:flex;flex-direction:column;width:100%}
 #roster-crew.active{align-items:center;justify-content:center;flex:1}
 #roster-crew .screen.active{flex:1;justify-content:center;padding-bottom:60px}
-#roster-cal.active{flex:1;min-height:0;overflow:hidden}
+#roster-cal.active{flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:none}
 /* ── Calendar ─────────────────────────────────────────────────────── */
 .gcal-wrap{display:flex;flex-direction:column;width:100%;height:100%;padding:0;overflow-y:auto;-webkit-overflow-scrolling:touch}
 .gcal-main{display:flex;flex-direction:column;flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:none}

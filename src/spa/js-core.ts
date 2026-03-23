@@ -199,6 +199,7 @@ function submitCredentials(e) {
 
 var _queueCountdown = 0;
 var _queueCountdownTimer = null;
+var _queueLastPos = -1;
 
 function _startQueueCountdown(secs) {
   _queueCountdown = secs;
@@ -248,9 +249,11 @@ function pollStatus() {
       const statusEl = document.getElementById('sync-status-text');
       if (data.status === 'queued' && data.queue > 0) {
         statusEl.textContent = '⏳ 排隊中，前面有 ' + data.queue + ' 人...';
-        // 更新倒數（如果 queue 位置變了就重算）
-        var newEta = data.queue * 60;
-        if (newEta < _queueCountdown - 5 || newEta > _queueCountdown + 5) _startQueueCountdown(newEta);
+        // 只在排隊人數變化時才重算倒數
+        if (data.queue !== _queueLastPos) {
+          _queueLastPos = data.queue;
+          _startQueueCountdown(data.queue * 60);
+        }
       } else {
         _stopQueueCountdown();
         if (data.status === 'running') statusEl.textContent = '正在同步中...';

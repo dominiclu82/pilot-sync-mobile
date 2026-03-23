@@ -181,7 +181,7 @@ export function getSpaHtmlBody(): string {
     <!-- Roster content -->
     <div id="rg-grid" style="overflow-x:auto;-webkit-overflow-scrolling:touch;padding:0"></div>
     <!-- Flight detail / crew panel -->
-    <div id="rg-detail" style="display:none;padding:16px"></div>
+    <div id="rg-detail" style="display:none;padding:16px 16px 60px"></div>
   </div>
 </div>
 
@@ -1149,7 +1149,7 @@ export function getSpaHtmlBody(): string {
       <button class="tab-util-btn tab-install-btn" id="tab-install-btn" onclick="showInstallGuide()" style="display:none">
         <span>📲</span>安裝
       </button>
-      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V6.177</span>
+      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V6.178</span>
     </div>
   </div>
 </div>
@@ -1179,15 +1179,15 @@ export function getSpaHtmlBody(): string {
       <div style="margin-bottom:4px">📱 建議使用 <b>iPad 橫向</b>操作以獲得最佳體驗</div>
       <div style="color:var(--muted)">Best experience on iPad in landscape mode</div>
     </div>
-    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V6.177</div>
+    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V6.178</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
-      <div>同步排隊倒數即時遞減；開始同步後清除排隊訊息；預估時間改為 60 秒/人；手機 Google Calendar 事件面板可捲動；所有分頁取消 iOS 視窗回彈</div>
-      <div>Sync queue countdown updates every second; clear queue msg on running; ETA 60s/person; mobile Google Calendar events scrollable; disable iOS overscroll bounce on all panels</div>
+      <div>修正排隊倒數重複跳回；修正手機 Google Calendar 事件面板被切掉</div>
+      <div>Fix queue countdown resetting; fix mobile Google Calendar events panel cut off</div>
     </div>
-    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V6.176</div>
+    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V6.177</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
-      <div>修正同步完成後 server 崩潰（排隊機制殘留變數）</div>
-      <div>Fix server crash after sync completion (stale variable in queue function)</div>
+      <div>同步排隊倒數即時遞減；開始同步後清除排隊訊息；預估時間改為 60 秒/人；所有分頁取消 iOS 視窗回彈</div>
+      <div>Sync queue countdown updates every second; clear queue msg on running; ETA 60s/person; disable iOS overscroll bounce on all panels</div>
     </div>
     <div style="font-size:.68em;color:var(--muted);margin-top:12px;margin-bottom:10px;display:flex;gap:16px;justify-content:center">
       <a href="/privacy" onclick="openLegal('/privacy');return false" style="color:var(--muted);text-decoration:underline">Privacy Policy 隱私權政策</a>
