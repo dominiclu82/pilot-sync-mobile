@@ -1149,7 +1149,7 @@ export function getSpaHtmlBody(): string {
       <button class="tab-util-btn tab-install-btn" id="tab-install-btn" onclick="showInstallGuide()" style="display:none">
         <span>📲</span>安裝
       </button>
-      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V6.180</span>
+      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V6.181</span>
     </div>
   </div>
 </div>
@@ -1179,7 +1179,7 @@ export function getSpaHtmlBody(): string {
       <div style="margin-bottom:4px">📱 建議使用 <b>iPad 橫向</b>操作以獲得最佳體驗</div>
       <div style="color:var(--muted)">Best experience on iPad in landscape mode</div>
     </div>
-    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V6.180</div>
+    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V6.181</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
       <div>修正手機月曆週高度過大；手機事件面板佔 40% 可捲動；排隊倒數到 0 顯示「即將輪到」</div>
       <div>Fix mobile calendar week height; mobile events panel 40% scrollable; queue countdown shows "almost there" at 0</div>

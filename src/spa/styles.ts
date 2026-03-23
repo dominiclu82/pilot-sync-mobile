@@ -283,7 +283,7 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
 .gcal-sch-ev-loc{font-size:.75em;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex-shrink:1}
 .gcal-sch-nowline{height:2px;background:var(--error);margin:0 8px;border-radius:1px}
 /* events detail panel — mobile: bottom; desktop: right side */
-.gcal-events{flex-shrink:0;border-top:1px solid var(--dim);padding:10px 12px;
+.gcal-events{flex-shrink:0;border-top:1px solid var(--dim);padding:10px 12px 60px;
   max-height:40vh;overflow-y:auto;overscroll-behavior:none}
 .gcal-ev-header{font-size:.82em;font-weight:700;color:var(--text);padding:0 0 6px}
 .gcal-ev-empty{font-size:.8em;color:var(--muted);padding:8px 0;text-align:center}
