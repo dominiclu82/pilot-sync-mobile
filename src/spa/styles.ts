@@ -167,7 +167,7 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
 #roster-cal.active{flex:1;min-height:0;overflow:hidden}
 /* ── Calendar ─────────────────────────────────────────────────────── */
 .gcal-wrap{display:flex;flex-direction:column;width:100%;height:100%;padding:0;overflow:hidden}
-.gcal-main{display:flex;flex-direction:column;flex:1;min-height:0;overflow:hidden}
+.gcal-main{display:flex;flex-direction:column;flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:none}
 .gcal-header{display:flex;align-items:center;gap:6px;padding:6px 8px;flex-shrink:0;position:relative}
 .gcal-title{font-size:1em;font-weight:700;color:var(--text);white-space:nowrap;
   position:absolute;left:50%;transform:translateX(-50%);pointer-events:none}
@@ -330,11 +330,12 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
 .brief-auto-val{color:var(--text);font-size:.9em;min-height:2em;display:flex;flex-direction:column;justify-content:center}
 div.brief-auto-val[contenteditable]{outline:none;white-space:pre-wrap;cursor:text}
 .brief-wx-val{color:var(--text);min-height:2.5em;display:flex;align-items:center;justify-content:center}
+.brief-wrap{display:flex;flex-direction:column;flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:none;padding:16px 16px 0}
 .brief-note{width:100%;background:rgba(255,255,255,.06);border:none;border-radius:8px;padding:10px;color:var(--text);font-size:.85em;resize:none;overflow:hidden;margin-bottom:8px;outline:none;font-family:inherit;min-height:3.5em}
 .brief-note::placeholder{color:var(--muted)}
 
 /* ── ⏳ 輪休計算 ── */
-.cr-wrap{max-width:800px;margin:0 auto}
+.cr-wrap{max-width:800px;margin:0 auto;display:flex;flex-direction:column;flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:none}
 .cr-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px}
 .cr-input-row{display:flex;gap:16px;align-items:flex-end;margin-bottom:12px;flex-wrap:wrap}
 .cr-input-group{display:flex;flex-direction:column;gap:4px}
@@ -381,7 +382,7 @@ div.brief-auto-val[contenteditable]{outline:none;white-space:pre-wrap;cursor:tex
 .wx-route-btn.active{background:var(--accent);color:#fff;border-color:var(--accent)}
 #briefing-datis.active,#briefing-pa.active,#briefing-duty.active{display:flex!important;flex-direction:column;padding:0!important}
 .wx-fixed-header{position:sticky;top:calc(env(safe-area-inset-top,0px) + 60px);z-index:90;background:var(--bg);flex-shrink:0}
-.wx-split{display:flex;flex-direction:column;flex:1}
+.wx-split{display:flex;flex-direction:column;flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:none}
 .wx-list-pane{border-bottom:1px solid var(--dim)}
 .wx-detail-pane{padding:16px}
 .wx-card{margin:5px 10px 0;border-radius:10px;cursor:pointer;overflow:hidden;-webkit-tap-highlight-color:transparent}
@@ -418,7 +419,7 @@ div.brief-auto-val[contenteditable]{outline:none;white-space:pre-wrap;cursor:tex
   .gcal-main{flex:3;min-width:0}
   .gcal-events{flex:1;height:auto;border-top:none;border-left:1px solid var(--dim);
     overflow-y:auto;padding:16px 14px;max-height:none}
-  #briefing-datis.active,#briefing-pa.active,#briefing-duty.active{display:flex;flex-direction:column;flex:1;min-height:0;overflow:hidden}
+  #briefing-datis.active,#briefing-pa.active,#briefing-duty.active,#briefing-crewrest.active,#briefing-brief.active,#briefing-coldtemp.active{display:flex;flex-direction:column;flex:1;min-height:0;overflow:hidden}
   #briefing-hf.active{display:flex;flex-direction:column;flex:1;overflow:hidden;padding:0}
   .wx-fixed-header{position:static;flex-shrink:0}
   .wx-split{flex-direction:row;overflow:hidden;flex:1}
@@ -544,7 +545,7 @@ div.brief-auto-val[contenteditable]{outline:none;white-space:pre-wrap;cursor:tex
 #briefing-hf.active{padding:0;display:flex;flex-direction:column;
   height:calc(100dvh - calc(56px + env(safe-area-inset-bottom,0px)) - 40px)}
 #hf-panel-iframe{flex:1;min-height:0}
-.ct-panel{padding:16px;overflow-y:auto}
+.ct-panel{padding:16px;flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:none}
 .ct-form{background:var(--card);border-radius:var(--radius);padding:16px;margin-bottom:16px}
 @media(orientation:landscape) and (min-width:640px){
 html:has(#tab-briefing.tab-active #briefing-coldtemp.active),
@@ -798,7 +799,7 @@ input[type=radio]{width:15px;height:15px;aspect-ratio:1;accent-color:var(--accen
 /* ── PA 工具 ─────────────────────────────────────────── */
 .pa-split{display:flex;flex-direction:column;flex:1;min-height:0;overflow:hidden}
 .pa-left{padding:12px 14px 40px;border-bottom:1px solid var(--dim);flex-shrink:0;overflow-y:auto;max-height:45%;overscroll-behavior:none}
-.pa-right{flex:1;display:flex;flex-direction:column;min-height:0;overflow:hidden}
+.pa-right{flex:1;display:flex;flex-direction:column;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:none}
 .pa-section{margin-bottom:20px}
 .pa-section:last-child{margin-bottom:0}
 .pa-section-title{font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:8px}
