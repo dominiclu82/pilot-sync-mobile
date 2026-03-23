@@ -564,16 +564,12 @@ html:has(#tab-briefing.tab-active #briefing-coldtemp.active) #tab-briefing.tab-a
   display:flex;flex-direction:column;justify-content:flex-start;gap:6px;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:none}
 .ct-form .ct-inputs{flex-shrink:0;gap:4px;margin-bottom:6px}
 .ct-form .ct-grid{display:grid;grid-template-columns:repeat(2,1fr);grid-template-rows:repeat(3,auto);
-  grid-auto-flow:column;gap:4px;margin-bottom:6px}
+  grid-auto-flow:column;gap:4px;margin-bottom:6px;flex-shrink:0}
 .ct-form .ct-calc-btn{flex-shrink:0;padding:8px;font-size:.9em}
 .ct-table-wrap{flex:1;min-width:0;min-height:0;margin-bottom:0;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:none;padding:0 0 60px}
 .ct-table-wrap h3{display:none}
-.ct-table{display:grid;grid-template-columns:auto repeat(6,1fr);grid-auto-rows:auto;
-  width:100%;gap:1px;background:var(--dim);min-width:unset}
-.ct-table thead,.ct-table tbody,.ct-table tr{display:contents}
-.ct-table th,.ct-table td{border:none}
-.ct-table-wrap .ct-table th:first-child,.ct-table-wrap .ct-table td:first-child{width:auto}
-.ct-table td{background:var(--card)}
+.ct-table{font-size:.7em;min-width:unset;width:100%}
+.ct-table th,.ct-table td{padding:4px 6px}
 }
 .ct-inputs{display:grid;grid-template-columns:1fr 1fr auto;gap:8px;margin-bottom:12px;align-items:end}
 .ct-input-group label{font-size:.72em;color:var(--muted);font-weight:600;display:block;margin-bottom:3px}
