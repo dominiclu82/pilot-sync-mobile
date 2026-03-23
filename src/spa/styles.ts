@@ -166,7 +166,7 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
 #roster-crew .screen.active{flex:1;justify-content:center;padding-bottom:60px}
 #roster-cal.active{flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:none}
 /* ── Calendar ─────────────────────────────────────────────────────── */
-.gcal-wrap{display:flex;flex-direction:column;width:100%;height:100%;padding:0;overflow-y:auto;-webkit-overflow-scrolling:touch}
+.gcal-wrap{display:flex;flex-direction:column;width:100%;height:100%;padding:0;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:none}
 .gcal-main{display:flex;flex-direction:column;flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:none}
 .gcal-header{display:flex;align-items:center;gap:6px;padding:6px 8px;flex-shrink:0;position:relative}
 .gcal-title{font-size:1em;font-weight:700;color:var(--text);white-space:nowrap;
@@ -210,7 +210,7 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
 .gcal-weekdays{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));text-align:center;flex-shrink:0;
   border-bottom:1px solid var(--dim)}
 .gcal-wk-cell{font-size:.75em;font-weight:600;color:var(--muted);padding:6px 0}
-.gcal-grid{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;min-height:0}
+.gcal-grid{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;min-height:0;overscroll-behavior:none}
 /* week row */
 .gcal-week-row{flex:1;display:grid;grid-template-columns:repeat(7,minmax(0,1fr));
   border-bottom:1px solid var(--dim);min-height:0;align-content:start;overflow:hidden}
@@ -248,7 +248,7 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
 .gcal-wk-alabel{width:36px;flex-shrink:0;display:flex;align-items:center;justify-content:center;
   font-size:.55em;color:var(--muted);padding:2px}
 .gcal-wk-allday-grid{flex:1;display:grid;grid-template-columns:repeat(7,minmax(0,1fr));padding:2px 0}
-.gcal-wk-scroll{flex:1;overflow-y:auto;overflow-x:hidden}
+.gcal-wk-scroll{flex:1;overflow-y:auto;overflow-x:hidden;overscroll-behavior:none}
 .gcal-wk-tg{display:flex;position:relative}
 .gcal-wk-hours{width:36px;flex-shrink:0;position:relative}
 .gcal-wk-hlabel{position:absolute;right:4px;font-size:.55em;color:var(--muted);
@@ -264,7 +264,7 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
 .gcal-wk-ev-time{font-size:.55em;color:rgba(255,255,255,.8)}
 .gcal-wk-now{position:absolute;left:36px;right:0;height:2px;background:var(--error);z-index:2;pointer-events:none}
 /* ── Schedule view ── */
-.gcal-sch-list{overflow-y:auto;flex:1;padding:0 4px}
+.gcal-sch-list{overflow-y:auto;flex:1;padding:0 4px;overscroll-behavior:none}
 .gcal-sch-day{display:flex;gap:12px;padding:10px 8px;border-bottom:1px solid var(--dim)}
 .gcal-sch-today{background:var(--surface);border-radius:8px}
 .gcal-sch-date{flex-shrink:0;width:72px;display:flex;align-items:flex-start;gap:8px}
@@ -410,7 +410,7 @@ div.brief-auto-val[contenteditable]{outline:none;white-space:pre-wrap;cursor:tex
     display:flex;flex-direction:column;
     height:calc(100dvh - calc(56px + env(safe-area-inset-bottom,0px)));
     min-height:unset;overflow:hidden;padding:0}
-  .briefing-panel.active{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;min-height:0}
+  .briefing-panel.active{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;min-height:0;padding-bottom:40px;overscroll-behavior:none}
   #tab-sync.tab-active{display:flex;flex-direction:column;
     height:calc(100dvh - calc(56px + env(safe-area-inset-bottom,0px)));
     min-height:unset;overflow:hidden;padding:0}
@@ -420,13 +420,13 @@ div.brief-auto-val[contenteditable]{outline:none;white-space:pre-wrap;cursor:tex
   .gcal-wrap{flex-direction:row}
   .gcal-main{flex:3;min-width:0}
   .gcal-events{flex:1;height:auto;border-top:none;border-left:1px solid var(--dim);
-    overflow-y:auto;padding:16px 14px;max-height:none}
+    overflow-y:auto;padding:16px 14px;max-height:none;overscroll-behavior:none}
   #briefing-datis.active,#briefing-pa.active,#briefing-duty.active{display:flex;flex-direction:column;flex:1;min-height:0;overflow:hidden}
   #briefing-hf.active{display:flex;flex-direction:column;flex:1;overflow:hidden;padding:0}
   .wx-fixed-header{position:static;flex-shrink:0}
   .wx-split{flex-direction:row;overflow:hidden;flex:1}
-  .wx-list-pane{width:280px;flex-shrink:0;overflow-y:auto;border-right:1px solid var(--dim);border-bottom:none}
-  .wx-detail-pane{flex:1;overflow-y:auto}
+  .wx-list-pane{width:280px;flex-shrink:0;overflow-y:auto;overscroll-behavior:none;border-right:1px solid var(--dim);border-bottom:none}
+  .wx-detail-pane{flex:1;overflow-y:auto;overscroll-behavior:none;padding-bottom:60px}
   /* ── 桌面版表格加大 ── */
   .dt-ref-table{font-size:.95em}
   .dt-ref-table th,.dt-ref-table td{padding:10px 14px}
@@ -547,7 +547,7 @@ div.brief-auto-val[contenteditable]{outline:none;white-space:pre-wrap;cursor:tex
 #briefing-hf.active{padding:0;display:flex;flex-direction:column;
   height:calc(100dvh - calc(56px + env(safe-area-inset-bottom,0px)) - 40px)}
 #hf-panel-iframe{flex:1;min-height:0}
-.ct-panel{padding:16px;overflow-y:auto}
+.ct-panel{padding:16px;overflow-y:auto;overscroll-behavior:none}
 .ct-form{background:var(--card);border-radius:var(--radius);padding:16px;margin-bottom:16px}
 @media(orientation:landscape) and (min-width:640px){
 html:has(#tab-briefing.tab-active #briefing-coldtemp.active),
@@ -557,7 +557,7 @@ html:has(#tab-briefing.tab-active #briefing-coldtemp.active) #tab-briefing.tab-a
   height:calc(100dvh - calc(56px + env(safe-area-inset-bottom,0px)));
   min-height:unset;overflow:hidden;padding:0}
 #briefing-coldtemp.active{flex:1;overflow:hidden;padding:0}
-.ct-panel{display:flex;gap:12px;align-items:stretch;padding:8px 12px;height:100%;overflow:hidden}
+.ct-panel{display:flex;gap:12px;align-items:stretch;padding:8px 12px;height:100%;overflow-y:auto;overscroll-behavior:none}
 .ct-form{flex:0 0 30%;min-width:0;margin-bottom:0;padding:8px 10px;
   display:flex;flex-direction:column;justify-content:space-evenly;overflow:visible}
 .ct-form .ct-inputs{flex-shrink:0;gap:4px;margin-bottom:6px}
@@ -883,8 +883,8 @@ input[type=radio]{width:15px;height:15px;aspect-ratio:1;accent-color:var(--accen
 .pa-input-num{min-width:30px;max-width:50px}
 @media(orientation:landscape) and (min-width:768px){
 .pa-split{flex-direction:row}
-.pa-left{width:380px;flex-shrink:0;border-bottom:none;border-right:1px solid var(--dim);max-height:none;overflow-y:auto}
-.pa-right{flex:1}
+.pa-left{width:380px;flex-shrink:0;border-bottom:none;border-right:1px solid var(--dim);max-height:none;overflow-y:auto;overscroll-behavior:none;padding-bottom:60px}
+.pa-right{flex:1;overflow-y:auto;overscroll-behavior:none;padding-bottom:60px}
 }
 `;
 }
