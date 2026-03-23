@@ -418,6 +418,7 @@ div.brief-auto-val[contenteditable]{outline:none;white-space:pre-wrap;cursor:tex
   .roster-panel.active{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;min-height:0;overscroll-behavior:none}
   #roster-cal.active{overflow:hidden}
   .gcal-week-row{flex:none;height:120px}
+  .gcal-grid{padding-bottom:40px}
   .gcal-wrap{flex-direction:row}
   .gcal-main{flex:3;min-width:0}
   .gcal-events{flex:1;height:auto;border-top:none;border-left:1px solid var(--dim);
@@ -560,7 +561,7 @@ html:has(#tab-briefing.tab-active #briefing-coldtemp.active) #tab-briefing.tab-a
 #briefing-coldtemp.active{flex:1;overflow:hidden;padding:0}
 .ct-panel{display:flex;gap:12px;align-items:stretch;padding:8px 12px;height:100%;overflow-y:auto;overscroll-behavior:none}
 .ct-form{flex:0 0 30%;min-width:0;margin-bottom:0;padding:8px 10px;
-  display:flex;flex-direction:column;justify-content:space-evenly;overflow-y:auto;overscroll-behavior:none}
+  display:flex;flex-direction:column;justify-content:flex-start;gap:6px;overflow-y:auto;overscroll-behavior:none}
 .ct-form .ct-inputs{flex-shrink:0;gap:4px;margin-bottom:6px}
 .ct-form .ct-grid{display:grid;grid-template-columns:repeat(2,1fr);grid-template-rows:repeat(3,auto);
   grid-auto-flow:column;gap:4px;margin-bottom:6px}

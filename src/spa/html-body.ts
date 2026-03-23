@@ -1149,7 +1149,7 @@ export function getSpaHtmlBody(): string {
       <button class="tab-util-btn tab-install-btn" id="tab-install-btn" onclick="showInstallGuide()" style="display:none">
         <span>📲</span>安裝
       </button>
-      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V6.185</span>
+      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V6.186</span>
     </div>
   </div>
 </div>
@@ -1179,7 +1179,7 @@ export function getSpaHtmlBody(): string {
       <div style="margin-bottom:4px">📱 建議使用 <b>iPad 橫向</b>操作以獲得最佳體驗</div>
       <div style="color:var(--muted)">Best experience on iPad in landscape mode</div>
     </div>
-    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V6.185</div>
+    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V6.186</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
       <div>修正 iPad Briefing/PA/WX/Cold Temp 底部被切掉；全面取消所有捲動區域的 iOS 視窗回彈</div>
       <div>Fix iPad Briefing/PA/WX/Cold Temp bottom cut off; disable iOS overscroll bounce on all scrollable areas</div>
