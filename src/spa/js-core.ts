@@ -208,9 +208,13 @@ async function startSyncJob(params) {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ year, month, jxUsername, jxPassword, refreshToken, calendarId }),
     });
-    const { jobId, error } = await res.json();
-    if (error) throw new Error(error);
-    currentJobId = jobId;
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+    currentJobId = data.jobId;
+    if (data.queue > 0) {
+      document.getElementById('sync-status-text').textContent = '⏳ 排隊中，前面有 ' + data.queue + ' 人...';
+      document.getElementById('sync-log').textContent = '預估等待 ' + (data.queue * 45) + ' 秒，您可以等待或稍後再試';
+    }
     pollStatus();
   } catch (err) {
     showDone(false, [], null, err.message);
@@ -223,8 +227,15 @@ function pollStatus() {
     try {
       const data = await fetch('/status/' + currentJobId).then(r => r.json());
       const logEl = document.getElementById('sync-log');
-      logEl.textContent = data.logs.join('\\n') || '等待中...';
-      logEl.scrollTop = logEl.scrollHeight;
+      const statusEl = document.getElementById('sync-status-text');
+      if (data.status === 'queued' && data.queue > 0) {
+        statusEl.textContent = '⏳ 排隊中，前面有 ' + data.queue + ' 人...';
+        logEl.textContent = '預估等待 ' + (data.queue * 45) + ' 秒，您可以等待或稍後再試';
+      } else {
+        if (data.status === 'running') statusEl.textContent = '正在同步中...';
+        logEl.textContent = data.logs.join('\\n') || '等待中...';
+        logEl.scrollTop = logEl.scrollHeight;
+      }
       if (data.status === 'done' || data.status === 'error') {
         clearInterval(pollTimer); pollTimer = null;
         if (data.newRefreshToken) {

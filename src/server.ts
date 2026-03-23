@@ -93,7 +93,7 @@ function _pkceGenerate() {
 // ── Job state ────────────────────────────────────────────────────────────────
 
 interface SyncJob {
-  status: 'running' | 'done' | 'error';
+  status: 'queued' | 'running' | 'done' | 'error';
   logs: string[];
   result?: SyncResult;
   newRefreshToken?: string;
@@ -385,7 +385,7 @@ app.get('/sw.js', (_req, res) => {
   res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
   res.setHeader('Service-Worker-Allowed', '/');
   res.send(`
-const CACHE = 'crewsync-v174';
+const CACHE = 'crewsync-v175';
 const SHELL = ['/', '/main', '/share'];
 self.addEventListener('install', e => {
   e.waitUntil(
@@ -1061,18 +1061,26 @@ app.get('/api/calendar-events', async (req, res) => {
   }
 });
 
-app.post('/sync', async (req, res) => {
-  const { year, month, jxUsername, jxPassword, refreshToken, calendarId } = req.body;
-  if (!year || !month || !jxUsername || !jxPassword || !refreshToken || !calendarId) {
-    res.status(400).json({ error: '缺少必要參數' });
-    return;
-  }
+// ── Sync queue（同時只允許一個 Puppeteer）────────────────────────────────────
+interface QueueEntry {
+  jobId: string;
+  params: { year: number; month: number; jxUsername: string; jxPassword: string; refreshToken: string; calendarId: string };
+}
+const _syncQueue: QueueEntry[] = [];
+let _syncRunning = false;
 
-  if (!fs.existsSync(OUTPUT_DIR)) fs.mkdirSync(OUTPUT_DIR, { recursive: true });
-  const jobId = randomUUID();
+function _syncNext() {
+  if (_syncRunning || _syncQueue.length === 0) return;
+  _syncRunning = true;
+  const entry = _syncQueue.shift()!;
+  const { jobId, params } = entry;
+  const { year, month, jxUsername, jxPassword, refreshToken, calendarId } = params;
+
   const icsPath = path.join(OUTPUT_DIR, `roster-${jobId}.ics`);
-  const job: SyncJob = { status: 'running', logs: [], startedAt: new Date(), icsPath };
-  jobs.set(jobId, job);
+  const job = jobs.get(jobId);
+  if (!job) { _syncRunning = false; _syncNext(); return; }
+  job.status = 'running';
+  job.icsPath = icsPath;
 
   const onLog = (msg: string) => { job.logs.push(msg); };
 
@@ -1102,14 +1110,7 @@ app.post('/sync', async (req, res) => {
             `UPDATE cs_users SET updated_at = NOW() WHERE employee_id = $1`,
             [eid]
           ).catch(() => {});
-          // Save roster data
-          await _pool.query(
-            `INSERT INTO cs_rosters (employee_id, month, roster_data, updated_at)
-             VALUES ($1, $2, $3, NOW())
-             ON CONFLICT (employee_id, month) DO UPDATE SET roster_data = $3, updated_at = NOW()`,
-            [eid, monthKey, JSON.stringify(rosterResult.duties)]
-          );
-          onLog(`💾 班表已儲存至資料庫（員工 ${eid}，${monthKey}）`);
+          // Roster data 不再存 DB，只存前端 localStorage（隱私考量）
         } catch (dbErr: any) {
           onLog(`⚠️ 資料庫儲存失敗: ${dbErr.message}`);
         }
@@ -1120,16 +1121,41 @@ app.post('/sync', async (req, res) => {
       onLog(`❌ 錯誤：${err.message}`);
     } finally {
       try { if (fs.existsSync(icsPath)) fs.unlinkSync(icsPath); } catch {}
+      _syncRunning = false;
+      _syncNext();
     }
   })();
 
   res.json({ jobId });
+}
+
+app.post('/sync', async (req, res) => {
+  const { year, month, jxUsername, jxPassword, refreshToken, calendarId } = req.body;
+  if (!year || !month || !jxUsername || !jxPassword || !refreshToken || !calendarId) {
+    res.status(400).json({ error: '缺少必要參數' });
+    return;
+  }
+
+  if (!fs.existsSync(OUTPUT_DIR)) fs.mkdirSync(OUTPUT_DIR, { recursive: true });
+  const jobId = randomUUID();
+  const job: SyncJob = { status: 'queued' as any, logs: [], startedAt: new Date(), icsPath: '' };
+  jobs.set(jobId, job);
+
+  const queuePos = _syncQueue.length + (_syncRunning ? 1 : 0);
+  _syncQueue.push({ jobId, params: { year: Number(year), month: Number(month), jxUsername, jxPassword, refreshToken, calendarId } });
+  job.logs.push(queuePos > 0 ? `⏳ 排隊中，前面有 ${queuePos} 人（預估等待 ${queuePos * 45} 秒）` : '🚀 開始同步...');
+  _syncNext();
+
+  res.json({ jobId, queue: queuePos });
 });
 
 app.get('/status/:jobId', (req, res) => {
   const job = jobs.get(req.params.jobId);
   if (!job) { res.status(404).json({ error: '找不到此工作' }); return; }
-  res.json({ status: job.status, logs: job.logs, result: job.result, newRefreshToken: job.newRefreshToken, employeeId: job.employeeId, error: job.error });
+  // 計算排隊位置
+  const queuePos = _syncQueue.findIndex(e => e.jobId === req.params.jobId);
+  const ahead = queuePos >= 0 ? queuePos + (_syncRunning ? 1 : 0) : 0;
+  res.json({ status: job.status, logs: job.logs, result: job.result, newRefreshToken: job.newRefreshToken, employeeId: job.employeeId, error: job.error, queue: ahead });
 });
 
 app.listen(Number(PORT), '0.0.0.0', () => {
