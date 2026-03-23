@@ -1149,7 +1149,7 @@ export function getSpaHtmlBody(): string {
       <button class="tab-util-btn tab-install-btn" id="tab-install-btn" onclick="showInstallGuide()" style="display:none">
         <span>📲</span>安裝
       </button>
-      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V6.188</span>
+      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V6.189</span>
     </div>
   </div>
 </div>
@@ -1179,15 +1179,15 @@ export function getSpaHtmlBody(): string {
       <div style="margin-bottom:4px">📱 建議使用 <b>iPad 橫向</b>操作以獲得最佳體驗</div>
       <div style="color:var(--muted)">Best experience on iPad in landscape mode</div>
     </div>
-    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V6.188</div>
+    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V6.189</div>
+    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
+      <div>修正 Cold Temp 左右無法獨立捲動、字型放大時計算按鈕被切掉、右側表格底部被裁切</div>
+      <div>Fix Cold Temp left/right independent scrolling, calc button hidden on enlarged font, and right-side table bottom cutoff</div>
+    </div>
+    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V6.188</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
       <div>修正 iPad Briefing/PA/WX/Cold Temp 底部被切掉；全面取消所有捲動區域的 iOS 視窗回彈</div>
       <div>Fix iPad Briefing/PA/WX/Cold Temp bottom cut off; disable iOS overscroll bounce on all scrollable areas</div>
-    </div>
-    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V6.177</div>
-    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
-      <div>同步排隊倒數即時遞減；開始同步後清除排隊訊息；預估時間改為 60 秒/人；所有分頁取消 iOS 視窗回彈</div>
-      <div>Sync queue countdown updates every second; clear queue msg on running; ETA 60s/person; disable iOS overscroll bounce on all panels</div>
     </div>
     <div style="font-size:.68em;color:var(--muted);margin-top:12px;margin-bottom:10px;display:flex;gap:16px;justify-content:center">
       <a href="/privacy" onclick="openLegal('/privacy');return false" style="color:var(--muted);text-decoration:underline">Privacy Policy 隱私權政策</a>
