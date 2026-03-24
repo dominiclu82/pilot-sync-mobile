@@ -102,6 +102,7 @@ interface SyncJob {
   result?: SyncResult;
   newRefreshToken?: string;
   employeeId?: string;
+  crewName?: string;
   rosterData?: any[];
   error?: string;
   startedAt: Date;
@@ -390,7 +391,7 @@ app.get('/sw.js', (_req, res) => {
   res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
   res.setHeader('Service-Worker-Allowed', '/');
   res.send(`
-const CACHE = 'crewsync-v7003';
+const CACHE = 'crewsync-v7004';
 const SHELL = ['/', '/main', '/share'];
 self.addEventListener('install', e => {
   e.waitUntil(
@@ -1099,11 +1100,22 @@ app.get('/api/roster-friends', async (req, res) => {
       [month]
     );
     // Get user info (name, picture, nickname)
+    // 拿所有有 employee_id 的記錄（不只 sharing=true），合併 picture
     const uq = await _pool.query(
-      `SELECT employee_id, name, picture, nickname, fleet, rank FROM cs_users WHERE sharing = true AND employee_id IS NOT NULL`
+      `SELECT employee_id, name, picture, nickname, fleet, rank, sharing FROM cs_users WHERE employee_id IS NOT NULL ORDER BY picture IS NOT NULL DESC, updated_at DESC`
     );
     const userMap: Record<string, { name: string; picture: string; nickname: string; fleet: string; rank: string }> = {};
-    for (const u of uq.rows) userMap[u.employee_id] = { name: u.name || '', picture: u.picture || '', nickname: u.nickname || '', fleet: u.fleet || '', rank: u.rank || '' };
+    for (const u of uq.rows) {
+      if (!userMap[u.employee_id]) {
+        userMap[u.employee_id] = { name: u.name || '', picture: u.picture || '', nickname: u.nickname || '', fleet: u.fleet || '', rank: u.rank || '' };
+      } else {
+        // 合併：優先有 picture 的記錄
+        if (u.picture && !userMap[u.employee_id].picture) userMap[u.employee_id].picture = u.picture;
+        if (u.nickname && !userMap[u.employee_id].nickname) userMap[u.employee_id].nickname = u.nickname;
+        if (u.fleet && !userMap[u.employee_id].fleet) userMap[u.employee_id].fleet = u.fleet;
+        if (u.rank && !userMap[u.employee_id].rank) userMap[u.employee_id].rank = u.rank;
+      }
+    }
 
     const friends = q.rows.map(r => ({
       eid: r.employee_id,
@@ -1211,6 +1223,7 @@ function _syncNext() {
       // Save employee ID + roster data to job for frontend
       const eid = rosterResult.employeeId || jxUsername;
       job.employeeId = eid;
+      job.crewName = rosterResult.crewName || '';
       job.rosterData = rosterResult.duties;
       if (_pool && eid) {
         try {
@@ -1279,7 +1292,7 @@ app.get('/status/:jobId', (req, res) => {
   // 計算排隊位置
   const queuePos = _syncQueue.findIndex(e => e.jobId === req.params.jobId);
   const ahead = queuePos >= 0 ? queuePos + (_syncRunning ? 1 : 0) : 0;
-  res.json({ status: job.status, logs: job.logs, result: job.result, newRefreshToken: job.newRefreshToken, employeeId: job.employeeId, rosterData: job.rosterData, error: job.error, queue: ahead });
+  res.json({ status: job.status, logs: job.logs, result: job.result, newRefreshToken: job.newRefreshToken, employeeId: job.employeeId, crewName: job.crewName, rosterData: job.rosterData, error: job.error, queue: ahead });
 });
 
 app.listen(Number(PORT), '0.0.0.0', () => {

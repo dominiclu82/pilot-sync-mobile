@@ -273,6 +273,7 @@ function pollStatus() {
         }
         if (data.employeeId) {
           localStorage.setItem('crewsync_eid', data.employeeId);
+          if (data.crewName) localStorage.setItem('crewsync_crew_name', data.crewName);
           // 同步完成後直接把 rosterData 存 localStorage（離線用，不經 DB）
           if (data.rosterData && data.rosterData.length > 0) {
             var selYear = document.getElementById('sync-year');
@@ -346,12 +347,11 @@ function switchRosterTab(panel, btn) {
   document.getElementById('roster-' + panel).classList.add('active');
   if (panel === 'cal' && !gcalInited) { gcalInited = true; gcalInit(); }
   if (panel === 'roster' && !_rgInited) { _rgInited = true; _rgInit(); }
-  if (panel === 'friends' && !_frInited) {
-    if (localStorage.getItem('crewsync_friends_unlocked') === '1') {
-      document.getElementById('roster-friends-gate').style.display = 'none';
-      document.getElementById('roster-friends-content').style.display = 'block';
-      _frInited = true; _frInit();
-    }
+  if (panel === 'friends') {
+    // 每次切到 Friends 都要重新輸入密碼
+    document.getElementById('roster-friends-gate').style.display = '';
+    document.getElementById('roster-friends-content').style.display = 'none';
+    _frInited = false;
   }
 }
 // Auto-switch to Calendar if user already authorized (setTimeout to wait for calendar JS)

@@ -9,7 +9,7 @@ function _frUnlock() {
   if (pw === 'qwertyui') {
     document.getElementById('roster-friends-gate').style.display = 'none';
     document.getElementById('roster-friends-content').style.display = 'block';
-    try { localStorage.setItem('crewsync_friends_unlocked', '1'); } catch(e){}
+    // 不存 localStorage，每次都要輸入密碼
     _frInit();
   } else {
     alert('密碼錯誤 Wrong password');
@@ -56,7 +56,7 @@ function _frShowShareUI(show) {
   if (rankSel) { rankSel.value = localStorage.getItem('crewsync_my_rank') || ''; rankSel.style.display = show ? '' : 'none'; }
   if (hint) hint.style.display = show ? '' : 'none';
   if (nameWrap) nameWrap.style.display = show ? '' : 'none';
-  if (nameInput) nameInput.value = localStorage.getItem('crewsync_nickname') || localStorage.getItem('crewsync_crew_name') || '';
+  if (nameInput) nameInput.value = localStorage.getItem('crewsync_nickname') || localStorage.getItem('crewsync_crew_name') || localStorage.getItem('crewsync_eid') || '';
 }
 
 // 機隊/職級/名稱都選完後才觸發上傳
