@@ -229,7 +229,7 @@ export function getSpaHtmlBody(): string {
         <option value="">All</option><option value="CAP">CAP</option><option value="SFO">SFO</option><option value="FO">FO</option>
       </select>
     </div>
-    <style>#fr-share-toggle:checked+span{background:var(--accent)}#fr-share-toggle:checked~#fr-share-dot{transform:translateX(16px)}</style>
+    <style>#fr-share-toggle:checked+span{background:var(--accent)!important}#fr-share-toggle:checked~#fr-share-dot{transform:translateX(16px)}</style>
     <!-- Friends grid -->
     <div id="fr-grid" style="padding:0"></div>
     <!-- Friends info overlay -->
