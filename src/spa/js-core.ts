@@ -346,7 +346,13 @@ function switchRosterTab(panel, btn) {
   document.getElementById('roster-' + panel).classList.add('active');
   if (panel === 'cal' && !gcalInited) { gcalInited = true; gcalInit(); }
   if (panel === 'roster' && !_rgInited) { _rgInited = true; _rgInit(); }
-  if (panel === 'friends' && !_frInited) { _frInited = true; _frInit(); }
+  if (panel === 'friends' && !_frInited) {
+    if (localStorage.getItem('crewsync_friends_unlocked') === '1') {
+      document.getElementById('roster-friends-gate').style.display = 'none';
+      document.getElementById('roster-friends-content').style.display = 'block';
+      _frInited = true; _frInit();
+    }
+  }
 }
 // Auto-switch to Calendar if user already authorized (setTimeout to wait for calendar JS)
 setTimeout(function() {

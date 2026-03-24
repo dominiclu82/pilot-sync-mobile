@@ -390,7 +390,7 @@ app.get('/sw.js', (_req, res) => {
   res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
   res.setHeader('Service-Worker-Allowed', '/');
   res.send(`
-const CACHE = 'crewsync-v192';
+const CACHE = 'crewsync-v7001';
 const SHELL = ['/', '/main', '/share'];
 self.addEventListener('install', e => {
   e.waitUntil(
@@ -1035,23 +1035,36 @@ app.post('/api/roster-share', async (req, res) => {
        ON CONFLICT (employee_id, month) DO UPDATE SET roster_data = $3, updated_at = NOW()`,
       [eid, month, JSON.stringify(duties)]
     );
-    // Update or create cs_users entry with sharing + fleet + rank
-    await _pool.query(
-      `UPDATE cs_users SET sharing = true, fleet = COALESCE($2, fleet), rank = COALESCE($3, rank), updated_at = NOW() WHERE employee_id = $1`,
-      [eid, fleet || null, rank || null]
-    ).catch(() => {});
-    // If no cs_users entry yet, create one
-    await _pool.query(
-      `INSERT INTO cs_users (email, name, employee_id, sharing, fleet, rank) VALUES ($1, $2, $3, true, $4, $5)
-       ON CONFLICT (email) DO UPDATE SET sharing = true, employee_id = $3, fleet = COALESCE($4, cs_users.fleet), rank = COALESCE($5, cs_users.rank), updated_at = NOW()`,
-      [eid + '@share', crewName || eid, eid, fleet || null, rank || null]
-    ).catch(() => {});
-    // Save nickname if provided
-    if (nickname) {
-      await _pool.query(
-        `UPDATE cs_users SET nickname = $2 WHERE employee_id = $1`,
-        [eid, nickname]
-      ).catch(() => {});
+    // 先嘗試更新已存在的 cs_users（OAuth 建立的，有 picture）
+    const upd = await _pool.query(
+      `UPDATE cs_users SET sharing = true, employee_id = $1,
+       fleet = COALESCE($2, fleet), rank = COALESCE($3, rank),
+       nickname = COALESCE(NULLIF($4, ''), nickname),
+       updated_at = NOW()
+       WHERE employee_id = $1`,
+      [eid, fleet || null, rank || null, nickname || '']
+    );
+    // 如果沒有 employee_id 匹配的記錄，嘗試用最近授權的記錄
+    if (upd.rowCount === 0) {
+      const upd2 = await _pool.query(
+        `UPDATE cs_users SET sharing = true, employee_id = $1,
+         name = COALESCE($2, name),
+         fleet = COALESCE($3, fleet), rank = COALESCE($4, rank),
+         nickname = COALESCE(NULLIF($5, ''), nickname),
+         updated_at = NOW()
+         WHERE employee_id IS NULL
+         ORDER BY updated_at DESC LIMIT 1`,
+        [eid, crewName || null, fleet || null, rank || null, nickname || '']
+      ).catch(() => ({ rowCount: 0 }));
+      // 完全沒有記錄才新建
+      if (!upd2 || (upd2 as any).rowCount === 0) {
+        await _pool.query(
+          `INSERT INTO cs_users (email, name, employee_id, sharing, fleet, rank, nickname)
+           VALUES ($1, $2, $3, true, $4, $5, $6)
+           ON CONFLICT (email) DO UPDATE SET sharing = true, employee_id = $3, updated_at = NOW()`,
+          [eid + '@share', crewName || eid, eid, fleet || null, rank || null, nickname || null]
+        ).catch(() => {});
+      }
     }
     res.json({ ok: true });
   } catch (e: any) {

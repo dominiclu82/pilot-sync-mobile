@@ -4,6 +4,18 @@ var _frMonth = new Date().getMonth() + 1;
 var _frData = []; // [{ name, nickname, picture, duties }]
 var _frInited = false;
 
+function _frUnlock() {
+  var pw = document.getElementById('friends-gate-pw').value;
+  if (pw === 'qwertyui') {
+    document.getElementById('roster-friends-gate').style.display = 'none';
+    document.getElementById('roster-friends-content').style.display = 'block';
+    try { localStorage.setItem('crewsync_friends_unlocked', '1'); } catch(e){}
+    _frInit();
+  } else {
+    alert('密碼錯誤 Wrong password');
+  }
+}
+
 function _frInit() {
   var isSharing = localStorage.getItem('crewsync_share_enabled') === '1';
   var shareToggle = document.getElementById('fr-share-toggle');
