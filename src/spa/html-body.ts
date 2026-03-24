@@ -187,17 +187,7 @@ export function getSpaHtmlBody(): string {
 
 <!-- ── Friends panel ── -->
 <div id="roster-friends" class="roster-panel">
-  <!-- Password gate -->
-  <div id="roster-friends-gate" style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:300px;color:var(--muted);text-align:center;padding:40px 20px">
-    <div style="font-size:3em;margin-bottom:16px">👥</div>
-    <div style="font-size:1.1em;font-weight:700;color:var(--text);margin-bottom:8px">Friends 班表分享</div>
-    <div style="font-size:.85em;margin-bottom:4px">Coming Soon 敬請期待</div>
-    <div style="font-size:.75em;opacity:.6">分享你的班表，查看同事的排班</div>
-    <div style="font-size:.75em;opacity:.6">Share your roster & view colleagues' schedules</div>
-    <div style="margin-top:24px"><input type="password" id="friends-gate-pw" placeholder="開發者密碼 Dev Password" style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 12px;color:var(--text);text-align:center;font-size:.85em;width:200px" onkeydown="if(event.key==='Enter')_frUnlock()"></div>
-  </div>
-  <!-- Friends content (hidden until unlocked) -->
-  <div id="roster-friends-content" style="display:none">
+  <div>
     <!-- Friends header: single row -->
     <div style="display:flex;align-items:center;padding:5px 8px;border-bottom:1px solid var(--dim);gap:4px;white-space:nowrap">
       <span style="font-size:.69em;color:var(--muted);flex-shrink:0">同意分享班表</span>
@@ -240,15 +230,18 @@ export function getSpaHtmlBody(): string {
         <div style="font-size:1em;font-weight:700;margin-bottom:12px;text-align:center">👥 Friends 班表分享</div>
         <div style="font-size:.78em;color:var(--muted)">
           <div style="margin-bottom:8px">同意分享後即可查看其他組員的班表<br><span style="opacity:.7">Share your roster to view others' schedules</span></div>
-          <div style="margin-bottom:6px">• 你的班表將上傳至雲端供其他分享者查看<br><span style="opacity:.7">Your roster will be uploaded for other shared members to view</span></div>
-          <div style="margin-bottom:6px">• 隨時可關閉分享，雲端資料將立即刪除<br><span style="opacity:.7">You can turn off sharing anytime — cloud data will be deleted immediately</span></div>
           <div style="margin-bottom:6px">• 未分享者無法查看他人班表<br><span style="opacity:.7">Non-sharing members cannot view others' rosters</span></div>
-          <div>• Friends 不儲存離線資料，每次開啟皆從雲端即時載入<br><span style="opacity:.7">Friends does not cache offline — data is loaded from the cloud each time</span></div>
+          <div style="margin-bottom:6px">• 同意分享後即可查看其他組員的班表<br><span style="opacity:.7">Share your roster to view others' schedules</span></div>
+          <div style="margin-bottom:6px">• 你的班表將上傳至雲端供其他分享者查看<br><span style="opacity:.7">Your roster will be uploaded for other shared members to view</span></div>
+          <div style="margin-bottom:6px">• 支援離線查看，連線時自動更新最新資料<br><span style="opacity:.7">Offline viewing supported — data refreshed when online</span></div>
+          <div style="margin-bottom:6px">• 隨時可關閉分享，雲端資料將立即刪除<br><span style="opacity:.7">You can turn off sharing anytime — cloud data will be deleted immediately</span></div>
+          <div style="margin-bottom:6px">• 撤銷分享後，其他使用者的離線快取將於下次連線時更新<br><span style="opacity:.7">After revoking, others' offline cache will update on next connection</span></div>
+          <div>• 離線快取保留一個月，一個月內未連網更新亦會自動刪除<br><span style="opacity:.7">Offline cache expires after 1 month — auto-deleted if not refreshed</span></div>
         </div>
         <button onclick="document.getElementById('fr-info-overlay').style.display='none'" style="margin-top:14px;width:100%;padding:8px;background:var(--accent);color:#fff;border:none;border-radius:8px;font-size:.85em;cursor:pointer">了解 Got it</button>
       </div>
     </div>
-  </div><!-- end friends-content -->
+  </div>
 </div>
 
 </div><!-- end tab-sync -->
@@ -1200,7 +1193,7 @@ export function getSpaHtmlBody(): string {
       <button class="tab-util-btn tab-install-btn" id="tab-install-btn" onclick="showInstallGuide()" style="display:none">
         <span>📲</span>安裝
       </button>
-      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V7.0.04</span>
+      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V7.0.06</span>
     </div>
   </div>
 </div>
@@ -1230,15 +1223,15 @@ export function getSpaHtmlBody(): string {
       <div style="margin-bottom:4px">📱 建議使用 <b>iPad 橫向</b>操作以獲得最佳體驗</div>
       <div style="color:var(--muted)">Best experience on iPad in landscape mode</div>
     </div>
-    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V7.0.04</div>
+    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V7.0.06</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
-      <div>新增 Friends 班表分享功能：同意分享、密碼保護、機隊/職級選擇、顯示名稱修改、Google 大頭照、篩選查看；修復班表上傳與大頭照顯示</div>
-      <div>Add Friends roster sharing: opt-in share, password gate, fleet/rank selection, display name edit, Google avatar, filter; fix roster upload &amp; avatar display</div>
+      <div>Friends 正式上線：移除密碼保護、點大頭顯示全名、離線快取支援、篩選機隊/職級、剔除組員名單保護隱私、說明文字更新</div>
+      <div>Friends goes live: remove password gate, tap avatar for full name, offline cache, fleet/rank filter, strip crew data for privacy, updated info text</div>
     </div>
-    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V6.192</div>
+    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V7.0.01</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
-      <div>修復 Roster 同步後資料存本機離線儲存；新增 Friends 班表分享功能初版</div>
-      <div>Fix roster local storage after sync; add initial Friends roster sharing</div>
+      <div>新增 Friends 班表分享功能：同意分享、機隊/職級選擇、顯示名稱修改、Google 大頭照</div>
+      <div>Add Friends roster sharing: opt-in share, fleet/rank selection, display name edit, Google avatar</div>
     </div>
     <div style="font-size:.68em;color:var(--muted);margin-top:12px;margin-bottom:10px;display:flex;gap:16px;justify-content:center">
       <a href="/privacy" onclick="openLegal('/privacy');return false" style="color:var(--muted);text-decoration:underline">Privacy Policy 隱私權政策</a>

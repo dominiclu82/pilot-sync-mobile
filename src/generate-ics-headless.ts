@@ -215,17 +215,7 @@ export async function generateICSHeadless(
       if (employeeId) log(`🪪 員工編號: ${employeeId}`);
     } catch { /* non-fatal */ }
 
-    // ── 抓取組員姓名 ─────────────────────────────────────────
     let crewName = '';
-    try {
-      crewName = await page.evaluate(() => {
-        const body = document.body.innerText;
-        // 嘗試抓取 "LU, DOMINIC" 格式的名字（大寫英文，逗號分隔）
-        const m = body.match(/([A-Z]{2,},\s*[A-Z][A-Za-z]+)/);
-        return m ? m[1] : '';
-      });
-      if (crewName) log(`👤 組員姓名: ${crewName}`);
-    } catch { /* non-fatal */ }
     let i = 0;
     const SKIP = new Set([
       'DO',  'HDO', 'BDO', 'MDO',
@@ -429,6 +419,23 @@ export async function generateICSHeadless(
     ics += 'END:VCALENDAR\n';
     fs.writeFileSync(icsPath, ics, 'utf8');
     log(`✅ ICS 已生成（${dutyDetails.length} 筆）`);
+
+    // 從 duty crew 資料中用 employeeId 找自己的名字
+    if (!crewName && employeeId) {
+      for (const d of dutyDetails) {
+        if (crewName) break;
+        for (const f of (d as any).flights || []) {
+          if (crewName) break;
+          for (const c of f.crew || []) {
+            if (c.staffId === employeeId && c.name) {
+              crewName = c.name;
+              log(`👤 組員姓名: ${crewName}`);
+              break;
+            }
+          }
+        }
+      }
+    }
 
     return { employeeId, crewName, duties: dutyDetails };
   } finally {

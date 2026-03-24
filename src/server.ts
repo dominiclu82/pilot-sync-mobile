@@ -391,7 +391,7 @@ app.get('/sw.js', (_req, res) => {
   res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
   res.setHeader('Service-Worker-Allowed', '/');
   res.send(`
-const CACHE = 'crewsync-v7004';
+const CACHE = 'crewsync-v7006';
 const SHELL = ['/', '/main', '/share'];
 self.addEventListener('install', e => {
   e.waitUntil(
@@ -1031,40 +1031,31 @@ app.post('/api/roster-share', async (req, res) => {
     }
 
     if (!month || !duties) return res.status(400).json({ error: 'Missing month or duties' });
+    // 剔除 crew 名單（隱私保護），只保留航班資訊
+    const cleanDuties = (Array.isArray(duties) ? duties : []).map((d: any) => ({
+      duty: d.duty, reportTime: d.reportTime, endTime: d.endTime,
+      flights: (d.flights || []).map((f: any) => ({
+        flightNo: f.flightNo, origin: f.origin, dest: f.dest,
+        depTime: f.depTime, arrTime: f.arrTime, date: f.date
+      }))
+    }));
     await _pool.query(
       `INSERT INTO cs_rosters (employee_id, month, roster_data, updated_at) VALUES ($1, $2, $3, NOW())
        ON CONFLICT (employee_id, month) DO UPDATE SET roster_data = $3, updated_at = NOW()`,
-      [eid, month, JSON.stringify(duties)]
+      [eid, month, JSON.stringify(cleanDuties)]
     );
-    // 先嘗試更新已存在的 cs_users（OAuth 建立的，有 picture）
+    // 更新已連結的 cs_users（同步時已用 Google email 精確連結 employee_id）
     const upd = await _pool.query(
-      `UPDATE cs_users SET sharing = true, employee_id = $1,
+      `UPDATE cs_users SET sharing = true,
        fleet = COALESCE($2, fleet), rank = COALESCE($3, rank),
-       nickname = COALESCE(NULLIF($4, ''), nickname),
+       nickname = CASE WHEN $4 = '' THEN NULL ELSE COALESCE(NULLIF($4, ''), nickname) END,
        updated_at = NOW()
        WHERE employee_id = $1`,
       [eid, fleet || null, rank || null, nickname || '']
     );
-    // 如果沒有 employee_id 匹配的記錄，嘗試用最近授權的記錄
     if (upd.rowCount === 0) {
-      const upd2 = await _pool.query(
-        `UPDATE cs_users SET sharing = true, employee_id = $1,
-         name = COALESCE($2, name),
-         fleet = COALESCE($3, fleet), rank = COALESCE($4, rank),
-         nickname = COALESCE(NULLIF($5, ''), nickname),
-         updated_at = NOW()
-         WHERE id = (SELECT id FROM cs_users WHERE employee_id IS NULL ORDER BY updated_at DESC LIMIT 1)`,
-        [eid, crewName || null, fleet || null, rank || null, nickname || '']
-      ).catch(() => ({ rowCount: 0 }));
-      // 完全沒有記錄才新建
-      if (!upd2 || (upd2 as any).rowCount === 0) {
-        await _pool.query(
-          `INSERT INTO cs_users (email, name, employee_id, sharing, fleet, rank, nickname)
-           VALUES ($1, $2, $3, true, $4, $5, $6)
-           ON CONFLICT (email) DO UPDATE SET sharing = true, employee_id = $3, updated_at = NOW()`,
-          [eid + '@share', crewName || eid, eid, fleet || null, rank || null, nickname || null]
-        ).catch(() => {});
-      }
+      // 找不到已連結的記錄 → 使用者可能還沒重新同步過，無法確認身份
+      return res.json({ error: '請先重新同步班表，讓系統連結你的 Google 帳號 Please re-sync your roster first' });
     }
     res.json({ ok: true });
   } catch (e: any) {
@@ -1228,17 +1219,26 @@ function _syncNext() {
       if (_pool && eid) {
         try {
           const monthKey = `${year}-${String(month).padStart(2, '0')}`;
-          // Link employee_id to user (jxUsername = employee ID = login username)
-          await _pool.query(
-            `UPDATE cs_users SET employee_id = $1, updated_at = NOW()
-             WHERE id = (SELECT id FROM cs_users WHERE employee_id IS NULL ORDER BY updated_at DESC LIMIT 1)`,
-            [eid]
-          ).catch(() => {});
-          // Also update if already linked
-          await _pool.query(
-            `UPDATE cs_users SET updated_at = NOW() WHERE employee_id = $1`,
-            [eid]
-          ).catch(() => {});
+          // 用 refresh token 查 Google email，精確連結 employee_id
+          try {
+            const creds = loadCredentials();
+            const oauth2 = new google.auth.OAuth2(creds.web.client_id, creds.web.client_secret);
+            oauth2.setCredentials({ refresh_token: refreshToken });
+            const tokenInfo = await oauth2.getTokenInfo(
+              (await oauth2.getAccessToken()).token!
+            );
+            const googleEmail = tokenInfo.email;
+            if (googleEmail) {
+              const crewNameVal = rosterResult.crewName || null;
+              await _pool.query(
+                `UPDATE cs_users SET employee_id = $1, name = COALESCE($3, name), updated_at = NOW() WHERE email = $2`,
+                [eid, googleEmail, crewNameVal]
+              );
+              onLog(`🔗 已連結 Google 帳號: ${googleEmail}` + (crewNameVal ? ` (${crewNameVal})` : ''));
+            }
+          } catch (linkErr: any) {
+            onLog(`⚠️ Google 帳號連結失敗: ${linkErr.message}`);
+          }
           // 如果使用者有開啟分享，自動上傳 DB
           const sharingQ = await _pool.query('SELECT sharing FROM cs_users WHERE employee_id = $1', [eid]);
           if (sharingQ.rows.length > 0 && sharingQ.rows[0].sharing) {
@@ -1246,7 +1246,13 @@ function _syncNext() {
             await _pool.query(
               `INSERT INTO cs_rosters (employee_id, month, roster_data, updated_at) VALUES ($1, $2, $3, NOW())
                ON CONFLICT (employee_id, month) DO UPDATE SET roster_data = $3, updated_at = NOW()`,
-              [eid, monthKey2, JSON.stringify(rosterResult.duties)]
+              [eid, monthKey2, JSON.stringify((rosterResult.duties || []).map((d: any) => ({
+                duty: d.duty, reportTime: d.reportTime, endTime: d.endTime,
+                flights: (d.flights || []).map((f: any) => ({
+                  flightNo: f.flightNo, origin: f.origin, dest: f.dest,
+                  depTime: f.depTime, arrTime: f.arrTime, date: f.date
+                }))
+              })))]
             );
             onLog('📤 班表已自動分享至 Friends');
           }

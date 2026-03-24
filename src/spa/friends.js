@@ -4,18 +4,6 @@ var _frMonth = new Date().getMonth() + 1;
 var _frData = []; // [{ name, nickname, picture, duties }]
 var _frInited = false;
 
-function _frUnlock() {
-  var pw = document.getElementById('friends-gate-pw').value;
-  if (pw === 'qwertyui') {
-    document.getElementById('roster-friends-gate').style.display = 'none';
-    document.getElementById('roster-friends-content').style.display = 'block';
-    // 不存 localStorage，每次都要輸入密碼
-    _frInit();
-  } else {
-    alert('密碼錯誤 Wrong password');
-  }
-}
-
 function _frInit() {
   var isSharing = localStorage.getItem('crewsync_share_enabled') === '1';
   var shareToggle = document.getElementById('fr-share-toggle');
@@ -39,10 +27,13 @@ function _frShowEmpty() {
     '<div style="font-size:.78em;line-height:1.6;max-width:380px;margin:0 auto">' +
     '<div style="margin-bottom:12px">同意分享後即可查看其他組員的班表<br><span style="opacity:.6">Share your roster to view others\' schedules</span></div>' +
     '<table style="text-align:left;margin:0 auto;border-spacing:0 6px">' +
+    '<tr><td style="vertical-align:top;padding-right:6px">•</td><td>未分享者無法查看他人班表<br><span style="opacity:.6">Non-sharing members cannot view others\' rosters</span></td></tr>' +
+    '<tr><td style="vertical-align:top;padding-right:6px">•</td><td>同意分享後即可查看其他組員的班表<br><span style="opacity:.6">Share your roster to view others\' schedules</span></td></tr>' +
     '<tr><td style="vertical-align:top;padding-right:6px">•</td><td>你的班表將上傳至雲端供其他分享者查看<br><span style="opacity:.6">Your roster will be uploaded for shared members to view</span></td></tr>' +
+    '<tr><td style="vertical-align:top;padding-right:6px">•</td><td>支援離線查看，連線時自動更新最新資料<br><span style="opacity:.6">Offline viewing supported — data refreshed when online</span></td></tr>' +
     '<tr><td style="vertical-align:top;padding-right:6px">•</td><td>隨時可關閉分享，雲端資料將立即刪除<br><span style="opacity:.6">Turn off anytime — cloud data deleted immediately</span></td></tr>' +
-    '<tr><td style="vertical-align:top;padding-right:6px">•</td><td>未分享者無法查看他人班表<br><span style="opacity:.6">Non-sharing members cannot view others</span></td></tr>' +
-    '<tr><td style="vertical-align:top;padding-right:6px">•</td><td>不儲存離線資料，每次皆從雲端即時載入<br><span style="opacity:.6">No offline cache — loaded from cloud each time</span></td></tr>' +
+    '<tr><td style="vertical-align:top;padding-right:6px">•</td><td>撤銷分享後，其他使用者的離線快取將於下次連線時更新<br><span style="opacity:.6">After revoking, others\' offline cache will update on next connection</span></td></tr>' +
+    '<tr><td style="vertical-align:top;padding-right:6px">•</td><td>離線快取保留一個月，一個月內未連網更新亦會自動刪除<br><span style="opacity:.6">Offline cache expires after 1 month — auto-deleted if not refreshed</span></td></tr>' +
     '</table></div></div>';
 }
 
@@ -177,19 +168,47 @@ function _frLoadMonth() {
   fetch('/api/roster-friends?month=' + monthKey)
     .then(function(r) { return r.json(); })
     .then(function(data) {
+      var filterFleet = document.getElementById('fr-filter-fleet');
+      var filterRank = document.getElementById('fr-filter-rank');
+      var ff = filterFleet ? filterFleet.value : '';
+      var fr = filterRank ? filterRank.value : '';
       if (data.friends && data.friends.length > 0) {
+        // 存離線快取（未篩選的完整資料）
+        try { localStorage.setItem('crewsync_friends_' + monthKey, JSON.stringify(data.friends)); } catch(e){}
         for (var i = 0; i < data.friends.length; i++) {
           var f = data.friends[i];
+          if (ff && f.fleet && f.fleet !== ff) continue;
+          if (fr && f.rank && f.rank !== fr) continue;
           _frData.push({ name: f.name, nickname: f.nickname, picture: f.picture, duties: f.duties });
         }
+      } else {
+        // 雲端無資料，清除該月快取
+        try { localStorage.removeItem('crewsync_friends_' + monthKey); } catch(e){}
       }
       _frRender();
     })
     .catch(function() {
+      // 離線：讀 localStorage 快取
+      _frLoadFromCache(monthKey, ff, fr);
       _frRender();
     });
 }
 
+
+function _frLoadFromCache(monthKey, ff, fr) {
+  try {
+    var cached = localStorage.getItem('crewsync_friends_' + monthKey);
+    if (cached) {
+      var friends = JSON.parse(cached);
+      for (var i = 0; i < friends.length; i++) {
+        var f = friends[i];
+        if (ff && f.fleet && f.fleet !== ff) continue;
+        if (fr && f.rank && f.rank !== fr) continue;
+        _frData.push({ name: f.name, nickname: f.nickname, picture: f.picture, duties: f.duties });
+      }
+    }
+  } catch(e){}
+}
 
 function _frRender() {
   var gridEl = document.getElementById('fr-grid');
@@ -235,9 +254,11 @@ function _frRender() {
   for (var p = 0; p < _frData.length; p++) {
     var person = _frData[p];
     var displayName = person.nickname || _frFormatName(person.name);
+    var fullName = person.name || '';
+    var escapedFull = fullName.replace(/'/g, '&#39;').replace(/"/g, '&quot;');
     var picHtml = person.picture
-      ? '<img src="' + person.picture + '" style="width:28px;height:28px;border-radius:50%;object-fit:cover">'
-      : '<div style="width:28px;height:28px;border-radius:50%;background:#374151;display:flex;align-items:center;justify-content:center;font-size:.7em">👤</div>';
+      ? '<img src="' + person.picture + '" onclick="_frToggleFullName(this,\'' + escapedFull + '\')" style="width:28px;height:28px;border-radius:50%;object-fit:cover;cursor:pointer;flex-shrink:0">'
+      : '<div onclick="_frToggleFullName(this,\'' + escapedFull + '\')" style="width:28px;height:28px;border-radius:50%;background:#374151;display:flex;align-items:center;justify-content:center;font-size:.7em;cursor:pointer;flex-shrink:0">👤</div>';
     var gridRow = p + 2;
     html += '<div style="grid-row:' + gridRow + ';grid-column:1;position:sticky;left:0;z-index:2;background:var(--bg);display:flex;align-items:center;gap:5px;padding:4px 6px;border-right:2px solid var(--dim);border-bottom:1px solid var(--dim)">';
     html += picHtml;
@@ -282,6 +303,30 @@ function _frRender() {
 
   gridEl.innerHTML = html;
 }
+
+// 點大頭顯示/隱藏全名
+var _frFullNameEl = null;
+var _frFullNameTarget = null;
+function _frToggleFullName(el, fullName) {
+  if (_frFullNameEl) { _frFullNameEl.remove(); _frFullNameEl = null; }
+  if (_frFullNameTarget === el) { _frFullNameTarget = null; return; }
+  _frFullNameTarget = el;
+  var rect = el.getBoundingClientRect();
+  var tip = document.createElement('div');
+  tip.style.cssText = 'position:fixed;left:' + rect.left + 'px;top:' + (rect.bottom + 4) + 'px;background:#1e2740;color:#e2e8f0;padding:5px 10px;border-radius:6px;font-size:.75em;white-space:nowrap;z-index:100;box-shadow:0 2px 8px rgba(0,0,0,.6)';
+  tip.textContent = fullName;
+  tip.id = 'fr-fullname-tip';
+  document.body.appendChild(tip);
+  _frFullNameEl = tip;
+}
+
+document.addEventListener('click', function(e) {
+  if (_frFullNameEl && !e.target.closest('#fr-fullname-tip') && e.target !== _frFullNameTarget) {
+    _frFullNameEl.remove();
+    _frFullNameEl = null;
+    _frFullNameTarget = null;
+  }
+});
 
 function _frBuildDayMap(duties) {
   var dayMap = {};
@@ -364,14 +409,15 @@ function _frParseDates(reportTime, endTime) {
 
 function _frParseDate(str) {
   if (!str) return null;
-  // Handle "DD MMM YYYY HH:MM" or ISO or other formats
+  var months = {jan:0,feb:1,mar:2,apr:3,may:4,jun:5,jul:6,aug:7,sep:8,oct:9,nov:10,dec:11};
+  // "2026.Mar.08 2150L" format
+  var m = str.match(/(\d{4})\.([A-Za-z]{3})\.(\d{1,2})/);
+  if (m) return new Date(parseInt(m[1]), months[m[2].toLowerCase()] || 0, parseInt(m[3]));
+  // "DD MMM YYYY" format
+  var m2 = str.match(/(\d{1,2})\s+([A-Za-z]{3})\s+(\d{4})/);
+  if (m2) return new Date(parseInt(m2[3]), months[m2[2].toLowerCase()] || 0, parseInt(m2[1]));
+  // ISO or other
   var d = new Date(str);
   if (!isNaN(d.getTime())) return d;
-  // Try "DD MMM YYYY" format
-  var m = str.match(/(\d{1,2})\s+([A-Za-z]{3})\s+(\d{4})/);
-  if (m) {
-    var months = {jan:0,feb:1,mar:2,apr:3,may:4,jun:5,jul:6,aug:7,sep:8,oct:9,nov:10,dec:11};
-    return new Date(parseInt(m[3]), months[m[2].toLowerCase()] || 0, parseInt(m[1]));
-  }
   return null;
 }

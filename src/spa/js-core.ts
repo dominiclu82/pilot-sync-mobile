@@ -347,12 +347,7 @@ function switchRosterTab(panel, btn) {
   document.getElementById('roster-' + panel).classList.add('active');
   if (panel === 'cal' && !gcalInited) { gcalInited = true; gcalInit(); }
   if (panel === 'roster' && !_rgInited) { _rgInited = true; _rgInit(); }
-  if (panel === 'friends') {
-    // 每次切到 Friends 都要重新輸入密碼
-    document.getElementById('roster-friends-gate').style.display = '';
-    document.getElementById('roster-friends-content').style.display = 'none';
-    _frInited = false;
-  }
+  if (panel === 'friends' && !_frInited) { _frInited = true; _frInit(); }
 }
 // Auto-switch to Calendar if user already authorized (setTimeout to wait for calendar JS)
 setTimeout(function() {
