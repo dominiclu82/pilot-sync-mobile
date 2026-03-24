@@ -129,8 +129,19 @@ function _frUploadAll(eid, fleet, rank) {
   }
   if (promises.length > 0) {
     var gridEl = document.getElementById('fr-grid');
-    if (gridEl) gridEl.innerHTML = '<div style="text-align:center;padding:40px;color:var(--muted)">上傳中... Uploading...</div>';
-    Promise.all(promises).then(function() { _frLoadMonth(); }).catch(function() { _frLoadMonth(); });
+    if (gridEl) gridEl.innerHTML = '<div style="text-align:center;padding:40px;color:var(--muted)">上傳中（' + promises.length + ' 筆）... Uploading...</div>';
+    Promise.all(promises).then(function(responses) {
+      return Promise.all(responses.map(function(r) { return r.json(); }));
+    }).then(function(results) {
+      var errors = results.filter(function(r) { return r.error; });
+      if (errors.length > 0) {
+        alert('上傳部分失敗 Upload errors: ' + errors.map(function(e) { return e.error; }).join(', '));
+      }
+      _frLoadMonth();
+    }).catch(function(err) {
+      alert('上傳失敗 Upload failed: ' + err.message);
+      _frLoadMonth();
+    });
   } else {
     alert('本機無班表資料，請先同步 No local roster data');
     var toggle = document.getElementById('fr-share-toggle');
