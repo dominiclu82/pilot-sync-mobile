@@ -22,6 +22,7 @@ import { getSpaBriefingCardJs } from './spa/js-briefing-card.js';
 import { getSpaCrewRestJs } from './spa/js-crew-rest.js';
 import { getSpaSubtabReorderJs } from './spa/js-subtab-reorder.js';
 import { getSpaRosterGridJs } from './spa/js-roster-grid.js';
+import { getSpaFriendsJs } from './spa/js-friends.js';
 import FR24Pkg from 'flightradarapi';
 import pg from 'pg';
 
@@ -62,6 +63,9 @@ async function _dbInit() {
     await _pool.query(`ALTER TABLE cs_users ADD COLUMN IF NOT EXISTS employee_id TEXT`).catch(() => {});
     await _pool.query(`ALTER TABLE cs_users ADD COLUMN IF NOT EXISTS picture TEXT`).catch(() => {});
     await _pool.query(`ALTER TABLE cs_rosters ADD COLUMN IF NOT EXISTS employee_id TEXT`).catch(() => {});
+    await _pool.query(`ALTER TABLE cs_users ADD COLUMN IF NOT EXISTS nickname TEXT`).catch(() => {});
+    await _pool.query(`ALTER TABLE cs_users ADD COLUMN IF NOT EXISTS fleet TEXT`).catch(() => {});
+    await _pool.query(`ALTER TABLE cs_users ADD COLUMN IF NOT EXISTS rank TEXT`).catch(() => {});
     console.log('✅ Database connected & tables ready');
   } catch (e: any) {
     console.error('❌ Database init error:', e.message);
@@ -386,7 +390,7 @@ app.get('/sw.js', (_req, res) => {
   res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
   res.setHeader('Service-Worker-Allowed', '/');
   res.send(`
-const CACHE = 'crewsync-v191';
+const CACHE = 'crewsync-v192';
 const SHELL = ['/', '/main', '/share'];
 self.addEventListener('install', e => {
   e.waitUntil(
@@ -1005,6 +1009,105 @@ app.get('/api/roster-data', async (req, res) => {
   }
 });
 
+// ── Friends sharing API ──────────────────────────────────────────────────────
+// 上傳分享班表
+app.post('/api/roster-share', async (req, res) => {
+  if (!_pool) return res.json({ error: 'No database' });
+  const { eid, month, duties, crewName, nickname, fleet, rank, updateInfoOnly } = req.body;
+  if (!eid) return res.status(400).json({ error: 'Missing eid' });
+  try {
+    // Add fleet/rank columns if needed
+    await _pool.query(`ALTER TABLE cs_users ADD COLUMN IF NOT EXISTS fleet TEXT`).catch(() => {});
+    await _pool.query(`ALTER TABLE cs_users ADD COLUMN IF NOT EXISTS rank TEXT`).catch(() => {});
+
+    if (updateInfoOnly) {
+      // 只更新機隊/職級，不上傳班表
+      await _pool.query(
+        `UPDATE cs_users SET fleet = COALESCE($2, fleet), rank = COALESCE($3, rank), updated_at = NOW() WHERE employee_id = $1`,
+        [eid, fleet || null, rank || null]
+      );
+      return res.json({ ok: true });
+    }
+
+    if (!month || !duties) return res.status(400).json({ error: 'Missing month or duties' });
+    await _pool.query(
+      `INSERT INTO cs_rosters (employee_id, month, roster_data, updated_at) VALUES ($1, $2, $3, NOW())
+       ON CONFLICT (employee_id, month) DO UPDATE SET roster_data = $3, updated_at = NOW()`,
+      [eid, month, JSON.stringify(duties)]
+    );
+    // Update or create cs_users entry with sharing + fleet + rank
+    await _pool.query(
+      `UPDATE cs_users SET sharing = true, fleet = COALESCE($2, fleet), rank = COALESCE($3, rank), updated_at = NOW() WHERE employee_id = $1`,
+      [eid, fleet || null, rank || null]
+    ).catch(() => {});
+    // If no cs_users entry yet, create one
+    await _pool.query(
+      `INSERT INTO cs_users (email, name, employee_id, sharing, fleet, rank) VALUES ($1, $2, $3, true, $4, $5)
+       ON CONFLICT (email) DO UPDATE SET sharing = true, employee_id = $3, fleet = COALESCE($4, cs_users.fleet), rank = COALESCE($5, cs_users.rank), updated_at = NOW()`,
+      [eid + '@share', crewName || eid, eid, fleet || null, rank || null]
+    ).catch(() => {});
+    // Save nickname if provided
+    if (nickname) {
+      await _pool.query(
+        `UPDATE cs_users SET nickname = $2 WHERE employee_id = $1`,
+        [eid, nickname]
+      ).catch(() => {});
+    }
+    res.json({ ok: true });
+  } catch (e: any) {
+    res.json({ error: e.message });
+  }
+});
+
+// 撤銷分享
+app.delete('/api/roster-share', async (req, res) => {
+  if (!_pool) return res.json({ error: 'No database' });
+  const { eid } = req.body;
+  if (!eid) return res.status(400).json({ error: 'Missing eid' });
+  try {
+    await _pool.query('DELETE FROM cs_rosters WHERE employee_id = $1', [eid]);
+    await _pool.query('UPDATE cs_users SET sharing = false WHERE employee_id = $1', [eid]);
+    res.json({ ok: true });
+  } catch (e: any) {
+    res.json({ error: e.message });
+  }
+});
+
+// 拉所有有分享的人的班表
+app.get('/api/roster-friends', async (req, res) => {
+  if (!_pool) return res.json({ error: 'No database' });
+  const { month } = req.query;
+  if (!month) return res.status(400).json({ error: 'Missing month' });
+  try {
+    // Get all shared rosters for this month
+    const q = await _pool.query(
+      `SELECT r.employee_id, r.roster_data FROM cs_rosters r
+       INNER JOIN cs_users u ON r.employee_id = u.employee_id
+       WHERE u.sharing = true AND r.month = $1`,
+      [month]
+    );
+    // Get user info (name, picture, nickname)
+    const uq = await _pool.query(
+      `SELECT employee_id, name, picture, nickname, fleet, rank FROM cs_users WHERE sharing = true AND employee_id IS NOT NULL`
+    );
+    const userMap: Record<string, { name: string; picture: string; nickname: string; fleet: string; rank: string }> = {};
+    for (const u of uq.rows) userMap[u.employee_id] = { name: u.name || '', picture: u.picture || '', nickname: u.nickname || '', fleet: u.fleet || '', rank: u.rank || '' };
+
+    const friends = q.rows.map(r => ({
+      eid: r.employee_id,
+      name: userMap[r.employee_id]?.name || r.employee_id,
+      picture: userMap[r.employee_id]?.picture || '',
+      nickname: userMap[r.employee_id]?.nickname || '',
+      fleet: userMap[r.employee_id]?.fleet || '',
+      rank: userMap[r.employee_id]?.rank || '',
+      duties: r.roster_data
+    }));
+    res.json({ friends });
+  } catch (e: any) {
+    res.json({ error: e.message });
+  }
+});
+
 app.get('/api/db-test', async (_req, res) => {
   if (!_pool) return res.json({ ok: false, error: 'No DATABASE_URL' });
   try {
@@ -1112,7 +1215,17 @@ function _syncNext() {
             `UPDATE cs_users SET updated_at = NOW() WHERE employee_id = $1`,
             [eid]
           ).catch(() => {});
-          // Roster data 不再存 DB，只存前端 localStorage（隱私考量）
+          // 如果使用者有開啟分享，自動上傳 DB
+          const sharingQ = await _pool.query('SELECT sharing FROM cs_users WHERE employee_id = $1', [eid]);
+          if (sharingQ.rows.length > 0 && sharingQ.rows[0].sharing) {
+            const monthKey2 = `${year}-${String(month).padStart(2, '0')}`;
+            await _pool.query(
+              `INSERT INTO cs_rosters (employee_id, month, roster_data, updated_at) VALUES ($1, $2, $3, NOW())
+               ON CONFLICT (employee_id, month) DO UPDATE SET roster_data = $3, updated_at = NOW()`,
+              [eid, monthKey2, JSON.stringify(rosterResult.duties)]
+            );
+            onLog('📤 班表已自動分享至 Friends');
+          }
         } catch (dbErr: any) {
           onLog(`⚠️ 資料庫儲存失敗: ${dbErr.message}`);
         }
@@ -1241,6 +1354,7 @@ ${getSpaBriefingCardJs()}
 ${getSpaCrewRestJs()}
 ${getSpaSubtabReorderJs()}
 ${getSpaRosterGridJs()}
+${getSpaFriendsJs()}
 </script>${viewScript}
 </body>
 </html>`;

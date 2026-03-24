@@ -329,7 +329,7 @@ function _rosterDevUnlock(tab) {
 }
 // Auto-unlock dev panels if previously unlocked
 setTimeout(function() {
-  ['roster','friends'].forEach(function(tab) {
+  ['roster'].forEach(function(tab) {
     if (localStorage.getItem('crewsync_dev_' + tab) === '1') {
       var coming = document.getElementById('roster-' + tab + '-coming');
       var dev = document.getElementById('roster-' + tab + '-dev');
@@ -346,6 +346,7 @@ function switchRosterTab(panel, btn) {
   document.getElementById('roster-' + panel).classList.add('active');
   if (panel === 'cal' && !gcalInited) { gcalInited = true; gcalInit(); }
   if (panel === 'roster' && !_rgInited) { _rgInited = true; _rgInit(); }
+  if (panel === 'friends' && !_frInited) { _frInited = true; _frInit(); }
 }
 // Auto-switch to Calendar if user already authorized (setTimeout to wait for calendar JS)
 setTimeout(function() {

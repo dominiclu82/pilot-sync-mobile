@@ -187,16 +187,57 @@ export function getSpaHtmlBody(): string {
 
 <!-- ── Friends panel ── -->
 <div id="roster-friends" class="roster-panel">
-  <div id="roster-friends-coming" style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:300px;color:var(--muted);text-align:center;padding:40px 20px">
-    <div style="font-size:3em;margin-bottom:16px">👥</div>
-    <div style="font-size:1.1em;font-weight:700;color:var(--text);margin-bottom:8px">Friends 班表分享</div>
-    <div style="font-size:.85em;margin-bottom:4px">Coming Soon 敬請期待</div>
-    <div style="font-size:.75em;opacity:.6">分享你的班表，查看同事的排班</div>
-    <div style="font-size:.75em;opacity:.6">Share your roster & view colleagues' schedules</div>
-    <div style="margin-top:24px"><input type="password" id="friends-dev-pw" placeholder="開發者密碼 Dev Password" style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 12px;color:var(--text);text-align:center;font-size:.85em;width:200px" onkeydown="if(event.key==='Enter')_rosterDevUnlock('friends')"></div>
-  </div>
-  <div id="roster-friends-dev" style="display:none">
-    <div style="padding:16px;text-align:center;color:var(--muted);font-size:.85em">Friends 開發區域 (dev mode)</div>
+  <div>
+    <!-- Friends header: single row -->
+    <div style="display:flex;align-items:center;padding:5px 8px;border-bottom:1px solid var(--dim);gap:4px;white-space:nowrap">
+      <span style="font-size:.56em;color:var(--muted);flex-shrink:0">同意分享班表</span>
+      <label style="position:relative;display:inline-block;width:32px;height:18px;cursor:pointer;flex-shrink:0">
+        <input type="checkbox" id="fr-share-toggle" onchange="_frToggleShare()" style="opacity:0;width:0;height:0">
+        <span style="position:absolute;top:0;left:0;right:0;bottom:0;background:#4a5568;border-radius:9px;transition:.3s"></span>
+        <span style="position:absolute;top:2px;left:2px;width:14px;height:14px;background:#fff;border-radius:50%;transition:.3s" id="fr-share-dot"></span>
+      </label>
+      <span onclick="_frShowInfo()" style="cursor:pointer;font-size:.7em;color:var(--muted);flex-shrink:0" title="分享說明">ⓘ</span>
+      <span id="fr-share-hint" style="font-size:.5em;color:var(--muted);display:none;flex-shrink:0;line-height:1.2">我的機隊/職級（可隨時更改）<br>My fleet/rank (can change anytime)</span>
+      <select id="fr-my-fleet" onchange="_frCheckReady()" style="display:none;background:#2d3748;color:#e2e8f0;border:1px solid #4a5568;border-radius:4px;padding:1px 2px;font-size:.58em;cursor:pointer;width:auto;flex-shrink:0">
+        <option value="" disabled selected>機隊</option><option value="A321">A321</option><option value="A330">A330</option><option value="A350">A350</option>
+      </select>
+      <select id="fr-my-rank" onchange="_frCheckReady()" style="display:none;background:#2d3748;color:#e2e8f0;border:1px solid #4a5568;border-radius:4px;padding:1px 2px;font-size:.58em;cursor:pointer;width:auto;flex-shrink:0">
+        <option value="" disabled selected>職級</option><option value="CAP">CAP</option><option value="SFO">SFO</option><option value="FO">FO</option>
+      </select>
+      <span id="fr-name-wrap" style="display:none;flex-shrink:0">
+        <input id="fr-my-name" type="text" placeholder="顯示名稱 Display name" onchange="_frCheckReady()" style="background:#2d3748;color:#e2e8f0;border:1px solid #4a5568;border-radius:4px;padding:1px 4px;font-size:.58em;width:100px">
+        <span style="font-size:.45em;color:var(--muted)">可改中文或暱稱</span>
+      </span>
+      <span style="flex:1"></span>
+      <button onclick="_frPrevMonth()" style="background:none;border:none;color:var(--muted);font-size:.9em;cursor:pointer;padding:0 4px;flex-shrink:0">◀</button>
+      <span id="fr-month-title" style="font-weight:700;font-size:.8em;color:var(--text);flex-shrink:0;min-width:70px;text-align:center"></span>
+      <button onclick="_frNextMonth()" style="background:none;border:none;color:var(--muted);font-size:.9em;cursor:pointer;padding:0 4px;flex-shrink:0">▶</button>
+      <span style="flex:1"></span>
+      <span style="font-size:.5em;color:var(--muted);flex-shrink:0;line-height:1.2">想查看的機隊/職級<br>View by fleet/rank</span>
+      <select id="fr-filter-fleet" onchange="_frLoadMonth()" style="background:#2d3748;color:#e2e8f0;border:1px solid #4a5568;border-radius:4px;padding:1px 2px;font-size:.58em;cursor:pointer;width:auto;flex-shrink:0">
+        <option value="">All</option><option value="A321">A321</option><option value="A330">A330</option><option value="A350">A350</option>
+      </select>
+      <select id="fr-filter-rank" onchange="_frLoadMonth()" style="background:#2d3748;color:#e2e8f0;border:1px solid #4a5568;border-radius:4px;padding:1px 2px;font-size:.58em;cursor:pointer;width:auto;flex-shrink:0">
+        <option value="">All</option><option value="CAP">CAP</option><option value="SFO">SFO</option><option value="FO">FO</option>
+      </select>
+    </div>
+    <style>#fr-share-toggle:checked+span{background:var(--accent)}#fr-share-toggle:checked~#fr-share-dot{transform:translateX(14px)}</style>
+    <!-- Friends grid -->
+    <div id="fr-grid" style="padding:0"></div>
+    <!-- Friends info overlay -->
+    <div id="fr-info-overlay" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.7);z-index:9000;display:none;align-items:center;justify-content:center" onclick="if(event.target===this)this.style.display='none'">
+      <div style="background:var(--card);border-radius:12px;padding:20px 24px;max-width:400px;margin:20px;line-height:1.6">
+        <div style="font-size:1em;font-weight:700;margin-bottom:12px;text-align:center">👥 Friends 班表分享</div>
+        <div style="font-size:.78em;color:var(--muted)">
+          <div style="margin-bottom:8px">同意分享後即可查看其他組員的班表<br><span style="opacity:.7">Share your roster to view others' schedules</span></div>
+          <div style="margin-bottom:6px">• 你的班表將上傳至雲端供其他分享者查看<br><span style="opacity:.7">Your roster will be uploaded for other shared members to view</span></div>
+          <div style="margin-bottom:6px">• 隨時可關閉分享，雲端資料將立即刪除<br><span style="opacity:.7">You can turn off sharing anytime — cloud data will be deleted immediately</span></div>
+          <div style="margin-bottom:6px">• 未分享者無法查看他人班表<br><span style="opacity:.7">Non-sharing members cannot view others' rosters</span></div>
+          <div>• Friends 不儲存離線資料，每次開啟皆從雲端即時載入<br><span style="opacity:.7">Friends does not cache offline — data is loaded from the cloud each time</span></div>
+        </div>
+        <button onclick="document.getElementById('fr-info-overlay').style.display='none'" style="margin-top:14px;width:100%;padding:8px;background:var(--accent);color:#fff;border:none;border-radius:8px;font-size:.85em;cursor:pointer">了解 Got it</button>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -1149,7 +1190,7 @@ export function getSpaHtmlBody(): string {
       <button class="tab-util-btn tab-install-btn" id="tab-install-btn" onclick="showInstallGuide()" style="display:none">
         <span>📲</span>安裝
       </button>
-      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V6.191</span>
+      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V6.192</span>
     </div>
   </div>
 </div>
@@ -1179,15 +1220,15 @@ export function getSpaHtmlBody(): string {
       <div style="margin-bottom:4px">📱 建議使用 <b>iPad 橫向</b>操作以獲得最佳體驗</div>
       <div style="color:var(--muted)">Best experience on iPad in landscape mode</div>
     </div>
-    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V6.191</div>
+    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V6.192</div>
+    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
+      <div>修復 Roster 同步後資料存本機離線儲存；新增 Friends 班表分享功能（同意分享、機隊/職級選擇、顯示名稱修改、Google 大頭照、篩選查看）</div>
+      <div>Fix roster local storage after sync; add Friends roster sharing (opt-in share, fleet/rank selection, display name edit, Google avatar, filter by fleet/rank)</div>
+    </div>
+    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V6.191</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
       <div>修復 Roster 同步後資料未儲存問題；班表改為本機離線儲存，顯示上次同步時間</div>
       <div>Fix roster data not saved after sync; roster now stored locally for offline access, showing last sync time</div>
-    </div>
-    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V6.190</div>
-    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
-      <div>修正 Cold Temp 左側字型放大時計算按鈕被擋住無法捲動、右側表格底部永遠被切掉</div>
-      <div>Fix Cold Temp left form not scrollable on enlarged font, and right-side table rows permanently cut off</div>
     </div>
     <div style="font-size:.68em;color:var(--muted);margin-top:12px;margin-bottom:10px;display:flex;gap:16px;justify-content:center">
       <a href="/privacy" onclick="openLegal('/privacy');return false" style="color:var(--muted);text-decoration:underline">Privacy Policy 隱私權政策</a>
