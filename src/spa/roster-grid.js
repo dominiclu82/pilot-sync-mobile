@@ -5,8 +5,24 @@ var _rgData = null; // { duties: [...], pictures: {} }
 var _rgLoading = false;
 var _rgView = 'calendar'; // 'calendar' or 'grid'
 
+function _rgUpdateSyncHint(monthKey) {
+  var el = document.getElementById('rg-sync-hint');
+  if (!el) return;
+  var syncTime = null;
+  try { syncTime = localStorage.getItem('crewsync_roster_sync_time_' + monthKey); } catch(e){}
+  if (syncTime) {
+    var d = new Date(syncTime);
+    var dateStr = d.getFullYear() + '/' + String(d.getMonth()+1).padStart(2,'0') + '/' + String(d.getDate()).padStart(2,'0') + ' ' + String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0');
+    el.innerHTML = '⚠️ 班表不會自動更新（📱 本機離線儲存 · 上次同步：' + dateStr + '）<br>Roster does not auto-sync. (📱 Local storage · Last sync: ' + dateStr + ')';
+  } else {
+    el.innerHTML = '⚠️ 此月份尚未同步，請先至 Crew Sync 同步班表<br>No roster data for this month. Please sync your roster first.';
+  }
+}
+
 function _rgInit() {
   var eid = localStorage.getItem('crewsync_eid');
+  var monthKey = _rgYear + '-' + String(_rgMonth).padStart(2, '0');
+  _rgUpdateSyncHint(monthKey);
   if (!eid) {
     document.getElementById('rg-grid').innerHTML = '<div style="text-align:center;padding:40px;color:var(--muted)">請先同步班表<br>Please sync your roster first</div>';
     return;
@@ -53,35 +69,19 @@ function _rgLoadMonth() {
   var gridEl = document.getElementById('rg-grid');
   var cacheKey = 'crewsync_roster_' + eid + '_' + monthKey;
 
-  // 先讀 localStorage 立刻顯示
+  // 只讀 localStorage（離線可用，不依賴 server）
   var cached = null;
   try { cached = localStorage.getItem(cacheKey); } catch(e){}
+  _rgLoading = false;
   if (cached) {
     try {
       _rgData = JSON.parse(cached);
       _rgRender();
     } catch(e){}
   } else {
-    gridEl.innerHTML = '<div style="text-align:center;padding:40px;color:var(--muted)">載入中...</div>';
+    gridEl.innerHTML = '<div style="text-align:center;padding:40px;color:var(--muted)">此月份無班表資料<br>No roster data for this month</div>';
   }
-
-  // 背景向 server 拉最新資料，有更新就覆蓋
-  fetch('/api/roster-data?eid=' + encodeURIComponent(eid) + '&month=' + monthKey)
-    .then(function(r) { return r.json(); })
-    .then(function(data) {
-      _rgLoading = false;
-      if (data.error || !data.rosters || data.rosters.length === 0) {
-        if (!cached) gridEl.innerHTML = '<div style="text-align:center;padding:40px;color:var(--muted)">此月份無班表資料<br>No roster data for this month</div>';
-        return;
-      }
-      _rgData = { duties: data.rosters[0].roster_data, pictures: data.pictures || {} };
-      try { localStorage.setItem(cacheKey, JSON.stringify(_rgData)); } catch(e){}
-      _rgRender();
-    })
-    .catch(function() {
-      _rgLoading = false;
-      if (!cached) gridEl.innerHTML = '<div style="text-align:center;padding:40px;color:var(--muted)">此月份無班表資料<br>No roster data for this month</div>';
-    });
+  _rgUpdateSyncHint(monthKey);
 }
 
 function _rgGetDayMap() {

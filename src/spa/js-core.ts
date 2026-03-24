@@ -273,8 +273,17 @@ function pollStatus() {
         }
         if (data.employeeId) {
           localStorage.setItem('crewsync_eid', data.employeeId);
-          // 同步完成後立刻快取 roster 到 localStorage（離線用）
-          _cacheRosterData(data.employeeId);
+          // 同步完成後直接把 rosterData 存 localStorage（離線用，不經 DB）
+          if (data.rosterData && data.rosterData.length > 0) {
+            var selYear = document.getElementById('sync-year');
+            var selMonth = document.getElementById('sync-month');
+            if (selYear && selMonth) {
+              var mk = selYear.value + '-' + String(selMonth.value).padStart(2, '0');
+              var cacheData = { duties: data.rosterData, pictures: {} };
+              try { localStorage.setItem('crewsync_roster_' + data.employeeId + '_' + mk, JSON.stringify(cacheData)); } catch(e){}
+              try { localStorage.setItem('crewsync_roster_sync_time_' + mk, new Date().toISOString()); } catch(e){}
+            }
+          }
         }
         showDone(data.status === 'done', data.logs, data.result, data.error);
       }
@@ -305,23 +314,6 @@ function mkStat(n, label) {
   return '<div class="stat-item"><div class="stat-num">' + n + '</div><div class="stat-lbl">' + label + '</div></div>';
 }
 
-function _cacheRosterData(eid) {
-  // 同步的是當前選擇的月份
-  var selYear = document.getElementById('sync-year');
-  var selMonth = document.getElementById('sync-month');
-  if (!selYear || !selMonth) return;
-  var monthKey = selYear.value + '-' + String(selMonth.value).padStart(2, '0');
-  if (!monthKey || monthKey.length < 7) return;
-  fetch('/api/roster-data?eid=' + encodeURIComponent(eid) + '&month=' + monthKey)
-    .then(function(r) { return r.json(); })
-    .then(function(data) {
-      if (!data.error && data.rosters && data.rosters.length > 0) {
-        var cacheData = { duties: data.rosters[0].roster_data, pictures: data.pictures || {} };
-        try { localStorage.setItem('crewsync_roster_' + eid + '_' + monthKey, JSON.stringify(cacheData)); } catch(e){}
-      }
-    })
-    .catch(function() {});
-}
 
 // ── Roster sub-tab ───────────────────────────────────────────────────────────
 var gcalInited = false;

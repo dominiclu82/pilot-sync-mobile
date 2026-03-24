@@ -177,7 +177,7 @@ export function getSpaHtmlBody(): string {
       <button onclick="_rgNextMonth()" style="background:none;border:none;color:var(--muted);font-size:1.2em;cursor:pointer;padding:4px 12px">▶</button>
     </div>
     <!-- Roster warning -->
-    <div style="padding:4px 12px;font-size:.7em;color:#eab308;text-align:center;line-height:1.4">⚠️ 班表不會自動更新，顯示的是最後一次同步的資料<br>Roster does not auto-sync. Showing data from your last sync.</div>
+    <div id="rg-sync-hint" style="padding:4px 12px;font-size:.7em;color:#eab308;text-align:center;line-height:1.4">⚠️ 班表不會自動更新<br>Roster does not auto-sync.</div>
     <!-- Roster content -->
     <div id="rg-grid" style="overflow-x:auto;-webkit-overflow-scrolling:touch;padding:0"></div>
     <!-- Flight detail / crew panel -->
@@ -1149,7 +1149,7 @@ export function getSpaHtmlBody(): string {
       <button class="tab-util-btn tab-install-btn" id="tab-install-btn" onclick="showInstallGuide()" style="display:none">
         <span>📲</span>安裝
       </button>
-      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V6.190</span>
+      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V6.191</span>
     </div>
   </div>
 </div>
@@ -1179,15 +1179,15 @@ export function getSpaHtmlBody(): string {
       <div style="margin-bottom:4px">📱 建議使用 <b>iPad 橫向</b>操作以獲得最佳體驗</div>
       <div style="color:var(--muted)">Best experience on iPad in landscape mode</div>
     </div>
-    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V6.190</div>
+    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V6.191</div>
+    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
+      <div>修復 Roster 同步後資料未儲存問題；班表改為本機離線儲存，顯示上次同步時間</div>
+      <div>Fix roster data not saved after sync; roster now stored locally for offline access, showing last sync time</div>
+    </div>
+    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V6.190</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
       <div>修正 Cold Temp 左側字型放大時計算按鈕被擋住無法捲動、右側表格底部永遠被切掉</div>
       <div>Fix Cold Temp left form not scrollable on enlarged font, and right-side table rows permanently cut off</div>
-    </div>
-    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V6.189</div>
-    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
-      <div>修正 Cold Temp 左右無法獨立捲動、字型放大時計算按鈕被切掉、右側表格底部被裁切</div>
-      <div>Fix Cold Temp left/right independent scrolling, calc button hidden on enlarged font, and right-side table bottom cutoff</div>
     </div>
     <div style="font-size:.68em;color:var(--muted);margin-top:12px;margin-bottom:10px;display:flex;gap:16px;justify-content:center">
       <a href="/privacy" onclick="openLegal('/privacy');return false" style="color:var(--muted);text-decoration:underline">Privacy Policy 隱私權政策</a>

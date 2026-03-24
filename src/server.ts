@@ -98,6 +98,7 @@ interface SyncJob {
   result?: SyncResult;
   newRefreshToken?: string;
   employeeId?: string;
+  rosterData?: any[];
   error?: string;
   startedAt: Date;
   icsPath: string;
@@ -385,7 +386,7 @@ app.get('/sw.js', (_req, res) => {
   res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
   res.setHeader('Service-Worker-Allowed', '/');
   res.send(`
-const CACHE = 'crewsync-v190';
+const CACHE = 'crewsync-v191';
 const SHELL = ['/', '/main', '/share'];
 self.addEventListener('install', e => {
   e.waitUntil(
@@ -1092,9 +1093,10 @@ function _syncNext() {
       if (newRefreshToken) job.newRefreshToken = newRefreshToken;
       job.status = 'done';
 
-      // Save employee ID to job for frontend
+      // Save employee ID + roster data to job for frontend
       const eid = rosterResult.employeeId || jxUsername;
       job.employeeId = eid;
+      job.rosterData = rosterResult.duties;
       if (_pool && eid) {
         try {
           const monthKey = `${year}-${String(month).padStart(2, '0')}`;
@@ -1153,7 +1155,7 @@ app.get('/status/:jobId', (req, res) => {
   // 計算排隊位置
   const queuePos = _syncQueue.findIndex(e => e.jobId === req.params.jobId);
   const ahead = queuePos >= 0 ? queuePos + (_syncRunning ? 1 : 0) : 0;
-  res.json({ status: job.status, logs: job.logs, result: job.result, newRefreshToken: job.newRefreshToken, employeeId: job.employeeId, error: job.error, queue: ahead });
+  res.json({ status: job.status, logs: job.logs, result: job.result, newRefreshToken: job.newRefreshToken, employeeId: job.employeeId, rosterData: job.rosterData, error: job.error, queue: ahead });
 });
 
 app.listen(Number(PORT), '0.0.0.0', () => {
