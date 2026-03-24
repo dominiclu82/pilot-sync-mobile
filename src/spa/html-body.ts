@@ -191,8 +191,10 @@ export function getSpaHtmlBody(): string {
   <div id="roster-friends-gate" style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:300px;color:var(--muted);text-align:center;padding:40px 20px">
     <div style="font-size:3em;margin-bottom:16px">👥</div>
     <div style="font-size:1.1em;font-weight:700;color:var(--text);margin-bottom:8px">Friends 班表分享</div>
-    <div style="font-size:.85em;margin-bottom:4px">測試中 Beta Testing</div>
-    <div style="margin-top:24px"><input type="password" id="friends-gate-pw" placeholder="密碼 Password" style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 12px;color:var(--text);text-align:center;font-size:.85em;width:200px" onkeydown="if(event.key==='Enter')_frUnlock()"></div>
+    <div style="font-size:.85em;margin-bottom:4px">Coming Soon 敬請期待</div>
+    <div style="font-size:.75em;opacity:.6">分享你的班表，查看同事的排班</div>
+    <div style="font-size:.75em;opacity:.6">Share your roster & view colleagues' schedules</div>
+    <div style="margin-top:24px"><input type="password" id="friends-gate-pw" placeholder="開發者密碼 Dev Password" style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 12px;color:var(--text);text-align:center;font-size:.85em;width:200px" onkeydown="if(event.key==='Enter')_frUnlock()"></div>
   </div>
   <!-- Friends content (hidden until unlocked) -->
   <div id="roster-friends-content" style="display:none">
@@ -1198,7 +1200,7 @@ export function getSpaHtmlBody(): string {
       <button class="tab-util-btn tab-install-btn" id="tab-install-btn" onclick="showInstallGuide()" style="display:none">
         <span>📲</span>安裝
       </button>
-      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V7.0.02</span>
+      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V7.0.03</span>
     </div>
   </div>
 </div>
@@ -1228,7 +1230,7 @@ export function getSpaHtmlBody(): string {
       <div style="margin-bottom:4px">📱 建議使用 <b>iPad 橫向</b>操作以獲得最佳體驗</div>
       <div style="color:var(--muted)">Best experience on iPad in landscape mode</div>
     </div>
-    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V7.0.02</div>
+    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V7.0.03</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
       <div>新增 Friends 班表分享功能：同意分享、密碼保護、機隊/職級選擇、顯示名稱修改、Google 大頭照、篩選查看；修復班表上傳與大頭照顯示</div>
       <div>Add Friends roster sharing: opt-in share, password gate, fleet/rank selection, display name edit, Google avatar, filter; fix roster upload &amp; avatar display</div>

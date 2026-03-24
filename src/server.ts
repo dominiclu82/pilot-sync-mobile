@@ -390,7 +390,7 @@ app.get('/sw.js', (_req, res) => {
   res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
   res.setHeader('Service-Worker-Allowed', '/');
   res.send(`
-const CACHE = 'crewsync-v7002';
+const CACHE = 'crewsync-v7003';
 const SHELL = ['/', '/main', '/share'];
 self.addEventListener('install', e => {
   e.waitUntil(
@@ -1052,8 +1052,7 @@ app.post('/api/roster-share', async (req, res) => {
          fleet = COALESCE($3, fleet), rank = COALESCE($4, rank),
          nickname = COALESCE(NULLIF($5, ''), nickname),
          updated_at = NOW()
-         WHERE employee_id IS NULL
-         ORDER BY updated_at DESC LIMIT 1`,
+         WHERE id = (SELECT id FROM cs_users WHERE employee_id IS NULL ORDER BY updated_at DESC LIMIT 1)`,
         [eid, crewName || null, fleet || null, rank || null, nickname || '']
       ).catch(() => ({ rowCount: 0 }));
       // 完全沒有記錄才新建
@@ -1219,8 +1218,7 @@ function _syncNext() {
           // Link employee_id to user (jxUsername = employee ID = login username)
           await _pool.query(
             `UPDATE cs_users SET employee_id = $1, updated_at = NOW()
-             WHERE employee_id IS NULL
-             ORDER BY updated_at DESC LIMIT 1`,
+             WHERE id = (SELECT id FROM cs_users WHERE employee_id IS NULL ORDER BY updated_at DESC LIMIT 1)`,
             [eid]
           ).catch(() => {});
           // Also update if already linked
