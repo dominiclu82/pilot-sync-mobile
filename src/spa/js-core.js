@@ -1,5 +1,5 @@
-export function getSpaCoreJs(): string {
-  return `
+export function getSpaCoreJs() {
+    return `
 // ── Auto-reload on idle ──────────────────────────────────────────────────────
 var _hiddenAt = 0;
 document.addEventListener('visibilitychange', function() {
@@ -273,7 +273,6 @@ function pollStatus() {
         }
         if (data.employeeId) {
           localStorage.setItem('crewsync_eid', data.employeeId);
-          if (data.crewName) localStorage.setItem('crewsync_crew_name', data.crewName);
           // 同步完成後直接把 rosterData 存 localStorage（離線用，不經 DB）
           if (data.rosterData && data.rosterData.length > 0) {
             var selYear = document.getElementById('sync-year');

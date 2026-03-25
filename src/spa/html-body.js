@@ -1,5 +1,5 @@
-export function getSpaHtmlBody(): string {
-  return `
+export function getSpaHtmlBody() {
+    return `
 <body>
 
 <div style="text-align:center;padding:6px 12px;font-size:.72em;color:var(--muted);letter-spacing:.3px">
@@ -188,7 +188,7 @@ export function getSpaHtmlBody(): string {
 <!-- ── Friends panel ── -->
 <div id="roster-friends" class="roster-panel">
   <div>
-    <!-- Friends header: single row -->
+    <!-- Friends header -->
     <div style="display:flex;align-items:center;padding:5px 8px;border-bottom:1px solid var(--dim);gap:4px;white-space:nowrap">
       <span style="font-size:.69em;color:var(--muted);flex-shrink:0">同意分享班表</span>
       <label style="position:relative;display:inline-block;width:36px;height:20px;cursor:pointer;flex-shrink:0">
@@ -1212,7 +1212,7 @@ export function getSpaHtmlBody(): string {
       <button class="tab-util-btn tab-install-btn" id="tab-install-btn" onclick="showInstallGuide()" style="display:none">
         <span>📲</span>安裝
       </button>
-      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V7.0.08</span>
+      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V6.191</span>
     </div>
   </div>
 </div>
@@ -1242,15 +1242,15 @@ export function getSpaHtmlBody(): string {
       <div style="margin-bottom:4px">📱 建議使用 <b>iPad 橫向</b>操作以獲得最佳體驗</div>
       <div style="color:var(--muted)">Best experience on iPad in landscape mode</div>
     </div>
-    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V7.0.08</div>
+    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V6.191</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
-      <div>Friends 色塊區分功能區、月份導覽位置調整；同步 Friends header 至實際載入檔案；Cold Temp 表格移除 6000ft 以上列，僅保留至 5000ft</div>
-      <div>Friends header color-coded sections & month nav positioning; sync Friends header to served file; Cold Temp table trimmed to 5000ft max (removed 6000–10000ft rows)</div>
+      <div>修復 Roster 同步後資料未儲存問題；班表改為本機離線儲存，顯示上次同步時間</div>
+      <div>Fix roster data not saved after sync; roster now stored locally for offline access, showing last sync time</div>
     </div>
-    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V7.0.07</div>
+    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V6.190</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
-      <div>Friends 頂部控制列以色塊區分功能區（藍：機隊職級／綠：名稱／紫：查看篩選），調整月份導覽位置改善視覺平衡</div>
-      <div>Friends header uses color-coded sections (blue: fleet/rank, green: name, purple: view filter) with improved month navigation positioning</div>
+      <div>修正 Cold Temp 左側字型放大時計算按鈕被擋住無法捲動、右側表格底部永遠被切掉</div>
+      <div>Fix Cold Temp left form not scrollable on enlarged font, and right-side table rows permanently cut off</div>
     </div>
     <div style="font-size:.68em;color:var(--muted);margin-top:12px;margin-bottom:10px;display:flex;gap:16px;justify-content:center">
       <a href="/privacy" onclick="openLegal('/privacy');return false" style="color:var(--muted);text-decoration:underline">Privacy Policy 隱私權政策</a>
