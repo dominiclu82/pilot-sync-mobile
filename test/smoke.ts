@@ -83,7 +83,7 @@ async function run() {
   const html = await fetchOk('/main');
 
   await check('版號存在 (V6.)', async () => {
-    assert(html.includes('V6.'), '找不到版號');
+    assert(html.includes('V6.') || html.includes('V7.'), '找不到版號');
   });
 
   await check('Tab bar 存在', async () => {

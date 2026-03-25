@@ -46,7 +46,7 @@ function _frShowShareUI(show) {
   if (fleetSel) { fleetSel.value = localStorage.getItem('crewsync_my_fleet') || ''; fleetSel.style.display = show ? '' : 'none'; }
   if (rankSel) { rankSel.value = localStorage.getItem('crewsync_my_rank') || ''; rankSel.style.display = show ? '' : 'none'; }
   if (hint) hint.style.display = show ? '' : 'none';
-  if (nameWrap) nameWrap.style.display = show ? '' : 'none';
+  if (nameWrap) nameWrap.style.display = show ? 'inline-flex' : 'none';
   if (nameInput) nameInput.value = localStorage.getItem('crewsync_nickname') || localStorage.getItem('crewsync_crew_name') || localStorage.getItem('crewsync_eid') || '';
 }
 
@@ -234,7 +234,7 @@ function _frRender() {
   html += '<div style="display:grid;grid-template-columns:' + nameColW + 'px ' + gridCols + ';grid-template-rows:48px repeat(' + _frData.length + ',44px);gap:0;width:' + fullW + 'px">';
 
   // ── Top-left corner cell: "Crew" (sticky top + sticky left) ──
-  html += '<div style="grid-row:1;grid-column:1;position:sticky;left:0;top:0;z-index:20;background:var(--bg);display:flex;align-items:center;justify-content:center;border-right:2px solid var(--dim);border-bottom:1px solid var(--dim);font-size:.7em;color:var(--muted);font-weight:700">Crew</div>';
+  html += '<div style="grid-row:1;grid-column:1;position:sticky;left:0;top:0;z-index:20;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;border-right:2px solid var(--dim);border-bottom:1px solid var(--dim);font-size:.7em;color:var(--muted);font-weight:700"><span>Crew</span><span style="font-size:.55em;font-weight:400;opacity:.6">點頭像看全名</span><span style="font-size:.55em;font-weight:400;opacity:.6">Tap 👤</span></div>';
 
   // ── Date header cells (row 1, col 2+): sticky top ──
   for (var d = 1; d <= daysInMonth; d++) {

@@ -204,9 +204,9 @@ export function getSpaHtmlBody(): string {
       <select id="fr-my-rank" onchange="_frCheckReady()" style="display:none;background:#2d3748;color:#e2e8f0;border:1px solid #4a5568;border-radius:4px;padding:2px 4px;font-size:.72em;cursor:pointer;width:auto;flex-shrink:0">
         <option value="" disabled selected>職級</option><option value="CAP">CAP</option><option value="SFO">SFO</option><option value="FO">FO</option>
       </select>
-      <span id="fr-name-wrap" style="display:none;flex-shrink:0">
+      <span id="fr-name-wrap" style="display:none;flex-shrink:0;display:inline-flex;align-items:center;gap:4px">
         <input id="fr-my-name" type="text" placeholder="顯示名稱 Display name" onchange="_frCheckReady()" style="background:#2d3748;color:#e2e8f0;border:1px solid #4a5568;border-radius:4px;padding:2px 4px;font-size:.72em;width:110px">
-        <span style="font-size:.56em;color:var(--muted)">可改中文或暱稱 Chinese/nickname OK</span>
+        <span style="font-size:.5em;color:var(--muted);line-height:1.4;display:inline-flex;flex-direction:column"><span>可改中文或暱稱 Chinese/nickname OK</span><span>點按大頭照顯示全名 Tap avatar for full name</span></span>
       </span>
       <span style="flex:1"></span>
       <button onclick="_frPrevMonth()" style="background:none;border:none;color:var(--muted);font-size:1.1em;cursor:pointer;padding:0 4px;flex-shrink:0">◀</button>
