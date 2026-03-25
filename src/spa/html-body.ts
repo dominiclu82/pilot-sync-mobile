@@ -199,7 +199,7 @@ export function getSpaHtmlBody(): string {
       <span onclick="_frShowInfo()" style="cursor:pointer;font-size:.85em;color:var(--muted);flex-shrink:0" title="分享說明">ⓘ</span>
       <!-- 區塊1: 我的機隊/職級 (淡藍) -->
       <span id="fr-share-hint" style="display:none;flex-shrink:0;background:rgba(59,130,246,.1);border:1px solid rgba(59,130,246,.25);border-radius:6px;padding:2px 6px;align-items:center;gap:4px">
-        <span style="font-size:.52em;color:#60a5fa;line-height:1.2">我的機隊/職級<br>My fleet/rank</span>
+        <span style="font-size:.52em;color:#60a5fa;line-height:1.2;white-space:nowrap">我的機隊/職級<br>My fleet/rank</span>
         <select id="fr-my-fleet" onchange="_frCheckReady()" style="background:#1e3a5f;color:#93c5fd;border:1px solid rgba(59,130,246,.3);border-radius:4px;padding:2px 4px;font-size:.72em;cursor:pointer;width:auto">
           <option value="" disabled selected>機隊</option><option value="A321">A321</option><option value="A330">A330</option><option value="A350">A350</option>
         </select>
@@ -211,8 +211,8 @@ export function getSpaHtmlBody(): string {
       <span id="fr-name-wrap" style="display:none;flex-shrink:0;background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.25);border-radius:6px;padding:2px 6px;margin-left:12px;align-items:center;gap:4px">
         <span style="font-size:.5em;color:#86efac">名稱<br>Name</span>
         <input id="fr-my-name" type="text" placeholder="可修改 editable" onchange="_frCheckReady()" style="background:#1a3a2a;color:#86efac;border:1px solid rgba(34,197,94,.3);border-radius:4px;padding:2px 4px;font-size:.72em;width:100px">
+        <span onclick="_frShowNameInfo()" style="cursor:pointer;font-size:.85em;color:rgba(34,197,94,.6);flex-shrink:0" title="名稱說明">ⓘ</span>
       </span>
-      <span onclick="_frShowNameInfo()" style="cursor:pointer;font-size:.85em;color:rgba(34,197,94,.6);flex-shrink:0" title="名稱說明">ⓘ</span>
       <span style="flex:1"></span>
       <button onclick="_frPrevMonth()" style="background:none;border:none;color:var(--muted);font-size:1.1em;cursor:pointer;padding:0 4px;flex-shrink:0">◀</button>
       <span id="fr-month-title" style="font-weight:700;font-size:1em;color:var(--text);flex-shrink:0;min-width:80px;text-align:center"></span>
@@ -1212,7 +1212,7 @@ export function getSpaHtmlBody(): string {
       <button class="tab-util-btn tab-install-btn" id="tab-install-btn" onclick="showInstallGuide()" style="display:none">
         <span>📲</span>安裝
       </button>
-      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V7.0.09</span>
+      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V7.0.10</span>
     </div>
   </div>
 </div>
@@ -1242,15 +1242,15 @@ export function getSpaHtmlBody(): string {
       <div style="margin-bottom:4px">📱 建議使用 <b>iPad 橫向</b>操作以獲得最佳體驗</div>
       <div style="color:var(--muted)">Best experience on iPad in landscape mode</div>
     </div>
-    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V7.0.09</div>
+    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V7.0.10</div>
+    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
+      <div>名稱說明 ⓘ 移出綠色區塊修正點擊問題；iPad 機隊/職級區塊高度對齊；Cold Temp 表格移除 6000ft 以上</div>
+      <div>Move name info ⓘ outside green block to fix tap issue; align fleet/rank block height on iPad; Cold Temp table trimmed to 5000ft</div>
+    </div>
+    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V7.0.09</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
       <div>Friends 色塊區分功能區、月份導覽位置調整、名稱說明 ⓘ 修正；Cold Temp 表格僅保留至 5000ft</div>
       <div>Friends color-coded sections, month nav positioning, name info ⓘ fix; Cold Temp table trimmed to 5000ft</div>
-    </div>
-    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V7.0.08</div>
-    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
-      <div>同步 Friends header 至實際載入檔案；Cold Temp 表格移除 6000ft 以上列</div>
-      <div>Sync Friends header to served file; Cold Temp table removed 6000–10000ft rows</div>
     </div>
     <div style="font-size:.68em;color:var(--muted);margin-top:12px;margin-bottom:10px;display:flex;gap:16px;justify-content:center">
       <a href="/privacy" onclick="openLegal('/privacy');return false" style="color:var(--muted);text-decoration:underline">Privacy Policy 隱私權政策</a>

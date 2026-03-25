@@ -5,12 +5,21 @@ var _frData = []; // [{ name, nickname, picture, duties }]
 var _frInited = false;
 
 function _frInit() {
+  // debug mode: ?debug=friends 或 #debug-friends 強制顯示 UI
+  if (new URLSearchParams(location.search).get('debug') === 'friends' || location.hash === '#debug-friends') {
+    localStorage.setItem('crewsync_share_enabled', '1');
+  }
   var isSharing = localStorage.getItem('crewsync_share_enabled') === '1';
   var shareToggle = document.getElementById('fr-share-toggle');
   if (shareToggle) shareToggle.checked = isSharing;
   _frShowShareUI(isSharing);
   if (isSharing) _frLoadMonth();
   else _frShowEmpty();
+}
+
+function _frShowNameInfo() {
+  var overlay = document.getElementById('fr-name-info-overlay');
+  if (overlay) overlay.style.display = 'flex';
 }
 
 function _frShowInfo() {
@@ -43,9 +52,9 @@ function _frShowShareUI(show) {
   var hint = document.getElementById('fr-share-hint');
   var nameWrap = document.getElementById('fr-name-wrap');
   var nameInput = document.getElementById('fr-my-name');
-  if (fleetSel) { fleetSel.value = localStorage.getItem('crewsync_my_fleet') || ''; fleetSel.style.display = show ? '' : 'none'; }
-  if (rankSel) { rankSel.value = localStorage.getItem('crewsync_my_rank') || ''; rankSel.style.display = show ? '' : 'none'; }
-  if (hint) hint.style.display = show ? '' : 'none';
+  if (fleetSel) fleetSel.value = localStorage.getItem('crewsync_my_fleet') || '';
+  if (rankSel) rankSel.value = localStorage.getItem('crewsync_my_rank') || '';
+  if (hint) hint.style.display = show ? 'inline-flex' : 'none';
   if (nameWrap) nameWrap.style.display = show ? 'inline-flex' : 'none';
   if (nameInput) nameInput.value = localStorage.getItem('crewsync_nickname') || localStorage.getItem('crewsync_crew_name') || localStorage.getItem('crewsync_eid') || '';
 }
