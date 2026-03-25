@@ -211,8 +211,8 @@ export function getSpaHtmlBody(): string {
       <span id="fr-name-wrap" style="display:none;flex-shrink:0;background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.25);border-radius:6px;padding:2px 6px;margin-left:12px;align-items:center;gap:4px">
         <span style="font-size:.5em;color:#86efac">名稱<br>Name</span>
         <input id="fr-my-name" type="text" placeholder="可修改 editable" onchange="_frCheckReady()" style="background:#1a3a2a;color:#86efac;border:1px solid rgba(34,197,94,.3);border-radius:4px;padding:2px 4px;font-size:.72em;width:100px">
-        <span onclick="_frShowNameInfo()" style="cursor:pointer;font-size:.75em;color:rgba(34,197,94,.6);flex-shrink:0" title="名稱說明">ⓘ</span>
       </span>
+      <span onclick="_frShowNameInfo()" style="cursor:pointer;font-size:.85em;color:rgba(34,197,94,.6);flex-shrink:0" title="名稱說明">ⓘ</span>
       <span style="flex:1"></span>
       <button onclick="_frPrevMonth()" style="background:none;border:none;color:var(--muted);font-size:1.1em;cursor:pointer;padding:0 4px;flex-shrink:0">◀</button>
       <span id="fr-month-title" style="font-weight:700;font-size:1em;color:var(--text);flex-shrink:0;min-width:80px;text-align:center"></span>
@@ -1212,7 +1212,7 @@ export function getSpaHtmlBody(): string {
       <button class="tab-util-btn tab-install-btn" id="tab-install-btn" onclick="showInstallGuide()" style="display:none">
         <span>📲</span>安裝
       </button>
-      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V7.0.08</span>
+      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V7.0.09</span>
     </div>
   </div>
 </div>
@@ -1242,15 +1242,15 @@ export function getSpaHtmlBody(): string {
       <div style="margin-bottom:4px">📱 建議使用 <b>iPad 橫向</b>操作以獲得最佳體驗</div>
       <div style="color:var(--muted)">Best experience on iPad in landscape mode</div>
     </div>
-    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V7.0.08</div>
+    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V7.0.09</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
-      <div>Friends 色塊區分功能區、月份導覽位置調整；同步 Friends header 至實際載入檔案；Cold Temp 表格移除 6000ft 以上列，僅保留至 5000ft</div>
-      <div>Friends header color-coded sections & month nav positioning; sync Friends header to served file; Cold Temp table trimmed to 5000ft max (removed 6000–10000ft rows)</div>
+      <div>Friends 色塊區分功能區、月份導覽位置調整、名稱說明 ⓘ 修正；Cold Temp 表格僅保留至 5000ft</div>
+      <div>Friends color-coded sections, month nav positioning, name info ⓘ fix; Cold Temp table trimmed to 5000ft</div>
     </div>
-    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V7.0.07</div>
+    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V7.0.08</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
-      <div>Friends 頂部控制列以色塊區分功能區（藍：機隊職級／綠：名稱／紫：查看篩選），調整月份導覽位置改善視覺平衡</div>
-      <div>Friends header uses color-coded sections (blue: fleet/rank, green: name, purple: view filter) with improved month navigation positioning</div>
+      <div>同步 Friends header 至實際載入檔案；Cold Temp 表格移除 6000ft 以上列</div>
+      <div>Sync Friends header to served file; Cold Temp table removed 6000–10000ft rows</div>
     </div>
     <div style="font-size:.68em;color:var(--muted);margin-top:12px;margin-bottom:10px;display:flex;gap:16px;justify-content:center">
       <a href="/privacy" onclick="openLegal('/privacy');return false" style="color:var(--muted);text-decoration:underline">Privacy Policy 隱私權政策</a>

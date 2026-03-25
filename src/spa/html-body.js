@@ -211,8 +211,8 @@ export function getSpaHtmlBody() {
       <span id="fr-name-wrap" style="display:none;flex-shrink:0;background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.25);border-radius:6px;padding:2px 6px;margin-left:12px;align-items:center;gap:4px">
         <span style="font-size:.5em;color:#86efac">名稱<br>Name</span>
         <input id="fr-my-name" type="text" placeholder="可修改 editable" onchange="_frCheckReady()" style="background:#1a3a2a;color:#86efac;border:1px solid rgba(34,197,94,.3);border-radius:4px;padding:2px 4px;font-size:.72em;width:100px">
-        <span onclick="_frShowNameInfo()" style="cursor:pointer;font-size:.75em;color:rgba(34,197,94,.6);flex-shrink:0" title="名稱說明">ⓘ</span>
       </span>
+      <span onclick="_frShowNameInfo()" style="cursor:pointer;font-size:.85em;color:rgba(34,197,94,.6);flex-shrink:0" title="名稱說明">ⓘ</span>
       <span style="flex:1"></span>
       <button onclick="_frPrevMonth()" style="background:none;border:none;color:var(--muted);font-size:1.1em;cursor:pointer;padding:0 4px;flex-shrink:0">◀</button>
       <span id="fr-month-title" style="font-weight:700;font-size:1em;color:var(--text);flex-shrink:0;min-width:80px;text-align:center"></span>
