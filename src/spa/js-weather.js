@@ -1,5 +1,5 @@
-export function getSpaWeatherJs(): string {
-  return `
+export function getSpaWeatherJs() {
+    return `
 // ── 航路氣象 ──────────────────────────────────────────────────────────────────
 // WX_AIRPORTS 由 _wxFleetData 動態取得（資料定義在 airport-data.js）
 var wxCurrentFleet = (function() { try { var f = localStorage.getItem('crewsync_fleet'); if (f && _wxFleetData[f]) return f; } catch(e) {} return 'A350-900'; })();
@@ -234,8 +234,9 @@ function refreshWxDetail(icao, name) {
   _wxSaveDetailCache();
   var content = document.getElementById('wx-detail-content');
   if (content) content.innerHTML = '<div class="atis-loading">重新載入...</div>';
+  /* 按鈕顯示更新中 */
   var btn = document.getElementById('wx-detail-refresh-btn');
-  if (btn) { btn.disabled = true; btn.textContent = '\\u21ba ...'; }
+  if (btn) { btn.disabled = true; btn.textContent = '\u21ba ...'; }
   fetchWxDetail(icao, name);
 }
 
@@ -325,11 +326,11 @@ function _wxDetailRefreshDone() {
   var btn = document.getElementById('wx-detail-refresh-btn');
   if (btn) {
     btn.disabled = false;
-    btn.textContent = '\\u21ba Done';
+    btn.textContent = '\u21ba Done';
     btn.classList.add('done');
     setTimeout(function() {
       var b = document.getElementById('wx-detail-refresh-btn');
-      if (b) { b.textContent = '\\u21ba \\u66f4\\u65b0'; b.classList.remove('done'); }
+      if (b) { b.textContent = '\u21ba \u66f4\u65b0'; b.classList.remove('done'); }
     }, 2000);
   }
 }
