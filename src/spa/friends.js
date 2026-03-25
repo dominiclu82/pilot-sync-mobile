@@ -168,7 +168,10 @@ function _frNextMonth() {
 function _frLoadMonth() {
   var months = ['','Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
   var titleEl = document.getElementById('fr-month-title');
-  if (titleEl) titleEl.textContent = months[_frMonth] + ' ' + _frYear;
+  var titleElM = document.getElementById('fr-month-title-m');
+  var titleText = months[_frMonth] + ' ' + _frYear;
+  if (titleEl) titleEl.textContent = titleText;
+  if (titleElM) titleElM.textContent = titleText;
 
   var monthKey = _frYear + '-' + String(_frMonth).padStart(2, '0');
 

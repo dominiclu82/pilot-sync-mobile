@@ -188,45 +188,66 @@ export function getSpaHtmlBody(): string {
 <!-- ── Friends panel ── -->
 <div id="roster-friends" class="roster-panel">
   <div>
-    <!-- Friends header: single row -->
-    <div style="display:flex;align-items:center;padding:5px 8px;border-bottom:1px solid var(--dim);gap:4px;white-space:nowrap">
-      <span style="font-size:.69em;color:var(--muted);flex-shrink:0">同意分享班表</span>
-      <label style="position:relative;display:inline-block;width:36px;height:20px;cursor:pointer;flex-shrink:0">
-        <input type="checkbox" id="fr-share-toggle" onchange="_frToggleShare()" style="opacity:0;width:0;height:0">
-        <span style="position:absolute;top:0;left:0;right:0;bottom:0;background:#4a5568;border-radius:10px;transition:.3s"></span>
-        <span style="position:absolute;top:2px;left:2px;width:16px;height:16px;background:#fff;border-radius:50%;transition:.3s" id="fr-share-dot"></span>
-      </label>
-      <span onclick="_frShowInfo()" style="cursor:pointer;font-size:.85em;color:var(--muted);flex-shrink:0" title="分享說明">ⓘ</span>
-      <!-- 區塊1: 我的機隊/職級 (淡藍) -->
-      <span id="fr-share-hint" style="display:none;flex-shrink:0;background:rgba(59,130,246,.1);border:1px solid rgba(59,130,246,.25);border-radius:6px;padding:2px 6px;align-items:center;gap:4px">
-        <span style="font-size:.52em;color:#60a5fa;line-height:1.2;white-space:nowrap">我的機隊/職級<br>My fleet/rank</span>
-        <select id="fr-my-fleet" onchange="_frCheckReady()" style="background:#1e3a5f;color:#93c5fd;border:1px solid rgba(59,130,246,.3);border-radius:4px;padding:2px 4px;font-size:.72em;cursor:pointer;width:auto">
-          <option value="" disabled selected>機隊</option><option value="A321">A321</option><option value="A330">A330</option><option value="A350">A350</option>
-        </select>
-        <select id="fr-my-rank" onchange="_frCheckReady()" style="background:#1e3a5f;color:#93c5fd;border:1px solid rgba(59,130,246,.3);border-radius:4px;padding:2px 4px;font-size:.72em;cursor:pointer;width:auto">
-          <option value="" disabled selected>職級</option><option value="CAP">CAP</option><option value="SFO">SFO</option><option value="FO">FO</option>
-        </select>
-      </span>
-      <!-- 區塊2: 名字 (淡綠) -->
-      <span id="fr-name-wrap" style="display:none;flex-shrink:0;background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.25);border-radius:6px;padding:2px 6px;margin-left:12px;align-items:center;gap:4px">
-        <span style="font-size:.5em;color:#86efac">名稱<br>Name</span>
-        <input id="fr-my-name" type="text" placeholder="可修改 editable" onchange="_frCheckReady()" style="background:#1a3a2a;color:#86efac;border:1px solid rgba(34,197,94,.3);border-radius:4px;padding:2px 4px;font-size:.72em;width:100px">
-        <span onclick="_frShowNameInfo()" style="cursor:pointer;font-size:.85em;color:rgba(34,197,94,.6);flex-shrink:0" title="名稱說明">ⓘ</span>
-      </span>
-      <span style="flex:1"></span>
-      <button onclick="_frPrevMonth()" style="background:none;border:none;color:var(--muted);font-size:1.1em;cursor:pointer;padding:0 4px;flex-shrink:0">◀</button>
-      <span id="fr-month-title" style="font-weight:700;font-size:1em;color:var(--text);flex-shrink:0;min-width:80px;text-align:center"></span>
-      <button onclick="_frNextMonth()" style="background:none;border:none;color:var(--muted);font-size:1.1em;cursor:pointer;padding:0 4px;flex-shrink:0">▶</button>
-      <span style="flex:2"></span>
-      <!-- 區塊3: 查看篩選 (淡紫) -->
-      <span style="flex-shrink:0;background:rgba(168,85,247,.1);border:1px solid rgba(168,85,247,.25);border-radius:6px;padding:2px 6px;display:inline-flex;align-items:center;gap:4px">
-        <span style="font-size:.52em;color:#c084fc;line-height:1.2">查看<br>View</span>
-        <select id="fr-filter-fleet" onchange="_frLoadMonth()" style="background:#2d1f4e;color:#d8b4fe;border:1px solid rgba(168,85,247,.3);border-radius:4px;padding:2px 4px;font-size:.72em;cursor:pointer;width:auto">
-          <option value="">All</option><option value="A321">A321</option><option value="A330">A330</option><option value="A350">A350</option>
-        </select>
-        <select id="fr-filter-rank" onchange="_frLoadMonth()" style="background:#2d1f4e;color:#d8b4fe;border:1px solid rgba(168,85,247,.3);border-radius:4px;padding:2px 4px;font-size:.72em;cursor:pointer;width:auto">
-        <option value="">All</option><option value="CAP">CAP</option><option value="SFO">SFO</option><option value="FO">FO</option>
-      </select>
+    <!-- Friends header: desktop 一行 / mobile portrait 兩行 -->
+    <div class="fr-header">
+      <!-- Row 1: toggle + 機隊 + 名稱（手機可左右滑） -->
+      <div class="fr-header-row1">
+        <span style="font-size:.69em;color:var(--muted);flex-shrink:0">同意分享班表</span>
+        <label style="position:relative;display:inline-block;width:36px;height:20px;cursor:pointer;flex-shrink:0">
+          <input type="checkbox" id="fr-share-toggle" onchange="_frToggleShare()" style="opacity:0;width:0;height:0">
+          <span style="position:absolute;top:0;left:0;right:0;bottom:0;background:#4a5568;border-radius:10px;transition:.3s"></span>
+          <span style="position:absolute;top:2px;left:2px;width:16px;height:16px;background:#fff;border-radius:50%;transition:.3s" id="fr-share-dot"></span>
+        </label>
+        <span onclick="_frShowInfo()" style="cursor:pointer;font-size:.85em;color:var(--muted);flex-shrink:0" title="分享說明">ⓘ</span>
+        <!-- 區塊1: 我的機隊/職級 (淡藍) -->
+        <span id="fr-share-hint" style="display:none;flex-shrink:0;background:rgba(59,130,246,.1);border:1px solid rgba(59,130,246,.25);border-radius:6px;padding:2px 6px;align-items:center;gap:4px">
+          <span style="font-size:.52em;color:#60a5fa;line-height:1.2;white-space:nowrap">我的機隊/職級<br>My fleet/rank</span>
+          <select id="fr-my-fleet" onchange="_frCheckReady()" style="background:#1e3a5f;color:#93c5fd;border:1px solid rgba(59,130,246,.3);border-radius:4px;padding:2px 4px;font-size:.72em;cursor:pointer;width:auto">
+            <option value="" disabled selected>機隊</option><option value="A321">A321</option><option value="A330">A330</option><option value="A350">A350</option>
+          </select>
+          <select id="fr-my-rank" onchange="_frCheckReady()" style="background:#1e3a5f;color:#93c5fd;border:1px solid rgba(59,130,246,.3);border-radius:4px;padding:2px 4px;font-size:.72em;cursor:pointer;width:auto">
+            <option value="" disabled selected>職級</option><option value="CAP">CAP</option><option value="SFO">SFO</option><option value="FO">FO</option>
+          </select>
+        </span>
+        <!-- 區塊2: 名字 (淡綠) -->
+        <span id="fr-name-wrap" style="display:none;flex-shrink:0;background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.25);border-radius:6px;padding:2px 6px;margin-left:12px;align-items:center;gap:4px">
+          <span style="font-size:.5em;color:#86efac">名稱<br>Name</span>
+          <input id="fr-my-name" type="text" placeholder="可修改 editable" onchange="_frCheckReady()" style="background:#1a3a2a;color:#86efac;border:1px solid rgba(34,197,94,.3);border-radius:4px;padding:2px 4px;font-size:.72em;width:100px">
+          <span onclick="_frShowNameInfo()" style="cursor:pointer;font-size:.85em;color:rgba(34,197,94,.6);flex-shrink:0" title="名稱說明">ⓘ</span>
+        </span>
+        <!-- desktop: 月份+篩選接在同一行 -->
+        <span class="fr-header-row2-inline" style="flex:1"></span>
+        <button class="fr-header-row2-inline" onclick="_frPrevMonth()" style="background:none;border:none;color:var(--muted);font-size:1.1em;cursor:pointer;padding:0 4px;flex-shrink:0">◀</button>
+        <span class="fr-header-row2-inline" id="fr-month-title" style="font-weight:700;font-size:1em;color:var(--text);flex-shrink:0;min-width:80px;text-align:center"></span>
+        <button class="fr-header-row2-inline" onclick="_frNextMonth()" style="background:none;border:none;color:var(--muted);font-size:1.1em;cursor:pointer;padding:0 4px;flex-shrink:0">▶</button>
+        <span class="fr-header-row2-inline" style="flex:2"></span>
+        <span class="fr-header-row2-inline" style="flex-shrink:0;background:rgba(168,85,247,.1);border:1px solid rgba(168,85,247,.25);border-radius:6px;padding:2px 6px;display:inline-flex;align-items:center;gap:4px">
+          <span style="font-size:.52em;color:#c084fc;line-height:1.2">查看<br>View</span>
+          <select id="fr-filter-fleet" onchange="_frLoadMonth()" style="background:#2d1f4e;color:#d8b4fe;border:1px solid rgba(168,85,247,.3);border-radius:4px;padding:2px 4px;font-size:.72em;cursor:pointer;width:auto">
+            <option value="">All</option><option value="A321">A321</option><option value="A330">A330</option><option value="A350">A350</option>
+          </select>
+          <select id="fr-filter-rank" onchange="_frLoadMonth()" style="background:#2d1f4e;color:#d8b4fe;border:1px solid rgba(168,85,247,.3);border-radius:4px;padding:2px 4px;font-size:.72em;cursor:pointer;width:auto">
+            <option value="">All</option><option value="CAP">CAP</option><option value="SFO">SFO</option><option value="FO">FO</option>
+          </select>
+        </span>
+      </div>
+      <!-- Row 2: 月份+篩選（僅手機直拿顯示） -->
+      <div class="fr-header-row2">
+        <span style="flex:1"></span>
+        <button onclick="_frPrevMonth()" style="background:none;border:none;color:var(--muted);font-size:1.1em;cursor:pointer;padding:0 4px;flex-shrink:0">◀</button>
+        <span id="fr-month-title-m" style="font-weight:700;font-size:1em;color:var(--text);flex-shrink:0;min-width:80px;text-align:center"></span>
+        <button onclick="_frNextMonth()" style="background:none;border:none;color:var(--muted);font-size:1.1em;cursor:pointer;padding:0 4px;flex-shrink:0">▶</button>
+        <span style="flex:1"></span>
+        <span style="flex-shrink:0;background:rgba(168,85,247,.1);border:1px solid rgba(168,85,247,.25);border-radius:6px;padding:2px 6px;display:inline-flex;align-items:center;gap:4px">
+          <span style="font-size:.52em;color:#c084fc;line-height:1.2">查看<br>View</span>
+          <select id="fr-filter-fleet-m" onchange="document.getElementById('fr-filter-fleet').value=this.value;_frLoadMonth()" style="background:#2d1f4e;color:#d8b4fe;border:1px solid rgba(168,85,247,.3);border-radius:4px;padding:2px 4px;font-size:.72em;cursor:pointer;width:auto">
+            <option value="">All</option><option value="A321">A321</option><option value="A330">A330</option><option value="A350">A350</option>
+          </select>
+          <select id="fr-filter-rank-m" onchange="document.getElementById('fr-filter-rank').value=this.value;_frLoadMonth()" style="background:#2d1f4e;color:#d8b4fe;border:1px solid rgba(168,85,247,.3);border-radius:4px;padding:2px 4px;font-size:.72em;cursor:pointer;width:auto">
+            <option value="">All</option><option value="CAP">CAP</option><option value="SFO">SFO</option><option value="FO">FO</option>
+          </select>
+        </span>
+      </div>
     </div>
     <style>#fr-share-toggle:checked+span{background:var(--accent)!important}#fr-share-toggle:checked~#fr-share-dot{transform:translateX(16px)}</style>
     <!-- Friends grid -->
@@ -1212,7 +1233,7 @@ export function getSpaHtmlBody(): string {
       <button class="tab-util-btn tab-install-btn" id="tab-install-btn" onclick="showInstallGuide()" style="display:none">
         <span>📲</span>安裝
       </button>
-      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V7.0.10</span>
+      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V7.0.11</span>
     </div>
   </div>
 </div>
@@ -1242,15 +1263,15 @@ export function getSpaHtmlBody(): string {
       <div style="margin-bottom:4px">📱 建議使用 <b>iPad 橫向</b>操作以獲得最佳體驗</div>
       <div style="color:var(--muted)">Best experience on iPad in landscape mode</div>
     </div>
-    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V7.0.10</div>
+    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V7.0.11</div>
+    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
+      <div>手機直拿 Friends header 分兩行排列：第一行控制項可左右滑動、第二行月份置中+篩選靠右</div>
+      <div>Mobile portrait Friends header split into two rows: scrollable controls on row 1, centered month nav + filter on row 2</div>
+    </div>
+    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V7.0.10</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
       <div>名稱說明 ⓘ 移出綠色區塊修正點擊問題；iPad 機隊/職級區塊高度對齊；Cold Temp 表格移除 6000ft 以上</div>
       <div>Move name info ⓘ outside green block to fix tap issue; align fleet/rank block height on iPad; Cold Temp table trimmed to 5000ft</div>
-    </div>
-    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V7.0.09</div>
-    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
-      <div>Friends 色塊區分功能區、月份導覽位置調整、名稱說明 ⓘ 修正；Cold Temp 表格僅保留至 5000ft</div>
-      <div>Friends color-coded sections, month nav positioning, name info ⓘ fix; Cold Temp table trimmed to 5000ft</div>
     </div>
     <div style="font-size:.68em;color:var(--muted);margin-top:12px;margin-bottom:10px;display:flex;gap:16px;justify-content:center">
       <a href="/privacy" onclick="openLegal('/privacy');return false" style="color:var(--muted);text-decoration:underline">Privacy Policy 隱私權政策</a>

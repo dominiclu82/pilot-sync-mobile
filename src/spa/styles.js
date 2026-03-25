@@ -1,5 +1,5 @@
-export function getSpaStyles(): string {
-  return `
+export function getSpaStyles() {
+    return `
 html{overscroll-behavior:none}
 html::before{content:'';position:fixed;top:0;left:0;right:0;height:env(safe-area-inset-top,0px);background:var(--bg);z-index:9999}
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
