@@ -197,27 +197,34 @@ export function getSpaHtmlBody(): string {
         <span style="position:absolute;top:2px;left:2px;width:16px;height:16px;background:#fff;border-radius:50%;transition:.3s" id="fr-share-dot"></span>
       </label>
       <span onclick="_frShowInfo()" style="cursor:pointer;font-size:.85em;color:var(--muted);flex-shrink:0" title="分享說明">ⓘ</span>
-      <span id="fr-share-hint" style="font-size:.62em;color:var(--muted);display:none;flex-shrink:0;line-height:1.2">我的機隊/職級（可隨時更改）<br>My fleet/rank (can change anytime)</span>
-      <select id="fr-my-fleet" onchange="_frCheckReady()" style="display:none;background:#2d3748;color:#e2e8f0;border:1px solid #4a5568;border-radius:4px;padding:2px 4px;font-size:.72em;cursor:pointer;width:auto;flex-shrink:0">
-        <option value="" disabled selected>機隊</option><option value="A321">A321</option><option value="A330">A330</option><option value="A350">A350</option>
-      </select>
-      <select id="fr-my-rank" onchange="_frCheckReady()" style="display:none;background:#2d3748;color:#e2e8f0;border:1px solid #4a5568;border-radius:4px;padding:2px 4px;font-size:.72em;cursor:pointer;width:auto;flex-shrink:0">
-        <option value="" disabled selected>職級</option><option value="CAP">CAP</option><option value="SFO">SFO</option><option value="FO">FO</option>
-      </select>
-      <span id="fr-name-wrap" style="display:none;flex-shrink:0;display:inline-flex;align-items:center;gap:4px">
-        <input id="fr-my-name" type="text" placeholder="顯示名稱 Display name" onchange="_frCheckReady()" style="background:#2d3748;color:#e2e8f0;border:1px solid #4a5568;border-radius:4px;padding:2px 4px;font-size:.72em;width:110px">
-        <span style="font-size:.5em;color:var(--muted);line-height:1.4;display:inline-flex;flex-direction:column"><span>可改中文或暱稱 Chinese/nickname OK</span><span>點按大頭照顯示全名 Tap avatar for full name</span></span>
+      <!-- 區塊1: 我的機隊/職級 (淡藍) -->
+      <span id="fr-share-hint" style="display:none;flex-shrink:0;background:rgba(59,130,246,.1);border:1px solid rgba(59,130,246,.25);border-radius:6px;padding:2px 6px;align-items:center;gap:4px">
+        <span style="font-size:.52em;color:#60a5fa;line-height:1.2">我的機隊/職級<br>My fleet/rank</span>
+        <select id="fr-my-fleet" onchange="_frCheckReady()" style="background:#1e3a5f;color:#93c5fd;border:1px solid rgba(59,130,246,.3);border-radius:4px;padding:2px 4px;font-size:.72em;cursor:pointer;width:auto">
+          <option value="" disabled selected>機隊</option><option value="A321">A321</option><option value="A330">A330</option><option value="A350">A350</option>
+        </select>
+        <select id="fr-my-rank" onchange="_frCheckReady()" style="background:#1e3a5f;color:#93c5fd;border:1px solid rgba(59,130,246,.3);border-radius:4px;padding:2px 4px;font-size:.72em;cursor:pointer;width:auto">
+          <option value="" disabled selected>職級</option><option value="CAP">CAP</option><option value="SFO">SFO</option><option value="FO">FO</option>
+        </select>
+      </span>
+      <!-- 區塊2: 名字 (淡綠) -->
+      <span id="fr-name-wrap" style="display:none;flex-shrink:0;background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.25);border-radius:6px;padding:2px 6px;margin-left:12px;align-items:center;gap:4px">
+        <span style="font-size:.5em;color:#86efac">名稱<br>Name</span>
+        <input id="fr-my-name" type="text" placeholder="可修改 editable" onchange="_frCheckReady()" style="background:#1a3a2a;color:#86efac;border:1px solid rgba(34,197,94,.3);border-radius:4px;padding:2px 4px;font-size:.72em;width:100px">
+        <span onclick="_frShowNameInfo()" style="cursor:pointer;font-size:.75em;color:rgba(34,197,94,.6);flex-shrink:0" title="名稱說明">ⓘ</span>
       </span>
       <span style="flex:1"></span>
       <button onclick="_frPrevMonth()" style="background:none;border:none;color:var(--muted);font-size:1.1em;cursor:pointer;padding:0 4px;flex-shrink:0">◀</button>
       <span id="fr-month-title" style="font-weight:700;font-size:1em;color:var(--text);flex-shrink:0;min-width:80px;text-align:center"></span>
       <button onclick="_frNextMonth()" style="background:none;border:none;color:var(--muted);font-size:1.1em;cursor:pointer;padding:0 4px;flex-shrink:0">▶</button>
-      <span style="flex:1"></span>
-      <span style="font-size:.62em;color:var(--muted);flex-shrink:0;line-height:1.2">想查看的機隊/職級<br>View by fleet/rank</span>
-      <select id="fr-filter-fleet" onchange="_frLoadMonth()" style="background:#2d3748;color:#e2e8f0;border:1px solid #4a5568;border-radius:4px;padding:2px 4px;font-size:.72em;cursor:pointer;width:auto;flex-shrink:0">
-        <option value="">All</option><option value="A321">A321</option><option value="A330">A330</option><option value="A350">A350</option>
-      </select>
-      <select id="fr-filter-rank" onchange="_frLoadMonth()" style="background:#2d3748;color:#e2e8f0;border:1px solid #4a5568;border-radius:4px;padding:2px 4px;font-size:.72em;cursor:pointer;width:auto;flex-shrink:0">
+      <span style="flex:2"></span>
+      <!-- 區塊3: 查看篩選 (淡紫) -->
+      <span style="flex-shrink:0;background:rgba(168,85,247,.1);border:1px solid rgba(168,85,247,.25);border-radius:6px;padding:2px 6px;display:inline-flex;align-items:center;gap:4px">
+        <span style="font-size:.52em;color:#c084fc;line-height:1.2">查看<br>View</span>
+        <select id="fr-filter-fleet" onchange="_frLoadMonth()" style="background:#2d1f4e;color:#d8b4fe;border:1px solid rgba(168,85,247,.3);border-radius:4px;padding:2px 4px;font-size:.72em;cursor:pointer;width:auto">
+          <option value="">All</option><option value="A321">A321</option><option value="A330">A330</option><option value="A350">A350</option>
+        </select>
+        <select id="fr-filter-rank" onchange="_frLoadMonth()" style="background:#2d1f4e;color:#d8b4fe;border:1px solid rgba(168,85,247,.3);border-radius:4px;padding:2px 4px;font-size:.72em;cursor:pointer;width:auto">
         <option value="">All</option><option value="CAP">CAP</option><option value="SFO">SFO</option><option value="FO">FO</option>
       </select>
     </div>
@@ -225,11 +232,10 @@ export function getSpaHtmlBody(): string {
     <!-- Friends grid -->
     <div id="fr-grid" style="padding:0"></div>
     <!-- Friends info overlay -->
-    <div id="fr-info-overlay" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.7);z-index:9000;display:none;align-items:center;justify-content:center" onclick="if(event.target===this)this.style.display='none'">
-      <div style="background:var(--card);border-radius:12px;padding:20px 24px;max-width:400px;margin:20px;line-height:1.6">
+    <div id="fr-info-overlay" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.7);z-index:9000;align-items:center;justify-content:center" onclick="if(event.target===this)this.style.display='none'">
+      <div style="background:var(--card);border-radius:12px;padding:20px 24px;max-width:400px;margin:20px;line-height:1.6;max-height:80vh;overflow-y:auto">
         <div style="font-size:1em;font-weight:700;margin-bottom:12px;text-align:center">👥 Friends 班表分享</div>
         <div style="font-size:.78em;color:var(--muted)">
-          <div style="margin-bottom:8px">同意分享後即可查看其他組員的班表<br><span style="opacity:.7">Share your roster to view others' schedules</span></div>
           <div style="margin-bottom:6px">• 未分享者無法查看他人班表<br><span style="opacity:.7">Non-sharing members cannot view others' rosters</span></div>
           <div style="margin-bottom:6px">• 同意分享後即可查看其他組員的班表<br><span style="opacity:.7">Share your roster to view others' schedules</span></div>
           <div style="margin-bottom:6px">• 你的班表將上傳至雲端供其他分享者查看<br><span style="opacity:.7">Your roster will be uploaded for other shared members to view</span></div>
@@ -239,6 +245,19 @@ export function getSpaHtmlBody(): string {
           <div>• 離線快取保留一個月，一個月內未連網更新亦會自動刪除<br><span style="opacity:.7">Offline cache expires after 1 month — auto-deleted if not refreshed</span></div>
         </div>
         <button onclick="document.getElementById('fr-info-overlay').style.display='none'" style="margin-top:14px;width:100%;padding:8px;background:var(--accent);color:#fff;border:none;border-radius:8px;font-size:.85em;cursor:pointer">了解 Got it</button>
+      </div>
+    </div>
+    <!-- 名字說明彈窗 -->
+    <div id="fr-name-info-overlay" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.7);z-index:9000;align-items:center;justify-content:center" onclick="if(event.target===this)this.style.display='none'">
+      <div style="background:var(--card);border-radius:12px;padding:20px 24px;max-width:360px;margin:20px;line-height:1.6;max-height:80vh;overflow-y:auto">
+        <div style="font-size:1em;font-weight:700;margin-bottom:12px;text-align:center">✏️ 顯示名稱說明</div>
+        <div style="font-size:.78em;color:var(--muted)">
+          <div style="margin-bottom:6px">• 可改中文或暱稱，方便同事辨認<br><span style="opacity:.7">Chinese name or nickname OK for easy recognition</span></div>
+          <div style="margin-bottom:6px">• 不改則預設顯示班表系統英文拼音<br><span style="opacity:.7">Default: English name from roster system</span></div>
+          <div style="margin-bottom:6px">• 大頭照同步自 Google 帳號<br><span style="opacity:.7">Avatar synced from Google account</span></div>
+          <div>• 點按大頭照可顯示完整全名<br><span style="opacity:.7">Tap avatar to view full name</span></div>
+        </div>
+        <button onclick="document.getElementById('fr-name-info-overlay').style.display='none'" style="margin-top:14px;width:100%;padding:8px;background:var(--accent);color:#fff;border:none;border-radius:8px;font-size:.85em;cursor:pointer">了解 Got it</button>
       </div>
     </div>
   </div>
@@ -1193,7 +1212,7 @@ export function getSpaHtmlBody(): string {
       <button class="tab-util-btn tab-install-btn" id="tab-install-btn" onclick="showInstallGuide()" style="display:none">
         <span>📲</span>安裝
       </button>
-      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V7.0.06</span>
+      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V7.0.07</span>
     </div>
   </div>
 </div>
@@ -1223,15 +1242,15 @@ export function getSpaHtmlBody(): string {
       <div style="margin-bottom:4px">📱 建議使用 <b>iPad 橫向</b>操作以獲得最佳體驗</div>
       <div style="color:var(--muted)">Best experience on iPad in landscape mode</div>
     </div>
-    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V7.0.06</div>
+    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V7.0.07</div>
+    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
+      <div>Friends 頂部控制列以色塊區分功能區（藍：機隊職級／綠：名稱／紫：查看篩選），調整月份導覽位置改善視覺平衡</div>
+      <div>Friends header uses color-coded sections (blue: fleet/rank, green: name, purple: view filter) with improved month navigation positioning</div>
+    </div>
+    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V7.0.06</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
       <div>Friends 正式上線：移除密碼保護、點大頭顯示全名、離線快取支援、篩選機隊/職級、剔除組員名單保護隱私、說明文字更新</div>
       <div>Friends goes live: remove password gate, tap avatar for full name, offline cache, fleet/rank filter, strip crew data for privacy, updated info text</div>
-    </div>
-    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V7.0.01</div>
-    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
-      <div>新增 Friends 班表分享功能：同意分享、機隊/職級選擇、顯示名稱修改、Google 大頭照</div>
-      <div>Add Friends roster sharing: opt-in share, fleet/rank selection, display name edit, Google avatar</div>
     </div>
     <div style="font-size:.68em;color:var(--muted);margin-top:12px;margin-bottom:10px;display:flex;gap:16px;justify-content:center">
       <a href="/privacy" onclick="openLegal('/privacy');return false" style="color:var(--muted);text-decoration:underline">Privacy Policy 隱私權政策</a>
