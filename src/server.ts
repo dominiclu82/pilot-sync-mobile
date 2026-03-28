@@ -200,49 +200,45 @@ app.get('/privacy', (_req, res) => {
 
 <h2>2. Data Usage 資料使用方式</h2>
 <ul>
-  <li>CrewSync uses your Google Calendar data <strong>solely</strong> to synchronize your flight roster: reading existing calendar events to avoid duplicate entries, and creating/updating calendar events based on your crew roster.</li>
-  <li class="zh">CrewSync <strong>僅</strong>將您的 Google 日曆資料用於同步飛行班表：讀取現有事件以避免重複建立，並根據您的組員班表新增或更新日曆事件。</li>
-  <li>CrewSync does <strong>not</strong> use your data for advertising, analytics, or any purpose other than the roster synchronization feature you initiated.</li>
-  <li class="zh">CrewSync <strong>不會</strong>將您的資料用於廣告、分析或班表同步以外的任何用途。</li>
+  <li>CrewSync uses your Google Calendar data <strong>solely</strong> to synchronize your flight roster: reading existing calendar events to avoid duplicate entries, and creating/updating calendar events based on your crew roster.<br><span class="zh">CrewSync <strong>僅</strong>將您的 Google 日曆資料用於同步飛行班表：讀取現有事件以避免重複建立，並根據您的組員班表新增或更新日曆事件。</span></li>
+  <li>CrewSync does <strong>not</strong> use your data for advertising, analytics, or any purpose other than the roster synchronization feature you initiated.<br><span class="zh">CrewSync <strong>不會</strong>將您的資料用於廣告、分析或班表同步以外的任何用途。</span></li>
 </ul>
 <p><strong>Google API Services User Data Policy Compliance:</strong> CrewSync's use and transfer to any other app of information received from Google APIs will adhere to the <a href="https://developers.google.com/terms/api-services-user-data-policy" target="_blank">Google API Services User Data Policy</a>, including the Limited Use requirements.</p>
 <p class="zh"><strong>符合 Google API 服務使用者資料政策：</strong>CrewSync 對於從 Google API 收到的資訊的使用和轉移，將遵守 <a href="https://developers.google.com/terms/api-services-user-data-policy" target="_blank">Google API 服務使用者資料政策</a>，包括其中的「受限使用」要求。</p>
 
 <h2>3. Data Sharing 資料分享</h2>
 <ul>
-  <li>CrewSync does <strong>not</strong> sell, share, or transfer your Google user data to any third party.</li>
-  <li class="zh">CrewSync <strong>不會</strong>出售、分享或轉移您的 Google 使用者資料給任何第三方。</li>
-  <li>No Google user data is used for advertising or shared with data brokers.</li>
-  <li class="zh">不會將 Google 使用者資料用於廣告或提供給資料仲介。</li>
+  <li>CrewSync does <strong>not</strong> sell, share, or transfer your Google user data to any third party.<br><span class="zh">CrewSync <strong>不會</strong>出售、分享或轉移您的 Google 使用者資料給任何第三方。</span></li>
+  <li>No Google user data is used for advertising or shared with data brokers.<br><span class="zh">不會將 Google 使用者資料用於廣告或提供給資料仲介。</span></li>
 </ul>
 
 <h2>4. Data Storage &amp; Protection 資料儲存與保護</h2>
 <ul>
-  <li>All user data (roster, settings, OAuth tokens) is stored <strong>locally on your device</strong> using browser localStorage. CrewSync does <strong>not</strong> store any personal data on its servers.</li>
-  <li class="zh">所有使用者資料（班表、設定、OAuth token）皆透過瀏覽器 localStorage <strong>儲存在您的裝置上</strong>。CrewSync <strong>不會</strong>在伺服器上儲存任何個人資料。</li>
-  <li>OAuth tokens are stored only in your browser's localStorage and are never transmitted to or stored on our servers.</li>
-  <li class="zh">OAuth token 僅儲存於您瀏覽器的 localStorage，絕不會傳輸至或儲存於我們的伺服器。</li>
-  <li>Data protection measures: all communication uses HTTPS encryption; OAuth 2.0 with PKCE (S256) is used for secure authorization; the server acts only as a proxy and does not retain any user data.</li>
-  <li class="zh">資料保護措施：所有通訊使用 HTTPS 加密；OAuth 2.0 搭配 PKCE (S256) 進行安全授權；伺服器僅作為代理，不保留任何使用者資料。</li>
+  <li>All user data (roster, settings, OAuth tokens) is stored <strong>locally on your device</strong> using browser localStorage. CrewSync does <strong>not</strong> store any personal data on its servers.<br><span class="zh">所有使用者資料（班表、設定、OAuth token）皆透過瀏覽器 localStorage <strong>儲存在您的裝置上</strong>。CrewSync <strong>不會</strong>在伺服器上儲存任何個人資料。</span></li>
+  <li>OAuth tokens are stored only in your browser's localStorage and are never transmitted to or stored on our servers.<br><span class="zh">OAuth token 僅儲存於您瀏覽器的 localStorage，絕不會傳輸至或儲存於我們的伺服器。</span></li>
+  <li>Data protection measures: all communication uses HTTPS encryption; OAuth 2.0 with PKCE (S256) is used for secure authorization; the server acts only as a proxy and does not retain any user data.<br><span class="zh">資料保護措施：所有通訊使用 HTTPS 加密；OAuth 2.0 搭配 PKCE (S256) 進行安全授權；伺服器僅作為代理，不保留任何使用者資料。</span></li>
 </ul>
 
 <h2>5. Data Retention &amp; Deletion 資料保留與刪除</h2>
 <ul>
-  <li>Since all data is stored locally in your browser, you have full control over data retention. Data is retained only as long as it remains in your browser's localStorage.</li>
-  <li class="zh">由於所有資料皆儲存在您的瀏覽器本機，您對資料保留擁有完全控制權。資料僅在您瀏覽器的 localStorage 中保留。</li>
-  <li>To delete all CrewSync data: clear your browser's localStorage for the CrewSync site, or use the app's built-in "Reset" functions.</li>
-  <li class="zh">刪除所有 CrewSync 資料：清除瀏覽器中 CrewSync 網站的 localStorage，或使用 app 內建的「重設」功能。</li>
-  <li>To revoke Google Calendar access: visit your <a href="https://myaccount.google.com/permissions" target="_blank">Google Account permissions</a> and remove CrewSync. This immediately revokes all access to your Google Calendar data.</li>
-  <li class="zh">撤銷 Google 日曆存取權：前往 <a href="https://myaccount.google.com/permissions" target="_blank">Google 帳戶權限設定</a> 移除 CrewSync，即可立即撤銷所有 Google 日曆資料的存取權。</li>
+  <li>Since all data is stored locally in your browser, you have full control over data retention. Data is retained only as long as it remains in your browser's localStorage.<br><span class="zh">由於所有資料皆儲存在您的瀏覽器本機，您對資料保留擁有完全控制權。資料僅在您瀏覽器的 localStorage 中保留。</span></li>
+  <li>To delete all CrewSync data: clear your browser's localStorage for the CrewSync site, or use the app's built-in "Reset" functions.<br><span class="zh">刪除所有 CrewSync 資料：清除瀏覽器中 CrewSync 網站的 localStorage，或使用 app 內建的「重設」功能。</span></li>
+  <li>To revoke Google Calendar access: visit your <a href="https://myaccount.google.com/permissions" target="_blank">Google Account permissions</a> and remove CrewSync. This immediately revokes all access to your Google Calendar data.<br><span class="zh">撤銷 Google 日曆存取權：前往 <a href="https://myaccount.google.com/permissions" target="_blank">Google 帳戶權限設定</a> 移除 CrewSync，即可立即撤銷所有 Google 日曆資料的存取權。</span></li>
 </ul>
 
 <h2>Third-Party Services 第三方服務</h2>
-<ul>
-  <li><strong>Google Calendar API：</strong>Used solely for roster synchronization as authorized by you.</li>
-  <li class="zh">僅用於您授權的班表同步功能。</li>
-  <li><strong>Aviation weather APIs：</strong>CrewSync fetches METAR/TAF data from public aviation weather services. No personal data is sent in these requests.</li>
-  <li class="zh">CrewSync 從公開的航空氣象服務取得 METAR/TAF 資料，這些請求不包含任何個人資料。</li>
-</ul>
+<table style="width:100%;border-collapse:collapse;font-size:.95em;margin-bottom:12px">
+<tr style="border-bottom:2px solid #555"><th style="text-align:left;padding:8px">服務 Service</th><th style="text-align:left;padding:8px">用途 Purpose</th></tr>
+<tr style="border-bottom:1px solid #333"><td style="padding:8px"><strong>Google Calendar API</strong></td><td style="padding:8px">班表同步（需使用者授權）<br>Roster synchronization (user-authorized)</td></tr>
+<tr style="border-bottom:1px solid #333"><td style="padding:8px"><strong>Aviation Weather APIs</strong></td><td style="padding:8px">METAR/TAF 航空氣象<br>Aviation weather data</td></tr>
+<tr style="border-bottom:1px solid #333"><td style="padding:8px"><strong>atis.guru</strong></td><td style="padding:8px">D-ATIS 資料<br>D-ATIS data</td></tr>
+<tr style="border-bottom:1px solid #333"><td style="padding:8px"><strong>CodeTabs CORS Proxy</strong></td><td style="padding:8px">前端跨域代理<br>Frontend cross-origin proxy</td></tr>
+<tr style="border-bottom:1px solid #333"><td style="padding:8px"><strong>OpenSky Network API</strong></td><td style="padding:8px">Live Radar 即時航機位置<br>Live aircraft positions</td></tr>
+<tr style="border-bottom:1px solid #333"><td style="padding:8px"><strong>FlightRadar24 (unofficial)</strong></td><td style="padding:8px">FR24 航班追蹤<br>Flight tracking data</td></tr>
+<tr style="border-bottom:1px solid #333"><td style="padding:8px"><strong>FlightAware (unofficial)</strong></td><td style="padding:8px">FR24 航班起訖地補充<br>Flight origin/destination supplement</td></tr>
+<tr style="border-bottom:1px solid #333"><td style="padding:8px"><strong>Taoyuan Airport FIDS API</strong></td><td style="padding:8px">Gate Info 航班資訊顯示<br>Flight information display</td></tr>
+</table>
+<p>Google Calendar API accesses calendar data with user authorization (see "Data Usage" above). No personal data is sent in any other third-party requests.<br><span class="zh">Google Calendar API 經使用者授權後存取日曆資料，詳見上方「資料使用方式」。其餘第三方服務請求均不包含任何個人資料。</span></p>
 
 <h2>Contact 聯繫方式</h2>
 <p>If you have questions about this privacy policy, please contact us via <a href="https://github.com/dominiclu82/pilot-sync-mobile/issues" target="_blank">GitHub Issues</a>.</p>
@@ -391,7 +387,7 @@ app.get('/sw.js', (_req, res) => {
   res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
   res.setHeader('Service-Worker-Allowed', '/');
   res.send(`
-const CACHE = 'crewsync-v7014';
+const CACHE = 'crewsync-v7015';
 const SHELL = ['/', '/main', '/share'];
 self.addEventListener('install', e => {
   e.waitUntil(

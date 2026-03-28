@@ -559,18 +559,13 @@ function _briefRestore() {
   } catch(e) {}
 }
 
-/* ── 日期切換 Today / Tomorrow ── */
-var _briefDateOffset = 0; // 0=today, 1=tomorrow
-function _briefSetDate(which) {
-  _briefDateOffset = (which === 'tomorrow') ? 1 : 0;
-  var btnT = document.getElementById('brief-date-today');
-  var btnM = document.getElementById('brief-date-tmr');
-  if (btnT && btnM) {
-    btnT.style.background = _briefDateOffset === 0 ? 'var(--accent)' : '#2d3748';
-    btnT.style.color = _briefDateOffset === 0 ? '#fff' : '#e2e8f0';
-    btnM.style.background = _briefDateOffset === 1 ? 'var(--accent)' : '#2d3748';
-    btnM.style.color = _briefDateOffset === 1 ? '#fff' : '#e2e8f0';
-  }
+/* ── 日期切換 ◀ M/D ▶ ── */
+var _briefDateOffset = 0; // -1=yesterday, 0=today, 1=tomorrow
+function _briefDateNav(dir) {
+  var next = _briefDateOffset + dir;
+  if (next < -1 || next > 1) return;
+  _briefDateOffset = next;
+  _briefUpdateDateLabel();
   // 切換日期後自動重新查詢
   var inp = document.getElementById('brief-fno');
   if (inp && inp.value.trim()) {
@@ -579,6 +574,15 @@ function _briefSetDate(which) {
     _briefForceQuery();
   }
 }
+function _briefUpdateDateLabel() {
+  var el = document.getElementById('brief-date-label');
+  if (!el) return;
+  var d = new Date();
+  d.setDate(d.getDate() + _briefDateOffset);
+  el.textContent = (d.getMonth() + 1) + '/' + d.getDate();
+}
+/* 頁面載入時初始化日期標籤 */
+document.addEventListener('DOMContentLoaded', _briefUpdateDateLabel);
 function _briefGetDate() {
   var d = new Date();
   d.setDate(d.getDate() + _briefDateOffset);

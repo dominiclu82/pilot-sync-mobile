@@ -318,9 +318,10 @@ export function getSpaHtmlBody(): string {
   <div id="briefing-brief" class="briefing-panel">
     <div class="brief-search">
       <input type="text" id="brief-fno" placeholder="JX801" oninput="_briefOnInput(this.value);_syncFltNo('brief',this.value)" onkeydown="if(event.key==='Enter'){event.preventDefault();_briefForceQuery()}">
-      <div style="display:inline-flex;border:1px solid #4a5568;border-radius:8px;overflow:hidden;margin:0 4px">
-        <button id="brief-date-today" class="brief-date-btn brief-date-active" onclick="_briefSetDate('today')" style="padding:4px 8px;font-size:.75em;border:none;cursor:pointer;background:var(--accent);color:#fff">Today</button>
-        <button id="brief-date-tmr" class="brief-date-btn" onclick="_briefSetDate('tomorrow')" style="padding:4px 8px;font-size:.75em;border:none;cursor:pointer;background:#2d3748;color:#e2e8f0">Tomorrow</button>
+      <div style="display:inline-flex;align-items:center;gap:2px;margin:0 4px">
+        <button onclick="_briefDateNav(-1)" style="padding:4px 6px;font-size:.75em;border:none;cursor:pointer;background:#2d3748;color:#e2e8f0;border-radius:6px">◀</button>
+        <span id="brief-date-label" style="font-size:.75em;min-width:40px;text-align:center;color:#e2e8f0"></span>
+        <button onclick="_briefDateNav(1)" style="padding:4px 6px;font-size:.75em;border:none;cursor:pointer;background:#2d3748;color:#e2e8f0;border-radius:6px">▶</button>
       </div>
       <button class="brief-search-btn" onclick="_briefForceQuery()">查詢 Query</button>
       <span id="brief-flt-status" class="pa-flt-status"></span>
@@ -1043,8 +1044,7 @@ export function getSpaHtmlBody(): string {
   <div id="gate-content" style="display:flex;flex-direction:column">
     <div class="gi-header">
       <div class="gi-header-left">
-        <span class="gi-title">JX Flight Info</span>
-        <span class="gi-notice-inline">⚠ Non-operational Reference only</span>
+        <span class="gi-notice-inline" style="color:#eab308">⚠ Non-operational Reference only</span>
         <div class="gi-date-nav">
           <button class="gi-nav-btn" id="gi-prev-day" onclick="giPrevDay()">◀</button>
           <span class="gi-date" id="gate-date"></span>
@@ -1071,7 +1071,7 @@ export function getSpaHtmlBody(): string {
         </div>
         <input type="text" id="gate-search" class="gi-search-input" placeholder="搜尋..." oninput="filterGateFlights()">
       </div>
-      <div class="gi-search-hint">Search by flight no. / airport code / city name ｜ Tap <span style="color:var(--sort)">green headers</span> to sort</div>
+      <div class="gi-search-hint">Search by flight no. / airport code / city name ｜ Tap <span style="color:var(--sort)">blue headers</span> to sort</div>
       <div class="gi-time-bar">
         <button class="gi-time-slot" data-slot="±2hr" onclick="giSetTimeSlot('±2hr')">±2hr</button>
         <button class="gi-time-slot" data-slot="00-06" onclick="giSetTimeSlot('00-06')">00-06</button>
@@ -1233,7 +1233,7 @@ export function getSpaHtmlBody(): string {
       <button class="tab-util-btn tab-install-btn" id="tab-install-btn" onclick="showInstallGuide()" style="display:none">
         <span>📲</span>安裝
       </button>
-      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V7.0.14</span>
+      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V7.0.15</span>
     </div>
   </div>
 </div>
@@ -1263,15 +1263,15 @@ export function getSpaHtmlBody(): string {
       <div style="margin-bottom:4px">📱 建議使用 <b>iPad 橫向</b>操作以獲得最佳體驗，Android 裝置可能無法正確顯示</div>
       <div style="color:var(--muted)">Best experience on iPad in landscape mode. Android devices may not display correctly.</div>
     </div>
-    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V7.0.14</div>
+    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V7.0.15</div>
+    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
+      <div>Briefing 日期切換改 ◀ M/D ▶ 支援前一天；Gate Info 移除標題、警語改黃色；隱私權政策補齊第三方服務</div>
+      <div>Briefing date nav changed to ◀ M/D ▶ with yesterday support; Gate Info title removed, warning in yellow; privacy policy third-party services updated</div>
+    </div>
+    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V7.0.14</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
       <div>About card 加註 Android 裝置可能無法正確顯示；FAQ 修正日曆授權說明以符合隱私權政策</div>
       <div>About card adds Android display note; FAQ corrects calendar authorization description to align with privacy policy</div>
-    </div>
-    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V7.0.13</div>
-    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
-      <div>PA Welcome 出發分鐘數加入快取保留；Descent 點選場站修正中文目的地未帶入</div>
-      <div>PA Welcome departure minutes now persisted in cache; Descent tap-to-select station now fills Chinese destination</div>
     </div>
     <div style="font-size:.68em;color:var(--muted);margin-top:12px;margin-bottom:10px;display:flex;gap:16px;justify-content:center">
       <a href="/privacy" onclick="openLegal('/privacy');return false" style="color:var(--muted);text-decoration:underline">Privacy Policy 隱私權政策</a>
