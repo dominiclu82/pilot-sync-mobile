@@ -652,6 +652,8 @@ function _paTzSelectStation(code) {
   var el = document.getElementById('pa-content');
   if (el) {
     el.querySelectorAll('[data-pa="dest"]').forEach(function(inp) { inp.value = code; });
+    var zhName = code ? (_paIataToName[code.toUpperCase().trim()] || code) : '';
+    el.querySelectorAll('[data-pa="dest-zh"]').forEach(function(inp) { inp.value = zhName; });
   }
   if (_paCurrentCat === 'descent') _paFillDescentTime();
   document.querySelectorAll('.pa-tz-link').forEach(function(l) {
@@ -993,7 +995,7 @@ function _paRestoreValues() {
   // 還原手動 flag 中有值的欄位（flt-hr / flt-min / altitude + descent 天氣）
   try {
     var savedPaInputs = JSON.parse(localStorage.getItem('crewsync_pa_inputs') || '{}');
-    ['flt-hr','flt-min','altitude'].forEach(function(attr) {
+    ['flt-hr','flt-min','altitude','dep-min'].forEach(function(attr) {
       if (_paManualFlags[attr] && savedPaInputs[attr]) {
         el.querySelectorAll('[data-pa="' + attr + '"]').forEach(function(inp) { inp.value = savedPaInputs[attr]; });
       }

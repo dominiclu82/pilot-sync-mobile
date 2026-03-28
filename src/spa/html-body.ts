@@ -1233,7 +1233,7 @@ export function getSpaHtmlBody(): string {
       <button class="tab-util-btn tab-install-btn" id="tab-install-btn" onclick="showInstallGuide()" style="display:none">
         <span>📲</span>安裝
       </button>
-      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V7.0.12</span>
+      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V7.0.13</span>
     </div>
   </div>
 </div>
@@ -1263,15 +1263,15 @@ export function getSpaHtmlBody(): string {
       <div style="margin-bottom:4px">📱 建議使用 <b>iPad 橫向</b>操作以獲得最佳體驗</div>
       <div style="color:var(--muted)">Best experience on iPad in landscape mode</div>
     </div>
-    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V7.0.12</div>
+    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V7.0.13</div>
+    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
+      <div>PA Welcome 出發分鐘數加入快取保留；Descent 點選場站修正中文目的地未帶入</div>
+      <div>PA Welcome departure minutes now persisted in cache; Descent tap-to-select station now fills Chinese destination</div>
+    </div>
+    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V7.0.12</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
       <div>WX 單一機場更新按鈕加入載入狀態（↺ ... → ↺ Done → ↺ 更新），並清除 24 小時快取強制重新抓取</div>
       <div>WX single airport refresh button now shows loading state and clears 24hr cache to force fresh fetch</div>
-    </div>
-    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V7.0.11</div>
-    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
-      <div>手機直拿 Friends header 分兩行排列：第一行控制項可左右滑動、第二行月份置中+篩選靠右</div>
-      <div>Mobile portrait Friends header split into two rows: scrollable controls on row 1, centered month nav + filter on row 2</div>
     </div>
     <div style="font-size:.68em;color:var(--muted);margin-top:12px;margin-bottom:10px;display:flex;gap:16px;justify-content:center">
       <a href="/privacy" onclick="openLegal('/privacy');return false" style="color:var(--muted);text-decoration:underline">Privacy Policy 隱私權政策</a>
