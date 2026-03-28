@@ -166,8 +166,8 @@ app.get('/faq', (_req, res) => {
 <div class="a-zh">安全。你輸入的員工編號和密碼只會在同步的那幾秒鐘內使用，用來登入班表系統擷取資料。同步完成後，伺服器立即丟棄，不留任何紀錄。你的員工編號會存在你自己的瀏覽器裡（方便下次自動填入），密碼則完全不儲存，由瀏覽器的密碼管理器自行處理。</div>
 
 <div class="q">What Does Google Authorization Do? Google 日曆授權做了什麼？</div>
-<div class="a">One thing only: writing your roster into your Google Calendar. We do not read, modify, or share any existing data in your calendar. The authorization token is stored only in your browser and is never uploaded to the server.</div>
-<div class="a-zh">只做一件事：把你的班表寫進你的 Google 日曆。我們不會讀取、修改或分享你日曆裡的任何現有資料。授權產生的令牌只存在你自己的瀏覽器裡，不會上傳到伺服器。</div>
+<div class="a">It writes your roster into your Google Calendar and reads existing events to avoid duplicates and display your calendar. We will not modify or share any non-roster data in your calendar. The authorization token is stored only in your browser and is never uploaded to our server.</div>
+<div class="a-zh">把你的班表寫進你的 Google 日曆，並讀取現有事件以避免重複建立及顯示行事曆。我們不會修改或分享你日曆裡的任何非班表資料。授權產生的令牌只存在你自己的瀏覽器裡，不會上傳到伺服器。</div>
 
 <div class="q">Is This Tool Free? 這個工具收費嗎？</div>
 <div class="a">Completely free. This tool is independently developed solely to help crew members sync their roster — no commercial purpose whatsoever.</div>
@@ -391,7 +391,7 @@ app.get('/sw.js', (_req, res) => {
   res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
   res.setHeader('Service-Worker-Allowed', '/');
   res.send(`
-const CACHE = 'crewsync-v7013';
+const CACHE = 'crewsync-v7014';
 const SHELL = ['/', '/main', '/share'];
 self.addEventListener('install', e => {
   e.waitUntil(
