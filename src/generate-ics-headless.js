@@ -306,9 +306,12 @@ export async function generateICSHeadless(targetYear, targetMonth, jxCredentials
                         };
                     });
                     if (d && d.workCode) {
+                        var datePrefix = d.date || '';
+                        var fullStart = datePrefix && d.startTime ? datePrefix + ' ' + d.startTime : d.startTime;
+                        var fullEnd = datePrefix && d.endTime ? datePrefix + ' ' + d.endTime : d.endTime;
                         flights.push({
                             flightNo: d.workCode, date: d.date, origin: '', dest: '',
-                            depTime: d.startTime, arrTime: d.endTime,
+                            depTime: fullStart, arrTime: fullEnd,
                             position: d.position, workCode: d.workCode, crew: []
                         });
                     }

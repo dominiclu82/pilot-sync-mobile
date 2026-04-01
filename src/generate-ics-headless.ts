@@ -331,9 +331,12 @@ export async function generateICSHeadless(
             };
           });
           if (d && d.workCode) {
+            const datePrefix = d.date || '';  // "2026.Feb.09"
+            const fullStart = datePrefix && d.startTime ? `${datePrefix} ${d.startTime}` : d.startTime;
+            const fullEnd = datePrefix && d.endTime ? `${datePrefix} ${d.endTime}` : d.endTime;
             flights.push({
               flightNo: d.workCode, date: d.date, origin: '', dest: '',
-              depTime: d.startTime, arrTime: d.endTime,
+              depTime: fullStart, arrTime: fullEnd,
               position: d.position, workCode: d.workCode, crew: []
             });
           }
