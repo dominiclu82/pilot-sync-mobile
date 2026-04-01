@@ -23,6 +23,7 @@ import { getSpaCrewRestJs } from './spa/js-crew-rest.js';
 import { getSpaSubtabReorderJs } from './spa/js-subtab-reorder.js';
 import { getSpaRosterGridJs } from './spa/js-roster-grid.js';
 import { getSpaFriendsJs } from './spa/js-friends.js';
+import { getSpaGroupsJs } from './spa/js-groups.js';
 import FR24Pkg from 'flightradarapi';
 import pg from 'pg';
 
@@ -66,6 +67,45 @@ async function _dbInit() {
     await _pool.query(`ALTER TABLE cs_users ADD COLUMN IF NOT EXISTS nickname TEXT`).catch(() => {});
     await _pool.query(`ALTER TABLE cs_users ADD COLUMN IF NOT EXISTS fleet TEXT`).catch(() => {});
     await _pool.query(`ALTER TABLE cs_users ADD COLUMN IF NOT EXISTS rank TEXT`).catch(() => {});
+    // ── Groups tables ──
+    await _pool.query(`
+      CREATE TABLE IF NOT EXISTS cs_groups (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        type TEXT NOT NULL CHECK (type IN ('preset','custom')),
+        created_by TEXT,
+        invite_code TEXT UNIQUE,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      );
+      CREATE TABLE IF NOT EXISTS cs_group_members (
+        group_id TEXT NOT NULL REFERENCES cs_groups(id) ON DELETE CASCADE,
+        employee_id TEXT NOT NULL,
+        joined_at TIMESTAMPTZ DEFAULT NOW(),
+        PRIMARY KEY (group_id, employee_id)
+      );
+      CREATE TABLE IF NOT EXISTS cs_group_invites (
+        id SERIAL PRIMARY KEY,
+        group_id TEXT NOT NULL REFERENCES cs_groups(id) ON DELETE CASCADE,
+        target_eid TEXT NOT NULL,
+        invited_by TEXT NOT NULL,
+        status TEXT DEFAULT 'pending' CHECK (status IN ('pending','accepted','declined')),
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        UNIQUE(group_id, target_eid)
+      );
+    `);
+    // Seed preset groups (idempotent)
+    const presets = [
+      { id: 'preset_all', name: 'All' },
+      { id: 'preset_A321_CAP', name: 'A321 CAP' }, { id: 'preset_A321_SFO', name: 'A321 SFO' }, { id: 'preset_A321_FO', name: 'A321 FO' },
+      { id: 'preset_A330_CAP', name: 'A330 CAP' }, { id: 'preset_A330_SFO', name: 'A330 SFO' }, { id: 'preset_A330_FO', name: 'A330 FO' },
+      { id: 'preset_A350_CAP', name: 'A350 CAP' }, { id: 'preset_A350_SFO', name: 'A350 SFO' }, { id: 'preset_A350_FO', name: 'A350 FO' },
+    ];
+    for (const g of presets) {
+      await _pool.query(
+        `INSERT INTO cs_groups (id, name, type) VALUES ($1, $2, 'preset') ON CONFLICT DO NOTHING`,
+        [g.id, g.name]
+      );
+    }
     console.log('✅ Database connected & tables ready');
   } catch (e: any) {
     console.error('❌ Database init error:', e.message);
@@ -387,7 +427,7 @@ app.get('/sw.js', (_req, res) => {
   res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
   res.setHeader('Service-Worker-Allowed', '/');
   res.send(`
-const CACHE = 'crewsync-v7015';
+const CACHE = 'crewsync-v8001';
 const SHELL = ['/', '/main', '/share'];
 self.addEventListener('install', e => {
   e.waitUntil(
@@ -404,6 +444,8 @@ self.addEventListener('activate', e => {
 const _offlinePage = '<html><body style="background:#111;color:#aaa;display:flex;align-items:center;justify-content:center;height:100vh;font-family:sans-serif"><div style="text-align:center"><h2>Offline</h2><p>Please connect to the internet and reload.</p></div></body></html>';
 self.addEventListener('fetch', e => {
   if (e.request.method !== 'GET') return;
+  const u = new URL(e.request.url);
+  if (u.pathname.startsWith('/api/')) return;
   e.respondWith(
     fetch(e.request).then(r => {
       caches.open(CACHE).then(c => c.put(e.request, r.clone()));
@@ -1018,10 +1060,12 @@ app.post('/api/roster-share', async (req, res) => {
     await _pool.query(`ALTER TABLE cs_users ADD COLUMN IF NOT EXISTS rank TEXT`).catch(() => {});
 
     if (updateInfoOnly) {
-      // 只更新機隊/職級，不上傳班表
+      // 只更新機隊/職級/名稱，不上傳班表
       await _pool.query(
-        `UPDATE cs_users SET fleet = COALESCE($2, fleet), rank = COALESCE($3, rank), updated_at = NOW() WHERE employee_id = $1`,
-        [eid, fleet || null, rank || null]
+        `UPDATE cs_users SET fleet = COALESCE($2, fleet), rank = COALESCE($3, rank),
+         nickname = CASE WHEN $4 = '' THEN nickname ELSE COALESCE(NULLIF($4, ''), nickname) END,
+         updated_at = NOW() WHERE employee_id = $1`,
+        [eid, fleet || null, rank || null, nickname || '']
       );
       return res.json({ ok: true });
     }
@@ -1073,19 +1117,41 @@ app.delete('/api/roster-share', async (req, res) => {
   }
 });
 
-// 拉所有有分享的人的班表
+// 拉班表（支援群組篩選）
 app.get('/api/roster-friends', async (req, res) => {
   if (!_pool) return res.json({ error: 'No database' });
-  const { month } = req.query;
+  const { month, eid, group } = req.query;
   if (!month) return res.status(400).json({ error: 'Missing month' });
   try {
-    // Get all shared rosters for this month
-    const q = await _pool.query(
-      `SELECT r.employee_id, r.roster_data FROM cs_rosters r
-       INNER JOIN cs_users u ON r.employee_id = u.employee_id
-       WHERE u.sharing = true AND r.month = $1`,
-      [month]
-    );
+    let q;
+    if (group && group !== 'all' && eid) {
+      // 篩選特定群組的成員班表
+      q = await _pool.query(
+        `SELECT DISTINCT r.employee_id, r.roster_data FROM cs_rosters r
+         INNER JOIN cs_users u ON r.employee_id = u.employee_id
+         INNER JOIN cs_group_members gm ON r.employee_id = gm.employee_id
+         WHERE u.sharing = true AND r.month = $1 AND gm.group_id = $2`,
+        [month, group]
+      );
+    } else if (eid && group !== 'all') {
+      // 預設：只顯示跟我同群組的人
+      q = await _pool.query(
+        `SELECT DISTINCT r.employee_id, r.roster_data FROM cs_rosters r
+         INNER JOIN cs_users u ON r.employee_id = u.employee_id
+         INNER JOIN cs_group_members gm ON r.employee_id = gm.employee_id
+         WHERE u.sharing = true AND r.month = $1
+           AND gm.group_id IN (SELECT group_id FROM cs_group_members WHERE employee_id = $2)`,
+        [month, eid]
+      );
+    } else {
+      // All：所有分享的人（原始行為）
+      q = await _pool.query(
+        `SELECT DISTINCT r.employee_id, r.roster_data FROM cs_rosters r
+         INNER JOIN cs_users u ON r.employee_id = u.employee_id
+         WHERE u.sharing = true AND r.month = $1`,
+        [month]
+      );
+    }
     // Get user info (name, picture, nickname)
     // 拿所有有 employee_id 的記錄（不只 sharing=true），合併 picture
     const uq = await _pool.query(
@@ -1118,6 +1184,215 @@ app.get('/api/roster-friends', async (req, res) => {
     res.json({ error: e.message });
   }
 });
+
+// ── Groups API ───────────────────────────────────────────────────────────────
+
+// 取得所有群組 + 加入狀態 + 待處理邀請數
+app.get('/api/groups', async (req, res) => {
+  if (!_pool) return res.json({ error: 'No database' });
+  const eid = req.query.eid as string;
+  if (!eid) return res.status(400).json({ error: 'Missing eid' });
+  try {
+    // 所有預設群組
+    const presetQ = await _pool.query(`SELECT id, name FROM cs_groups WHERE type = 'preset' ORDER BY id`);
+    // 使用者加入的群組 ID
+    const memberQ = await _pool.query(`SELECT group_id FROM cs_group_members WHERE employee_id = $1`, [eid]);
+    const joinedSet = new Set(memberQ.rows.map((r: any) => r.group_id));
+    // 使用者的自訂群組（已加入的）
+    const customQ = await _pool.query(
+      `SELECT g.id, g.name, g.invite_code, g.created_by,
+        (SELECT COUNT(*) FROM cs_group_members m WHERE m.group_id = g.id) AS member_count
+       FROM cs_groups g INNER JOIN cs_group_members m ON g.id = m.group_id
+       WHERE g.type = 'custom' AND m.employee_id = $1
+       ORDER BY g.created_at DESC`, [eid]
+    );
+    // 待處理邀請數
+    const invQ = await _pool.query(
+      `SELECT COUNT(*) AS cnt FROM cs_group_invites WHERE target_eid = $1 AND status = 'pending'`, [eid]
+    );
+    res.json({
+      presets: presetQ.rows.map((g: any) => ({ id: g.id, name: g.name, joined: joinedSet.has(g.id) })),
+      custom: customQ.rows.map((g: any) => ({ id: g.id, name: g.name, inviteCode: g.invite_code, createdBy: g.created_by, memberCount: +g.member_count })),
+      pendingInvites: +invQ.rows[0].cnt
+    });
+  } catch (e: any) { res.json({ error: e.message }); }
+});
+
+// 建立自訂群組
+app.post('/api/groups', async (req, res) => {
+  if (!_pool) return res.json({ error: 'No database' });
+  const { eid, name } = req.body;
+  if (!eid || !name) return res.status(400).json({ error: 'Missing eid or name' });
+  try {
+    // 產生 4 碼邀請碼（重試避免碰撞）
+    let code = '';
+    for (let i = 0; i < 10; i++) {
+      code = randomBytes(2).toString('hex').toUpperCase().slice(0, 4);
+      const dup = await _pool.query(`SELECT 1 FROM cs_groups WHERE invite_code = $1`, [code]);
+      if (dup.rowCount === 0) break;
+    }
+    const id = 'custom_' + code;
+    await _pool.query(
+      `INSERT INTO cs_groups (id, name, type, created_by, invite_code) VALUES ($1, $2, 'custom', $3, $4)`,
+      [id, name.trim(), eid, code]
+    );
+    // 建立者自動加入
+    await _pool.query(`INSERT INTO cs_group_members (group_id, employee_id) VALUES ($1, $2)`, [id, eid]);
+    res.json({ ok: true, group: { id, name: name.trim(), inviteCode: code, createdBy: eid, memberCount: 1 } });
+  } catch (e: any) { res.json({ error: e.message }); }
+});
+
+// 刪除自訂群組（僅建立者）
+app.delete('/api/groups/:id', async (req, res) => {
+  if (!_pool) return res.json({ error: 'No database' });
+  const { eid } = req.body;
+  const gid = req.params.id;
+  if (!eid) return res.status(400).json({ error: 'Missing eid' });
+  try {
+    const g = await _pool.query(`SELECT created_by FROM cs_groups WHERE id = $1 AND type = 'custom'`, [gid]);
+    if (g.rowCount === 0) return res.status(404).json({ error: 'Group not found' });
+    if (g.rows[0].created_by !== eid) return res.status(403).json({ error: 'Only creator can delete' });
+    await _pool.query(`DELETE FROM cs_groups WHERE id = $1`, [gid]); // CASCADE deletes members + invites
+    res.json({ ok: true });
+  } catch (e: any) { res.json({ error: e.message }); }
+});
+
+// 加入預設群組
+app.post('/api/groups/join', async (req, res) => {
+  if (!_pool) return res.json({ error: 'No database' });
+  const { eid, groupId } = req.body;
+  if (!eid || !groupId) return res.status(400).json({ error: 'Missing eid or groupId' });
+  try {
+    await _pool.query(
+      `INSERT INTO cs_group_members (group_id, employee_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`,
+      [groupId, eid]
+    );
+    res.json({ ok: true });
+  } catch (e: any) { res.json({ error: e.message }); }
+});
+
+// 用邀請碼加入自訂群組
+app.post('/api/groups/join-code', async (req, res) => {
+  if (!_pool) return res.json({ error: 'No database' });
+  const { eid, inviteCode } = req.body;
+  if (!eid || !inviteCode) return res.status(400).json({ error: 'Missing eid or inviteCode' });
+  try {
+    const g = await _pool.query(`SELECT id, name FROM cs_groups WHERE invite_code = $1`, [inviteCode.toUpperCase().trim()]);
+    if (g.rowCount === 0) return res.status(404).json({ error: '找不到此邀請碼 Invite code not found' });
+    await _pool.query(
+      `INSERT INTO cs_group_members (group_id, employee_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`,
+      [g.rows[0].id, eid]
+    );
+    res.json({ ok: true, group: { id: g.rows[0].id, name: g.rows[0].name } });
+  } catch (e: any) { res.json({ error: e.message }); }
+});
+
+// 退出群組
+app.post('/api/groups/leave', async (req, res) => {
+  if (!_pool) return res.json({ error: 'No database' });
+  const { eid, groupId } = req.body;
+  if (!eid || !groupId) return res.status(400).json({ error: 'Missing eid or groupId' });
+  try {
+    await _pool.query(`DELETE FROM cs_group_members WHERE group_id = $1 AND employee_id = $2`, [groupId, eid]);
+    res.json({ ok: true });
+  } catch (e: any) { res.json({ error: e.message }); }
+});
+
+// 邀請人（輸入員工編號）
+app.post('/api/groups/invite', async (req, res) => {
+  if (!_pool) return res.json({ error: 'No database' });
+  const { eid, groupId, targetEid } = req.body;
+  if (!eid || !groupId || !targetEid) return res.status(400).json({ error: 'Missing fields' });
+  try {
+    // 確認邀請者是成員
+    const mem = await _pool.query(`SELECT 1 FROM cs_group_members WHERE group_id = $1 AND employee_id = $2`, [groupId, eid]);
+    if (mem.rowCount === 0) return res.status(403).json({ error: '你不是此群組成員 Not a member' });
+    // 確認目標存在
+    const usr = await _pool.query(`SELECT 1 FROM cs_users WHERE employee_id = $1`, [targetEid]);
+    if (usr.rowCount === 0) return res.status(404).json({ error: '找不到此員工編號 Employee not found' });
+    // 確認目標尚未加入
+    const already = await _pool.query(`SELECT 1 FROM cs_group_members WHERE group_id = $1 AND employee_id = $2`, [groupId, targetEid]);
+    if (already.rowCount! > 0) return res.json({ ok: true, note: '已經是成員 Already a member' });
+    // 建立邀請
+    await _pool.query(
+      `INSERT INTO cs_group_invites (group_id, target_eid, invited_by) VALUES ($1, $2, $3)
+       ON CONFLICT (group_id, target_eid) DO UPDATE SET status = 'pending', invited_by = $3, created_at = NOW()`,
+      [groupId, targetEid, eid]
+    );
+    res.json({ ok: true });
+  } catch (e: any) { res.json({ error: e.message }); }
+});
+
+// 取得待處理邀請
+app.get('/api/groups/invites', async (req, res) => {
+  if (!_pool) return res.json({ error: 'No database' });
+  const eid = req.query.eid as string;
+  if (!eid) return res.status(400).json({ error: 'Missing eid' });
+  try {
+    const q = await _pool.query(
+      `SELECT i.id, i.group_id, g.name AS group_name, i.invited_by,
+        COALESCE(u.nickname, u.name, i.invited_by) AS inviter_name
+       FROM cs_group_invites i
+       INNER JOIN cs_groups g ON i.group_id = g.id
+       LEFT JOIN cs_users u ON i.invited_by = u.employee_id
+       WHERE i.target_eid = $1 AND i.status = 'pending'
+       ORDER BY i.created_at DESC`, [eid]
+    );
+    res.json({ invites: q.rows });
+  } catch (e: any) { res.json({ error: e.message }); }
+});
+
+// 接受邀請
+app.post('/api/groups/invites/:id/accept', async (req, res) => {
+  if (!_pool) return res.json({ error: 'No database' });
+  const { eid } = req.body;
+  const invId = req.params.id;
+  if (!eid) return res.status(400).json({ error: 'Missing eid' });
+  try {
+    const inv = await _pool.query(`SELECT group_id, target_eid FROM cs_group_invites WHERE id = $1 AND status = 'pending'`, [invId]);
+    if (inv.rowCount === 0) return res.status(404).json({ error: 'Invite not found' });
+    if (inv.rows[0].target_eid !== eid) return res.status(403).json({ error: 'Not your invite' });
+    await _pool.query(`UPDATE cs_group_invites SET status = 'accepted' WHERE id = $1`, [invId]);
+    await _pool.query(
+      `INSERT INTO cs_group_members (group_id, employee_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`,
+      [inv.rows[0].group_id, eid]
+    );
+    res.json({ ok: true });
+  } catch (e: any) { res.json({ error: e.message }); }
+});
+
+// 拒絕邀請
+app.post('/api/groups/invites/:id/decline', async (req, res) => {
+  if (!_pool) return res.json({ error: 'No database' });
+  const { eid } = req.body;
+  const invId = req.params.id;
+  if (!eid) return res.status(400).json({ error: 'Missing eid' });
+  try {
+    const inv = await _pool.query(`SELECT target_eid FROM cs_group_invites WHERE id = $1 AND status = 'pending'`, [invId]);
+    if (inv.rowCount === 0) return res.status(404).json({ error: 'Invite not found' });
+    if (inv.rows[0].target_eid !== eid) return res.status(403).json({ error: 'Not your invite' });
+    await _pool.query(`UPDATE cs_group_invites SET status = 'declined' WHERE id = $1`, [invId]);
+    res.json({ ok: true });
+  } catch (e: any) { res.json({ error: e.message }); }
+});
+
+// 取得群組成員
+app.get('/api/groups/:id/members', async (req, res) => {
+  if (!_pool) return res.json({ error: 'No database' });
+  const gid = req.params.id;
+  try {
+    const q = await _pool.query(
+      `SELECT m.employee_id, COALESCE(u.nickname, u.name, m.employee_id) AS name, u.fleet, u.rank
+       FROM cs_group_members m
+       LEFT JOIN cs_users u ON m.employee_id = u.employee_id
+       WHERE m.group_id = $1
+       ORDER BY m.joined_at`, [gid]
+    );
+    res.json({ members: q.rows });
+  } catch (e: any) { res.json({ error: e.message }); }
+});
+
+// ── End Groups API ───────────────────────────────────────────────────────────
 
 app.get('/api/db-test', async (_req, res) => {
   if (!_pool) return res.json({ ok: false, error: 'No DATABASE_URL' });
@@ -1381,6 +1656,7 @@ ${getSpaCrewRestJs()}
 ${getSpaSubtabReorderJs()}
 ${getSpaRosterGridJs()}
 ${getSpaFriendsJs()}
+${getSpaGroupsJs()}
 </script>${viewScript}
 </body>
 </html>`;

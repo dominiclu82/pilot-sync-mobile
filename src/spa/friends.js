@@ -5,7 +5,7 @@ var _frData = []; // [{ name, nickname, picture, duties }]
 var _frInited = false;
 
 function _frInit() {
-  // debug mode: ?debug=friends 或 #debug-friends 強制顯示 UI
+  // debug mode
   if (new URLSearchParams(location.search).get('debug') === 'friends' || location.hash === '#debug-friends') {
     localStorage.setItem('crewsync_share_enabled', '1');
   }
@@ -13,8 +13,34 @@ function _frInit() {
   var shareToggle = document.getElementById('fr-share-toggle');
   if (shareToggle) shareToggle.checked = isSharing;
   _frShowShareUI(isSharing);
-  if (isSharing) _frLoadMonth();
+  if (isSharing) { _frLoadMonth(); _frPopulateGroupFilter(); }
   else _frShowEmpty();
+}
+
+function _frPopulateGroupFilter() {
+  var eid = localStorage.getItem('crewsync_eid');
+  if (!eid) return;
+  fetch('/api/groups?eid=' + encodeURIComponent(eid))
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (data.error || !data.custom) return;
+      var sel = document.getElementById('fr-filter-group');
+      var selM = document.getElementById('fr-filter-group-m');
+      var current = sel ? sel.value : 'all';
+      var html = '';
+      for (var i = 0; i < data.custom.length; i++) {
+        html += '<option value="' + data.custom[i].id + '">' + data.custom[i].name + '</option>';
+      }
+      if (html === '') html = '<option value="none">尚無好友圈</option>';
+      if (sel) { sel.innerHTML = html; sel.value = current; }
+      if (selM) { selM.innerHTML = html; selM.value = current; }
+      // 更新紅點（subtab + 好友圈按鈕）
+      var cnt = data.pendingInvites || 0;
+      ['fr-invite-badge', 'grp-manage-badge', 'grp-manage-badge-m'].forEach(function(id) {
+        var el = document.getElementById(id);
+        if (el) { el.style.display = cnt > 0 ? 'inline-flex' : 'none'; el.textContent = cnt > 0 ? cnt : ''; }
+      });
+    }).catch(function() {});
 }
 
 function _frShowNameInfo() {
@@ -72,6 +98,15 @@ function _frCheckReady() {
   // 名字清空時移除 nickname，fallback 回英文名
   if (name) { localStorage.setItem('crewsync_nickname', name); }
   else { localStorage.removeItem('crewsync_nickname'); }
+  // 同步到 Groups
+  var grpFleet = document.getElementById('grp-my-fleet');
+  var grpRank = document.getElementById('grp-my-rank');
+  var grpName = document.getElementById('grp-my-name');
+  if (grpFleet && fleet) grpFleet.value = fleet;
+  if (grpRank && rank) grpRank.value = rank;
+  if (grpName) grpName.value = name;
+  // 機隊/職級改變時，退出不符合的預設群組
+  if (fleet && rank) _grpAutoLeavePresets(fleet, rank);
   // 如果已開啟分享且三個都填了，自動上傳
   if (localStorage.getItem('crewsync_share_enabled') === '1' && fleet && rank) {
     var eid = localStorage.getItem('crewsync_eid');
@@ -175,22 +210,24 @@ function _frLoadMonth() {
 
   var monthKey = _frYear + '-' + String(_frMonth).padStart(2, '0');
 
-  // 從 DB 拉有分享的人的班表
+  // 從 DB 拉好友圈成員的班表
   _frData = [];
-  fetch('/api/roster-friends?month=' + monthKey)
+  var _frGroupSel = document.getElementById('fr-filter-group');
+  var _frGroupVal = _frGroupSel ? _frGroupSel.value : 'none';
+  var _frEid = localStorage.getItem('crewsync_eid') || '';
+  if (_frGroupVal === 'none' || !_frGroupVal) {
+    var gridEl = document.getElementById('fr-grid');
+    if (gridEl) gridEl.innerHTML = '<div style="text-align:center;padding:40px 20px;color:var(--muted)"><div style="font-size:2em;margin-bottom:8px">🤝</div><div style="font-size:.85em">建立或加入好友圈即可查看班表<br><span style="opacity:.6">Create or join a friend group to view rosters</span></div></div>';
+    return;
+  }
+  fetch('/api/roster-friends?month=' + monthKey + '&eid=' + encodeURIComponent(_frEid) + '&group=' + encodeURIComponent(_frGroupVal))
     .then(function(r) { return r.json(); })
     .then(function(data) {
-      var filterFleet = document.getElementById('fr-filter-fleet');
-      var filterRank = document.getElementById('fr-filter-rank');
-      var ff = filterFleet ? filterFleet.value : '';
-      var fr = filterRank ? filterRank.value : '';
       if (data.friends && data.friends.length > 0) {
         // 存離線快取（未篩選的完整資料）
         try { localStorage.setItem('crewsync_friends_' + monthKey, JSON.stringify(data.friends)); } catch(e){}
         for (var i = 0; i < data.friends.length; i++) {
           var f = data.friends[i];
-          if (ff && f.fleet && f.fleet !== ff) continue;
-          if (fr && f.rank && f.rank !== fr) continue;
           _frData.push({ name: f.name, nickname: f.nickname, picture: f.picture, duties: f.duties });
         }
       } else {
@@ -222,8 +259,25 @@ function _frLoadFromCache(monthKey, ff, fr) {
   } catch(e){}
 }
 
+function _frRenderGridTo(gridEl, data, year, month) {
+  if (!gridEl) return;
+  if (data.length === 0) {
+    gridEl.innerHTML = '<div style="text-align:center;padding:40px;color:var(--muted)">此月份無分享班表<br>No shared roster for this month</div>';
+    return;
+  }
+  // 委託給內部 render
+  var savedData = _frData, savedYear = _frYear, savedMonth = _frMonth;
+  _frData = data; _frYear = year; _frMonth = month;
+  _frRenderInternal(gridEl);
+  _frData = savedData; _frYear = savedYear; _frMonth = savedMonth;
+}
+
 function _frRender() {
   var gridEl = document.getElementById('fr-grid');
+  _frRenderInternal(gridEl);
+}
+
+function _frRenderInternal(gridEl) {
   if (!gridEl) return;
 
   if (_frData.length === 0) {
@@ -242,7 +296,10 @@ function _frRender() {
   var totalGridW = daysInMonth * colW;
   var fullW = nameColW + totalGridW + 2;
   // Single scroll container (both axes)
-  var html = '<div style="overflow:scroll;max-height:calc(100dvh - 188px);-webkit-overflow-scrolling:touch;overscroll-behavior:none;position:relative" id="fr-outer">';
+  var isGrpGrid = gridEl && gridEl.id === 'grp-grid';
+  var outerH = isGrpGrid ? 'calc(100dvh - 290px)' : 'calc(100dvh - 188px)';
+  var outerId = isGrpGrid ? 'grp-outer' : 'fr-outer';
+  var html = '<div style="overflow:scroll;max-height:' + outerH + ';-webkit-overflow-scrolling:touch;overscroll-behavior:none;position:relative" id="' + outerId + '">';
   html += '<div style="display:grid;grid-template-columns:' + nameColW + 'px ' + gridCols + ';grid-template-rows:48px repeat(' + _frData.length + ',44px);gap:0;width:' + fullW + 'px">';
 
   // ── Top-left corner cell: "Crew" (sticky top + sticky left) ──

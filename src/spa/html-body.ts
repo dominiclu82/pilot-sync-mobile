@@ -14,7 +14,8 @@ export function getSpaHtmlBody(): string {
   <div class="subtab-slot"><button class="roster-subtab active" onclick="switchRosterTab('crew',this)"><span class="drag-grip">≡</span>✈️ Crew Sync</button></div>
   <div class="subtab-slot"><button class="roster-subtab" onclick="switchRosterTab('cal',this)"><span class="drag-grip">≡</span>📅 Google Calendar</button></div>
   <div class="subtab-slot"><button class="roster-subtab" onclick="switchRosterTab('roster',this)"><span class="drag-grip">≡</span>📋 Roster</button></div>
-  <div class="subtab-slot"><button class="roster-subtab" onclick="switchRosterTab('friends',this)"><span class="drag-grip">≡</span>👥 Friends</button></div>
+  <div class="subtab-slot"><button class="roster-subtab" onclick="switchRosterTab('friends',this)"><span class="drag-grip">≡</span>🤝 Friends<span id="fr-invite-badge" style="display:none;background:#ef4444;color:#fff;font-size:.55em;min-width:14px;height:14px;border-radius:7px;align-items:center;justify-content:center;margin-left:4px;padding:0 3px"></span></button></div>
+  <div class="subtab-slot"><button class="roster-subtab" onclick="switchRosterTab('groups',this)"><span class="drag-grip">≡</span>👥 Groups</button></div>
 </div>
 
 <!-- ── Crew Sync panel ── -->
@@ -185,6 +186,62 @@ export function getSpaHtmlBody(): string {
   </div>
 </div>
 
+<!-- ── Groups panel ── -->
+<div id="roster-groups" class="roster-panel">
+  <div>
+    <!-- Groups header -->
+    <div style="padding:8px 12px;border-bottom:1px solid var(--dim)">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+        <span style="font-size:.69em;color:var(--muted);flex-shrink:0">同意分享班表</span>
+        <label style="position:relative;display:inline-block;width:36px;height:20px;cursor:pointer;flex-shrink:0">
+          <input type="checkbox" id="grp-share-toggle" onchange="_grpToggleShare()" style="opacity:0;width:0;height:0">
+          <span style="position:absolute;top:0;left:0;right:0;bottom:0;background:#4a5568;border-radius:10px;transition:.3s"></span>
+          <span style="position:absolute;top:2px;left:2px;width:16px;height:16px;background:#fff;border-radius:50%;transition:.3s" id="grp-share-dot"></span>
+        </label>
+        <span onclick="_frShowInfo()" style="cursor:pointer;font-size:.85em;color:var(--muted);flex-shrink:0" title="分享說明">ⓘ</span>
+        <!-- 機隊/職級 -->
+        <span id="grp-fleet-hint" style="display:none;flex-shrink:0;background:rgba(59,130,246,.1);border:1px solid rgba(59,130,246,.25);border-radius:6px;padding:2px 6px;align-items:center;gap:4px">
+          <span style="font-size:.52em;color:#60a5fa;line-height:1.2;white-space:nowrap">我的機隊/職級<br>My fleet/rank</span>
+          <select id="grp-my-fleet" onchange="_grpSyncFleetRank()" style="background:#1e3a5f;color:#93c5fd;border:1px solid rgba(59,130,246,.3);border-radius:4px;padding:2px 4px;font-size:.72em;cursor:pointer;width:auto">
+            <option value="" disabled selected>機隊</option><option value="A321">A321</option><option value="A330">A330</option><option value="A350">A350</option>
+          </select>
+          <select id="grp-my-rank" onchange="_grpSyncFleetRank()" style="background:#1e3a5f;color:#93c5fd;border:1px solid rgba(59,130,246,.3);border-radius:4px;padding:2px 4px;font-size:.72em;cursor:pointer;width:auto">
+            <option value="" disabled selected>職級</option><option value="CAP">CAP</option><option value="SFO">SFO</option><option value="FO">FO</option>
+          </select>
+        </span>
+        <!-- 名稱 -->
+        <span id="grp-name-wrap" style="display:none;flex-shrink:0;background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.25);border-radius:6px;padding:2px 6px;align-items:center;gap:4px">
+          <span style="font-size:.5em;color:#86efac">名稱<br>Name</span>
+          <input id="grp-my-name" type="text" placeholder="可修改 editable" onchange="_grpSyncName()" style="background:#1a3a2a;color:#86efac;border:1px solid rgba(34,197,94,.3);border-radius:4px;padding:2px 4px;font-size:.72em;width:100px">
+        </span>
+        <span style="font-size:.65em;color:var(--muted);flex-shrink:0">僅可勾選自己的機隊/職級</span>
+      </div>
+      <div id="grp-preset-list"></div>
+    </div>
+    <!-- Groups month nav + filter -->
+    <div style="display:flex;align-items:center;padding:5px 8px;border-bottom:1px solid var(--dim);gap:6px">
+      <span style="flex:1"></span>
+      <button onclick="_grpPrevMonth()" style="background:none;border:none;color:var(--muted);font-size:1.1em;cursor:pointer;padding:0 4px">◀</button>
+      <span id="grp-month-title" style="font-weight:700;font-size:1.1em;color:var(--text);min-width:100px;text-align:center"></span>
+      <button onclick="_grpNextMonth()" style="background:none;border:none;color:var(--muted);font-size:1.1em;cursor:pointer;padding:0 4px">▶</button>
+      <span style="flex:1"></span>
+      <span style="flex-shrink:0;background:rgba(168,85,247,.1);border:1px solid rgba(168,85,247,.25);border-radius:6px;padding:2px 6px;display:inline-flex;align-items:center;gap:4px">
+        <span style="font-size:.52em;color:#c084fc;line-height:1.2">查看<br>View</span>
+        <select id="grp-view-filter" onchange="_grpLoadGrid()" style="background:#2d1f4e;color:#d8b4fe;border:1px solid rgba(168,85,247,.3);border-radius:4px;padding:2px 4px;font-size:.72em;cursor:pointer;width:auto">
+          <option value="all">全部 All</option>
+        </select>
+        <select id="grp-filter-fleet" onchange="_grpLoadGrid()" style="background:#2d1f4e;color:#d8b4fe;border:1px solid rgba(168,85,247,.3);border-radius:4px;padding:2px 4px;font-size:.72em;cursor:pointer;width:auto">
+          <option value="">All</option><option value="A321">A321</option><option value="A330">A330</option><option value="A350">A350</option>
+        </select>
+        <select id="grp-filter-rank" onchange="_grpLoadGrid()" style="background:#2d1f4e;color:#d8b4fe;border:1px solid rgba(168,85,247,.3);border-radius:4px;padding:2px 4px;font-size:.72em;cursor:pointer;width:auto">
+          <option value="">All</option><option value="CAP">CAP</option><option value="SFO">SFO</option><option value="FO">FO</option>
+        </select>
+      </span>
+    </div>
+    <div id="grp-grid" style="padding:0"></div>
+  </div>
+</div>
+
 <!-- ── Friends panel ── -->
 <div id="roster-friends" class="roster-panel">
   <div>
@@ -223,13 +280,11 @@ export function getSpaHtmlBody(): string {
         <span class="fr-header-row2-inline" style="flex:2"></span>
         <span class="fr-header-row2-inline" style="flex-shrink:0;background:rgba(168,85,247,.1);border:1px solid rgba(168,85,247,.25);border-radius:6px;padding:2px 6px;display:inline-flex;align-items:center;gap:4px">
           <span style="font-size:.52em;color:#c084fc;line-height:1.2">查看<br>View</span>
-          <select id="fr-filter-fleet" onchange="_frLoadMonth()" style="background:#2d1f4e;color:#d8b4fe;border:1px solid rgba(168,85,247,.3);border-radius:4px;padding:2px 4px;font-size:.72em;cursor:pointer;width:auto">
-            <option value="">All</option><option value="A321">A321</option><option value="A330">A330</option><option value="A350">A350</option>
-          </select>
-          <select id="fr-filter-rank" onchange="_frLoadMonth()" style="background:#2d1f4e;color:#d8b4fe;border:1px solid rgba(168,85,247,.3);border-radius:4px;padding:2px 4px;font-size:.72em;cursor:pointer;width:auto">
-            <option value="">All</option><option value="CAP">CAP</option><option value="SFO">SFO</option><option value="FO">FO</option>
+          <select id="fr-filter-group" onchange="_frLoadMonth()" style="background:#2d1f4e;color:#d8b4fe;border:1px solid rgba(168,85,247,.3);border-radius:4px;padding:2px 4px;font-size:.72em;cursor:pointer;width:auto">
+            <option value="none">尚無好友圈</option>
           </select>
         </span>
+        <button onclick="_grpShowManage()" style="flex-shrink:0;background:rgba(251,191,36,.15);border:1px solid rgba(251,191,36,.4);border-radius:8px;padding:4px 12px;font-size:.82em;color:#fbbf24;cursor:pointer;position:relative;font-weight:600">⚙ 好友圈<span id="grp-manage-badge" style="display:none;position:absolute;top:-5px;right:-5px;background:#ef4444;color:#fff;font-size:.6em;min-width:16px;height:16px;border-radius:8px;align-items:center;justify-content:center;padding:0 3px"></span></button>
       </div>
       <!-- Row 2: 月份+篩選（僅手機直拿顯示） -->
       <div class="fr-header-row2">
@@ -240,13 +295,11 @@ export function getSpaHtmlBody(): string {
         <span style="flex:1"></span>
         <span style="flex-shrink:0;background:rgba(168,85,247,.1);border:1px solid rgba(168,85,247,.25);border-radius:6px;padding:2px 6px;display:inline-flex;align-items:center;gap:4px">
           <span style="font-size:.52em;color:#c084fc;line-height:1.2">查看<br>View</span>
-          <select id="fr-filter-fleet-m" onchange="document.getElementById('fr-filter-fleet').value=this.value;_frLoadMonth()" style="background:#2d1f4e;color:#d8b4fe;border:1px solid rgba(168,85,247,.3);border-radius:4px;padding:2px 4px;font-size:.72em;cursor:pointer;width:auto">
-            <option value="">All</option><option value="A321">A321</option><option value="A330">A330</option><option value="A350">A350</option>
-          </select>
-          <select id="fr-filter-rank-m" onchange="document.getElementById('fr-filter-rank').value=this.value;_frLoadMonth()" style="background:#2d1f4e;color:#d8b4fe;border:1px solid rgba(168,85,247,.3);border-radius:4px;padding:2px 4px;font-size:.72em;cursor:pointer;width:auto">
-            <option value="">All</option><option value="CAP">CAP</option><option value="SFO">SFO</option><option value="FO">FO</option>
+          <select id="fr-filter-group-m" onchange="document.getElementById('fr-filter-group').value=this.value;_frLoadMonth()" style="background:#2d1f4e;color:#d8b4fe;border:1px solid rgba(168,85,247,.3);border-radius:4px;padding:2px 4px;font-size:.72em;cursor:pointer;width:auto">
+            <option value="none">尚無好友圈</option>
           </select>
         </span>
+        <button onclick="_grpShowManage()" style="flex-shrink:0;background:rgba(251,191,36,.15);border:1px solid rgba(251,191,36,.4);border-radius:8px;padding:4px 12px;font-size:.82em;color:#fbbf24;cursor:pointer;position:relative;font-weight:600">⚙ 好友圈<span id="grp-manage-badge-m" style="display:none;position:absolute;top:-5px;right:-5px;background:#ef4444;color:#fff;font-size:.6em;min-width:16px;height:16px;border-radius:8px;align-items:center;justify-content:center;padding:0 3px"></span></button>
       </div>
     </div>
     <style>#fr-share-toggle:checked+span{background:var(--accent)!important}#fr-share-toggle:checked~#fr-share-dot{transform:translateX(16px)}</style>
@@ -281,6 +334,17 @@ export function getSpaHtmlBody(): string {
         <button onclick="document.getElementById('fr-name-info-overlay').style.display='none'" style="margin-top:14px;width:100%;padding:8px;background:var(--accent);color:#fff;border:none;border-radius:8px;font-size:.85em;cursor:pointer">了解 Got it</button>
       </div>
     </div>
+  </div>
+</div>
+
+<!-- Groups 管理彈窗 -->
+<div id="grp-manage-overlay" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.7);z-index:9000;align-items:center;justify-content:center" onclick="if(event.target===this)_grpCloseManage()">
+  <div style="background:var(--bg,#0a0e1a);border-radius:14px;padding:16px;width:90vw;max-width:400px;max-height:80vh;overflow-y:auto;-webkit-overflow-scrolling:touch">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+      <span style="font-weight:700;font-size:1em;color:var(--text)">🤝 好友圈管理 Friends</span>
+      <button onclick="_grpCloseManage()" style="background:none;border:none;color:var(--muted);font-size:1.3em;cursor:pointer">✕</button>
+    </div>
+    <div id="grp-friends-content"></div>
   </div>
 </div>
 
@@ -1233,7 +1297,7 @@ export function getSpaHtmlBody(): string {
       <button class="tab-util-btn tab-install-btn" id="tab-install-btn" onclick="showInstallGuide()" style="display:none">
         <span>📲</span>安裝
       </button>
-      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V7.0.15</span>
+      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer;text-decoration:underline" onclick="showAbout()">V8.0.01</span>
     </div>
   </div>
 </div>
@@ -1263,7 +1327,13 @@ export function getSpaHtmlBody(): string {
       <div style="margin-bottom:4px">📱 建議使用 <b>iPad 橫向</b>操作以獲得最佳體驗，Android 裝置可能無法正確顯示</div>
       <div style="color:var(--muted)">Best experience on iPad in landscape mode. Android devices may not display correctly.</div>
     </div>
-    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V7.0.15</div>
+    <div style="max-height:50vh;overflow-y:auto;-webkit-overflow-scrolling:touch;margin-bottom:10px">
+    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V8.0.01</div>
+    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
+      <div>新增 Groups 群組功能：10 個預設群組（All + 9 個機隊職級）、自訂好友圈、邀請碼加入、員工編號邀請、紅點通知</div>
+      <div>New Groups feature: 10 preset groups (All + 9 fleet/rank), custom friend circles, invite code, employee ID invitation, notification badge</div>
+    </div>
+    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V7.0.15</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
       <div>Briefing 日期切換改 ◀ M/D ▶ 支援前一天；Gate Info 移除標題、警語改黃色；隱私權政策補齊第三方服務</div>
       <div>Briefing date nav changed to ◀ M/D ▶ with yesterday support; Gate Info title removed, warning in yellow; privacy policy third-party services updated</div>
@@ -1272,6 +1342,22 @@ export function getSpaHtmlBody(): string {
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
       <div>About card 加註 Android 裝置可能無法正確顯示；FAQ 修正日曆授權說明以符合隱私權政策</div>
       <div>About card adds Android display note; FAQ corrects calendar authorization description to align with privacy policy</div>
+    </div>
+    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V7.0.13</div>
+    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
+      <div>PA Welcome 出發分鐘數快取保留、Descent 點選場站帶入中文目的地</div>
+      <div>PA Welcome departure minutes persisted; Descent tap-to-select fills Chinese destination</div>
+    </div>
+    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V7.0.12</div>
+    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
+      <div>WX 單一機場更新按鈕加入載入狀態，清除 24hr 快取強制重新抓取</div>
+      <div>WX single airport refresh button shows loading state, clears 24hr cache</div>
+    </div>
+    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V7.0.11</div>
+    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
+      <div>手機直拿 Friends header 分兩行排列，第一行可滑動、第二行月份置中+篩選靠右</div>
+      <div>Mobile portrait Friends header split into two rows</div>
+    </div>
     </div>
     <div style="font-size:.68em;color:var(--muted);margin-top:12px;margin-bottom:10px;display:flex;gap:16px;justify-content:center">
       <a href="/privacy" onclick="openLegal('/privacy');return false" style="color:var(--muted);text-decoration:underline">Privacy Policy 隱私權政策</a>

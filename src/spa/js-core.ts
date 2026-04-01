@@ -318,6 +318,7 @@ function mkStat(n, label) {
 
 // ── Roster sub-tab ───────────────────────────────────────────────────────────
 var gcalInited = false;
+var _grpPanelInited = false;
 function _rosterDevUnlock(tab) {
   var pw = document.getElementById(tab === 'friends' ? 'friends-dev-pw' : 'roster-dev-pw').value;
   if (pw === 'qwertyui') {
@@ -347,6 +348,7 @@ function switchRosterTab(panel, btn) {
   document.getElementById('roster-' + panel).classList.add('active');
   if (panel === 'cal' && !gcalInited) { gcalInited = true; gcalInit(); }
   if (panel === 'roster' && !_rgInited) { _rgInited = true; _rgInit(); }
+  if (panel === 'groups' && !_grpPanelInited) { _grpPanelInited = true; _grpInitPanel(); }
   if (panel === 'friends' && !_frInited) { _frInited = true; _frInit(); }
 }
 // Auto-switch to Calendar if user already authorized (setTimeout to wait for calendar JS)
