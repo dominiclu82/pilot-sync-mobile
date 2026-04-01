@@ -23,7 +23,7 @@ function _stVisibleSlots() {
 function _stSaveOrder() {
   var bar = _stDragSlot ? _stDragSlot.closest('.briefing-subtabs, .roster-subtabs') : null;
   if (!bar) return;
-  var key = bar.classList.contains('roster-subtabs') ? 'crewsync_roster_subtab_order' : 'crewsync_subtab_order';
+  var key = bar.classList.contains('roster-subtabs') ? 'crewsync_roster_subtab_order' : bar.classList.contains('cabin-subtabs') ? 'crewsync_cabin_subtab_order' : 'crewsync_subtab_order';
   var order = Array.from(bar.children)
     .filter(function(el) { return el.classList.contains('subtab-slot') || el.classList.contains('subtab-wx-wrap'); })
     .map(function(el) { return _stSlotId(el); })
@@ -32,8 +32,9 @@ function _stSaveOrder() {
 }
 
 function _stRestoreOrder() {
-  _stRestoreBar('.briefing-subtabs', 'crewsync_subtab_order');
+  _stRestoreBar('.briefing-subtabs:not(.cabin-subtabs)', 'crewsync_subtab_order');
   _stRestoreBar('.roster-subtabs', 'crewsync_roster_subtab_order');
+  _stRestoreBar('.cabin-subtabs', 'crewsync_cabin_subtab_order');
 }
 function _stRestoreBar(selector, key) {
   try {
@@ -188,7 +189,7 @@ function _stPreventClick(e) {
 /* ── 初始化 ── */
 function subtabReorderInit() {
   _stRestoreOrder();
-  ['.briefing-subtabs', '.roster-subtabs'].forEach(function(sel) {
+  ['.briefing-subtabs:not(.cabin-subtabs)', '.roster-subtabs', '.cabin-subtabs'].forEach(function(sel) {
     var bar = document.querySelector(sel);
     if (!bar) return;
     bar.addEventListener('touchstart', _stTouchStart, { passive: true });

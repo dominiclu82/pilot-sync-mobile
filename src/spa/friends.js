@@ -73,16 +73,55 @@ function _frShowEmpty() {
 }
 
 function _frShowShareUI(show) {
+  var roleSel = document.getElementById('fr-my-role');
   var fleetSel = document.getElementById('fr-my-fleet');
   var rankSel = document.getElementById('fr-my-rank');
   var hint = document.getElementById('fr-share-hint');
   var nameWrap = document.getElementById('fr-name-wrap');
   var nameInput = document.getElementById('fr-my-name');
-  if (fleetSel) fleetSel.value = localStorage.getItem('crewsync_my_fleet') || '';
-  if (rankSel) rankSel.value = localStorage.getItem('crewsync_my_rank') || '';
   if (hint) hint.style.display = show ? 'inline-flex' : 'none';
   if (nameWrap) nameWrap.style.display = show ? 'inline-flex' : 'none';
-  if (nameInput) nameInput.value = localStorage.getItem('crewsync_nickname') || localStorage.getItem('crewsync_crew_name') || localStorage.getItem('crewsync_eid') || '';
+  if (show) {
+    var role = localStorage.getItem('crewsync_my_role') || '';
+    if (roleSel) roleSel.value = role;
+    if (role === 'cc') {
+      if (fleetSel) fleetSel.style.display = 'none';
+      if (rankSel) rankSel.innerHTML = '<option value="" disabled selected>職級</option><option value="SP">SP</option><option value="PR">PR</option><option value="SC">SC</option><option value="CC">CC</option><option value="PC">PC</option>';
+    } else if (role === 'fc') {
+      if (fleetSel) fleetSel.style.display = '';
+      if (rankSel) rankSel.innerHTML = '<option value="" disabled selected>職級</option><option value="CAP">CAP</option><option value="SFO">SFO</option><option value="FO">FO</option>';
+    }
+    if (fleetSel) fleetSel.value = localStorage.getItem('crewsync_my_fleet') || '';
+    if (rankSel) rankSel.value = localStorage.getItem('crewsync_my_rank') || '';
+    if (nameInput) nameInput.value = localStorage.getItem('crewsync_nickname') || localStorage.getItem('crewsync_crew_name') || localStorage.getItem('crewsync_eid') || '';
+  }
+}
+
+function _frSyncRole() {
+  var roleSel = document.getElementById('fr-my-role');
+  var role = roleSel ? roleSel.value : '';
+  if (role) localStorage.setItem('crewsync_my_role', role);
+  var fleetSel = document.getElementById('fr-my-fleet');
+  var rankSel = document.getElementById('fr-my-rank');
+  if (role === 'fc') {
+    if (fleetSel) fleetSel.style.display = '';
+    if (rankSel) rankSel.innerHTML = '<option value="" disabled selected>職級</option><option value="CAP">CAP</option><option value="SFO">SFO</option><option value="FO">FO</option>';
+  } else if (role === 'cc') {
+    if (fleetSel) fleetSel.style.display = 'none';
+    localStorage.removeItem('crewsync_my_fleet');
+    if (rankSel) rankSel.innerHTML = '<option value="" disabled selected>職級</option><option value="SP">SP</option><option value="PR">PR</option><option value="SC">SC</option><option value="CC">CC</option><option value="PC">PC</option>';
+  }
+  // 同步到 Groups
+  var grpRole = document.getElementById('grp-my-role');
+  if (grpRole) grpRole.value = role;
+  // 重置職級
+  if (rankSel) rankSel.value = '';
+  localStorage.removeItem('crewsync_my_rank');
+  if (typeof _grpSyncRole === 'function') {
+    var grpRoleSel = document.getElementById('grp-my-role');
+    if (grpRoleSel) grpRoleSel.value = role;
+    if (typeof _grpData !== 'undefined' && _grpData) _grpRenderPresets(_grpData);
+  }
 }
 
 // 機隊/職級/名稱都選完後才觸發上傳
@@ -108,10 +147,12 @@ function _frCheckReady() {
   // 機隊/職級改變時，退出不符合的預設群組
   if (fleet && rank) _grpAutoLeavePresets(fleet, rank);
   if (typeof _grpLoadPresets === 'function') _grpLoadPresets();
-  // 如果已開啟分享且三個都填了，自動上傳
-  if (localStorage.getItem('crewsync_share_enabled') === '1' && fleet && rank) {
+  // 如果已開啟分享且資料填好，自動上傳
+  var role = localStorage.getItem('crewsync_my_role') || '';
+  var canUpload = role === 'cc' ? !!rank : (!!fleet && !!rank);
+  if (localStorage.getItem('crewsync_share_enabled') === '1' && canUpload) {
     var eid = localStorage.getItem('crewsync_eid');
-    if (eid) _frUploadAll(eid, fleet, rank);
+    if (eid) _frUploadAll(eid, fleet || '', rank);
   }
 }
 

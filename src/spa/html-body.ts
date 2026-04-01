@@ -258,14 +258,16 @@ export function getSpaHtmlBody(): string {
           <span style="position:absolute;top:2px;left:2px;width:16px;height:16px;background:#fff;border-radius:50%;transition:.3s" id="fr-share-dot"></span>
         </label>
         <span onclick="_frShowInfo()" style="cursor:pointer;font-size:.85em;color:var(--muted);flex-shrink:0" title="分享說明">ⓘ</span>
-        <!-- 區塊1: 我的機隊/職級 (淡藍) -->
+        <!-- 區塊1: 身分/機隊/職級 (淡藍) -->
         <span id="fr-share-hint" style="display:none;flex-shrink:0;background:rgba(59,130,246,.1);border:1px solid rgba(59,130,246,.25);border-radius:6px;padding:2px 6px;align-items:center;gap:4px">
-          <span style="font-size:.52em;color:#60a5fa;line-height:1.2;white-space:nowrap">我的機隊/職級<br>My fleet/rank</span>
+          <select id="fr-my-role" onchange="_frSyncRole()" style="background:#1e3a5f;color:#93c5fd;border:1px solid rgba(59,130,246,.3);border-radius:4px;padding:2px 4px;font-size:.72em;cursor:pointer;width:auto">
+            <option value="" disabled selected>身分</option><option value="fc">Flight Crew</option><option value="cc">Cabin Crew</option>
+          </select>
           <select id="fr-my-fleet" onchange="_frCheckReady()" style="background:#1e3a5f;color:#93c5fd;border:1px solid rgba(59,130,246,.3);border-radius:4px;padding:2px 4px;font-size:.72em;cursor:pointer;width:auto">
             <option value="" disabled selected>機隊</option><option value="A321">A321</option><option value="A330">A330</option><option value="A350">A350</option>
           </select>
           <select id="fr-my-rank" onchange="_frCheckReady()" style="background:#1e3a5f;color:#93c5fd;border:1px solid rgba(59,130,246,.3);border-radius:4px;padding:2px 4px;font-size:.72em;cursor:pointer;width:auto">
-            <option value="" disabled selected>職級</option><option value="CAP">CAP</option><option value="SFO">SFO</option><option value="FO">FO</option>
+            <option value="" disabled selected>職級</option>
           </select>
         </span>
         <!-- 區塊2: 名字 (淡綠) -->
@@ -1108,17 +1110,77 @@ export function getSpaHtmlBody(): string {
 <!-- ══ Tab: Cabin Crew ══════════════════════════════════════════════ -->
 <div id="tab-cabin" style="display:none">
   <!-- Cabin Crew sub-tabs -->
-  <div class="briefing-subtabs" id="cabin-subtabs">
-    <div class="subtab-slot"><button class="briefing-subtab active" id="cabinSubBtn-rest" onclick="switchCabinTab('rest',this)"><span class="drag-grip">≡</span>⏳ Rest Calc</button></div>
-    <div class="subtab-slot"><button class="briefing-subtab" id="cabinSubBtn-swap" onclick="switchCabinTab('swap',this)"><span class="drag-grip">≡</span>🔄 Swap Check</button></div>
+  <div class="briefing-subtabs cabin-subtabs" id="cabin-subtabs" style="justify-content:space-evenly">
+    <div class="subtab-slot" style="flex:1"><button class="briefing-subtab active" id="cabinSubBtn-rest" onclick="switchCabinTab('rest',this)" style="width:100%"><span class="drag-grip">≡</span>⏳ Rest Calc</button></div>
+    <div class="subtab-slot" style="flex:1"><button class="briefing-subtab" id="cabinSubBtn-swap" onclick="switchCabinTab('swap',this)" style="width:100%"><span class="drag-grip">≡</span>🔄 Swap Check</button></div>
   </div>
 
   <!-- Cabin Rest Calc -->
   <div id="cabin-rest" class="briefing-panel active" style="padding:20px">
-    <div style="text-align:center;padding:40px 20px;color:var(--muted)">
-      <div style="font-size:2.5em;margin-bottom:12px">⏳</div>
-      <div style="font-size:1em;font-weight:700;color:var(--text);margin-bottom:8px">Cabin Crew Rest Calculator</div>
-      <div style="font-size:.82em;color:var(--muted)">Coming Soon</div>
+    <div style="text-align:center;padding:8px;background:rgba(251,191,36,.1);border:1px solid rgba(251,191,36,.3);border-radius:8px;margin-bottom:12px;font-size:.78em;color:#fbbf24">🚧 Coming Soon — 測試版 Beta</div>
+    <div id="cabin-rest-lock" style="text-align:center;padding:40px 20px">
+      <div style="font-size:2.5em;margin-bottom:12px">🔒</div>
+      <div style="font-size:.95em;font-weight:700;color:var(--text);margin-bottom:12px">Cabin Crew Rest Calculator</div>
+      <div style="font-size:.78em;color:var(--muted);margin-bottom:16px">測試中，請輸入開發者密碼<br>In testing — enter developer password</div>
+      <input id="cabin-rest-pw" type="password" placeholder="Password" onkeydown="if(event.key==='Enter')_ccRestUnlock()" style="background:var(--surface);color:var(--text);border:1px solid var(--dim);border-radius:8px;padding:8px 12px;font-size:.9em;text-align:center;width:180px">
+      <button onclick="_ccRestUnlock()" style="margin-left:8px;background:var(--accent);color:#fff;border:none;border-radius:8px;padding:8px 16px;font-size:.85em;cursor:pointer">Enter</button>
+    </div>
+    <div id="cabin-rest-content" style="display:none">
+      <div style="font-size:1em;font-weight:700;color:var(--text);margin-bottom:16px;text-align:center">⏳ Cabin Crew Rest Calculator</div>
+      <!-- 輸入區 -->
+      <div style="background:var(--card);border-radius:12px;padding:16px;margin-bottom:16px">
+        <div style="display:flex;flex-direction:column;gap:12px">
+          <div style="display:flex;align-items:center;gap:10px">
+            <div style="font-size:.85em;color:var(--muted);min-width:110px;white-space:nowrap">目的地時區<br><span style="opacity:.6">Dest TZ</span></div>
+            <select id="cc-rest-tz" style="flex:1;background:var(--surface);color:var(--text);border:1px solid var(--dim);border-radius:8px;padding:10px;font-size:.9em">
+              <option value="8" selected>UTC+8 (TPE / HKG / MFM / SIN)</option>
+              <option value="9">UTC+9 (NRT / ICN)</option>
+              <option value="7">UTC+7 (BKK / SGN / CGK)</option>
+              <option value="-8">UTC-8 (LAX / SFO / SEA) PST</option>
+              <option value="-7">UTC-7 (PHX / LAX DST)</option>
+              <option value="1">UTC+1 (PRG) CET</option>
+              <option value="2">UTC+2 (PRG DST) CEST</option>
+              <option value="0">UTC+0</option>
+              <option value="-5">UTC-5</option>
+              <option value="-6">UTC-6</option>
+              <option value="-9">UTC-9</option>
+              <option value="-10">UTC-10</option>
+              <option value="3">UTC+3</option>
+              <option value="4">UTC+4</option>
+              <option value="5">UTC+5</option>
+              <option value="5.5">UTC+5:30</option>
+              <option value="6">UTC+6</option>
+              <option value="10">UTC+10</option>
+              <option value="11">UTC+11</option>
+              <option value="12">UTC+12</option>
+            </select>
+          </div>
+          <div style="display:flex;align-items:center;gap:10px">
+            <div style="font-size:.85em;color:var(--muted);min-width:110px;white-space:nowrap">1st Rest 開始<br><span style="opacity:.6">Start</span></div>
+            <input id="cc-rest-start" type="time" style="flex:1;background:var(--surface);color:var(--text);border:1px solid var(--dim);border-radius:8px;padding:10px;font-size:1em">
+          </div>
+          <div style="display:flex;align-items:center;gap:10px">
+            <div style="font-size:.85em;color:var(--muted);min-width:110px;white-space:nowrap">Handover<br><span style="opacity:.6">HHMM or min</span></div>
+            <input id="cc-rest-handover" type="text" value="10" inputmode="numeric" placeholder="0010 or 10" style="flex:1;background:var(--surface);color:var(--text);border:1px solid var(--dim);border-radius:8px;padding:10px;font-size:1em;text-align:center">
+          </div>
+          <div style="display:flex;align-items:center;gap:10px">
+            <div style="font-size:.85em;color:var(--muted);min-width:110px;white-space:nowrap">2nd Meal<br><span style="opacity:.6">HHMM</span></div>
+            <input id="cc-rest-meal" type="text" value="0230" inputmode="numeric" placeholder="e.g. 0230" style="flex:1;background:var(--surface);color:var(--text);border:1px solid var(--dim);border-radius:8px;padding:10px;font-size:1em;text-align:center">
+          </div>
+          <div style="display:flex;align-items:center;gap:10px">
+            <div style="font-size:.85em;color:var(--muted);min-width:110px;white-space:nowrap">TOD<br><span style="opacity:.6">時間</span></div>
+            <input id="cc-rest-tod" type="time" style="flex:1;background:var(--surface);color:var(--text);border:1px solid var(--dim);border-radius:8px;padding:10px;font-size:1em">
+          </div>
+          <div style="display:flex;align-items:center;gap:10px">
+            <div style="font-size:.85em;color:var(--muted);min-width:110px;white-space:nowrap">Landing<br><span style="opacity:.6">時間</span></div>
+            <input id="cc-rest-landing" type="time" style="flex:1;background:var(--surface);color:var(--text);border:1px solid var(--dim);border-radius:8px;padding:10px;font-size:1em">
+          </div>
+        </div>
+        <button onclick="_ccRestCalc()" style="margin-top:16px;width:100%;background:var(--accent);color:#fff;border:none;border-radius:10px;padding:14px;font-size:1.05em;font-weight:700;cursor:pointer">計算 Calculate</button>
+      </div>
+      <!-- 結果區 -->
+      <div id="cc-rest-result" style="display:none;background:var(--card);border-radius:12px;padding:14px">
+      </div>
     </div>
   </div>
 
@@ -1330,7 +1392,7 @@ export function getSpaHtmlBody(): string {
       <button class="tab-util-btn tab-install-btn" id="tab-install-btn" onclick="showInstallGuide()" style="display:none">
         <span>📲</span>安裝
       </button>
-      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer;text-decoration:underline" onclick="showAbout()">V8.0.06</span>
+      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer;text-decoration:underline" onclick="showAbout()">V8.0.07</span>
     </div>
   </div>
 </div>
@@ -1361,7 +1423,12 @@ export function getSpaHtmlBody(): string {
       <div style="color:var(--muted)">Best experience on iPad in landscape mode. Android devices may not display correctly.</div>
     </div>
     <div style="max-height:50vh;overflow-y:auto;-webkit-overflow-scrolling:touch;margin-bottom:10px">
-    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V8.0.06</div>
+    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V8.0.07</div>
+    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
+      <div>Cabin Crew Rest Calculator（Beta）、FC/CC 身分連動 Friends、Cabin subtab 拖移排序、時區加場站名</div>
+      <div>Cabin Crew Rest Calculator (Beta), FC/CC role sync with Friends, Cabin subtab drag reorder, timezone with station names</div>
+    </div>
+    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V8.0.06</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
       <div>新增 Cabin Crew tab + 預設群組改版（FC 6 + CC 3 + All）、手機 tab bar 可捲動、分享選 FC/CC 身分</div>
       <div>New Cabin Crew tab, preset groups redesign (FC 6 + CC 3 + All), mobile tab bar scrollable, FC/CC role selection</div>

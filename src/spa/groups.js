@@ -546,6 +546,131 @@ function _grpAutoLeavePresets(newFleet, newRank) {
 
 function _grpEsc(s) { var d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
 
+// ── Cabin Crew Rest Calculator ──────────────────────────────────────────────
+function _ccRestUnlock() {
+  var pw = document.getElementById('cabin-rest-pw');
+  if (pw && pw.value === '12345678') {
+    document.getElementById('cabin-rest-lock').style.display = 'none';
+    document.getElementById('cabin-rest-content').style.display = '';
+    localStorage.setItem('crewsync_cc_rest_unlocked', '1');
+  } else {
+    alert('密碼錯誤 Wrong password');
+  }
+}
+// 頁面載入時自動解鎖
+document.addEventListener('DOMContentLoaded', function() {
+  if (localStorage.getItem('crewsync_cc_rest_unlocked') === '1') {
+    var lock = document.getElementById('cabin-rest-lock');
+    var content = document.getElementById('cabin-rest-content');
+    if (lock) lock.style.display = 'none';
+    if (content) content.style.display = '';
+  }
+});
+
+function _ccRestCalc() {
+  var startEl = document.getElementById('cc-rest-start');
+  var handoverEl = document.getElementById('cc-rest-handover');
+  var mealEl = document.getElementById('cc-rest-meal');
+  var todEl = document.getElementById('cc-rest-tod');
+  var landingEl = document.getElementById('cc-rest-landing');
+
+  if (!startEl.value || !todEl.value) { alert('請填入 1st Rest 開始和 TOD 時間'); return; }
+
+  var startMin = _ccTimeToMin(startEl.value);
+  var todMin = _ccTimeToMin(todEl.value);
+  var landingMin = landingEl.value ? _ccTimeToMin(landingEl.value) : null;
+  var handoverMin = _ccParseDuration(handoverEl.value);
+  var mealMin = _ccParseDuration(mealEl.value);
+
+  // 處理跨午夜
+  if (todMin <= startMin) todMin += 1440;
+
+  var totalAvail = todMin - startMin;
+  var nonRest = handoverMin + mealMin;
+  var totalRest = totalAvail - nonRest;
+
+  if (totalRest <= 0) { alert('可用休息時間不足 Not enough rest time'); return; }
+
+  var restPerGroup = Math.floor(totalRest / 2);
+
+  // 時間軸：1st Rest → Handover → 2nd Rest → 2nd Meal → TOD
+  var t = startMin;
+  var rest1Start = t;
+  var rest1End = t + restPerGroup;
+  t = rest1End;
+  var hoStart = t;
+  var hoEnd = t + handoverMin;
+  t = hoEnd;
+  var rest2Start = t;
+  var rest2End = t + restPerGroup;
+  t = rest2End;
+  var mealStart = t;
+  var mealEnd = t + mealMin;
+
+  var resultEl = document.getElementById('cc-rest-result');
+  var html = '';
+  html += '<div style="font-size:.9em;font-weight:700;color:var(--text);margin-bottom:12px;text-align:center">📋 Rest Schedule (Dest Local Time)</div>';
+
+  html += _ccRestRow('1st Rest', rest1Start, rest1End, '#1e40af', restPerGroup);
+  html += _ccRestRow('Handover', hoStart, hoEnd, '#854d0e', handoverMin);
+  html += _ccRestRow('2nd Rest', rest2Start, rest2End, '#7f1d1d', restPerGroup);
+  html += _ccRestRow('2nd Meal', mealStart, mealEnd, '#065f46', mealMin);
+  html += '<div style="border-top:1px solid var(--dim);margin-top:8px;padding-top:8px">';
+  html += _ccRestRow('TOD', todMin, null, '#4a5568', 0);
+  if (landingMin !== null) {
+    var lm = landingMin;
+    if (lm <= startMin) lm += 1440;
+    html += _ccRestRow('Landing', lm, null, '#4a5568', 0);
+  }
+  html += '</div>';
+
+  // 總結
+  html += '<div style="margin-top:12px;padding:10px;background:rgba(59,130,246,.08);border-radius:8px;font-size:.78em;color:var(--muted);text-align:center">';
+  html += '總可用 Total: ' + totalAvail + ' min ｜ 純休息 Rest: ' + totalRest + ' min ｜ 每組 Per group: ' + restPerGroup + ' min (' + Math.floor(restPerGroup/60) + 'h' + (restPerGroup%60 ? restPerGroup%60 + 'm' : '') + ')';
+  html += '</div>';
+
+  resultEl.innerHTML = html;
+  resultEl.style.display = '';
+}
+
+function _ccRestRow(label, startMin, endMin, color, duration) {
+  var html = '<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid rgba(255,255,255,.05)">';
+  html += '<div style="width:8px;height:8px;border-radius:50%;background:' + color + ';flex-shrink:0"></div>';
+  html += '<div style="flex:1;font-size:.85em;font-weight:600;color:var(--text)">' + label + '</div>';
+  html += '<div style="font-size:.85em;color:var(--text);font-weight:700">' + _ccMinToTime(startMin);
+  if (endMin !== null) html += ' ~ ' + _ccMinToTime(endMin);
+  html += '</div>';
+  if (duration > 0) html += '<div style="font-size:.7em;color:var(--muted);min-width:40px;text-align:right">' + duration + 'min</div>';
+  html += '</div>';
+  return html;
+}
+
+// 解析 HHMM 或純分鐘格式 → 回傳分鐘數
+// "0230" → 150, "30" → 30, "0030" → 30, "130" → 90
+function _ccParseDuration(val) {
+  var s = (val || '').trim();
+  if (!s) return 0;
+  var n = parseInt(s);
+  if (s.length >= 3) {
+    // HHMM: 0230 → 2h30m, 130 → 1h30m
+    var hh = Math.floor(n / 100);
+    var mm = n % 100;
+    return hh * 60 + mm;
+  }
+  // 純分鐘: 30 → 30
+  return n;
+}
+
+function _ccTimeToMin(timeStr) {
+  var parts = timeStr.split(':');
+  return parseInt(parts[0]) * 60 + parseInt(parts[1]);
+}
+
+function _ccMinToTime(min) {
+  var m = ((min % 1440) + 1440) % 1440;
+  return String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(m % 60).padStart(2, '0');
+}
+
 // 頁面載入時檢查待處理邀請（紅點）
 document.addEventListener('DOMContentLoaded', function() {
   var eid = localStorage.getItem('crewsync_eid');
