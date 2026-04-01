@@ -199,14 +199,16 @@ export function getSpaHtmlBody(): string {
           <span style="position:absolute;top:2px;left:2px;width:16px;height:16px;background:#fff;border-radius:50%;transition:.3s" id="grp-share-dot"></span>
         </label>
         <span onclick="_frShowInfo()" style="cursor:pointer;font-size:.85em;color:var(--muted);flex-shrink:0" title="分享說明">ⓘ</span>
-        <!-- 機隊/職級 -->
+        <!-- 身分/機隊/職級 -->
         <span id="grp-fleet-hint" style="display:none;flex-shrink:0;background:rgba(59,130,246,.1);border:1px solid rgba(59,130,246,.25);border-radius:6px;padding:2px 6px;align-items:center;gap:4px">
-          <span style="font-size:.52em;color:#60a5fa;line-height:1.2;white-space:nowrap">我的機隊/職級<br>My fleet/rank</span>
+          <select id="grp-my-role" onchange="_grpSyncRole()" style="background:#1e3a5f;color:#93c5fd;border:1px solid rgba(59,130,246,.3);border-radius:4px;padding:2px 4px;font-size:.72em;cursor:pointer;width:auto">
+            <option value="" disabled selected>身分</option><option value="fc">Flight Crew</option><option value="cc">Cabin Crew</option>
+          </select>
           <select id="grp-my-fleet" onchange="_grpSyncFleetRank()" style="background:#1e3a5f;color:#93c5fd;border:1px solid rgba(59,130,246,.3);border-radius:4px;padding:2px 4px;font-size:.72em;cursor:pointer;width:auto">
             <option value="" disabled selected>機隊</option><option value="A321">A321</option><option value="A330">A330</option><option value="A350">A350</option>
           </select>
           <select id="grp-my-rank" onchange="_grpSyncFleetRank()" style="background:#1e3a5f;color:#93c5fd;border:1px solid rgba(59,130,246,.3);border-radius:4px;padding:2px 4px;font-size:.72em;cursor:pointer;width:auto">
-            <option value="" disabled selected>職級</option><option value="CAP">CAP</option><option value="SFO">SFO</option><option value="FO">FO</option>
+            <option value="" disabled selected>職級</option>
           </select>
         </span>
         <!-- 名稱 -->
@@ -1103,6 +1105,33 @@ export function getSpaHtmlBody(): string {
 
 </div><!-- end tab-briefing -->
 
+<!-- ══ Tab: Cabin Crew ══════════════════════════════════════════════ -->
+<div id="tab-cabin" style="display:none">
+  <!-- Cabin Crew sub-tabs -->
+  <div class="briefing-subtabs" id="cabin-subtabs">
+    <div class="subtab-slot"><button class="briefing-subtab active" id="cabinSubBtn-rest" onclick="switchCabinTab('rest',this)"><span class="drag-grip">≡</span>⏳ Rest Calc</button></div>
+    <div class="subtab-slot"><button class="briefing-subtab" id="cabinSubBtn-swap" onclick="switchCabinTab('swap',this)"><span class="drag-grip">≡</span>🔄 Swap Check</button></div>
+  </div>
+
+  <!-- Cabin Rest Calc -->
+  <div id="cabin-rest" class="briefing-panel active" style="padding:20px">
+    <div style="text-align:center;padding:40px 20px;color:var(--muted)">
+      <div style="font-size:2.5em;margin-bottom:12px">⏳</div>
+      <div style="font-size:1em;font-weight:700;color:var(--text);margin-bottom:8px">Cabin Crew Rest Calculator</div>
+      <div style="font-size:.82em;color:var(--muted)">Coming Soon</div>
+    </div>
+  </div>
+
+  <!-- Swap Check -->
+  <div id="cabin-swap" class="briefing-panel" style="padding:20px">
+    <div style="text-align:center;padding:40px 20px;color:var(--muted)">
+      <div style="font-size:2.5em;margin-bottom:12px">🔄</div>
+      <div style="font-size:1em;font-weight:700;color:var(--text);margin-bottom:8px">Swap Check</div>
+      <div style="font-size:.82em;color:var(--muted)">Coming Soon</div>
+    </div>
+  </div>
+</div><!-- end tab-cabin -->
+
 <!-- ══ Tab: Gate Info ═══════════════════════════════════════════════ -->
 <div id="tab-gate" style="display:none">
 
@@ -1276,7 +1305,10 @@ export function getSpaHtmlBody(): string {
     <span class="tab-btn-icon">✈️</span>Roster Sync
   </button>
   <button class="tab-btn tab-active" id="tabBtn-briefing" onclick="switchTab('briefing',this)">
-    <span class="tab-btn-icon">💼</span>Operation
+    <span class="tab-btn-icon">🧑‍✈️</span>Flight Crew
+  </button>
+  <button class="tab-btn" id="tabBtn-cabin" onclick="switchTab('cabin',this)">
+    <span class="tab-btn-icon">👥</span>Cabin Crew
   </button>
   <button class="tab-btn" id="tabBtn-fr24" onclick="switchTab('fr24',this)">
     <span class="tab-btn-icon">📡</span>FR24
@@ -1298,7 +1330,7 @@ export function getSpaHtmlBody(): string {
       <button class="tab-util-btn tab-install-btn" id="tab-install-btn" onclick="showInstallGuide()" style="display:none">
         <span>📲</span>安裝
       </button>
-      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer;text-decoration:underline" onclick="showAbout()">V8.0.05</span>
+      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer;text-decoration:underline" onclick="showAbout()">V8.0.06</span>
     </div>
   </div>
 </div>
@@ -1329,7 +1361,12 @@ export function getSpaHtmlBody(): string {
       <div style="color:var(--muted)">Best experience on iPad in landscape mode. Android devices may not display correctly.</div>
     </div>
     <div style="max-height:50vh;overflow-y:auto;-webkit-overflow-scrolling:touch;margin-bottom:10px">
-    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V8.0.05</div>
+    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V8.0.06</div>
+    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
+      <div>新增 Cabin Crew tab + 預設群組改版（FC 6 + CC 3 + All）、手機 tab bar 可捲動、分享選 FC/CC 身分</div>
+      <div>New Cabin Crew tab, preset groups redesign (FC 6 + CC 3 + All), mobile tab bar scrollable, FC/CC role selection</div>
+    </div>
+    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V8.0.05</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
       <div>Training duty（RT）拆分 PT/PC 子項目、每天獨立組員名單；Groups 排版修正、toggle 與名稱同行、ⓘ 修正</div>
       <div>Training duty (RT) split into PT/PC sub-items with per-day crew; Groups layout fix, inline toggles, ⓘ fix</div>

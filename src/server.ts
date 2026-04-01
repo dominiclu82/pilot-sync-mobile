@@ -96,9 +96,12 @@ async function _dbInit() {
     // Seed preset groups (idempotent)
     const presets = [
       { id: 'preset_all', name: 'All' },
-      { id: 'preset_A321_CAP', name: 'A321 CAP' }, { id: 'preset_A321_SFO', name: 'A321 SFO' }, { id: 'preset_A321_FO', name: 'A321 FO' },
-      { id: 'preset_A330_CAP', name: 'A330 CAP' }, { id: 'preset_A330_SFO', name: 'A330 SFO' }, { id: 'preset_A330_FO', name: 'A330 FO' },
-      { id: 'preset_A350_CAP', name: 'A350 CAP' }, { id: 'preset_A350_SFO', name: 'A350 SFO' }, { id: 'preset_A350_FO', name: 'A350 FO' },
+      // Flight Crew（6 個）
+      { id: 'preset_A321_CAP', name: 'A321 CAP' }, { id: 'preset_A321_SFOFO', name: 'A321 SFO/FO' },
+      { id: 'preset_A330_CAP', name: 'A330 CAP' }, { id: 'preset_A330_SFOFO', name: 'A330 SFO/FO' },
+      { id: 'preset_A350_CAP', name: 'A350 CAP' }, { id: 'preset_A350_SFOFO', name: 'A350 SFO/FO' },
+      // Cabin Crew（3 個）
+      { id: 'preset_CC_SPPR', name: 'SP/PR' }, { id: 'preset_CC_SC', name: 'SC' }, { id: 'preset_CC_CCPC', name: 'CC/PC' },
     ];
     for (const g of presets) {
       await _pool.query(
@@ -427,7 +430,7 @@ app.get('/sw.js', (_req, res) => {
   res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
   res.setHeader('Service-Worker-Allowed', '/');
   res.send(`
-const CACHE = 'crewsync-v8005';
+const CACHE = 'crewsync-v8006';
 const SHELL = ['/', '/main', '/share'];
 self.addEventListener('install', e => {
   e.waitUntil(

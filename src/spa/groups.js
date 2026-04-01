@@ -64,13 +64,52 @@ function _grpShowShareUI(show) {
   var fleetSel = document.getElementById('grp-my-fleet');
   var rankSel = document.getElementById('grp-my-rank');
   var nameInp = document.getElementById('grp-my-name');
+  var roleSel = document.getElementById('grp-my-role');
   if (fleetHint) fleetHint.style.display = show ? 'inline-flex' : 'none';
   if (nameWrap) nameWrap.style.display = show ? 'inline-flex' : 'none';
   if (show) {
+    var role = localStorage.getItem('crewsync_my_role') || '';
+    if (roleSel) roleSel.value = role;
+    if (role === 'cc') {
+      if (fleetSel) fleetSel.style.display = 'none';
+      if (rankSel) rankSel.innerHTML = '<option value="" disabled selected>職級</option><option value="SP">SP</option><option value="PR">PR</option><option value="SC">SC</option><option value="CC">CC</option><option value="PC">PC</option>';
+    } else if (role === 'fc') {
+      if (fleetSel) fleetSel.style.display = '';
+      if (rankSel) rankSel.innerHTML = '<option value="" disabled selected>職級</option><option value="CAP">CAP</option><option value="SFO">SFO</option><option value="FO">FO</option>';
+    }
     if (fleetSel) fleetSel.value = localStorage.getItem('crewsync_my_fleet') || '';
     if (rankSel) rankSel.value = localStorage.getItem('crewsync_my_rank') || '';
     if (nameInp) nameInp.value = localStorage.getItem('crewsync_nickname') || localStorage.getItem('crewsync_crew_name') || '';
   }
+}
+
+function _grpSyncRole() {
+  var roleSel = document.getElementById('grp-my-role');
+  var role = roleSel ? roleSel.value : '';
+  if (role) localStorage.setItem('crewsync_my_role', role);
+  var fleetSel = document.getElementById('grp-my-fleet');
+  var rankSel = document.getElementById('grp-my-rank');
+  if (role === 'fc') {
+    if (fleetSel) fleetSel.style.display = '';
+    if (rankSel) {
+      rankSel.innerHTML = '<option value="" disabled selected>職級</option><option value="CAP">CAP</option><option value="SFO">SFO</option><option value="FO">FO</option>';
+      rankSel.style.display = '';
+    }
+  } else if (role === 'cc') {
+    if (fleetSel) fleetSel.style.display = 'none';
+    localStorage.removeItem('crewsync_my_fleet');
+    if (rankSel) {
+      rankSel.innerHTML = '<option value="" disabled selected>職級</option><option value="SP">SP</option><option value="PR">PR</option><option value="SC">SC</option><option value="CC">CC</option><option value="PC">PC</option>';
+      rankSel.style.display = '';
+    }
+  }
+  // 同步到 Friends
+  var frRole = document.getElementById('fr-my-role');
+  if (frRole) frRole.value = role;
+  // 改身分時重置職級
+  if (rankSel) rankSel.value = '';
+  localStorage.removeItem('crewsync_my_rank');
+  if (_grpData) _grpRenderPresets(_grpData);
 }
 
 function _grpSyncFleetRank() {
@@ -139,6 +178,7 @@ function _grpLoadPresets() {
 function _grpRenderPresets(data) {
   var container = document.getElementById('grp-preset-list');
   if (!container) return;
+  var myRole = localStorage.getItem('crewsync_my_role') || ''; // 'fc' or 'cc'
   var myFleet = localStorage.getItem('crewsync_my_fleet') || '';
   var myRank = localStorage.getItem('crewsync_my_rank') || '';
   var joinedCount = data.presets.filter(function(p) { return p.joined; }).length;
@@ -148,9 +188,15 @@ function _grpRenderPresets(data) {
     var p = data.presets[i];
     var isAll = p.id === 'preset_all';
     var canJoin = isAll;
-    if (!isAll) {
-      var parts = p.name.split(' ');
-      canJoin = (parts[0] === myFleet && parts[1] === myRank);
+    if (!isAll && myRole === 'fc') {
+      // Flight Crew: CAP → A3xx CAP, SFO/FO → A3xx SFO/FO
+      if (myRank === 'CAP') canJoin = p.id === 'preset_' + myFleet + '_CAP';
+      else canJoin = p.id === 'preset_' + myFleet + '_SFOFO';
+    } else if (!isAll && myRole === 'cc') {
+      // Cabin Crew: SP/PR → preset_CC_SPPR, SC → preset_CC_SC, CC/PC → preset_CC_CCPC
+      if (myRank === 'SP' || myRank === 'PR') canJoin = p.id === 'preset_CC_SPPR';
+      else if (myRank === 'SC') canJoin = p.id === 'preset_CC_SC';
+      else if (myRank === 'CC' || myRank === 'PC') canJoin = p.id === 'preset_CC_CCPC';
     }
     // 隱藏不符合且未加入的群組
     if (!canJoin && !p.joined) continue;
@@ -473,11 +519,21 @@ function _grpAutoLeavePresets(newFleet, newRank) {
   if (!_grpData || !_grpData.presets) return;
   var eid = localStorage.getItem('crewsync_eid');
   if (!eid) return;
-  var validId = 'preset_' + newFleet + '_' + newRank;
+  var role = localStorage.getItem('crewsync_my_role') || '';
+  // 計算目前有效的群組 ID
+  var validIds = ['preset_all'];
+  if (role === 'fc') {
+    if (newRank === 'CAP') validIds.push('preset_' + newFleet + '_CAP');
+    else validIds.push('preset_' + newFleet + '_SFOFO');
+  } else if (role === 'cc') {
+    if (newRank === 'SP' || newRank === 'PR') validIds.push('preset_CC_SPPR');
+    else if (newRank === 'SC') validIds.push('preset_CC_SC');
+    else if (newRank === 'CC' || newRank === 'PC') validIds.push('preset_CC_CCPC');
+  }
   var promises = [];
   for (var i = 0; i < _grpData.presets.length; i++) {
     var p = _grpData.presets[i];
-    if (p.joined && p.id !== 'preset_all' && p.id !== validId) {
+    if (p.joined && validIds.indexOf(p.id) === -1) {
       promises.push(
         fetch('/api/groups/leave', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ eid: eid, groupId: p.id }) })
       );

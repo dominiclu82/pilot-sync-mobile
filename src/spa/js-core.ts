@@ -399,7 +399,7 @@ setTimeout(function() {
 
 // ── Tab switching ─────────────────────────────────────────────────────────────
 function switchTab(tab, btn) {
-  ['tab-sync','tab-briefing','tab-fr24','tab-gate'].forEach(function(id) {
+  ['tab-sync','tab-briefing','tab-cabin','tab-fr24','tab-gate'].forEach(function(id) {
     var el = document.getElementById(id);
     if (el) { el.classList.remove('tab-active'); el.style.display = 'none'; }
   });
@@ -694,6 +694,14 @@ function ctReset() {
 }
 
 // ── Briefing sub-tab ──────────────────────────────────────────────────────────
+function switchCabinTab(panel, btn) {
+  document.querySelectorAll('#tab-cabin .briefing-subtab').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('#tab-cabin .briefing-panel').forEach(p => p.classList.remove('active'));
+  btn.classList.add('active');
+  var target = document.getElementById('cabin-' + panel);
+  if (target) target.classList.add('active');
+}
+
 function switchBriefingTab(panel, btn) {
   document.querySelectorAll('.briefing-subtab').forEach(b => b.classList.remove('active'));
   document.querySelectorAll('.briefing-panel').forEach(p => p.classList.remove('active'));
