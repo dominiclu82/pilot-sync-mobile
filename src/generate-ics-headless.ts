@@ -314,6 +314,33 @@ export async function generateICSHeadless(
         }
         processedDuties.add(dutyKey);
 
+      } else {
+        // ── Training / 非航班 duty：解析每天的子項目 ──
+        const dutyCards = await page.$$('[class*="dutyPanel"] .card-body, [class*="duty__"]');
+        for (const card of dutyCards) {
+          const d = await card.evaluate((el) => {
+            const dateEl = el.querySelector('[class*="dutyStart"]');
+            const item = el.querySelector('.tripActivityItem');
+            if (!item) return null;
+            return {
+              date: dateEl?.textContent?.trim() ?? '',
+              workCode: (item.querySelector('.workDuty') as HTMLElement)?.textContent?.trim() ?? '',
+              startTime: (item.querySelector('.startTimeLocal') as HTMLElement)?.textContent?.trim() ?? '',
+              endTime: (item.querySelector('.endTimeLocal') as HTMLElement)?.textContent?.trim() ?? '',
+              position: (item.querySelector('.position') as HTMLElement)?.textContent?.trim() ?? '',
+            };
+          });
+          if (d && d.workCode) {
+            flights.push({
+              flightNo: d.workCode, date: d.date, origin: '', dest: '',
+              depTime: d.startTime, arrTime: d.endTime,
+              position: d.position, workCode: d.workCode, crew: []
+            });
+          }
+        }
+        if (flights.length > 0) {
+          finalDutyName = flights.map(f => f.workCode).join(' + ');
+        }
       }
 
       // ── 抓取組員名單（CREW tab）── 航班和訓練都抓
@@ -332,7 +359,7 @@ export async function generateICSHeadless(
             var sections = text.split(/((?:JX\\d+|Training) - [A-Za-z]+\\.\\d+)/);
             for (var s = 1; s < sections.length; s += 2) {
               var header = sections[s].trim();
-              var label = header.split(' - ')[0].trim();
+              var label = header.trim();
               var tableText = sections[s + 1] || '';
               var rows = tableText.split('\\n').filter(function(r) { return r.includes('\\t'); });
               var crew = [];
@@ -361,14 +388,22 @@ export async function generateICSHeadless(
               Object.assign(crewData, data);
             }
           }
-          // Match crew to flights (for JX flights)
+          // Match crew to flights
           for (const f of flights) {
-            if (crewData[f.flightNo]) f.crew = crewData[f.flightNo];
-          }
-          // For training/non-flight duties, store crew in a dummy flight entry
-          if (!isFlightDuty && Object.keys(crewData).length > 0) {
-            for (const [label, crew] of Object.entries(crewData)) {
-              flights.push({ flightNo: label, date: '', origin: '', dest: '', depTime: '', arrTime: '', crew });
+            // 航班：直接用 flightNo 比對
+            if (crewData[f.flightNo]) {
+              f.crew = crewData[f.flightNo];
+            }
+            // Training：用日期比對（crewData key 格式 "Training - Feb.09"）
+            if (!f.crew || f.crew.length === 0) {
+              for (const [label, crew] of Object.entries(crewData)) {
+                if (!f.date) continue;
+                const datePart = f.date.split('.').slice(1).join('.');
+                if (label.includes(datePart)) {
+                  f.crew = crew;
+                  break;
+                }
+              }
             }
           }
           log(`👥 組員名單已擷取（${Object.keys(crewData).length} 個項目）`);
