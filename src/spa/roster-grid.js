@@ -523,8 +523,25 @@ function _rgRenderPairingTab() {
 
         html += '</div>';
       }
+    } else if (duty.flights && duty.flights.length > 0) {
+      // Training / non-flight duty with sub-items (PT/PC etc.)
+      for (var f = 0; f < duty.flights.length; f++) {
+        var tf = duty.flights[f];
+        var tfColor = _rgGetDutyColor(tf.workCode || tf.flightNo || duty.duty);
+        html += '<div style="background:var(--card);border-radius:12px;margin-bottom:12px;border:1px solid var(--border);overflow:hidden">';
+        html += '<div style="background:' + tfColor + ';color:#fff;padding:10px;text-align:center;font-weight:700;font-size:1.05em">' + (tf.workCode || tf.flightNo || duty.duty) + '</div>';
+        if (tf.position) {
+          html += '<div style="padding:6px 20px 0;font-size:.75em"><span style="background:var(--surface);border:1px solid var(--border);border-radius:4px;padding:2px 8px;font-weight:600;color:var(--accent)">' + tf.position + '</span></div>';
+        }
+        html += '<div style="padding:8px 20px;font-size:.78em;color:var(--muted)">';
+        if (tf.date) html += '<div style="display:flex;justify-content:space-between;margin-bottom:2px"><span>Date</span><span style="color:var(--text)">' + tf.date + '</span></div>';
+        html += '<div style="display:flex;justify-content:space-between;margin-bottom:2px"><span>Start</span><span style="color:var(--text)">' + (tf.depTime || '—') + '</span></div>';
+        html += '<div style="display:flex;justify-content:space-between"><span>End</span><span style="color:var(--text)">' + (tf.arrTime || '—') + '</span></div>';
+        html += '</div>';
+        html += '</div>';
+      }
     } else {
-      // Non-flight duty
+      // Non-flight duty without sub-items
       var bgColor = _rgGetDutyColor(duty.duty);
       html += '<div style="background:var(--card);border-radius:12px;margin-bottom:12px;border:1px solid var(--border);overflow:hidden">';
       html += '<div style="background:' + bgColor + ';color:#fff;padding:10px;text-align:center;font-weight:700;font-size:1.05em">' + duty.duty + '</div>';

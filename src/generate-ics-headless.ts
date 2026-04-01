@@ -316,34 +316,52 @@ export async function generateICSHeadless(
 
       } else {
         // ── Training / 非航班 duty：解析每天的子項目 ──
-        const dutyCards = await page.$$('[class*="dutyPanel"] .card-body, [class*="duty__"]');
-        for (const card of dutyCards) {
-          const d = await card.evaluate((el) => {
-            const dateEl = el.querySelector('[class*="dutyStart"]');
-            const item = el.querySelector('.tripActivityItem');
-            if (!item) return null;
-            return {
-              date: dateEl?.textContent?.trim() ?? '',
-              workCode: (item.querySelector('.workDuty') as HTMLElement)?.textContent?.trim() ?? '',
-              startTime: (item.querySelector('.startTimeLocal') as HTMLElement)?.textContent?.trim() ?? '',
-              endTime: (item.querySelector('.endTimeLocal') as HTMLElement)?.textContent?.trim() ?? '',
-              position: (item.querySelector('.position') as HTMLElement)?.textContent?.trim() ?? '',
-            };
-          });
-          if (d && d.workCode) {
-            const datePrefix = d.date || '';  // "2026.Feb.09"
-            const fullStart = datePrefix && d.startTime ? `${datePrefix} ${d.startTime}` : d.startTime;
-            const fullEnd = datePrefix && d.endTime ? `${datePrefix} ${d.endTime}` : d.endTime;
-            flights.push({
-              flightNo: d.workCode, date: d.date, origin: '', dest: '',
-              depTime: fullStart, arrTime: fullEnd,
-              position: d.position, workCode: d.workCode, crew: []
+        // 確保 ActDetail tab 是啟動的
+        try {
+          const actTab = page.locator('#rosterAllocationView-tab-ActDetail, a[href*="ActDetail"].nav-link').first();
+          if (await actTab.count() > 0) await actTab.click();
+          await page.waitForTimeout(500);
+        } catch {}
+
+        const trainingItems = await page.evaluate(() => {
+          const results: any[] = [];
+          const pane = document.querySelector('#rosterAllocationView-tabpane-ActDetail') || document.body;
+          const cards = pane.querySelectorAll('.card-body');
+          for (const card of cards) {
+            const dateEls = card.querySelectorAll('[class*="dutyStart"]');
+            let dateStr = '';
+            for (const de of dateEls) {
+              const t = de.textContent?.trim() || '';
+              if (/^\d{4}\./.test(t)) { dateStr = t; break; }
+            }
+            const item = card.querySelector('.tripActivityItem');
+            if (!item) continue;
+            results.push({
+              date: dateStr,
+              workCode: item.querySelector('.workDuty')?.textContent?.trim() ?? '',
+              startTime: item.querySelector('.startTimeLocal')?.textContent?.trim() ?? '',
+              endTime: item.querySelector('.endTimeLocal')?.textContent?.trim() ?? '',
+              position: item.querySelector('.position')?.textContent?.trim() ?? '',
             });
           }
+          return results;
+        });
+
+        for (const d of trainingItems) {
+          if (!d.workCode) continue;
+          const datePrefix = d.date || '';
+          const fullStart = datePrefix && d.startTime ? `${datePrefix} ${d.startTime}` : d.startTime;
+          const fullEnd = datePrefix && d.endTime ? `${datePrefix} ${d.endTime}` : d.endTime;
+          flights.push({
+            flightNo: d.workCode, date: d.date, origin: '', dest: '',
+            depTime: fullStart, arrTime: fullEnd,
+            position: d.position, workCode: d.workCode, crew: []
+          });
         }
         if (flights.length > 0) {
           finalDutyName = flights.map(f => f.workCode).join(' + ');
         }
+        log(`📚 Training 子項目：${flights.length} 筆 (${flights.map(f => f.workCode).join(', ')})`);
       }
 
       // ── 抓取組員名單（CREW tab）── 航班和訓練都抓
