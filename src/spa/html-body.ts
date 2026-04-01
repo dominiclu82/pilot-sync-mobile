@@ -188,9 +188,9 @@ export function getSpaHtmlBody(): string {
 
 <!-- ── Groups panel ── -->
 <div id="roster-groups" class="roster-panel">
-  <div>
-    <!-- Groups header -->
-    <div style="padding:8px 12px;border-bottom:1px solid var(--dim)">
+  <div style="display:flex;flex-direction:column;height:100%">
+    <!-- Groups header (固定不捲動) -->
+    <div style="padding:8px 12px;border-bottom:1px solid var(--dim);flex-shrink:0;overflow-x:auto;-webkit-overflow-scrolling:touch">
       <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
         <span style="font-size:.69em;color:var(--muted);flex-shrink:0">同意分享班表</span>
         <label style="position:relative;display:inline-block;width:36px;height:20px;cursor:pointer;flex-shrink:0">
@@ -214,12 +214,11 @@ export function getSpaHtmlBody(): string {
           <span style="font-size:.5em;color:#86efac">名稱<br>Name</span>
           <input id="grp-my-name" type="text" placeholder="可修改 editable" onchange="_grpSyncName()" style="background:#1a3a2a;color:#86efac;border:1px solid rgba(34,197,94,.3);border-radius:4px;padding:2px 4px;font-size:.72em;width:100px">
         </span>
-        <span style="font-size:.65em;color:var(--muted);flex-shrink:0">僅可勾選自己的機隊/職級</span>
       </div>
       <div id="grp-preset-list"></div>
     </div>
-    <!-- Groups month nav + filter -->
-    <div style="display:flex;align-items:center;padding:5px 8px;border-bottom:1px solid var(--dim);gap:6px">
+    <!-- Groups month nav + filter (固定不捲動) -->
+    <div style="display:flex;align-items:center;padding:5px 8px;border-bottom:1px solid var(--dim);gap:6px;flex-shrink:0">
       <span style="flex:1"></span>
       <button onclick="_grpPrevMonth()" style="background:none;border:none;color:var(--muted);font-size:1.1em;cursor:pointer;padding:0 4px">◀</button>
       <span id="grp-month-title" style="font-weight:700;font-size:1.1em;color:var(--text);min-width:100px;text-align:center"></span>
@@ -238,7 +237,7 @@ export function getSpaHtmlBody(): string {
         </select>
       </span>
     </div>
-    <div id="grp-grid" style="padding:0"></div>
+    <div id="grp-grid" style="padding:0;flex:1;min-height:0;overflow:hidden"></div>
   </div>
 </div>
 
@@ -284,7 +283,7 @@ export function getSpaHtmlBody(): string {
             <option value="none">尚無好友圈</option>
           </select>
         </span>
-        <button onclick="_grpShowManage()" style="flex-shrink:0;background:rgba(251,191,36,.15);border:1px solid rgba(251,191,36,.4);border-radius:8px;padding:4px 12px;font-size:.82em;color:#fbbf24;cursor:pointer;position:relative;font-weight:600">⚙ 好友圈<span id="grp-manage-badge" style="display:none;position:absolute;top:-5px;right:-5px;background:#ef4444;color:#fff;font-size:.6em;min-width:16px;height:16px;border-radius:8px;align-items:center;justify-content:center;padding:0 3px"></span></button>
+        <button class="fr-header-row2-inline" onclick="_grpShowManage()" style="flex-shrink:0;background:rgba(251,191,36,.15);border:1px solid rgba(251,191,36,.4);border-radius:8px;padding:4px 12px;font-size:.82em;color:#fbbf24;cursor:pointer;position:relative;font-weight:600">⚙ 好友圈<span id="grp-manage-badge" style="display:none;position:absolute;top:-5px;right:-5px;background:#ef4444;color:#fff;font-size:.6em;min-width:16px;height:16px;border-radius:8px;align-items:center;justify-content:center;padding:0 3px"></span></button>
       </div>
       <!-- Row 2: 月份+篩選（僅手機直拿顯示） -->
       <div class="fr-header-row2">
@@ -1297,7 +1296,7 @@ export function getSpaHtmlBody(): string {
       <button class="tab-util-btn tab-install-btn" id="tab-install-btn" onclick="showInstallGuide()" style="display:none">
         <span>📲</span>安裝
       </button>
-      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer;text-decoration:underline" onclick="showAbout()">V8.0.01</span>
+      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer;text-decoration:underline" onclick="showAbout()">V8.0.02</span>
     </div>
   </div>
 </div>
@@ -1328,7 +1327,12 @@ export function getSpaHtmlBody(): string {
       <div style="color:var(--muted)">Best experience on iPad in landscape mode. Android devices may not display correctly.</div>
     </div>
     <div style="max-height:50vh;overflow-y:auto;-webkit-overflow-scrolling:touch;margin-bottom:10px">
-    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V8.0.01</div>
+    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V8.0.02</div>
+    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
+      <div>Groups 手機版排版修正：隱藏不符合機隊/職級的群組、header 固定不捲動、Friends 重複按鈕修正</div>
+      <div>Groups mobile layout fix: hide non-matching groups, fixed header, Friends duplicate button fix</div>
+    </div>
+    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V8.0.01</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
       <div>新增 Groups 群組功能：10 個預設群組（All + 9 個機隊職級）、自訂好友圈、邀請碼加入、員工編號邀請、紅點通知</div>
       <div>New Groups feature: 10 preset groups (All + 9 fleet/rank), custom friend circles, invite code, employee ID invitation, notification badge</div>

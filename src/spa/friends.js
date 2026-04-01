@@ -297,7 +297,7 @@ function _frRenderInternal(gridEl) {
   var fullW = nameColW + totalGridW + 2;
   // Single scroll container (both axes)
   var isGrpGrid = gridEl && gridEl.id === 'grp-grid';
-  var outerH = isGrpGrid ? 'calc(100dvh - 290px)' : 'calc(100dvh - 188px)';
+  var outerH = isGrpGrid ? '100%' : 'calc(100dvh - 188px)';
   var outerId = isGrpGrid ? 'grp-outer' : 'fr-outer';
   var html = '<div style="overflow:scroll;max-height:' + outerH + ';-webkit-overflow-scrolling:touch;overscroll-behavior:none;position:relative" id="' + outerId + '">';
   html += '<div style="display:grid;grid-template-columns:' + nameColW + 'px ' + gridCols + ';grid-template-rows:48px repeat(' + _frData.length + ',44px);gap:0;width:' + fullW + 'px">';

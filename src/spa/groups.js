@@ -151,13 +151,14 @@ function _grpRenderPresets(data) {
       var parts = p.name.split(' ');
       canJoin = (parts[0] === myFleet && parts[1] === myRank);
     }
-    var disabled = (!canJoin && !p.joined) || (!p.joined && joinedCount >= 2);
+    // 隱藏不符合且未加入的群組
+    if (!canJoin && !p.joined) continue;
+    var disabled = !p.joined && joinedCount >= 2;
     var checked = p.joined;
     var toggleBg = checked ? 'var(--accent)' : '#4a5568';
     var dotLeft = checked ? '18px' : '2px';
     var hint = '';
-    if (!canJoin && !p.joined) hint = ' (不符合機隊/職級)';
-    else if (!p.joined && joinedCount >= 2) hint = ' (已達上限)';
+    if (disabled) hint = ' (已達上限)';
 
     html += '<div style="display:inline-flex;align-items:center;gap:6px;margin:3px 6px 3px 0;' + (disabled ? 'opacity:.35;pointer-events:none' : '') + '">';
     html += '<label onclick="_grpTogglePreset(\'' + p.id + '\',' + !checked + ')" style="position:relative;display:inline-block;width:32px;height:18px;cursor:pointer;flex-shrink:0">';
@@ -165,10 +166,11 @@ function _grpRenderPresets(data) {
     html += '<span style="position:absolute;top:2px;left:' + dotLeft + ';width:14px;height:14px;background:#fff;border-radius:50%;transition:.3s"></span>';
     html += '</label>';
     html += '<span style="font-size:.78em;color:var(--text)">' + p.name + '</span>';
-    if (isAll) html += '<span style="font-size:.62em;color:var(--muted)">不設限，開放所有人 Open to all</span>';
+    if (isAll) html += '<span style="font-size:.6em;color:var(--muted);white-space:nowrap">不設限 Open to all</span>';
     if (hint) html += '<span style="font-size:.65em;color:var(--muted)">' + hint + '</span>';
     html += '</div>';
   }
+  if (!html) html = '<div style="font-size:.78em;color:var(--muted);padding:4px 0">請先選擇機隊/職級 Please select fleet/rank first</div>';
   container.innerHTML = html;
 }
 
