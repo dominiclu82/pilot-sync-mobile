@@ -213,9 +213,10 @@ export function getSpaHtmlBody(): string {
         <span id="grp-name-wrap" style="display:none;flex-shrink:0;background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.25);border-radius:6px;padding:2px 6px;align-items:center;gap:4px">
           <span style="font-size:.5em;color:#86efac">名稱<br>Name</span>
           <input id="grp-my-name" type="text" placeholder="可修改 editable" onchange="_grpSyncName()" style="background:#1a3a2a;color:#86efac;border:1px solid rgba(34,197,94,.3);border-radius:4px;padding:2px 4px;font-size:.72em;width:100px">
+          <span onclick="_frShowNameInfo()" style="cursor:pointer;font-size:.85em;color:rgba(34,197,94,.6);flex-shrink:0" title="名稱說明">ⓘ</span>
         </span>
+        <span id="grp-preset-list" style="display:inline-flex;align-items:center;gap:2px;flex-wrap:wrap"></span>
       </div>
-      <div id="grp-preset-list"></div>
     </div>
     <!-- Groups month nav + filter (固定不捲動) -->
     <div style="display:flex;align-items:center;padding:5px 8px;border-bottom:1px solid var(--dim);gap:6px;flex-shrink:0">
@@ -304,7 +305,10 @@ export function getSpaHtmlBody(): string {
     <style>#fr-share-toggle:checked+span{background:var(--accent)!important}#fr-share-toggle:checked~#fr-share-dot{transform:translateX(16px)}</style>
     <!-- Friends grid -->
     <div id="fr-grid" style="padding:0"></div>
-    <!-- Friends info overlay -->
+  </div>
+</div>
+
+<!-- Friends info overlay (tab-sync 層級) -->
     <div id="fr-info-overlay" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.7);z-index:9000;align-items:center;justify-content:center" onclick="if(event.target===this)this.style.display='none'">
       <div style="background:var(--card);border-radius:12px;padding:20px 24px;max-width:400px;margin:20px;line-height:1.6;max-height:80vh;overflow-y:auto">
         <div style="font-size:1em;font-weight:700;margin-bottom:12px;text-align:center">👥 Friends 班表分享</div>
@@ -333,8 +337,6 @@ export function getSpaHtmlBody(): string {
         <button onclick="document.getElementById('fr-name-info-overlay').style.display='none'" style="margin-top:14px;width:100%;padding:8px;background:var(--accent);color:#fff;border:none;border-radius:8px;font-size:.85em;cursor:pointer">了解 Got it</button>
       </div>
     </div>
-  </div>
-</div>
 
 <!-- Groups 管理彈窗 -->
 <div id="grp-manage-overlay" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.7);z-index:9000;align-items:center;justify-content:center" onclick="if(event.target===this)_grpCloseManage()">
@@ -1296,7 +1298,7 @@ export function getSpaHtmlBody(): string {
       <button class="tab-util-btn tab-install-btn" id="tab-install-btn" onclick="showInstallGuide()" style="display:none">
         <span>📲</span>安裝
       </button>
-      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer;text-decoration:underline" onclick="showAbout()">V8.0.02</span>
+      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer;text-decoration:underline" onclick="showAbout()">V8.0.03</span>
     </div>
   </div>
 </div>
@@ -1327,10 +1329,15 @@ export function getSpaHtmlBody(): string {
       <div style="color:var(--muted)">Best experience on iPad in landscape mode. Android devices may not display correctly.</div>
     </div>
     <div style="max-height:50vh;overflow-y:auto;-webkit-overflow-scrolling:touch;margin-bottom:10px">
-    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V8.0.02</div>
+    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V8.0.03</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
-      <div>Groups 手機版排版修正：隱藏不符合機隊/職級的群組、header 固定不捲動、Friends 重複按鈕修正</div>
-      <div>Groups mobile layout fix: hide non-matching groups, fixed header, Friends duplicate button fix</div>
+      <div>Groups 排版修正：隱藏不符合群組、header 固定、toggle 與名稱同行、ⓘ 修正、Friends 重複按鈕修正</div>
+      <div>Groups layout fix: hide non-matching groups, fixed header, inline toggles, ⓘ fix, Friends duplicate button fix</div>
+    </div>
+    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V8.0.02</div>
+    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
+      <div>Groups 手機版排版修正：隱藏不符合機隊/職級的群組、header 固定不捲動</div>
+      <div>Groups mobile layout fix: hide non-matching groups, fixed header</div>
     </div>
     <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V8.0.01</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">

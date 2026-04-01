@@ -107,6 +107,7 @@ function _frCheckReady() {
   if (grpName) grpName.value = name;
   // 機隊/職級改變時，退出不符合的預設群組
   if (fleet && rank) _grpAutoLeavePresets(fleet, rank);
+  if (typeof _grpLoadPresets === 'function') _grpLoadPresets();
   // 如果已開啟分享且三個都填了，自動上傳
   if (localStorage.getItem('crewsync_share_enabled') === '1' && fleet && rank) {
     var eid = localStorage.getItem('crewsync_eid');

@@ -85,8 +85,9 @@ function _grpSyncFleetRank() {
   var frRank = document.getElementById('fr-my-rank');
   if (frFleet) frFleet.value = fleet;
   if (frRank) frRank.value = rank;
-  // 機隊/職級改變時，退出不符合的預設群組
+  // 機隊/職級改變時，退出不符合的預設群組 + 重新渲染
   if (fleet && rank) _grpAutoLeavePresets(fleet, rank);
+  _grpLoadPresets();
   // 觸發上傳
   _frCheckReady();
 }
