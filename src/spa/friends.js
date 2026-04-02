@@ -5,16 +5,9 @@ var _frData = []; // [{ name, nickname, picture, duties }]
 var _frInited = false;
 
 function _frInit() {
-  // debug mode
-  if (new URLSearchParams(location.search).get('debug') === 'friends' || location.hash === '#debug-friends') {
-    localStorage.setItem('crewsync_share_enabled', '1');
-  }
-  var isSharing = localStorage.getItem('crewsync_share_enabled') === '1';
-  var shareToggle = document.getElementById('fr-share-toggle');
-  if (shareToggle) shareToggle.checked = isSharing;
-  _frShowShareUI(isSharing);
-  if (isSharing) { _frLoadMonth(); _frPopulateGroupFilter(); }
-  else _frShowEmpty();
+  _frShowShareUI();
+  _frPopulateGroupFilter();
+  _frLoadMonth();
 }
 
 function _frPopulateGroupFilter() {
@@ -76,25 +69,21 @@ function _frShowShareUI(show) {
   var roleSel = document.getElementById('fr-my-role');
   var fleetSel = document.getElementById('fr-my-fleet');
   var rankSel = document.getElementById('fr-my-rank');
-  var hint = document.getElementById('fr-share-hint');
   var nameWrap = document.getElementById('fr-name-wrap');
   var nameInput = document.getElementById('fr-my-name');
-  if (hint) hint.style.display = show ? 'inline-flex' : 'none';
-  if (nameWrap) nameWrap.style.display = show ? 'inline-flex' : 'none';
-  if (show) {
-    var role = localStorage.getItem('crewsync_my_role') || '';
-    if (roleSel) roleSel.value = role;
-    if (role === 'cc') {
-      if (fleetSel) fleetSel.style.display = 'none';
-      if (rankSel) rankSel.innerHTML = '<option value="" disabled selected>職級</option><option value="SP">SP</option><option value="PR">PR</option><option value="SC">SC</option><option value="CC">CC</option><option value="PC">PC</option>';
-    } else if (role === 'fc') {
-      if (fleetSel) fleetSel.style.display = '';
-      if (rankSel) rankSel.innerHTML = '<option value="" disabled selected>職級</option><option value="CAP">CAP</option><option value="SFO">SFO</option><option value="FO">FO</option>';
-    }
-    if (fleetSel) fleetSel.value = localStorage.getItem('crewsync_my_fleet') || '';
-    if (rankSel) rankSel.value = localStorage.getItem('crewsync_my_rank') || '';
-    if (nameInput) nameInput.value = localStorage.getItem('crewsync_nickname') || localStorage.getItem('crewsync_crew_name') || localStorage.getItem('crewsync_eid') || '';
+  // Friends 沒有 toggle，UI 始終顯示
+  var role = localStorage.getItem('crewsync_my_role') || '';
+  if (roleSel) roleSel.value = role;
+  if (role === 'cc') {
+    if (fleetSel) fleetSel.style.display = 'none';
+    if (rankSel) rankSel.innerHTML = '<option value="" disabled selected>職級</option><option value="SP">SP</option><option value="PR">PR</option><option value="SC">SC</option><option value="CC">CC</option><option value="PC">PC</option>';
+  } else if (role === 'fc') {
+    if (fleetSel) fleetSel.style.display = '';
+    if (rankSel) rankSel.innerHTML = '<option value="" disabled selected>職級</option><option value="CAP">CAP</option><option value="SFO">SFO</option><option value="FO">FO</option>';
   }
+  if (fleetSel) fleetSel.value = localStorage.getItem('crewsync_my_fleet') || '';
+  if (rankSel) rankSel.value = localStorage.getItem('crewsync_my_rank') || '';
+  if (nameInput) nameInput.value = localStorage.getItem('crewsync_nickname') || localStorage.getItem('crewsync_crew_name') || localStorage.getItem('crewsync_eid') || '';
 }
 
 function _frSyncRole() {
@@ -267,7 +256,7 @@ function _frLoadMonth() {
     .then(function(data) {
       if (data.friends && data.friends.length > 0) {
         // 存離線快取（未篩選的完整資料）
-        try { localStorage.setItem('crewsync_friends_' + monthKey, JSON.stringify(data.friends)); } catch(e){}
+        try { localStorage.setItem('crewsync_friends_' + monthKey, JSON.stringify({ ts: Date.now(), data: data.friends })); } catch(e){}
         for (var i = 0; i < data.friends.length; i++) {
           var f = data.friends[i];
           _frData.push({ name: f.name, nickname: f.nickname, picture: f.picture, duties: f.duties });
@@ -288,13 +277,18 @@ function _frLoadMonth() {
 
 function _frLoadFromCache(monthKey, ff, fr) {
   try {
-    var cached = localStorage.getItem('crewsync_friends_' + monthKey);
-    if (cached) {
-      var friends = JSON.parse(cached);
+    var raw = localStorage.getItem('crewsync_friends_' + monthKey);
+    if (raw) {
+      var parsed = JSON.parse(raw);
+      var friends = parsed.data || parsed; // 相容舊格式
+      var ts = parsed.ts || 0;
+      // 一個月過期（30天）
+      if (ts && Date.now() - ts > 30 * 24 * 60 * 60 * 1000) {
+        localStorage.removeItem('crewsync_friends_' + monthKey);
+        return;
+      }
       for (var i = 0; i < friends.length; i++) {
         var f = friends[i];
-        if (ff && f.fleet && f.fleet !== ff) continue;
-        if (fr && f.rank && f.rank !== fr) continue;
         _frData.push({ name: f.name, nickname: f.nickname, picture: f.picture, duties: f.duties });
       }
     }

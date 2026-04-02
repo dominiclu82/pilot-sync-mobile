@@ -249,17 +249,10 @@ export function getSpaHtmlBody(): string {
   <div>
     <!-- Friends header: desktop 一行 / mobile portrait 兩行 -->
     <div class="fr-header">
-      <!-- Row 1: toggle + 機隊 + 名稱（手機可左右滑） -->
+      <!-- Row 1: 機隊 + 名稱（手機可左右滑） -->
       <div class="fr-header-row1">
-        <span style="font-size:.69em;color:var(--muted);flex-shrink:0">同意分享班表</span>
-        <label style="position:relative;display:inline-block;width:36px;height:20px;cursor:pointer;flex-shrink:0">
-          <input type="checkbox" id="fr-share-toggle" onchange="_frToggleShare()" style="opacity:0;width:0;height:0">
-          <span style="position:absolute;top:0;left:0;right:0;bottom:0;background:#4a5568;border-radius:10px;transition:.3s"></span>
-          <span style="position:absolute;top:2px;left:2px;width:16px;height:16px;background:#fff;border-radius:50%;transition:.3s" id="fr-share-dot"></span>
-        </label>
-        <span onclick="_frShowInfo()" style="cursor:pointer;font-size:.85em;color:var(--muted);flex-shrink:0" title="分享說明">ⓘ</span>
         <!-- 區塊1: 身分/機隊/職級 (淡藍) -->
-        <span id="fr-share-hint" style="display:none;flex-shrink:0;background:rgba(59,130,246,.1);border:1px solid rgba(59,130,246,.25);border-radius:6px;padding:2px 6px;align-items:center;gap:4px">
+        <span id="fr-share-hint" style="flex-shrink:0;background:rgba(59,130,246,.1);border:1px solid rgba(59,130,246,.25);border-radius:6px;padding:2px 6px;display:inline-flex;align-items:center;gap:4px">
           <select id="fr-my-role" onchange="_frSyncRole()" style="background:#1e3a5f;color:#93c5fd;border:1px solid rgba(59,130,246,.3);border-radius:4px;padding:2px 4px;font-size:.72em;cursor:pointer;width:auto">
             <option value="" disabled selected>身分</option><option value="fc">Flight Crew</option><option value="cc">Cabin Crew</option>
           </select>
@@ -315,14 +308,12 @@ export function getSpaHtmlBody(): string {
 <!-- Friends info overlay (tab-sync 層級) -->
     <div id="fr-info-overlay" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.7);z-index:9000;align-items:center;justify-content:center" onclick="if(event.target===this)this.style.display='none'">
       <div style="background:var(--card);border-radius:12px;padding:20px 24px;max-width:400px;margin:20px;line-height:1.6;max-height:80vh;overflow-y:auto">
-        <div style="font-size:1em;font-weight:700;margin-bottom:12px;text-align:center">👥 Friends 班表分享</div>
+        <div style="font-size:1em;font-weight:700;margin-bottom:12px;text-align:center">👥 Groups 群組分享</div>
         <div style="font-size:.78em;color:var(--muted)">
-          <div style="margin-bottom:6px">• 未分享者無法查看他人班表<br><span style="opacity:.7">Non-sharing members cannot view others' rosters</span></div>
-          <div style="margin-bottom:6px">• 同意分享後即可查看其他組員的班表<br><span style="opacity:.7">Share your roster to view others' schedules</span></div>
-          <div style="margin-bottom:6px">• 你的班表將上傳至雲端供其他分享者查看<br><span style="opacity:.7">Your roster will be uploaded for other shared members to view</span></div>
-          <div style="margin-bottom:6px">• 支援離線查看，連線時自動更新最新資料<br><span style="opacity:.7">Offline viewing supported — data refreshed when online</span></div>
-          <div style="margin-bottom:6px">• 隨時可關閉分享，雲端資料將立即刪除<br><span style="opacity:.7">You can turn off sharing anytime — cloud data will be deleted immediately</span></div>
-          <div style="margin-bottom:6px">• 撤銷分享後，其他使用者的離線快取將於下次連線時更新<br><span style="opacity:.7">After revoking, others' offline cache will update on next connection</span></div>
+          <div style="margin-bottom:6px">• 開啟分享後，你的班表將僅對你所加入的群組成員可見<br><span style="opacity:.7">When sharing is enabled, your roster is only visible to members of groups you have joined</span></div>
+          <div style="margin-bottom:6px">• 未加入任何群組的人無法看到你的班表<br><span style="opacity:.7">No one outside your groups can see your roster</span></div>
+          <div style="margin-bottom:6px">• 你的班表將上傳至雲端供群組成員查看<br><span style="opacity:.7">Your roster will be uploaded for group members to view</span></div>
+          <div style="margin-bottom:6px">• 關閉分享後，雲端資料將立即刪除<br><span style="opacity:.7">Turn off sharing — cloud data deleted immediately</span></div>
           <div>• 離線快取保留一個月，一個月內未連網更新亦會自動刪除<br><span style="opacity:.7">Offline cache expires after 1 month — auto-deleted if not refreshed</span></div>
         </div>
         <button onclick="document.getElementById('fr-info-overlay').style.display='none'" style="margin-top:14px;width:100%;padding:8px;background:var(--accent);color:#fff;border:none;border-radius:8px;font-size:.85em;cursor:pointer">了解 Got it</button>
@@ -345,9 +336,13 @@ export function getSpaHtmlBody(): string {
 <!-- Groups 管理彈窗 -->
 <div id="grp-manage-overlay" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.7);z-index:9000;align-items:center;justify-content:center" onclick="if(event.target===this)_grpCloseManage()">
   <div style="background:var(--bg,#0a0e1a);border-radius:14px;padding:16px;width:90vw;max-width:400px;max-height:80vh;overflow-y:auto;-webkit-overflow-scrolling:touch">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
       <span style="font-weight:700;font-size:1em;color:var(--text)">🤝 好友圈管理 Friends</span>
       <button onclick="_grpCloseManage()" style="background:none;border:none;color:var(--muted);font-size:1.3em;cursor:pointer">✕</button>
+    </div>
+    <div style="font-size:.75em;color:var(--muted);line-height:1.5;margin-bottom:12px;padding:8px;background:rgba(59,130,246,.06);border-radius:8px">
+      <div>加入好友圈即代表同意將班表分享給該好友圈成員。退出所有好友圈將停止分享。</div>
+      <div style="opacity:.7">Joining a friend group means you agree to share your roster with its members. Leaving all groups will stop sharing.</div>
     </div>
     <div id="grp-friends-content"></div>
   </div>
@@ -1392,7 +1387,7 @@ export function getSpaHtmlBody(): string {
       <button class="tab-util-btn tab-install-btn" id="tab-install-btn" onclick="showInstallGuide()" style="display:none">
         <span>📲</span>安裝
       </button>
-      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer;text-decoration:underline" onclick="showAbout()">V8.0.07</span>
+      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer;text-decoration:underline" onclick="showAbout()">V8.0.08</span>
     </div>
   </div>
 </div>
@@ -1423,7 +1418,12 @@ export function getSpaHtmlBody(): string {
       <div style="color:var(--muted)">Best experience on iPad in landscape mode. Android devices may not display correctly.</div>
     </div>
     <div style="max-height:50vh;overflow-y:auto;-webkit-overflow-scrolling:touch;margin-bottom:10px">
-    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V8.0.07</div>
+    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V8.0.08</div>
+    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
+      <div>Friends 拿掉分享 toggle、說明文字更新；Groups ⓘ 修正；加入群組自動開分享；0 人群組自動刪除；離線快取 30 天過期</div>
+      <div>Friends remove share toggle, updated descriptions; Groups ⓘ fix; auto-share on join; auto-delete empty groups; 30-day cache expiry</div>
+    </div>
+    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V8.0.07</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
       <div>Cabin Crew Rest Calculator（Beta）、FC/CC 身分連動 Friends、Cabin subtab 拖移排序、時區加場站名</div>
       <div>Cabin Crew Rest Calculator (Beta), FC/CC role sync with Friends, Cabin subtab drag reorder, timezone with station names</div>

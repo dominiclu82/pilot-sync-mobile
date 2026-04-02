@@ -430,7 +430,7 @@ app.get('/sw.js', (_req, res) => {
   res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
   res.setHeader('Service-Worker-Allowed', '/');
   res.send(`
-const CACHE = 'crewsync-v8007';
+const CACHE = 'crewsync-v8008';
 const SHELL = ['/', '/main', '/share'];
 self.addEventListener('install', e => {
   e.waitUntil(
@@ -1286,6 +1286,8 @@ app.post('/api/groups/join-code', async (req, res) => {
       `INSERT INTO cs_group_members (group_id, employee_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`,
       [g.rows[0].id, eid]
     );
+    // 自動開啟分享
+    await _pool.query(`UPDATE cs_users SET sharing = true, updated_at = NOW() WHERE employee_id = $1 AND sharing = false`, [eid]);
     res.json({ ok: true, group: { id: g.rows[0].id, name: g.rows[0].name } });
   } catch (e: any) { res.json({ error: e.message }); }
 });
@@ -1297,6 +1299,13 @@ app.post('/api/groups/leave', async (req, res) => {
   if (!eid || !groupId) return res.status(400).json({ error: 'Missing eid or groupId' });
   try {
     await _pool.query(`DELETE FROM cs_group_members WHERE group_id = $1 AND employee_id = $2`, [groupId, eid]);
+    // 自動刪除 0 人的自訂群組
+    if (groupId.startsWith('custom_')) {
+      const cnt = await _pool.query(`SELECT COUNT(*) AS c FROM cs_group_members WHERE group_id = $1`, [groupId]);
+      if (+cnt.rows[0].c === 0) {
+        await _pool.query(`DELETE FROM cs_groups WHERE id = $1`, [groupId]);
+      }
+    }
     res.json({ ok: true });
   } catch (e: any) { res.json({ error: e.message }); }
 });
@@ -1360,6 +1369,8 @@ app.post('/api/groups/invites/:id/accept', async (req, res) => {
       `INSERT INTO cs_group_members (group_id, employee_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`,
       [inv.rows[0].group_id, eid]
     );
+    // 自動開啟分享
+    await _pool.query(`UPDATE cs_users SET sharing = true, updated_at = NOW() WHERE employee_id = $1 AND sharing = false`, [eid]);
     res.json({ ok: true });
   } catch (e: any) { res.json({ error: e.message }); }
 });
