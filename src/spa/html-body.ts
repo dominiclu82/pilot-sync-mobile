@@ -1387,7 +1387,7 @@ export function getSpaHtmlBody(): string {
       <button class="tab-util-btn tab-install-btn" id="tab-install-btn" onclick="showInstallGuide()" style="display:none">
         <span>📲</span>安裝
       </button>
-      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer;text-decoration:underline" onclick="showAbout()">V8.0.08</span>
+      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer;text-decoration:underline" onclick="showAbout()">V8.0.09</span>
     </div>
   </div>
 </div>
@@ -1418,7 +1418,12 @@ export function getSpaHtmlBody(): string {
       <div style="color:var(--muted)">Best experience on iPad in landscape mode. Android devices may not display correctly.</div>
     </div>
     <div style="max-height:50vh;overflow-y:auto;-webkit-overflow-scrolling:touch;margin-bottom:10px">
-    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V8.0.08</div>
+    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V8.0.09</div>
+    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
+      <div>加入群組自動上傳班表、修正組員名單消失、Friends 拿掉 toggle、說明文字更新、0 人群組自動刪除、離線快取 30 天過期</div>
+      <div>Auto-upload roster on group join, fix crew data missing, Friends remove toggle, updated descriptions, auto-delete empty groups, 30-day cache expiry</div>
+    </div>
+    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V8.0.08</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
       <div>Friends 拿掉分享 toggle、說明文字更新；Groups ⓘ 修正；加入群組自動開分享；0 人群組自動刪除；離線快取 30 天過期</div>
       <div>Friends remove share toggle, updated descriptions; Groups ⓘ fix; auto-share on join; auto-delete empty groups; 30-day cache expiry</div>

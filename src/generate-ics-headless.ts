@@ -380,7 +380,8 @@ export async function generateICSHeadless(
             var sections = text.split(/((?:JX\\d+|Training) - [A-Za-z]+\\.\\d+)/);
             for (var s = 1; s < sections.length; s += 2) {
               var header = sections[s].trim();
-              var label = header.trim();
+              var isTraining = header.indexOf('Training') >= 0;
+              var label = isTraining ? header.trim() : header.split(' - ')[0].trim();
               var tableText = sections[s + 1] || '';
               var rows = tableText.split('\\n').filter(function(r) { return r.includes('\\t'); });
               var crew = [];

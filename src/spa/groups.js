@@ -228,6 +228,7 @@ function _grpTogglePreset(groupId, join) {
   fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ eid: eid, groupId: groupId }) })
     .then(function(r) { return r.json(); })
     .then(function() {
+      if (join) _grpAutoUploadRoster();
       _grpLoadPresets(); // 會更新 view filter 再 loadGrid
     });
 }
@@ -431,6 +432,7 @@ function _grpCreate() {
         alert('建立成功！邀請碼 Invite Code: ' + data.group.inviteCode);
         nameEl.value = '';
         document.getElementById('grp-create-form').style.display = 'none';
+        _grpAutoUploadRoster();
         _grpRefreshFriends();
       } else { alert(data.error || 'Error'); }
     });
@@ -446,6 +448,7 @@ function _grpJoinCode() {
         alert('已加入「' + data.group.name + '」');
         inp.value = '';
         document.getElementById('grp-joincode-form').style.display = 'none';
+        _grpAutoUploadRoster();
         _grpRefreshFriends();
       } else { alert(data.error || 'Error'); }
     });
@@ -506,7 +509,7 @@ function _grpAcceptInvite(invId) {
   var eid = localStorage.getItem('crewsync_eid');
   if (!eid) return;
   fetch('/api/groups/invites/' + invId + '/accept', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ eid: eid }) })
-    .then(function() { _grpRefreshFriends(); });
+    .then(function() { _grpAutoUploadRoster(); _grpRefreshFriends(); });
 }
 function _grpDeclineInvite(invId) {
   var eid = localStorage.getItem('crewsync_eid');
@@ -541,6 +544,31 @@ function _grpAutoLeavePresets(newFleet, newRank) {
   }
   if (promises.length > 0) {
     Promise.all(promises).then(function() { _grpLoadPresets(); _grpLoadGrid(); });
+  }
+}
+
+// 加入群組後自動上傳 local 班表到資料庫
+function _grpAutoUploadRoster() {
+  var eid = localStorage.getItem('crewsync_eid');
+  if (!eid) return;
+  var fleet = localStorage.getItem('crewsync_my_fleet') || '';
+  var rank = localStorage.getItem('crewsync_my_rank') || '';
+  var nickname = localStorage.getItem('crewsync_nickname') || '';
+  // 找所有 localStorage 裡的班表
+  for (var i = 0; i < localStorage.length; i++) {
+    var key = localStorage.key(i);
+    if (!key || key.indexOf('crewsync_roster_' + eid + '_') !== 0) continue;
+    var monthKey = key.replace('crewsync_roster_' + eid + '_', '');
+    try {
+      var cached = JSON.parse(localStorage.getItem(key));
+      var duties = cached.duties || cached;
+      if (!duties || !duties.length) continue;
+      fetch('/api/roster-share', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ eid: eid, month: monthKey, duties: duties, fleet: fleet, rank: rank, nickname: nickname })
+      });
+    } catch(e) {}
   }
 }
 
