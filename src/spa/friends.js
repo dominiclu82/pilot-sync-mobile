@@ -19,7 +19,15 @@ function _frPopulateGroupFilter() {
       if (data.error || !data.custom) return;
       var sel = document.getElementById('fr-filter-group');
       var selM = document.getElementById('fr-filter-group-m');
-      var current = sel ? sel.value : 'all';
+      var current = sel ? sel.value : '';
+      // 還原快取的好友圈選擇（30 天過期）
+      if (!current) {
+        try {
+          var cached = JSON.parse(localStorage.getItem('crewsync_fr_group') || '{}');
+          if (cached.v && cached.ts && Date.now() - cached.ts < 30 * 24 * 60 * 60 * 1000) current = cached.v;
+          else localStorage.removeItem('crewsync_fr_group');
+        } catch(e){}
+      }
       var html = '';
       for (var i = 0; i < data.custom.length; i++) {
         html += '<option value="' + data.custom[i].id + '">' + data.custom[i].name + '</option>';
@@ -257,6 +265,11 @@ function _frLoadMonth() {
   var _frGroupSel = document.getElementById('fr-filter-group');
   var _frGroupVal = _frGroupSel ? _frGroupSel.value : 'none';
   var _frEid = localStorage.getItem('crewsync_eid') || '';
+
+  // 存快取（30 天過期）
+  if (_frGroupVal && _frGroupVal !== 'none') {
+    try { localStorage.setItem('crewsync_fr_group', JSON.stringify({ v: _frGroupVal, ts: Date.now() })); } catch(e){}
+  }
   if (_frGroupVal === 'none' || !_frGroupVal) {
     var gridEl = document.getElementById('fr-grid');
     if (gridEl) gridEl.innerHTML = '<div style="text-align:center;padding:40px 20px;color:var(--muted)"><div style="font-size:2em;margin-bottom:8px">🤝</div><div style="font-size:.85em">建立或加入好友圈即可查看班表<br><span style="opacity:.6">Create or join a friend group to view rosters</span></div></div>';

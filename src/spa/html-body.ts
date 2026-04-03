@@ -1386,7 +1386,7 @@ export function getSpaHtmlBody(): string {
       <button class="tab-util-btn tab-install-btn" id="tab-install-btn" onclick="showInstallGuide()" style="display:none">
         <span>📲</span>安裝
       </button>
-      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer;text-decoration:underline" onclick="showAbout()">V8.0.10</span>
+      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer;text-decoration:underline" onclick="showAbout()">V8.0.11</span>
     </div>
   </div>
 </div>
@@ -1417,7 +1417,12 @@ export function getSpaHtmlBody(): string {
       <div style="color:var(--muted)">Best experience on iPad in landscape mode. Android devices may not display correctly.</div>
     </div>
     <div style="max-height:50vh;overflow-y:auto;-webkit-overflow-scrolling:touch;margin-bottom:10px">
-    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V8.0.10</div>
+    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V8.0.11</div>
+    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
+      <div>Groups All 群組篩選修正：CC 不顯示機隊下拉；Groups / Friends 記憶上次選擇的群組（30 天快取）</div>
+      <div>Groups All filter fix: hide fleet dropdown for CC; Groups / Friends remember last selected group (30-day cache)</div>
+    </div>
+    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V8.0.10</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
       <div>Groups 移除分享 toggle，加入群組即啟用分享，退出所有群組自動停止；預設群組改下拉選單 + 已加入標籤；新增 FC/CC/職級篩選器；Friends header 加 ⓘ、名稱/機隊欄位預設顯示、自動載入第一個群組班表；CC Rest Calculator 移除密碼鎖正式開放、新增 Crew Prep 欄位、休時取整至 5 min、新增重設按鈕與 24hr 快取、表單寬度優化；好友圈說明文字更新；PA dep-min 手動修改 flag 修正</div>
       <div>Groups: remove share toggle, join = auto-share, leave all = auto-stop; presets changed to dropdown + joined tags; added FC/CC/rank filter; Friends: ⓘ in header, name/fleet shown by default, auto-load first group roster; CC Rest Calculator: removed password lock, added Crew Prep field, rest rounded to 5 min, Reset button, 24hr cache, form width optimized; friend group description updated; PA dep-min manual flag fix</div>

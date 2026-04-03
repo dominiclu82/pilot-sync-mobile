@@ -261,7 +261,14 @@ function _grpUpdateMonthTitle() {
 function _grpUpdateViewFilter(data) {
   var sel = document.getElementById('grp-view-filter');
   if (!sel) return;
+  // 還原快取的群組選擇（30 天過期）
   var current = sel.value || 'all';
+  try {
+    var cached = JSON.parse(localStorage.getItem('crewsync_grp_view') || '{}');
+    if (cached.v && cached.ts && Date.now() - cached.ts < 30 * 24 * 60 * 60 * 1000) {
+      if (!sel.value || sel.value === 'all') current = cached.v;
+    } else { localStorage.removeItem('crewsync_grp_view'); }
+  } catch(e){}
   var joined = data.presets.filter(function(p) { return p.joined; });
   if (joined.length <= 1) {
     sel.style.display = 'none';
@@ -284,6 +291,9 @@ function _grpLoadGrid() {
   var monthKey = _grpYear + '-' + String(_grpMonth).padStart(2, '0');
   var filterGroup = document.getElementById('grp-view-filter');
   var groupVal = filterGroup ? filterGroup.value : 'all';
+
+  // 存快取（30 天過期）
+  try { localStorage.setItem('crewsync_grp_view', JSON.stringify({ v: groupVal, ts: Date.now() })); } catch(e){}
 
   // 如果 groupVal 是 'all'，要用所有已加入的預設群組
   var url = '/api/roster-friends?month=' + monthKey + '&eid=' + encodeURIComponent(eid);
@@ -329,12 +339,12 @@ function _grpRenderGrid() {
   // 篩選只在 All 群組時顯示
   var isAll = viewVal === 'preset_all' || viewVal === 'all';
   var filterWrap = filterRole ? filterRole.parentElement : null;
+  var roleVal = filterRole ? filterRole.value : '';
   if (filterRole) filterRole.style.display = isAll ? '' : 'none';
-  if (filterFleet) filterFleet.style.display = isAll ? '' : 'none';
+  if (filterFleet) filterFleet.style.display = (isAll && roleVal !== 'cc') ? '' : 'none';
   if (filterRank) filterRank.style.display = isAll ? '' : 'none';
   var filtered = _grpGridData;
   if (isAll) {
-    var roleVal = filterRole ? filterRole.value : '';
     var ff = filterFleet ? filterFleet.value : '';
     var frVal = filterRank ? filterRank.value : '';
     // 身分篩選
