@@ -961,7 +961,7 @@ function _paInitListeners() {
     else if (attr === 'temp-f') _paOnTempInput('f', e.target.value);
     else _paSyncField(attr, e.target);
     // 手動修改 flag（flt-hr / flt-min / altitude）
-    if (attr === 'flt-hr' || attr === 'flt-min' || attr === 'altitude') {
+    if (attr === 'flt-hr' || attr === 'flt-min' || attr === 'altitude' || attr === 'dep-min') {
       _paManualFlags[attr] = true;
     }
     _paSaveInputs();

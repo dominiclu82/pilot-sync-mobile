@@ -25,8 +25,19 @@ function _frPopulateGroupFilter() {
         html += '<option value="' + data.custom[i].id + '">' + data.custom[i].name + '</option>';
       }
       if (html === '') html = '<option value="none">尚無好友圈</option>';
-      if (sel) { sel.innerHTML = html; sel.value = current; }
-      if (selM) { selM.innerHTML = html; selM.value = current; }
+      if (sel) {
+        sel.innerHTML = html;
+        // 嘗試還原選項，如果無效就選第一個
+        sel.value = current;
+        if (sel.selectedIndex < 0 && sel.options.length > 0) sel.selectedIndex = 0;
+      }
+      if (selM) {
+        selM.innerHTML = html;
+        selM.value = sel ? sel.value : current;
+        if (selM.selectedIndex < 0 && selM.options.length > 0) selM.selectedIndex = 0;
+      }
+      // 自動載入第一個群組的班表
+      if (sel && sel.value && sel.value !== 'none') _frLoadMonth();
       // 更新紅點（subtab + 好友圈按鈕）
       var cnt = data.pendingInvites || 0;
       ['fr-invite-badge', 'grp-manage-badge', 'grp-manage-badge-m'].forEach(function(id) {

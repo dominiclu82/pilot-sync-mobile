@@ -6,18 +6,10 @@ var _grpGridData = [];
 
 // ── Groups Panel Init ──
 function _grpInitPanel() {
-  var isSharing = localStorage.getItem('crewsync_share_enabled') === '1';
-  var toggle = document.getElementById('grp-share-toggle');
-  if (toggle) toggle.checked = isSharing;
-  _grpUpdateShareDot(isSharing);
-  _grpShowShareUI(isSharing);
-  if (isSharing) {
-    _grpLoadPresets();
-    _grpUpdateMonthTitle();
-    _grpLoadGrid();
-  } else {
-    _grpShowEmpty();
-  }
+  _grpShowShareUI(true);
+  _grpLoadPresets();
+  _grpUpdateMonthTitle();
+  _grpLoadGrid();
 }
 
 function _grpUpdateShareDot(on) {
@@ -176,49 +168,54 @@ function _grpLoadPresets() {
 }
 
 function _grpRenderPresets(data) {
-  var container = document.getElementById('grp-preset-list');
-  if (!container) return;
-  var myRole = localStorage.getItem('crewsync_my_role') || ''; // 'fc' or 'cc'
+  var sel = document.getElementById('grp-preset-select');
+  var tags = document.getElementById('grp-preset-tags');
+  if (!sel || !tags) return;
+  var myRole = localStorage.getItem('crewsync_my_role') || '';
   var myFleet = localStorage.getItem('crewsync_my_fleet') || '';
   var myRank = localStorage.getItem('crewsync_my_rank') || '';
-  var joinedCount = data.presets.filter(function(p) { return p.joined; }).length;
-  var html = '';
+
+  // 下拉選單：未加入的群組
+  var selHtml = '<option value="">+ 加入群組</option>';
+  // 標籤：已加入的群組
+  var tagHtml = '';
 
   for (var i = 0; i < data.presets.length; i++) {
     var p = data.presets[i];
     var isAll = p.id === 'preset_all';
     var canJoin = isAll;
     if (!isAll && myRole === 'fc') {
-      // Flight Crew: CAP → A3xx CAP, SFO/FO → A3xx SFO/FO
       if (myRank === 'CAP') canJoin = p.id === 'preset_' + myFleet + '_CAP';
       else canJoin = p.id === 'preset_' + myFleet + '_SFOFO';
     } else if (!isAll && myRole === 'cc') {
-      // Cabin Crew: SP/PR → preset_CC_SPPR, SC → preset_CC_SC, CC/PC → preset_CC_CCPC
       if (myRank === 'SP' || myRank === 'PR') canJoin = p.id === 'preset_CC_SPPR';
       else if (myRank === 'SC') canJoin = p.id === 'preset_CC_SC';
       else if (myRank === 'CC' || myRank === 'PC') canJoin = p.id === 'preset_CC_CCPC';
     }
-    // 隱藏不符合且未加入的群組
-    if (!canJoin && !p.joined) continue;
-    var disabled = !p.joined && joinedCount >= 2;
-    var checked = p.joined;
-    var toggleBg = checked ? 'var(--accent)' : '#4a5568';
-    var dotLeft = checked ? '18px' : '2px';
-    var hint = '';
-    if (disabled) hint = ' (已達上限)';
 
-    html += '<div style="display:inline-flex;align-items:center;gap:6px;margin:3px 6px 3px 0;' + (disabled ? 'opacity:.35;pointer-events:none' : '') + '">';
-    html += '<label onclick="_grpTogglePreset(\'' + p.id + '\',' + !checked + ')" style="position:relative;display:inline-block;width:32px;height:18px;cursor:pointer;flex-shrink:0">';
-    html += '<span style="position:absolute;top:0;left:0;right:0;bottom:0;background:' + toggleBg + ';border-radius:9px;transition:.3s"></span>';
-    html += '<span style="position:absolute;top:2px;left:' + dotLeft + ';width:14px;height:14px;background:#fff;border-radius:50%;transition:.3s"></span>';
-    html += '</label>';
-    html += '<span style="font-size:.78em;color:var(--text)">' + p.name + '</span>';
-    if (isAll) html += '<span style="font-size:.6em;color:var(--muted);white-space:nowrap">不設限 Open to all</span>';
-    if (hint) html += '<span style="font-size:.65em;color:var(--muted)">' + hint + '</span>';
-    html += '</div>';
+    if (p.joined) {
+      // 已加入 → 標籤
+      tagHtml += '<span style="display:inline-flex;align-items:center;gap:2px;background:var(--accent);color:#fff;border-radius:4px;padding:1px 6px;font-size:.68em;white-space:nowrap">';
+      tagHtml += p.name;
+      tagHtml += ' <span onclick="_grpTogglePreset(\'' + p.id + '\',false)" style="cursor:pointer;opacity:.7;font-size:1.1em">✕</span>';
+      tagHtml += '</span>';
+    } else {
+      // 未加入 → 下拉選項
+      var disabled = !canJoin;
+      var suffix = disabled ? ' (不符合職級)' : '';
+      selHtml += '<option value="' + p.id + '"' + (disabled ? ' disabled' : '') + '>' + p.name + suffix + '</option>';
+    }
   }
-  if (!html) html = '<div style="font-size:.78em;color:var(--muted);padding:4px 0">請先選擇機隊/職級 Please select fleet/rank first</div>';
-  container.innerHTML = html;
+  sel.innerHTML = selHtml;
+  if (tagHtml) tagHtml += '<span style="font-size:.55em;color:var(--muted);opacity:.6;white-space:nowrap">✕退出 Leave</span>';
+  tags.innerHTML = tagHtml;
+}
+
+function _grpJoinFromSelect(sel) {
+  var groupId = sel.value;
+  if (!groupId) return;
+  sel.value = ''; // 重置下拉
+  _grpTogglePreset(groupId, true);
 }
 
 function _grpTogglePreset(groupId, join) {
@@ -228,8 +225,14 @@ function _grpTogglePreset(groupId, join) {
   fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ eid: eid, groupId: groupId }) })
     .then(function(r) { return r.json(); })
     .then(function() {
-      if (join) _grpAutoUploadRoster();
-      _grpLoadPresets(); // 會更新 view filter 再 loadGrid
+      if (join) {
+        localStorage.setItem('crewsync_share_enabled', '1');
+        _grpAutoUploadRoster();
+      } else {
+        // 檢查是否還有任何群組，沒有就關閉 sharing
+        _grpCheckAutoDisableSharing();
+      }
+      _grpLoadPresets();
     });
 }
 
@@ -297,23 +300,57 @@ function _grpLoadGrid() {
     }).catch(function() {});
 }
 
+function _grpOnFilterRole() {
+  var roleSel = document.getElementById('grp-filter-role');
+  var fleetSel = document.getElementById('grp-filter-fleet');
+  var rankSel = document.getElementById('grp-filter-rank');
+  var role = roleSel ? roleSel.value : '';
+  if (role === 'fc') {
+    if (fleetSel) fleetSel.style.display = '';
+    if (rankSel) { rankSel.style.display = ''; rankSel.innerHTML = '<option value="">All</option><option value="CAP">CAP</option><option value="SFOFO">SFO+FO</option>'; }
+  } else if (role === 'cc') {
+    if (fleetSel) fleetSel.style.display = 'none';
+    if (rankSel) { rankSel.style.display = ''; rankSel.innerHTML = '<option value="">All</option><option value="SPPR">SP+PR</option><option value="SC">SC</option><option value="CCPC">CC+PC</option>'; }
+  } else {
+    if (fleetSel) fleetSel.style.display = '';
+    if (rankSel) { rankSel.style.display = ''; rankSel.innerHTML = '<option value="">All</option>'; }
+  }
+  _grpLoadGrid();
+}
+
 function _grpRenderGrid() {
   var gridEl = document.getElementById('grp-grid');
   if (!gridEl) return;
   var viewSel = document.getElementById('grp-view-filter');
   var viewVal = viewSel ? viewSel.value : 'all';
+  var filterRole = document.getElementById('grp-filter-role');
   var filterFleet = document.getElementById('grp-filter-fleet');
   var filterRank = document.getElementById('grp-filter-rank');
   // 篩選只在 All 群組時顯示
   var isAll = viewVal === 'preset_all' || viewVal === 'all';
+  var filterWrap = filterRole ? filterRole.parentElement : null;
+  if (filterRole) filterRole.style.display = isAll ? '' : 'none';
   if (filterFleet) filterFleet.style.display = isAll ? '' : 'none';
   if (filterRank) filterRank.style.display = isAll ? '' : 'none';
   var filtered = _grpGridData;
   if (isAll) {
+    var roleVal = filterRole ? filterRole.value : '';
     var ff = filterFleet ? filterFleet.value : '';
-    var fr = filterRank ? filterRank.value : '';
-    if (ff) filtered = filtered.filter(function(p) { return p.fleet === ff; });
-    if (fr) filtered = filtered.filter(function(p) { return p.rank === fr; });
+    var frVal = filterRank ? filterRank.value : '';
+    // 身分篩選
+    if (roleVal === 'fc') {
+      filtered = filtered.filter(function(p) { return p.fleet && p.fleet.indexOf('A3') === 0; });
+    } else if (roleVal === 'cc') {
+      filtered = filtered.filter(function(p) { return !p.fleet || p.fleet === ''; });
+    }
+    // 機隊篩選（FC only）
+    if (ff && roleVal !== 'cc') filtered = filtered.filter(function(p) { return p.fleet === ff; });
+    // 職級篩選
+    if (frVal === 'CAP') filtered = filtered.filter(function(p) { return p.rank === 'CAP'; });
+    else if (frVal === 'SFOFO') filtered = filtered.filter(function(p) { return p.rank === 'SFO' || p.rank === 'FO'; });
+    else if (frVal === 'SPPR') filtered = filtered.filter(function(p) { return p.rank === 'SP' || p.rank === 'PR'; });
+    else if (frVal === 'SC') filtered = filtered.filter(function(p) { return p.rank === 'SC'; });
+    else if (frVal === 'CCPC') filtered = filtered.filter(function(p) { return p.rank === 'CC' || p.rank === 'PC'; });
   }
   if (filtered.length === 0) {
     gridEl.innerHTML = '<div style="text-align:center;padding:40px 20px;color:var(--muted)"><div style="font-size:.85em">尚無成員班表<br><span style="opacity:.6">No roster data from group members</span></div></div>';
@@ -547,6 +584,23 @@ function _grpAutoLeavePresets(newFleet, newRank) {
   }
 }
 
+// 檢查是否還有任何群組（preset + custom），沒有就關閉 sharing
+function _grpCheckAutoDisableSharing() {
+  var eid = localStorage.getItem('crewsync_eid');
+  if (!eid) return;
+  fetch('/api/groups?eid=' + encodeURIComponent(eid))
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (data.error) return;
+      var hasAny = (data.presets || []).some(function(p) { return p.joined; }) || (data.custom || []).length > 0;
+      if (!hasAny) {
+        localStorage.removeItem('crewsync_share_enabled');
+        // 撤銷分享
+        fetch('/api/roster-share', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ eid: eid }) });
+      }
+    });
+}
+
 // 加入群組後自動上傳 local 班表到資料庫
 function _grpAutoUploadRoster() {
   var eid = localStorage.getItem('crewsync_eid');
@@ -575,53 +629,39 @@ function _grpAutoUploadRoster() {
 function _grpEsc(s) { var d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
 
 // ── Cabin Crew Rest Calculator ──────────────────────────────────────────────
-function _ccRestUnlock() {
-  var pw = document.getElementById('cabin-rest-pw');
-  if (pw && pw.value === '12345678') {
-    document.getElementById('cabin-rest-lock').style.display = 'none';
-    document.getElementById('cabin-rest-content').style.display = '';
-    localStorage.setItem('crewsync_cc_rest_unlocked', '1');
-  } else {
-    alert('密碼錯誤 Wrong password');
-  }
-}
-// 頁面載入時自動解鎖
-document.addEventListener('DOMContentLoaded', function() {
-  if (localStorage.getItem('crewsync_cc_rest_unlocked') === '1') {
-    var lock = document.getElementById('cabin-rest-lock');
-    var content = document.getElementById('cabin-rest-content');
-    if (lock) lock.style.display = 'none';
-    if (content) content.style.display = '';
-  }
-});
+// _ccRestUnlock removed — no longer password-locked
 
 function _ccRestCalc() {
   var startEl = document.getElementById('cc-rest-start');
   var handoverEl = document.getElementById('cc-rest-handover');
+  var prepEl = document.getElementById('cc-rest-prep');
   var mealEl = document.getElementById('cc-rest-meal');
   var todEl = document.getElementById('cc-rest-tod');
   var landingEl = document.getElementById('cc-rest-landing');
+  var tzEl = document.getElementById('cc-rest-tz');
 
-  if (!startEl.value || !todEl.value) { alert('請填入 1st Rest 開始和 TOD 時間'); return; }
+  if (!startEl.value || !todEl.value) { alert('請填入 1st Rest 開始和 TOD Time'); return; }
 
   var startMin = _ccTimeToMin(startEl.value);
   var todMin = _ccTimeToMin(todEl.value);
   var landingMin = landingEl.value ? _ccTimeToMin(landingEl.value) : null;
   var handoverMin = _ccParseDuration(handoverEl.value);
+  var prepMin = _ccParseDuration(prepEl ? prepEl.value : '0');
   var mealMin = _ccParseDuration(mealEl.value);
 
   // 處理跨午夜
   if (todMin <= startMin) todMin += 1440;
 
   var totalAvail = todMin - startMin;
-  var nonRest = handoverMin + mealMin;
+  var nonRest = handoverMin + prepMin + mealMin;
   var totalRest = totalAvail - nonRest;
 
   if (totalRest <= 0) { alert('可用休息時間不足 Not enough rest time'); return; }
 
   var restPerGroup = Math.floor(totalRest / 2);
+  restPerGroup = Math.floor(restPerGroup / 5) * 5;
 
-  // 時間軸：1st Rest → Handover → 2nd Rest → 2nd Meal → TOD
+  // 時間軸：1st Rest → Handover → 2nd Rest → Crew Prep → 2nd Meal → TOD
   var t = startMin;
   var rest1Start = t;
   var rest1End = t + restPerGroup;
@@ -632,6 +672,9 @@ function _ccRestCalc() {
   var rest2Start = t;
   var rest2End = t + restPerGroup;
   t = rest2End;
+  var prepStart = t;
+  var prepEnd = t + prepMin;
+  t = prepEnd;
   var mealStart = t;
   var mealEnd = t + mealMin;
 
@@ -642,7 +685,8 @@ function _ccRestCalc() {
   html += _ccRestRow('1st Rest', rest1Start, rest1End, '#1e40af', restPerGroup);
   html += _ccRestRow('Handover', hoStart, hoEnd, '#854d0e', handoverMin);
   html += _ccRestRow('2nd Rest', rest2Start, rest2End, '#7f1d1d', restPerGroup);
-  html += _ccRestRow('2nd Meal', mealStart, mealEnd, '#065f46', mealMin);
+  if (prepMin > 0) html += _ccRestRow('Crew Prep', prepStart, prepEnd, '#6b21a8', prepMin);
+  html += _ccRestRow('2nd Meal Svc', mealStart, mealEnd, '#065f46', mealMin);
   html += '<div style="border-top:1px solid var(--dim);margin-top:8px;padding-top:8px">';
   html += _ccRestRow('TOD', todMin, null, '#4a5568', 0);
   if (landingMin !== null) {
@@ -656,6 +700,9 @@ function _ccRestCalc() {
   html += '<div style="margin-top:12px;padding:10px;background:rgba(59,130,246,.08);border-radius:8px;font-size:.78em;color:var(--muted);text-align:center">';
   html += '總可用 Total: ' + totalAvail + ' min ｜ 純休息 Rest: ' + totalRest + ' min ｜ 每組 Per group: ' + restPerGroup + ' min (' + Math.floor(restPerGroup/60) + 'h' + (restPerGroup%60 ? restPerGroup%60 + 'm' : '') + ')';
   html += '</div>';
+
+  // 存快取
+  _ccRestSaveCache();
 
   resultEl.innerHTML = html;
   resultEl.style.display = '';
@@ -672,6 +719,54 @@ function _ccRestRow(label, startMin, endMin, color, duration) {
   html += '</div>';
   return html;
 }
+
+// ── CC Rest 快取（24 小時）──
+function _ccRestSaveCache() {
+  try {
+    var obj = {
+      ts: Date.now(),
+      tz: document.getElementById('cc-rest-tz').value,
+      start: document.getElementById('cc-rest-start').value,
+      handover: document.getElementById('cc-rest-handover').value,
+      prep: document.getElementById('cc-rest-prep').value,
+      meal: document.getElementById('cc-rest-meal').value,
+      tod: document.getElementById('cc-rest-tod').value,
+      landing: document.getElementById('cc-rest-landing').value
+    };
+    localStorage.setItem('crewsync_cc_rest', JSON.stringify(obj));
+  } catch(e) {}
+}
+function _ccRestLoadCache() {
+  try {
+    var raw = localStorage.getItem('crewsync_cc_rest');
+    if (!raw) return;
+    var obj = JSON.parse(raw);
+    if (obj.ts && Date.now() - obj.ts > 24 * 60 * 60 * 1000) { localStorage.removeItem('crewsync_cc_rest'); return; }
+    if (obj.tz) document.getElementById('cc-rest-tz').value = obj.tz;
+    if (obj.start) document.getElementById('cc-rest-start').value = obj.start;
+    if (obj.handover) document.getElementById('cc-rest-handover').value = obj.handover;
+    if (obj.prep) document.getElementById('cc-rest-prep').value = obj.prep;
+    if (obj.meal) document.getElementById('cc-rest-meal').value = obj.meal;
+    if (obj.tod) document.getElementById('cc-rest-tod').value = obj.tod;
+    if (obj.landing) document.getElementById('cc-rest-landing').value = obj.landing;
+  } catch(e) {}
+}
+function _ccRestReset() {
+  document.getElementById('cc-rest-tz').value = '8';
+  document.getElementById('cc-rest-start').value = '';
+  document.getElementById('cc-rest-handover').value = '5';
+  document.getElementById('cc-rest-prep').value = '5';
+  document.getElementById('cc-rest-meal').value = '0230';
+  document.getElementById('cc-rest-tod').value = '';
+  document.getElementById('cc-rest-landing').value = '';
+  document.getElementById('cc-rest-result').innerHTML = '';
+  document.getElementById('cc-rest-result').style.display = 'none';
+  localStorage.removeItem('crewsync_cc_rest');
+}
+// 頁面載入時還原快取
+document.addEventListener('DOMContentLoaded', function() {
+  setTimeout(_ccRestLoadCache, 500);
+});
 
 // 解析 HHMM 或純分鐘格式 → 回傳分鐘數
 // "0230" → 150, "30" → 30, "0030" → 30, "130" → 90

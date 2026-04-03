@@ -189,18 +189,11 @@ export function getSpaHtmlBody(): string {
 <!-- ── Groups panel ── -->
 <div id="roster-groups" class="roster-panel">
   <div style="display:flex;flex-direction:column;height:100%">
-    <!-- Groups header (固定不捲動) -->
-    <div style="padding:8px 12px;border-bottom:1px solid var(--dim);flex-shrink:0;overflow-x:auto;-webkit-overflow-scrolling:touch">
-      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
-        <span style="font-size:.69em;color:var(--muted);flex-shrink:0">同意分享班表</span>
-        <label style="position:relative;display:inline-block;width:36px;height:20px;cursor:pointer;flex-shrink:0">
-          <input type="checkbox" id="grp-share-toggle" onchange="_grpToggleShare()" style="opacity:0;width:0;height:0">
-          <span style="position:absolute;top:0;left:0;right:0;bottom:0;background:#4a5568;border-radius:10px;transition:.3s"></span>
-          <span style="position:absolute;top:2px;left:2px;width:16px;height:16px;background:#fff;border-radius:50%;transition:.3s" id="grp-share-dot"></span>
-        </label>
-        <span onclick="_frShowInfo()" style="cursor:pointer;font-size:.85em;color:var(--muted);flex-shrink:0" title="分享說明">ⓘ</span>
+    <!-- Groups header (固定不捲動，比照 Friends 單行) -->
+    <div style="padding:5px 8px;border-bottom:1px solid var(--dim);flex-shrink:0;display:flex;align-items:center;gap:4px;white-space:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch">
+        <span onclick="_frShowInfo()" style="cursor:pointer;font-size:.85em;color:var(--accent);flex-shrink:0" title="分享說明">ⓘ</span>
         <!-- 身分/機隊/職級 -->
-        <span id="grp-fleet-hint" style="display:none;flex-shrink:0;background:rgba(59,130,246,.1);border:1px solid rgba(59,130,246,.25);border-radius:6px;padding:2px 6px;align-items:center;gap:4px">
+        <span id="grp-fleet-hint" style="flex-shrink:0;background:rgba(59,130,246,.1);border:1px solid rgba(59,130,246,.25);border-radius:6px;padding:2px 6px;display:inline-flex;align-items:center;gap:4px">
           <select id="grp-my-role" onchange="_grpSyncRole()" style="background:#1e3a5f;color:#93c5fd;border:1px solid rgba(59,130,246,.3);border-radius:4px;padding:2px 4px;font-size:.72em;cursor:pointer;width:auto">
             <option value="" disabled selected>身分</option><option value="fc">Flight Crew</option><option value="cc">Cabin Crew</option>
           </select>
@@ -212,13 +205,16 @@ export function getSpaHtmlBody(): string {
           </select>
         </span>
         <!-- 名稱 -->
-        <span id="grp-name-wrap" style="display:none;flex-shrink:0;background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.25);border-radius:6px;padding:2px 6px;align-items:center;gap:4px">
+        <span id="grp-name-wrap" style="flex-shrink:0;background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.25);border-radius:6px;padding:2px 6px;display:inline-flex;align-items:center;gap:4px">
           <span style="font-size:.5em;color:#86efac">名稱<br>Name</span>
           <input id="grp-my-name" type="text" placeholder="可修改 editable" onchange="_grpSyncName()" style="background:#1a3a2a;color:#86efac;border:1px solid rgba(34,197,94,.3);border-radius:4px;padding:2px 4px;font-size:.72em;width:100px">
           <span onclick="_frShowNameInfo()" style="cursor:pointer;font-size:.85em;color:rgba(34,197,94,.6);flex-shrink:0" title="名稱說明">ⓘ</span>
         </span>
-        <span id="grp-preset-list" style="display:inline-flex;align-items:center;gap:2px;flex-wrap:wrap"></span>
-      </div>
+        <!-- 群組下拉 + 已加入標籤 -->
+        <select id="grp-preset-select" onchange="_grpJoinFromSelect(this)" style="flex-shrink:0;background:#1e3a5f;color:#93c5fd;border:1px solid rgba(59,130,246,.3);border-radius:4px;padding:2px 4px;font-size:.72em;cursor:pointer;width:auto;max-width:120px">
+          <option value="">+ 加入群組</option>
+        </select>
+        <span id="grp-preset-tags" style="display:inline-flex;align-items:center;gap:3px"></span>
     </div>
     <!-- Groups month nav + filter (固定不捲動) -->
     <div style="display:flex;align-items:center;padding:5px 8px;border-bottom:1px solid var(--dim);gap:6px;flex-shrink:0">
@@ -232,15 +228,18 @@ export function getSpaHtmlBody(): string {
         <select id="grp-view-filter" onchange="_grpLoadGrid()" style="background:#2d1f4e;color:#d8b4fe;border:1px solid rgba(168,85,247,.3);border-radius:4px;padding:2px 4px;font-size:.72em;cursor:pointer;width:auto">
           <option value="all">全部 All</option>
         </select>
+        <select id="grp-filter-role" onchange="_grpOnFilterRole()" style="background:#2d1f4e;color:#d8b4fe;border:1px solid rgba(168,85,247,.3);border-radius:4px;padding:2px 4px;font-size:.72em;cursor:pointer;width:auto">
+          <option value="">All</option><option value="fc">FC</option><option value="cc">CC</option>
+        </select>
         <select id="grp-filter-fleet" onchange="_grpLoadGrid()" style="background:#2d1f4e;color:#d8b4fe;border:1px solid rgba(168,85,247,.3);border-radius:4px;padding:2px 4px;font-size:.72em;cursor:pointer;width:auto">
           <option value="">All</option><option value="A321">A321</option><option value="A330">A330</option><option value="A350">A350</option>
         </select>
         <select id="grp-filter-rank" onchange="_grpLoadGrid()" style="background:#2d1f4e;color:#d8b4fe;border:1px solid rgba(168,85,247,.3);border-radius:4px;padding:2px 4px;font-size:.72em;cursor:pointer;width:auto">
-          <option value="">All</option><option value="CAP">CAP</option><option value="SFO">SFO</option><option value="FO">FO</option>
+          <option value="">All</option>
         </select>
       </span>
     </div>
-    <div id="grp-grid" style="padding:0;flex:1;min-height:0;overflow:hidden"></div>
+    <div id="grp-grid" style="padding:0;flex:1;min-height:0"></div>
   </div>
 </div>
 
@@ -249,8 +248,9 @@ export function getSpaHtmlBody(): string {
   <div>
     <!-- Friends header: desktop 一行 / mobile portrait 兩行 -->
     <div class="fr-header">
-      <!-- Row 1: 機隊 + 名稱（手機可左右滑） -->
+      <!-- Row 1: ⓘ + 機隊 + 名稱（手機可左右滑） -->
       <div class="fr-header-row1">
+        <span onclick="_frShowInfo()" style="cursor:pointer;font-size:.85em;color:var(--accent);flex-shrink:0" title="分享說明">ⓘ</span>
         <!-- 區塊1: 身分/機隊/職級 (淡藍) -->
         <span id="fr-share-hint" style="flex-shrink:0;background:rgba(59,130,246,.1);border:1px solid rgba(59,130,246,.25);border-radius:6px;padding:2px 6px;display:inline-flex;align-items:center;gap:4px">
           <select id="fr-my-role" onchange="_frSyncRole()" style="background:#1e3a5f;color:#93c5fd;border:1px solid rgba(59,130,246,.3);border-radius:4px;padding:2px 4px;font-size:.72em;cursor:pointer;width:auto">
@@ -264,7 +264,7 @@ export function getSpaHtmlBody(): string {
           </select>
         </span>
         <!-- 區塊2: 名字 (淡綠) -->
-        <span id="fr-name-wrap" style="display:none;flex-shrink:0;background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.25);border-radius:6px;padding:2px 6px;margin-left:12px;align-items:center;gap:4px">
+        <span id="fr-name-wrap" style="flex-shrink:0;background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.25);border-radius:6px;padding:2px 6px;margin-left:12px;display:inline-flex;align-items:center;gap:4px">
           <span style="font-size:.5em;color:#86efac">名稱<br>Name</span>
           <input id="fr-my-name" type="text" placeholder="可修改 editable" onchange="_frCheckReady()" style="background:#1a3a2a;color:#86efac;border:1px solid rgba(34,197,94,.3);border-radius:4px;padding:2px 4px;font-size:.72em;width:100px">
           <span onclick="_frShowNameInfo()" style="cursor:pointer;font-size:.85em;color:rgba(34,197,94,.6);flex-shrink:0" title="名稱說明">ⓘ</span>
@@ -341,8 +341,8 @@ export function getSpaHtmlBody(): string {
       <button onclick="_grpCloseManage()" style="background:none;border:none;color:var(--muted);font-size:1.3em;cursor:pointer">✕</button>
     </div>
     <div style="font-size:.75em;color:var(--muted);line-height:1.5;margin-bottom:12px;padding:8px;background:rgba(59,130,246,.06);border-radius:8px">
-      <div>加入好友圈即代表同意將班表分享給該好友圈成員。退出所有好友圈將停止分享。</div>
-      <div style="opacity:.7">Joining a friend group means you agree to share your roster with its members. Leaving all groups will stop sharing.</div>
+      <div><span onclick="_frShowInfo()" style="cursor:pointer;color:var(--accent)">ⓘ</span> 加入好友圈或建立好友圈即代表同意將班表分享給<b style="color:var(--text)">該好友圈</b>成員</div>
+      <div style="opacity:.7">Joining or creating a friend group means you agree to share your roster with <b>that group's</b> members</div>
     </div>
     <div id="grp-friends-content"></div>
   </div>
@@ -1112,18 +1112,13 @@ export function getSpaHtmlBody(): string {
 
   <!-- Cabin Rest Calc -->
   <div id="cabin-rest" class="briefing-panel active" style="padding:20px">
-    <div style="text-align:center;padding:8px;background:rgba(251,191,36,.1);border:1px solid rgba(251,191,36,.3);border-radius:8px;margin-bottom:12px;font-size:.78em;color:#fbbf24">🚧 Coming Soon — 測試版 Beta</div>
-    <div id="cabin-rest-lock" style="text-align:center;padding:40px 20px">
-      <div style="font-size:2.5em;margin-bottom:12px">🔒</div>
-      <div style="font-size:.95em;font-weight:700;color:var(--text);margin-bottom:12px">Cabin Crew Rest Calculator</div>
-      <div style="font-size:.78em;color:var(--muted);margin-bottom:16px">測試中，請輸入開發者密碼<br>In testing — enter developer password</div>
-      <input id="cabin-rest-pw" type="password" placeholder="Password" onkeydown="if(event.key==='Enter')_ccRestUnlock()" style="background:var(--surface);color:var(--text);border:1px solid var(--dim);border-radius:8px;padding:8px 12px;font-size:.9em;text-align:center;width:180px">
-      <button onclick="_ccRestUnlock()" style="margin-left:8px;background:var(--accent);color:#fff;border:none;border-radius:8px;padding:8px 16px;font-size:.85em;cursor:pointer">Enter</button>
-    </div>
-    <div id="cabin-rest-content" style="display:none">
-      <div style="font-size:1em;font-weight:700;color:var(--text);margin-bottom:16px;text-align:center">⏳ Cabin Crew Rest Calculator</div>
+    <div id="cabin-rest-content">
+      <div style="display:flex;align-items:center;justify-content:center;gap:12px;margin-bottom:16px">
+        <span style="font-size:1em;font-weight:700;color:var(--text)">⏳ Cabin Crew Rest Calculator</span>
+        <button onclick="_ccRestReset()" style="background:none;border:2px solid #ef4444;color:#ef4444;border-radius:6px;padding:2px 10px;font-size:.72em;font-weight:700;cursor:pointer">重設 Reset</button>
+      </div>
       <!-- 輸入區 -->
-      <div style="background:var(--card);border-radius:12px;padding:16px;margin-bottom:16px">
+      <div style="background:var(--card);border-radius:12px;padding:16px;margin-bottom:16px;max-width:480px;margin-left:auto;margin-right:auto">
         <div style="display:flex;flex-direction:column;gap:12px">
           <div style="display:flex;align-items:center;gap:10px">
             <div style="font-size:.85em;color:var(--muted);min-width:110px;white-space:nowrap">目的地時區<br><span style="opacity:.6">Dest TZ</span></div>
@@ -1155,26 +1150,30 @@ export function getSpaHtmlBody(): string {
             <input id="cc-rest-start" type="time" style="flex:1;background:var(--surface);color:var(--text);border:1px solid var(--dim);border-radius:8px;padding:10px;font-size:1em">
           </div>
           <div style="display:flex;align-items:center;gap:10px">
-            <div style="font-size:.85em;color:var(--muted);min-width:110px;white-space:nowrap">Handover<br><span style="opacity:.6">HHMM or min</span></div>
-            <input id="cc-rest-handover" type="text" value="10" inputmode="numeric" placeholder="0010 or 10" style="flex:1;background:var(--surface);color:var(--text);border:1px solid var(--dim);border-radius:8px;padding:10px;font-size:1em;text-align:center">
+            <div style="font-size:.85em;color:var(--muted);min-width:120px;white-space:nowrap">Handover<br><span style="opacity:.6">Duration (min)</span></div>
+            <input id="cc-rest-handover" type="text" value="5" inputmode="numeric" placeholder="5" style="flex:1;background:var(--surface);color:var(--text);border:1px solid var(--dim);border-radius:8px;padding:10px;font-size:1em;text-align:center">
           </div>
           <div style="display:flex;align-items:center;gap:10px">
-            <div style="font-size:.85em;color:var(--muted);min-width:110px;white-space:nowrap">2nd Meal<br><span style="opacity:.6">HHMM</span></div>
+            <div style="font-size:.85em;color:var(--muted);min-width:120px;white-space:nowrap">2nd Rest 準備<br><span style="opacity:.6">Crew Prep (min)</span></div>
+            <input id="cc-rest-prep" type="text" value="5" inputmode="numeric" placeholder="5" style="flex:1;background:var(--surface);color:var(--text);border:1px solid var(--dim);border-radius:8px;padding:10px;font-size:1em;text-align:center">
+          </div>
+          <div style="display:flex;align-items:center;gap:10px">
+            <div style="font-size:.85em;color:var(--muted);min-width:120px;white-space:nowrap">2nd Meal<br><span style="opacity:.6">Duration (HHMM)</span></div>
             <input id="cc-rest-meal" type="text" value="0230" inputmode="numeric" placeholder="e.g. 0230" style="flex:1;background:var(--surface);color:var(--text);border:1px solid var(--dim);border-radius:8px;padding:10px;font-size:1em;text-align:center">
           </div>
           <div style="display:flex;align-items:center;gap:10px">
-            <div style="font-size:.85em;color:var(--muted);min-width:110px;white-space:nowrap">TOD<br><span style="opacity:.6">時間</span></div>
+            <div style="font-size:.85em;color:var(--muted);min-width:120px;white-space:nowrap">TOD<br><span style="opacity:.6">Time (HH:MM)</span></div>
             <input id="cc-rest-tod" type="time" style="flex:1;background:var(--surface);color:var(--text);border:1px solid var(--dim);border-radius:8px;padding:10px;font-size:1em">
           </div>
           <div style="display:flex;align-items:center;gap:10px">
-            <div style="font-size:.85em;color:var(--muted);min-width:110px;white-space:nowrap">Landing<br><span style="opacity:.6">時間</span></div>
+            <div style="font-size:.85em;color:var(--muted);min-width:120px;white-space:nowrap">Landing<br><span style="opacity:.6">Time (HH:MM)</span></div>
             <input id="cc-rest-landing" type="time" style="flex:1;background:var(--surface);color:var(--text);border:1px solid var(--dim);border-radius:8px;padding:10px;font-size:1em">
           </div>
         </div>
         <button onclick="_ccRestCalc()" style="margin-top:16px;width:100%;background:var(--accent);color:#fff;border:none;border-radius:10px;padding:14px;font-size:1.05em;font-weight:700;cursor:pointer">計算 Calculate</button>
       </div>
       <!-- 結果區 -->
-      <div id="cc-rest-result" style="display:none;background:var(--card);border-radius:12px;padding:14px">
+      <div id="cc-rest-result" style="display:none;background:var(--card);border-radius:12px;padding:14px;max-width:480px;margin:0 auto">
       </div>
     </div>
   </div>
@@ -1387,7 +1386,7 @@ export function getSpaHtmlBody(): string {
       <button class="tab-util-btn tab-install-btn" id="tab-install-btn" onclick="showInstallGuide()" style="display:none">
         <span>📲</span>安裝
       </button>
-      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer;text-decoration:underline" onclick="showAbout()">V8.0.09</span>
+      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer;text-decoration:underline" onclick="showAbout()">V8.0.10</span>
     </div>
   </div>
 </div>
@@ -1418,10 +1417,10 @@ export function getSpaHtmlBody(): string {
       <div style="color:var(--muted)">Best experience on iPad in landscape mode. Android devices may not display correctly.</div>
     </div>
     <div style="max-height:50vh;overflow-y:auto;-webkit-overflow-scrolling:touch;margin-bottom:10px">
-    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V8.0.09</div>
+    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V8.0.10</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
-      <div>加入群組自動上傳班表、修正組員名單消失、Friends 拿掉 toggle、說明文字更新、0 人群組自動刪除、離線快取 30 天過期</div>
-      <div>Auto-upload roster on group join, fix crew data missing, Friends remove toggle, updated descriptions, auto-delete empty groups, 30-day cache expiry</div>
+      <div>Groups 移除分享 toggle，加入群組即啟用分享，退出所有群組自動停止；預設群組改下拉選單 + 已加入標籤；新增 FC/CC/職級篩選器；Friends header 加 ⓘ、名稱/機隊欄位預設顯示、自動載入第一個群組班表；CC Rest Calculator 移除密碼鎖正式開放、新增 Crew Prep 欄位、休時取整至 5 min、新增重設按鈕與 24hr 快取、表單寬度優化；好友圈說明文字更新；PA dep-min 手動修改 flag 修正</div>
+      <div>Groups: remove share toggle, join = auto-share, leave all = auto-stop; presets changed to dropdown + joined tags; added FC/CC/rank filter; Friends: ⓘ in header, name/fleet shown by default, auto-load first group roster; CC Rest Calculator: removed password lock, added Crew Prep field, rest rounded to 5 min, Reset button, 24hr cache, form width optimized; friend group description updated; PA dep-min manual flag fix</div>
     </div>
     <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V8.0.08</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
