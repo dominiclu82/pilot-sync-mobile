@@ -718,27 +718,25 @@ export function getSpaHtmlBody(): string {
   </div>
 
   <!-- ── 💰 Overtime panel ── -->
-  <div id="briefing-overtime" class="briefing-panel" style="padding:20px">
-    <div style="display:flex;align-items:center;justify-content:center;gap:12px;margin-bottom:16px">
+  <div id="briefing-overtime" class="briefing-panel" style="padding:12px;padding-bottom:80px;overflow-y:auto;-webkit-overflow-scrolling:touch;max-height:calc(100vh - 160px)">
+    <div style="display:flex;align-items:center;justify-content:center;gap:8px;margin-bottom:8px">
       <span style="font-size:1em;font-weight:700;color:var(--text)">💰 Overtime Calculator</span>
       <button onclick="_otReset()" style="background:none;border:2px solid #ef4444;color:#ef4444;border-radius:6px;padding:2px 10px;font-size:.72em;font-weight:700;cursor:pointer">重設 Reset</button>
     </div>
     <div style="max-width:480px;margin:0 auto">
-      <!-- 月份切換 + 航班選擇 -->
-      <div style="display:flex;align-items:center;justify-content:center;gap:8px;margin-bottom:12px">
-        <button onclick="_otPrevMonth()" style="background:var(--surface);color:var(--text);border:1px solid var(--dim);border-radius:6px;padding:4px 10px;font-size:.9em;cursor:pointer">◀</button>
-        <span id="ot-month-title" style="font-size:.9em;font-weight:700;color:var(--text);min-width:80px;text-align:center"></span>
-        <button onclick="_otNextMonth()" style="background:var(--surface);color:var(--text);border:1px solid var(--dim);border-radius:6px;padding:4px 10px;font-size:.9em;cursor:pointer">▶</button>
-      </div>
-      <div style="text-align:center;margin-bottom:12px">
-        <select id="ot-flight-select" onchange="_otSelectFlight(this)" style="background:var(--surface);color:var(--text);border:1px solid var(--dim);border-radius:8px;padding:8px 12px;font-size:.9em;min-width:240px">
+      <!-- 月份切換 + 航班選擇 + 說明（一區塊） -->
+      <div style="display:flex;align-items:center;justify-content:center;gap:6px;margin-bottom:6px;flex-wrap:wrap">
+        <button onclick="_otPrevMonth()" style="background:var(--surface);color:var(--text);border:1px solid var(--dim);border-radius:6px;padding:2px 8px;font-size:.85em;cursor:pointer">◀</button>
+        <span id="ot-month-title" style="font-size:.85em;font-weight:700;color:var(--text);min-width:70px;text-align:center"></span>
+        <button onclick="_otNextMonth()" style="background:var(--surface);color:var(--text);border:1px solid var(--dim);border-radius:6px;padding:2px 8px;font-size:.85em;cursor:pointer">▶</button>
+        <select id="ot-flight-select" onchange="_otSelectFlight(this)" style="background:var(--surface);color:var(--text);border:1px solid var(--dim);border-radius:6px;padding:4px 8px;font-size:.8em;max-width:220px">
           <option value="">選擇航班 Select flight</option>
         </select>
       </div>
-      <div style="font-size:.72em;color:var(--muted);text-align:center;margin-bottom:12px;line-height:1.6">
-        已同步班表可直接下拉選擇航班，或手動輸入時間資訊<br>
-        <span style="opacity:.7">Select from synced roster, or enter schedule times manually</span><br>
-        <span style="opacity:.5">手動輸入時起訖地可不填，重點是時間 / Origin & Dest optional for manual input</span>
+      <div style="font-size:.65em;color:var(--muted);text-align:center;margin-bottom:10px;line-height:1.5">
+        已同步班表可直接下拉選擇航班，或手動輸入時間資訊 / Select from synced roster, or enter schedule times manually<br>
+        <span style="opacity:.6">手動輸入時僅需輸入時間 / Origin & Dest optional for manual input</span><br>
+        <span style="color:#eab308">⚠ 已值勤完畢航班的表定時間可能被更改，並非原本表定時間，資料僅供參考<br>Schedule times for completed flights may have been modified and may not reflect the original schedule. Data is for reference only.</span>
       </div>
       <!-- 輸入區 -->
       <div style="background:var(--card);border-radius:12px;padding:16px;margin-bottom:16px">
@@ -1451,7 +1449,7 @@ export function getSpaHtmlBody(): string {
       <button class="tab-util-btn tab-install-btn" id="tab-install-btn" onclick="showInstallGuide()" style="display:none">
         <span>📲</span>安裝
       </button>
-      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer;text-decoration:underline" onclick="showAbout()">V8.0.12</span>
+      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer;text-decoration:underline" onclick="showAbout()">V8.0.13</span>
     </div>
   </div>
 </div>
@@ -1482,7 +1480,12 @@ export function getSpaHtmlBody(): string {
       <div style="color:var(--muted)">Best experience on iPad in landscape mode. Android devices may not display correctly.</div>
     </div>
     <div style="max-height:50vh;overflow-y:auto;-webkit-overflow-scrolling:touch;margin-bottom:10px">
-    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V8.0.12</div>
+    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V8.0.13</div>
+    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
+      <div>Overtime Calculator UI 優化：header 精簡、航班選單與月份同行、iPad 橫拿捲動修正、已完成航班警語</div>
+      <div>Overtime Calculator UI improvements: compact header, inline month & flight selector, iPad landscape scroll fix, completed flight warning</div>
+    </div>
+    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V8.0.12</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
       <div>新增 Overtime Calculator subtab（Flight Crew），從班表自動帶入航班時間、月份切換、跨月航班支援、手動輸入模式、24hr 快取</div>
       <div>New Overtime Calculator subtab (Flight Crew): auto-load flights from roster, month navigation, cross-month flight support, manual input mode, 24hr cache</div>
