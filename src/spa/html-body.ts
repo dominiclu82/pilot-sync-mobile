@@ -771,7 +771,7 @@ export function getSpaHtmlBody(): string {
       </div>
       <!-- 結果區 -->
       <div id="ot-result" style="display:none;background:var(--card);border-radius:12px;padding:16px;text-align:center">
-        <div style="font-size:.78em;color:var(--muted);margin-bottom:8px">Block-In 在這個時間之後有 Overtime<br><span style="opacity:.7">Overtime if Block-In after:</span></div>
+        <div style="font-size:.78em;color:var(--muted);margin-bottom:8px">晚於此時間 Block-In 將產生<span style="color:#eab308;font-weight:700">額外營運成本</span><br><span style="opacity:.7">Block-In after this time will incur <span style="color:#eab308;font-weight:700">additional operational costs</span></span></div>
         <div id="ot-magic" style="font-size:2em;font-weight:700;color:#22c55e">—</div>
         <div id="ot-magic-local" style="font-size:1em;color:var(--muted);margin-top:4px;display:none">—</div>
         <div style="font-size:.65em;color:var(--muted);margin-top:8px;opacity:.6">= Actual Block-Out + Schedule Flight Time + 30 min</div>
@@ -1449,7 +1449,7 @@ export function getSpaHtmlBody(): string {
       <button class="tab-util-btn tab-install-btn" id="tab-install-btn" onclick="showInstallGuide()" style="display:none">
         <span>📲</span>安裝
       </button>
-      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer;text-decoration:underline" onclick="showAbout()">V8.0.13</span>
+      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer;text-decoration:underline" onclick="showAbout()">V8.0.14</span>
     </div>
   </div>
 </div>
@@ -1480,7 +1480,12 @@ export function getSpaHtmlBody(): string {
       <div style="color:var(--muted)">Best experience on iPad in landscape mode. Android devices may not display correctly.</div>
     </div>
     <div style="max-height:50vh;overflow-y:auto;-webkit-overflow-scrolling:touch;margin-bottom:10px">
-    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V8.0.13</div>
+    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V8.0.14</div>
+    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
+      <div>Overtime Calculator 結果文字調整：強調額外營運成本提示</div>
+      <div>Overtime Calculator result text update: highlight additional operational costs warning</div>
+    </div>
+    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V8.0.13</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
       <div>Overtime Calculator UI 優化：header 精簡、航班選單與月份同行、iPad 橫拿捲動修正、已完成航班警語</div>
       <div>Overtime Calculator UI improvements: compact header, inline month & flight selector, iPad landscape scroll fix, completed flight warning</div>
