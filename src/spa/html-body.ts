@@ -358,6 +358,7 @@ export function getSpaHtmlBody(): string {
     <div class="subtab-slot"><button class="briefing-subtab" id="subtabBtn-brief" onclick="switchBriefingTab('brief',this)"><span class="drag-grip">≡</span>📋 Briefing</button></div>
     <div class="subtab-slot"><button class="briefing-subtab" id="subtabBtn-pa" onclick="switchBriefingTab('pa',this)"><span class="drag-grip">≡</span>🎙️ PA</button></div>
     <div class="subtab-slot"><button class="briefing-subtab" id="subtabBtn-crewrest" onclick="switchBriefingTab('crewrest',this)"><span class="drag-grip">≡</span>⏳ Rest Calc</button></div>
+    <div class="subtab-slot"><button class="briefing-subtab" id="subtabBtn-overtime" onclick="switchBriefingTab('overtime',this)"><span class="drag-grip">≡</span>💰 Overtime</button></div>
     <div class="subtab-slot"><button class="briefing-subtab" id="subtabBtn-hf" onclick="switchBriefingTab('hf',this)"><span class="drag-grip">≡</span>📻 Pacific HF</button></div>
     <div class="subtab-wx-wrap">
       <button class="briefing-subtab active" id="subtabBtn-datis" onclick="switchBriefingTab('datis',this)"><span class="drag-grip">≡</span>⛅ WX <select class="wx-fleet-inline" id="wx-fleet-select"
@@ -712,6 +713,70 @@ export function getSpaHtmlBody(): string {
         <div class="pa-content" id="pa-content">
           <div class="pa-placeholder">選擇分類以查看廣播詞範本<br>Select a category to view PA scripts</div>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── 💰 Overtime panel ── -->
+  <div id="briefing-overtime" class="briefing-panel" style="padding:20px">
+    <div style="display:flex;align-items:center;justify-content:center;gap:12px;margin-bottom:16px">
+      <span style="font-size:1em;font-weight:700;color:var(--text)">💰 Overtime Calculator</span>
+      <button onclick="_otReset()" style="background:none;border:2px solid #ef4444;color:#ef4444;border-radius:6px;padding:2px 10px;font-size:.72em;font-weight:700;cursor:pointer">重設 Reset</button>
+    </div>
+    <div style="max-width:480px;margin:0 auto">
+      <!-- 月份切換 + 航班選擇 -->
+      <div style="display:flex;align-items:center;justify-content:center;gap:8px;margin-bottom:12px">
+        <button onclick="_otPrevMonth()" style="background:var(--surface);color:var(--text);border:1px solid var(--dim);border-radius:6px;padding:4px 10px;font-size:.9em;cursor:pointer">◀</button>
+        <span id="ot-month-title" style="font-size:.9em;font-weight:700;color:var(--text);min-width:80px;text-align:center"></span>
+        <button onclick="_otNextMonth()" style="background:var(--surface);color:var(--text);border:1px solid var(--dim);border-radius:6px;padding:4px 10px;font-size:.9em;cursor:pointer">▶</button>
+      </div>
+      <div style="text-align:center;margin-bottom:12px">
+        <select id="ot-flight-select" onchange="_otSelectFlight(this)" style="background:var(--surface);color:var(--text);border:1px solid var(--dim);border-radius:8px;padding:8px 12px;font-size:.9em;min-width:240px">
+          <option value="">選擇航班 Select flight</option>
+        </select>
+      </div>
+      <div style="font-size:.72em;color:var(--muted);text-align:center;margin-bottom:12px;line-height:1.6">
+        已同步班表可直接下拉選擇航班，或手動輸入時間資訊<br>
+        <span style="opacity:.7">Select from synced roster, or enter schedule times manually</span><br>
+        <span style="opacity:.5">手動輸入時起訖地可不填，重點是時間 / Origin & Dest optional for manual input</span>
+      </div>
+      <!-- 輸入區 -->
+      <div style="background:var(--card);border-radius:12px;padding:16px;margin-bottom:16px">
+        <div style="display:flex;flex-direction:column;gap:12px">
+          <div style="display:flex;align-items:center;gap:10px">
+            <div style="font-size:.85em;color:var(--muted);min-width:130px;white-space:nowrap">起飛地<br><span style="opacity:.6">Origin (IATA)</span></div>
+            <input id="ot-origin" type="text" maxlength="4" placeholder="e.g. TPE" oninput="_otCalcScheduleFT()" style="flex:1;background:var(--surface);color:var(--text);border:1px solid var(--dim);border-radius:8px;padding:10px;font-size:1em;text-align:center;text-transform:uppercase">
+          </div>
+          <div style="display:flex;align-items:center;gap:10px">
+            <div style="font-size:.85em;color:var(--muted);min-width:130px;white-space:nowrap">目的地<br><span style="opacity:.6">Dest (IATA)</span></div>
+            <input id="ot-dest" type="text" maxlength="4" placeholder="e.g. NRT" oninput="_otCalcScheduleFT()" style="flex:1;background:var(--surface);color:var(--text);border:1px solid var(--dim);border-radius:8px;padding:10px;font-size:1em;text-align:center;text-transform:uppercase">
+          </div>
+          <div style="border-top:1px solid var(--dim);padding-top:12px"></div>
+          <div style="display:flex;align-items:center;gap:10px">
+            <div style="font-size:.85em;color:var(--muted);min-width:130px;white-space:nowrap">Sched Block-Out<br><span style="opacity:.6">UTC (HH:MM)</span></div>
+            <input id="ot-sched-out" type="time" oninput="_otCalcScheduleFT()" style="flex:1;background:var(--surface);color:var(--text);border:1px solid var(--dim);border-radius:8px;padding:10px;font-size:1em">
+          </div>
+          <div style="display:flex;align-items:center;gap:10px">
+            <div style="font-size:.85em;color:var(--muted);min-width:130px;white-space:nowrap">Sched Block-In<br><span style="opacity:.6">UTC (HH:MM)</span></div>
+            <input id="ot-sched-in" type="time" oninput="_otCalcScheduleFT()" style="flex:1;background:var(--surface);color:var(--text);border:1px solid var(--dim);border-radius:8px;padding:10px;font-size:1em">
+          </div>
+          <div style="display:flex;align-items:center;gap:10px">
+            <div style="font-size:.85em;color:var(--muted);min-width:130px;white-space:nowrap">Sched Flight Time<br><span style="opacity:.6">Block Time</span></div>
+            <div id="ot-sched-ft" style="flex:1;text-align:center;font-size:1.1em;font-weight:700;color:var(--text)">—</div>
+          </div>
+          <div style="border-top:1px solid var(--dim);padding-top:12px"></div>
+          <div style="display:flex;align-items:center;gap:10px">
+            <div style="font-size:.85em;color:var(--muted);min-width:130px;white-space:nowrap">Actual Block-Out<br><span style="opacity:.6">UTC (HH:MM)</span></div>
+            <input id="ot-actual-out" type="time" oninput="_otCalcMagic()" style="flex:1;background:var(--surface);color:var(--text);border:1px solid var(--dim);border-radius:8px;padding:10px;font-size:1em">
+          </div>
+        </div>
+      </div>
+      <!-- 結果區 -->
+      <div id="ot-result" style="display:none;background:var(--card);border-radius:12px;padding:16px;text-align:center">
+        <div style="font-size:.78em;color:var(--muted);margin-bottom:8px">Block-In 在這個時間之後有 Overtime<br><span style="opacity:.7">Overtime if Block-In after:</span></div>
+        <div id="ot-magic" style="font-size:2em;font-weight:700;color:#22c55e">—</div>
+        <div id="ot-magic-local" style="font-size:1em;color:var(--muted);margin-top:4px;display:none">—</div>
+        <div style="font-size:.65em;color:var(--muted);margin-top:8px;opacity:.6">= Actual Block-Out + Schedule Flight Time + 30 min</div>
       </div>
     </div>
   </div>
@@ -1386,7 +1451,7 @@ export function getSpaHtmlBody(): string {
       <button class="tab-util-btn tab-install-btn" id="tab-install-btn" onclick="showInstallGuide()" style="display:none">
         <span>📲</span>安裝
       </button>
-      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer;text-decoration:underline" onclick="showAbout()">V8.0.11</span>
+      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer;text-decoration:underline" onclick="showAbout()">V8.0.12</span>
     </div>
   </div>
 </div>
@@ -1417,7 +1482,12 @@ export function getSpaHtmlBody(): string {
       <div style="color:var(--muted)">Best experience on iPad in landscape mode. Android devices may not display correctly.</div>
     </div>
     <div style="max-height:50vh;overflow-y:auto;-webkit-overflow-scrolling:touch;margin-bottom:10px">
-    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V8.0.11</div>
+    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V8.0.12</div>
+    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
+      <div>新增 Overtime Calculator subtab（Flight Crew），從班表自動帶入航班時間、月份切換、跨月航班支援、手動輸入模式、24hr 快取</div>
+      <div>New Overtime Calculator subtab (Flight Crew): auto-load flights from roster, month navigation, cross-month flight support, manual input mode, 24hr cache</div>
+    </div>
+    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V8.0.11</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
       <div>Groups All 群組篩選修正：CC 不顯示機隊下拉；Groups / Friends 記憶上次選擇的群組（30 天快取）</div>
       <div>Groups All filter fix: hide fleet dropdown for CC; Groups / Friends remember last selected group (30-day cache)</div>
