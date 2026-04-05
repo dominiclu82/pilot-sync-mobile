@@ -20,7 +20,7 @@ import { getSpaLiveRadarJs } from './spa/js-live-radar.js';
 import { getSpaFr24RadarJs } from './spa/js-fr24-radar.js';
 import { getSpaBriefingCardJs } from './spa/js-briefing-card.js';
 import { getSpaCrewRestJs } from './spa/js-crew-rest.js';
-import { getSpaOvertimeJs } from './spa/js-overtime.js';
+import { getSpaOvertimeJs } from './spa/js-overtime.ts';
 import { getSpaSubtabReorderJs } from './spa/js-subtab-reorder.js';
 import { getSpaRosterGridJs } from './spa/js-roster-grid.js';
 import { getSpaFriendsJs } from './spa/js-friends.js';
