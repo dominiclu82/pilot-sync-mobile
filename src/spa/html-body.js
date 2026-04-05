@@ -1,5 +1,5 @@
-export function getSpaHtmlBody() {
-    return `
+export function getSpaHtmlBody(): string {
+  return `
 <body>
 
 <div style="text-align:center;padding:6px 12px;font-size:.72em;color:var(--muted);letter-spacing:.3px">
@@ -14,7 +14,8 @@ export function getSpaHtmlBody() {
   <div class="subtab-slot"><button class="roster-subtab active" onclick="switchRosterTab('crew',this)"><span class="drag-grip">≡</span>✈️ Crew Sync</button></div>
   <div class="subtab-slot"><button class="roster-subtab" onclick="switchRosterTab('cal',this)"><span class="drag-grip">≡</span>📅 Google Calendar</button></div>
   <div class="subtab-slot"><button class="roster-subtab" onclick="switchRosterTab('roster',this)"><span class="drag-grip">≡</span>📋 Roster</button></div>
-  <div class="subtab-slot"><button class="roster-subtab" onclick="switchRosterTab('friends',this)"><span class="drag-grip">≡</span>👥 Friends</button></div>
+  <div class="subtab-slot"><button class="roster-subtab" onclick="switchRosterTab('friends',this)"><span class="drag-grip">≡</span>🤝 Friends<span id="fr-invite-badge" style="display:none;background:#ef4444;color:#fff;font-size:.55em;min-width:14px;height:14px;border-radius:7px;align-items:center;justify-content:center;margin-left:4px;padding:0 3px"></span></button></div>
+  <div class="subtab-slot"><button class="roster-subtab" onclick="switchRosterTab('groups',this)"><span class="drag-grip">≡</span>👥 Groups</button></div>
 </div>
 
 <!-- ── Crew Sync panel ── -->
@@ -185,32 +186,85 @@ export function getSpaHtmlBody() {
   </div>
 </div>
 
+<!-- ── Groups panel ── -->
+<div id="roster-groups" class="roster-panel">
+  <div style="display:flex;flex-direction:column;height:100%;min-height:0;overflow:hidden">
+    <!-- Groups header (固定不捲動，比照 Friends 單行) -->
+    <div style="padding:5px 8px;border-bottom:1px solid var(--dim);flex-shrink:0;display:flex;align-items:center;gap:4px;white-space:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch">
+        <span onclick="_frShowInfo()" style="cursor:pointer;font-size:.85em;color:var(--accent);flex-shrink:0" title="分享說明">ⓘ</span>
+        <!-- 身分/機隊/職級 -->
+        <span id="grp-fleet-hint" style="flex-shrink:0;background:rgba(59,130,246,.1);border:1px solid rgba(59,130,246,.25);border-radius:6px;padding:2px 6px;display:inline-flex;align-items:center;gap:4px">
+          <select id="grp-my-role" onchange="_grpSyncRole()" style="background:#1e3a5f;color:#93c5fd;border:1px solid rgba(59,130,246,.3);border-radius:4px;padding:2px 4px;font-size:.72em;cursor:pointer;width:auto">
+            <option value="" disabled selected>身分</option><option value="fc">Flight Crew</option><option value="cc">Cabin Crew</option>
+          </select>
+          <select id="grp-my-fleet" onchange="_grpSyncFleetRank()" style="background:#1e3a5f;color:#93c5fd;border:1px solid rgba(59,130,246,.3);border-radius:4px;padding:2px 4px;font-size:.72em;cursor:pointer;width:auto">
+            <option value="" disabled selected>機隊</option><option value="A321">A321</option><option value="A330">A330</option><option value="A350">A350</option>
+          </select>
+          <select id="grp-my-rank" onchange="_grpSyncFleetRank()" style="background:#1e3a5f;color:#93c5fd;border:1px solid rgba(59,130,246,.3);border-radius:4px;padding:2px 4px;font-size:.72em;cursor:pointer;width:auto">
+            <option value="" disabled selected>職級</option>
+          </select>
+        </span>
+        <!-- 名稱 -->
+        <span id="grp-name-wrap" style="flex-shrink:0;background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.25);border-radius:6px;padding:2px 6px;display:inline-flex;align-items:center;gap:4px">
+          <span style="font-size:.5em;color:#86efac">名稱<br>Name</span>
+          <input id="grp-my-name" type="text" placeholder="可修改 editable" onchange="_grpSyncName()" style="background:#1a3a2a;color:#86efac;border:1px solid rgba(34,197,94,.3);border-radius:4px;padding:2px 4px;font-size:.72em;width:100px">
+          <span onclick="_frShowNameInfo()" style="cursor:pointer;font-size:.85em;color:rgba(34,197,94,.6);flex-shrink:0" title="名稱說明">ⓘ</span>
+        </span>
+        <!-- 群組下拉 + 已加入標籤 -->
+        <select id="grp-preset-select" onchange="_grpJoinFromSelect(this)" style="flex-shrink:0;background:#1e3a5f;color:#93c5fd;border:1px solid rgba(59,130,246,.3);border-radius:4px;padding:2px 4px;font-size:.72em;cursor:pointer;width:auto;max-width:120px">
+          <option value="">+ 加入群組</option>
+        </select>
+        <span id="grp-preset-tags" style="display:inline-flex;align-items:center;gap:3px"></span>
+    </div>
+    <!-- Groups month nav + filter (固定不捲動) -->
+    <div style="display:flex;align-items:center;padding:5px 8px;border-bottom:1px solid var(--dim);gap:6px;flex-shrink:0">
+      <span style="flex:1"></span>
+      <button onclick="_grpPrevMonth()" style="background:none;border:none;color:var(--muted);font-size:1.1em;cursor:pointer;padding:0 4px">◀</button>
+      <span id="grp-month-title" style="font-weight:700;font-size:1.1em;color:var(--text);min-width:100px;text-align:center"></span>
+      <button onclick="_grpNextMonth()" style="background:none;border:none;color:var(--muted);font-size:1.1em;cursor:pointer;padding:0 4px">▶</button>
+      <span style="flex:1"></span>
+      <span style="flex-shrink:0;background:rgba(168,85,247,.1);border:1px solid rgba(168,85,247,.25);border-radius:6px;padding:2px 6px;display:inline-flex;align-items:center;gap:4px">
+        <span style="font-size:.52em;color:#c084fc;line-height:1.2">查看<br>View</span>
+        <select id="grp-view-filter" onchange="_grpLoadGrid()" style="background:#2d1f4e;color:#d8b4fe;border:1px solid rgba(168,85,247,.3);border-radius:4px;padding:2px 4px;font-size:.72em;cursor:pointer;width:auto">
+          <option value="all">全部 All</option>
+        </select>
+        <select id="grp-filter-role" onchange="_grpOnFilterRole()" style="background:#2d1f4e;color:#d8b4fe;border:1px solid rgba(168,85,247,.3);border-radius:4px;padding:2px 4px;font-size:.72em;cursor:pointer;width:auto">
+          <option value="">All</option><option value="fc">FC</option><option value="cc">CC</option>
+        </select>
+        <select id="grp-filter-fleet" onchange="_grpLoadGrid()" style="background:#2d1f4e;color:#d8b4fe;border:1px solid rgba(168,85,247,.3);border-radius:4px;padding:2px 4px;font-size:.72em;cursor:pointer;width:auto">
+          <option value="">All</option><option value="A321">A321</option><option value="A330">A330</option><option value="A350">A350</option>
+        </select>
+        <select id="grp-filter-rank" onchange="_grpLoadGrid()" style="background:#2d1f4e;color:#d8b4fe;border:1px solid rgba(168,85,247,.3);border-radius:4px;padding:2px 4px;font-size:.72em;cursor:pointer;width:auto">
+          <option value="">All</option>
+        </select>
+      </span>
+    </div>
+    <div id="grp-grid" style="padding:0;flex:1;min-height:0;overflow:auto;-webkit-overflow-scrolling:touch"></div>
+  </div>
+</div>
+
 <!-- ── Friends panel ── -->
 <div id="roster-friends" class="roster-panel">
   <div>
     <!-- Friends header: desktop 一行 / mobile portrait 兩行 -->
     <div class="fr-header">
-      <!-- Row 1: toggle + 機隊 + 名稱（手機可左右滑） -->
+      <!-- Row 1: ⓘ + 機隊 + 名稱（手機可左右滑） -->
       <div class="fr-header-row1">
-        <span style="font-size:.69em;color:var(--muted);flex-shrink:0">同意分享班表</span>
-        <label style="position:relative;display:inline-block;width:36px;height:20px;cursor:pointer;flex-shrink:0">
-          <input type="checkbox" id="fr-share-toggle" onchange="_frToggleShare()" style="opacity:0;width:0;height:0">
-          <span style="position:absolute;top:0;left:0;right:0;bottom:0;background:#4a5568;border-radius:10px;transition:.3s"></span>
-          <span style="position:absolute;top:2px;left:2px;width:16px;height:16px;background:#fff;border-radius:50%;transition:.3s" id="fr-share-dot"></span>
-        </label>
-        <span onclick="_frShowInfo()" style="cursor:pointer;font-size:.85em;color:var(--muted);flex-shrink:0" title="分享說明">ⓘ</span>
-        <!-- 區塊1: 我的機隊/職級 (淡藍) -->
-        <span id="fr-share-hint" style="display:none;flex-shrink:0;background:rgba(59,130,246,.1);border:1px solid rgba(59,130,246,.25);border-radius:6px;padding:2px 6px;align-items:center;gap:4px">
-          <span style="font-size:.52em;color:#60a5fa;line-height:1.2;white-space:nowrap">我的機隊/職級<br>My fleet/rank</span>
+        <span onclick="_frShowInfo()" style="cursor:pointer;font-size:.85em;color:var(--accent);flex-shrink:0" title="分享說明">ⓘ</span>
+        <!-- 區塊1: 身分/機隊/職級 (淡藍) -->
+        <span id="fr-share-hint" style="flex-shrink:0;background:rgba(59,130,246,.1);border:1px solid rgba(59,130,246,.25);border-radius:6px;padding:2px 6px;display:inline-flex;align-items:center;gap:4px">
+          <select id="fr-my-role" onchange="_frSyncRole()" style="background:#1e3a5f;color:#93c5fd;border:1px solid rgba(59,130,246,.3);border-radius:4px;padding:2px 4px;font-size:.72em;cursor:pointer;width:auto">
+            <option value="" disabled selected>身分</option><option value="fc">Flight Crew</option><option value="cc">Cabin Crew</option>
+          </select>
           <select id="fr-my-fleet" onchange="_frCheckReady()" style="background:#1e3a5f;color:#93c5fd;border:1px solid rgba(59,130,246,.3);border-radius:4px;padding:2px 4px;font-size:.72em;cursor:pointer;width:auto">
             <option value="" disabled selected>機隊</option><option value="A321">A321</option><option value="A330">A330</option><option value="A350">A350</option>
           </select>
           <select id="fr-my-rank" onchange="_frCheckReady()" style="background:#1e3a5f;color:#93c5fd;border:1px solid rgba(59,130,246,.3);border-radius:4px;padding:2px 4px;font-size:.72em;cursor:pointer;width:auto">
-            <option value="" disabled selected>職級</option><option value="CAP">CAP</option><option value="SFO">SFO</option><option value="FO">FO</option>
+            <option value="" disabled selected>職級</option>
           </select>
         </span>
         <!-- 區塊2: 名字 (淡綠) -->
-        <span id="fr-name-wrap" style="display:none;flex-shrink:0;background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.25);border-radius:6px;padding:2px 6px;margin-left:12px;align-items:center;gap:4px">
+        <span id="fr-name-wrap" style="flex-shrink:0;background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.25);border-radius:6px;padding:2px 6px;margin-left:12px;display:inline-flex;align-items:center;gap:4px">
           <span style="font-size:.5em;color:#86efac">名稱<br>Name</span>
           <input id="fr-my-name" type="text" placeholder="可修改 editable" onchange="_frCheckReady()" style="background:#1a3a2a;color:#86efac;border:1px solid rgba(34,197,94,.3);border-radius:4px;padding:2px 4px;font-size:.72em;width:100px">
           <span onclick="_frShowNameInfo()" style="cursor:pointer;font-size:.85em;color:rgba(34,197,94,.6);flex-shrink:0" title="名稱說明">ⓘ</span>
@@ -223,13 +277,11 @@ export function getSpaHtmlBody() {
         <span class="fr-header-row2-inline" style="flex:2"></span>
         <span class="fr-header-row2-inline" style="flex-shrink:0;background:rgba(168,85,247,.1);border:1px solid rgba(168,85,247,.25);border-radius:6px;padding:2px 6px;display:inline-flex;align-items:center;gap:4px">
           <span style="font-size:.52em;color:#c084fc;line-height:1.2">查看<br>View</span>
-          <select id="fr-filter-fleet" onchange="_frLoadMonth()" style="background:#2d1f4e;color:#d8b4fe;border:1px solid rgba(168,85,247,.3);border-radius:4px;padding:2px 4px;font-size:.72em;cursor:pointer;width:auto">
-            <option value="">All</option><option value="A321">A321</option><option value="A330">A330</option><option value="A350">A350</option>
-          </select>
-          <select id="fr-filter-rank" onchange="_frLoadMonth()" style="background:#2d1f4e;color:#d8b4fe;border:1px solid rgba(168,85,247,.3);border-radius:4px;padding:2px 4px;font-size:.72em;cursor:pointer;width:auto">
-            <option value="">All</option><option value="CAP">CAP</option><option value="SFO">SFO</option><option value="FO">FO</option>
+          <select id="fr-filter-group" onchange="_frLoadMonth()" style="background:#2d1f4e;color:#d8b4fe;border:1px solid rgba(168,85,247,.3);border-radius:4px;padding:2px 4px;font-size:.72em;cursor:pointer;width:auto">
+            <option value="none">尚無好友圈</option>
           </select>
         </span>
+        <button class="fr-header-row2-inline" onclick="_grpShowManage()" style="flex-shrink:0;background:rgba(251,191,36,.15);border:1px solid rgba(251,191,36,.4);border-radius:8px;padding:4px 12px;font-size:.82em;color:#fbbf24;cursor:pointer;position:relative;font-weight:600">⚙ 好友圈<span id="grp-manage-badge" style="display:none;position:absolute;top:-5px;right:-5px;background:#ef4444;color:#fff;font-size:.6em;min-width:16px;height:16px;border-radius:8px;align-items:center;justify-content:center;padding:0 3px"></span></button>
       </div>
       <!-- Row 2: 月份+篩選（僅手機直拿顯示） -->
       <div class="fr-header-row2">
@@ -240,29 +292,28 @@ export function getSpaHtmlBody() {
         <span style="flex:1"></span>
         <span style="flex-shrink:0;background:rgba(168,85,247,.1);border:1px solid rgba(168,85,247,.25);border-radius:6px;padding:2px 6px;display:inline-flex;align-items:center;gap:4px">
           <span style="font-size:.52em;color:#c084fc;line-height:1.2">查看<br>View</span>
-          <select id="fr-filter-fleet-m" onchange="document.getElementById('fr-filter-fleet').value=this.value;_frLoadMonth()" style="background:#2d1f4e;color:#d8b4fe;border:1px solid rgba(168,85,247,.3);border-radius:4px;padding:2px 4px;font-size:.72em;cursor:pointer;width:auto">
-            <option value="">All</option><option value="A321">A321</option><option value="A330">A330</option><option value="A350">A350</option>
-          </select>
-          <select id="fr-filter-rank-m" onchange="document.getElementById('fr-filter-rank').value=this.value;_frLoadMonth()" style="background:#2d1f4e;color:#d8b4fe;border:1px solid rgba(168,85,247,.3);border-radius:4px;padding:2px 4px;font-size:.72em;cursor:pointer;width:auto">
-            <option value="">All</option><option value="CAP">CAP</option><option value="SFO">SFO</option><option value="FO">FO</option>
+          <select id="fr-filter-group-m" onchange="document.getElementById('fr-filter-group').value=this.value;_frLoadMonth()" style="background:#2d1f4e;color:#d8b4fe;border:1px solid rgba(168,85,247,.3);border-radius:4px;padding:2px 4px;font-size:.72em;cursor:pointer;width:auto">
+            <option value="none">尚無好友圈</option>
           </select>
         </span>
+        <button onclick="_grpShowManage()" style="flex-shrink:0;background:rgba(251,191,36,.15);border:1px solid rgba(251,191,36,.4);border-radius:8px;padding:4px 12px;font-size:.82em;color:#fbbf24;cursor:pointer;position:relative;font-weight:600">⚙ 好友圈<span id="grp-manage-badge-m" style="display:none;position:absolute;top:-5px;right:-5px;background:#ef4444;color:#fff;font-size:.6em;min-width:16px;height:16px;border-radius:8px;align-items:center;justify-content:center;padding:0 3px"></span></button>
       </div>
     </div>
     <style>#fr-share-toggle:checked+span{background:var(--accent)!important}#fr-share-toggle:checked~#fr-share-dot{transform:translateX(16px)}</style>
     <!-- Friends grid -->
     <div id="fr-grid" style="padding:0"></div>
-    <!-- Friends info overlay -->
+  </div>
+</div>
+
+<!-- Friends info overlay (tab-sync 層級) -->
     <div id="fr-info-overlay" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.7);z-index:9000;align-items:center;justify-content:center" onclick="if(event.target===this)this.style.display='none'">
       <div style="background:var(--card);border-radius:12px;padding:20px 24px;max-width:400px;margin:20px;line-height:1.6;max-height:80vh;overflow-y:auto">
-        <div style="font-size:1em;font-weight:700;margin-bottom:12px;text-align:center">👥 Friends 班表分享</div>
+        <div style="font-size:1em;font-weight:700;margin-bottom:12px;text-align:center">👥 Groups 群組分享</div>
         <div style="font-size:.78em;color:var(--muted)">
-          <div style="margin-bottom:6px">• 未分享者無法查看他人班表<br><span style="opacity:.7">Non-sharing members cannot view others' rosters</span></div>
-          <div style="margin-bottom:6px">• 同意分享後即可查看其他組員的班表<br><span style="opacity:.7">Share your roster to view others' schedules</span></div>
-          <div style="margin-bottom:6px">• 你的班表將上傳至雲端供其他分享者查看<br><span style="opacity:.7">Your roster will be uploaded for other shared members to view</span></div>
-          <div style="margin-bottom:6px">• 支援離線查看，連線時自動更新最新資料<br><span style="opacity:.7">Offline viewing supported — data refreshed when online</span></div>
-          <div style="margin-bottom:6px">• 隨時可關閉分享，雲端資料將立即刪除<br><span style="opacity:.7">You can turn off sharing anytime — cloud data will be deleted immediately</span></div>
-          <div style="margin-bottom:6px">• 撤銷分享後，其他使用者的離線快取將於下次連線時更新<br><span style="opacity:.7">After revoking, others' offline cache will update on next connection</span></div>
+          <div style="margin-bottom:6px">• 開啟分享後，你的班表將僅對你所加入的群組成員可見<br><span style="opacity:.7">When sharing is enabled, your roster is only visible to members of groups you have joined</span></div>
+          <div style="margin-bottom:6px">• 未加入任何群組的人無法看到你的班表<br><span style="opacity:.7">No one outside your groups can see your roster</span></div>
+          <div style="margin-bottom:6px">• 你的班表將上傳至雲端供群組成員查看<br><span style="opacity:.7">Your roster will be uploaded for group members to view</span></div>
+          <div style="margin-bottom:6px">• 關閉分享後，雲端資料將立即刪除<br><span style="opacity:.7">Turn off sharing — cloud data deleted immediately</span></div>
           <div>• 離線快取保留一個月，一個月內未連網更新亦會自動刪除<br><span style="opacity:.7">Offline cache expires after 1 month — auto-deleted if not refreshed</span></div>
         </div>
         <button onclick="document.getElementById('fr-info-overlay').style.display='none'" style="margin-top:14px;width:100%;padding:8px;background:var(--accent);color:#fff;border:none;border-radius:8px;font-size:.85em;cursor:pointer">了解 Got it</button>
@@ -281,6 +332,19 @@ export function getSpaHtmlBody() {
         <button onclick="document.getElementById('fr-name-info-overlay').style.display='none'" style="margin-top:14px;width:100%;padding:8px;background:var(--accent);color:#fff;border:none;border-radius:8px;font-size:.85em;cursor:pointer">了解 Got it</button>
       </div>
     </div>
+
+<!-- Groups 管理彈窗 -->
+<div id="grp-manage-overlay" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.7);z-index:9000;align-items:center;justify-content:center" onclick="if(event.target===this)_grpCloseManage()">
+  <div style="background:var(--bg,#0a0e1a);border-radius:14px;padding:16px;width:90vw;max-width:400px;max-height:80vh;overflow-y:auto;-webkit-overflow-scrolling:touch">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+      <span style="font-weight:700;font-size:1em;color:var(--text)">🤝 好友圈管理 Friends</span>
+      <button onclick="_grpCloseManage()" style="background:none;border:none;color:var(--muted);font-size:1.3em;cursor:pointer">✕</button>
+    </div>
+    <div style="font-size:.75em;color:var(--muted);line-height:1.5;margin-bottom:12px;padding:8px;background:rgba(59,130,246,.06);border-radius:8px">
+      <div><span onclick="_frShowInfo()" style="cursor:pointer;color:var(--accent)">ⓘ</span> 加入好友圈或建立好友圈即代表同意將班表分享給<b style="color:var(--text)">該好友圈</b>成員</div>
+      <div style="opacity:.7">Joining or creating a friend group means you agree to share your roster with <b>that group's</b> members</div>
+    </div>
+    <div id="grp-friends-content"></div>
   </div>
 </div>
 
@@ -294,6 +358,7 @@ export function getSpaHtmlBody() {
     <div class="subtab-slot"><button class="briefing-subtab" id="subtabBtn-brief" onclick="switchBriefingTab('brief',this)"><span class="drag-grip">≡</span>📋 Briefing</button></div>
     <div class="subtab-slot"><button class="briefing-subtab" id="subtabBtn-pa" onclick="switchBriefingTab('pa',this)"><span class="drag-grip">≡</span>🎙️ PA</button></div>
     <div class="subtab-slot"><button class="briefing-subtab" id="subtabBtn-crewrest" onclick="switchBriefingTab('crewrest',this)"><span class="drag-grip">≡</span>⏳ Rest Calc</button></div>
+    <div class="subtab-slot"><button class="briefing-subtab" id="subtabBtn-overtime" onclick="switchBriefingTab('overtime',this)"><span class="drag-grip">≡</span>💰 Overtime</button></div>
     <div class="subtab-slot"><button class="briefing-subtab" id="subtabBtn-hf" onclick="switchBriefingTab('hf',this)"><span class="drag-grip">≡</span>📻 Pacific HF</button></div>
     <div class="subtab-wx-wrap">
       <button class="briefing-subtab active" id="subtabBtn-datis" onclick="switchBriefingTab('datis',this)"><span class="drag-grip">≡</span>⛅ WX <select class="wx-fleet-inline" id="wx-fleet-select"
@@ -318,9 +383,10 @@ export function getSpaHtmlBody() {
   <div id="briefing-brief" class="briefing-panel">
     <div class="brief-search">
       <input type="text" id="brief-fno" placeholder="JX801" oninput="_briefOnInput(this.value);_syncFltNo('brief',this.value)" onkeydown="if(event.key==='Enter'){event.preventDefault();_briefForceQuery()}">
-      <div style="display:inline-flex;border:1px solid #4a5568;border-radius:8px;overflow:hidden;margin:0 4px">
-        <button id="brief-date-today" class="brief-date-btn brief-date-active" onclick="_briefSetDate('today')" style="padding:4px 8px;font-size:.75em;border:none;cursor:pointer;background:var(--accent);color:#fff">Today</button>
-        <button id="brief-date-tmr" class="brief-date-btn" onclick="_briefSetDate('tomorrow')" style="padding:4px 8px;font-size:.75em;border:none;cursor:pointer;background:#2d3748;color:#e2e8f0">Tomorrow</button>
+      <div style="display:inline-flex;align-items:center;gap:2px;margin:0 4px">
+        <button onclick="_briefDateNav(-1)" style="padding:4px 6px;font-size:.75em;border:none;cursor:pointer;background:#2d3748;color:#e2e8f0;border-radius:6px">◀</button>
+        <span id="brief-date-label" style="font-size:.75em;min-width:40px;text-align:center;color:#e2e8f0"></span>
+        <button onclick="_briefDateNav(1)" style="padding:4px 6px;font-size:.75em;border:none;cursor:pointer;background:#2d3748;color:#e2e8f0;border-radius:6px">▶</button>
       </div>
       <button class="brief-search-btn" onclick="_briefForceQuery()">查詢 Query</button>
       <span id="brief-flt-status" class="pa-flt-status"></span>
@@ -647,6 +713,68 @@ export function getSpaHtmlBody() {
         <div class="pa-content" id="pa-content">
           <div class="pa-placeholder">選擇分類以查看廣播詞範本<br>Select a category to view PA scripts</div>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── 💰 Overtime panel ── -->
+  <div id="briefing-overtime" class="briefing-panel" style="padding:12px;padding-bottom:80px;overflow-y:auto;-webkit-overflow-scrolling:touch;max-height:calc(100vh - 160px)">
+    <div style="display:flex;align-items:center;justify-content:center;gap:8px;margin-bottom:8px">
+      <span style="font-size:1em;font-weight:700;color:var(--text)">💰 Overtime Calculator</span>
+      <button onclick="_otReset()" style="background:none;border:2px solid #ef4444;color:#ef4444;border-radius:6px;padding:2px 10px;font-size:.72em;font-weight:700;cursor:pointer">重設 Reset</button>
+    </div>
+    <div style="max-width:480px;margin:0 auto">
+      <!-- 月份切換 + 航班選擇 + 說明（一區塊） -->
+      <div style="display:flex;align-items:center;justify-content:center;gap:6px;margin-bottom:6px;flex-wrap:wrap">
+        <button onclick="_otPrevMonth()" style="background:var(--surface);color:var(--text);border:1px solid var(--dim);border-radius:6px;padding:2px 8px;font-size:.85em;cursor:pointer">◀</button>
+        <span id="ot-month-title" style="font-size:.85em;font-weight:700;color:var(--text);min-width:70px;text-align:center"></span>
+        <button onclick="_otNextMonth()" style="background:var(--surface);color:var(--text);border:1px solid var(--dim);border-radius:6px;padding:2px 8px;font-size:.85em;cursor:pointer">▶</button>
+        <select id="ot-flight-select" onchange="_otSelectFlight(this)" style="background:var(--surface);color:var(--text);border:1px solid var(--dim);border-radius:6px;padding:4px 8px;font-size:.8em;max-width:220px">
+          <option value="">選擇航班 Select flight</option>
+        </select>
+      </div>
+      <div style="font-size:.65em;color:var(--muted);text-align:center;margin-bottom:10px;line-height:1.5">
+        已同步班表可直接下拉選擇航班，或手動輸入時間資訊 / Select from synced roster, or enter schedule times manually<br>
+        <span style="opacity:.6">手動輸入時僅需輸入時間 / Origin & Dest optional for manual input</span><br>
+        <span style="color:#eab308">⚠ 已值勤完畢航班的表定時間可能被更改，並非原本表定時間，資料僅供參考<br>Schedule times for completed flights may have been modified and may not reflect the original schedule. Data is for reference only.</span>
+      </div>
+      <!-- 輸入區 -->
+      <div style="background:var(--card);border-radius:12px;padding:16px;margin-bottom:16px">
+        <div style="display:flex;flex-direction:column;gap:12px">
+          <div style="display:flex;align-items:center;gap:10px">
+            <div style="font-size:.85em;color:var(--muted);min-width:130px;white-space:nowrap">起飛地<br><span style="opacity:.6">Origin (IATA)</span></div>
+            <input id="ot-origin" type="text" maxlength="4" placeholder="e.g. TPE" oninput="_otCalcScheduleFT()" style="flex:1;background:var(--surface);color:var(--text);border:1px solid var(--dim);border-radius:8px;padding:10px;font-size:1em;text-align:center;text-transform:uppercase">
+          </div>
+          <div style="display:flex;align-items:center;gap:10px">
+            <div style="font-size:.85em;color:var(--muted);min-width:130px;white-space:nowrap">目的地<br><span style="opacity:.6">Dest (IATA)</span></div>
+            <input id="ot-dest" type="text" maxlength="4" placeholder="e.g. NRT" oninput="_otCalcScheduleFT()" style="flex:1;background:var(--surface);color:var(--text);border:1px solid var(--dim);border-radius:8px;padding:10px;font-size:1em;text-align:center;text-transform:uppercase">
+          </div>
+          <div style="border-top:1px solid var(--dim);padding-top:12px"></div>
+          <div style="display:flex;align-items:center;gap:10px">
+            <div style="font-size:.85em;color:var(--muted);min-width:130px;white-space:nowrap">Sched Block-Out<br><span style="opacity:.6">UTC (HH:MM)</span></div>
+            <input id="ot-sched-out" type="time" oninput="_otCalcScheduleFT()" style="flex:1;background:var(--surface);color:var(--text);border:1px solid var(--dim);border-radius:8px;padding:10px;font-size:1em">
+          </div>
+          <div style="display:flex;align-items:center;gap:10px">
+            <div style="font-size:.85em;color:var(--muted);min-width:130px;white-space:nowrap">Sched Block-In<br><span style="opacity:.6">UTC (HH:MM)</span></div>
+            <input id="ot-sched-in" type="time" oninput="_otCalcScheduleFT()" style="flex:1;background:var(--surface);color:var(--text);border:1px solid var(--dim);border-radius:8px;padding:10px;font-size:1em">
+          </div>
+          <div style="display:flex;align-items:center;gap:10px">
+            <div style="font-size:.85em;color:var(--muted);min-width:130px;white-space:nowrap">Sched Flight Time<br><span style="opacity:.6">Block Time</span></div>
+            <div id="ot-sched-ft" style="flex:1;text-align:center;font-size:1.1em;font-weight:700;color:var(--text)">—</div>
+          </div>
+          <div style="border-top:1px solid var(--dim);padding-top:12px"></div>
+          <div style="display:flex;align-items:center;gap:10px">
+            <div style="font-size:.85em;color:var(--muted);min-width:130px;white-space:nowrap">Actual Block-Out<br><span style="opacity:.6">UTC (HH:MM)</span></div>
+            <input id="ot-actual-out" type="time" oninput="_otCalcMagic()" style="flex:1;background:var(--surface);color:var(--text);border:1px solid var(--dim);border-radius:8px;padding:10px;font-size:1em">
+          </div>
+        </div>
+      </div>
+      <!-- 結果區 -->
+      <div id="ot-result" style="display:none;background:var(--card);border-radius:12px;padding:16px;text-align:center">
+        <div style="font-size:.78em;color:var(--muted);margin-bottom:8px">晚於此時間 Block-In 將產生<span style="color:#eab308;font-weight:700">額外營運成本</span><br><span style="opacity:.7">Block-In after this time will incur <span style="color:#eab308;font-weight:700">additional operational costs</span></span></div>
+        <div id="ot-magic" style="font-size:2em;font-weight:700;color:#22c55e">—</div>
+        <div id="ot-magic-local" style="font-size:1em;color:var(--muted);margin-top:4px;display:none">—</div>
+        <div style="font-size:.65em;color:var(--muted);margin-top:8px;opacity:.6">= Actual Block-Out + Schedule Flight Time + 30 min</div>
       </div>
     </div>
   </div>
@@ -1037,14 +1165,99 @@ export function getSpaHtmlBody() {
 
 </div><!-- end tab-briefing -->
 
+<!-- ══ Tab: Cabin Crew ══════════════════════════════════════════════ -->
+<div id="tab-cabin" style="display:none">
+  <!-- Cabin Crew sub-tabs -->
+  <div class="briefing-subtabs cabin-subtabs" id="cabin-subtabs" style="justify-content:space-evenly">
+    <div class="subtab-slot" style="flex:1"><button class="briefing-subtab active" id="cabinSubBtn-rest" onclick="switchCabinTab('rest',this)" style="width:100%"><span class="drag-grip">≡</span>⏳ Rest Calc</button></div>
+    <div class="subtab-slot" style="flex:1"><button class="briefing-subtab" id="cabinSubBtn-swap" onclick="switchCabinTab('swap',this)" style="width:100%"><span class="drag-grip">≡</span>🔄 Swap Check</button></div>
+  </div>
+
+  <!-- Cabin Rest Calc -->
+  <div id="cabin-rest" class="briefing-panel active" style="padding:20px">
+    <div id="cabin-rest-content">
+      <div style="display:flex;align-items:center;justify-content:center;gap:12px;margin-bottom:16px">
+        <span style="font-size:1em;font-weight:700;color:var(--text)">⏳ Cabin Crew Rest Calculator</span>
+        <button onclick="_ccRestReset()" style="background:none;border:2px solid #ef4444;color:#ef4444;border-radius:6px;padding:2px 10px;font-size:.72em;font-weight:700;cursor:pointer">重設 Reset</button>
+      </div>
+      <!-- 輸入區 -->
+      <div style="background:var(--card);border-radius:12px;padding:16px;margin-bottom:16px;max-width:480px;margin-left:auto;margin-right:auto">
+        <div style="display:flex;flex-direction:column;gap:12px">
+          <div style="display:flex;align-items:center;gap:10px">
+            <div style="font-size:.85em;color:var(--muted);min-width:110px;white-space:nowrap">目的地時區<br><span style="opacity:.6">Dest TZ</span></div>
+            <select id="cc-rest-tz" style="flex:1;background:var(--surface);color:var(--text);border:1px solid var(--dim);border-radius:8px;padding:10px;font-size:.9em">
+              <option value="8" selected>UTC+8 (TPE / HKG / MFM / SIN)</option>
+              <option value="9">UTC+9 (NRT / ICN)</option>
+              <option value="7">UTC+7 (BKK / SGN / CGK)</option>
+              <option value="-8">UTC-8 (LAX / SFO / SEA) PST</option>
+              <option value="-7">UTC-7 (PHX / LAX DST)</option>
+              <option value="1">UTC+1 (PRG) CET</option>
+              <option value="2">UTC+2 (PRG DST) CEST</option>
+              <option value="0">UTC+0</option>
+              <option value="-5">UTC-5</option>
+              <option value="-6">UTC-6</option>
+              <option value="-9">UTC-9</option>
+              <option value="-10">UTC-10</option>
+              <option value="3">UTC+3</option>
+              <option value="4">UTC+4</option>
+              <option value="5">UTC+5</option>
+              <option value="5.5">UTC+5:30</option>
+              <option value="6">UTC+6</option>
+              <option value="10">UTC+10</option>
+              <option value="11">UTC+11</option>
+              <option value="12">UTC+12</option>
+            </select>
+          </div>
+          <div style="display:flex;align-items:center;gap:10px">
+            <div style="font-size:.85em;color:var(--muted);min-width:110px;white-space:nowrap">1st Rest 開始<br><span style="opacity:.6">Start</span></div>
+            <input id="cc-rest-start" type="time" style="flex:1;background:var(--surface);color:var(--text);border:1px solid var(--dim);border-radius:8px;padding:10px;font-size:1em">
+          </div>
+          <div style="display:flex;align-items:center;gap:10px">
+            <div style="font-size:.85em;color:var(--muted);min-width:120px;white-space:nowrap">Handover<br><span style="opacity:.6">Duration (min)</span></div>
+            <input id="cc-rest-handover" type="text" value="5" inputmode="numeric" placeholder="5" style="flex:1;background:var(--surface);color:var(--text);border:1px solid var(--dim);border-radius:8px;padding:10px;font-size:1em;text-align:center">
+          </div>
+          <div style="display:flex;align-items:center;gap:10px">
+            <div style="font-size:.85em;color:var(--muted);min-width:120px;white-space:nowrap">2nd Rest 準備<br><span style="opacity:.6">Crew Prep (min)</span></div>
+            <input id="cc-rest-prep" type="text" value="5" inputmode="numeric" placeholder="5" style="flex:1;background:var(--surface);color:var(--text);border:1px solid var(--dim);border-radius:8px;padding:10px;font-size:1em;text-align:center">
+          </div>
+          <div style="display:flex;align-items:center;gap:10px">
+            <div style="font-size:.85em;color:var(--muted);min-width:120px;white-space:nowrap">2nd Meal<br><span style="opacity:.6">Duration (HHMM)</span></div>
+            <input id="cc-rest-meal" type="text" value="0230" inputmode="numeric" placeholder="e.g. 0230" style="flex:1;background:var(--surface);color:var(--text);border:1px solid var(--dim);border-radius:8px;padding:10px;font-size:1em;text-align:center">
+          </div>
+          <div style="display:flex;align-items:center;gap:10px">
+            <div style="font-size:.85em;color:var(--muted);min-width:120px;white-space:nowrap">TOD<br><span style="opacity:.6">Time (HH:MM)</span></div>
+            <input id="cc-rest-tod" type="time" style="flex:1;background:var(--surface);color:var(--text);border:1px solid var(--dim);border-radius:8px;padding:10px;font-size:1em">
+          </div>
+          <div style="display:flex;align-items:center;gap:10px">
+            <div style="font-size:.85em;color:var(--muted);min-width:120px;white-space:nowrap">Landing<br><span style="opacity:.6">Time (HH:MM)</span></div>
+            <input id="cc-rest-landing" type="time" style="flex:1;background:var(--surface);color:var(--text);border:1px solid var(--dim);border-radius:8px;padding:10px;font-size:1em">
+          </div>
+        </div>
+        <button onclick="_ccRestCalc()" style="margin-top:16px;width:100%;background:var(--accent);color:#fff;border:none;border-radius:10px;padding:14px;font-size:1.05em;font-weight:700;cursor:pointer">計算 Calculate</button>
+      </div>
+      <!-- 結果區 -->
+      <div id="cc-rest-result" style="display:none;background:var(--card);border-radius:12px;padding:14px;max-width:480px;margin:0 auto">
+      </div>
+    </div>
+  </div>
+
+  <!-- Swap Check -->
+  <div id="cabin-swap" class="briefing-panel" style="padding:20px">
+    <div style="text-align:center;padding:40px 20px;color:var(--muted)">
+      <div style="font-size:2.5em;margin-bottom:12px">🔄</div>
+      <div style="font-size:1em;font-weight:700;color:var(--text);margin-bottom:8px">Swap Check</div>
+      <div style="font-size:.82em;color:var(--muted)">Coming Soon</div>
+    </div>
+  </div>
+</div><!-- end tab-cabin -->
+
 <!-- ══ Tab: Gate Info ═══════════════════════════════════════════════ -->
 <div id="tab-gate" style="display:none">
 
   <div id="gate-content" style="display:flex;flex-direction:column">
     <div class="gi-header">
       <div class="gi-header-left">
-        <span class="gi-title">JX Flight Info</span>
-        <span class="gi-notice-inline">⚠ Non-operational Reference only</span>
+        <span class="gi-notice-inline" style="color:#eab308">⚠ Non-operational Reference only</span>
         <div class="gi-date-nav">
           <button class="gi-nav-btn" id="gi-prev-day" onclick="giPrevDay()">◀</button>
           <span class="gi-date" id="gate-date"></span>
@@ -1071,7 +1284,7 @@ export function getSpaHtmlBody() {
         </div>
         <input type="text" id="gate-search" class="gi-search-input" placeholder="搜尋..." oninput="filterGateFlights()">
       </div>
-      <div class="gi-search-hint">Search by flight no. / airport code / city name ｜ Tap <span style="color:var(--sort)">green headers</span> to sort</div>
+      <div class="gi-search-hint">Search by flight no. / airport code / city name ｜ Tap <span style="color:var(--sort)">blue headers</span> to sort</div>
       <div class="gi-time-bar">
         <button class="gi-time-slot" data-slot="±2hr" onclick="giSetTimeSlot('±2hr')">±2hr</button>
         <button class="gi-time-slot" data-slot="00-06" onclick="giSetTimeSlot('00-06')">00-06</button>
@@ -1211,7 +1424,10 @@ export function getSpaHtmlBody() {
     <span class="tab-btn-icon">✈️</span>Roster Sync
   </button>
   <button class="tab-btn tab-active" id="tabBtn-briefing" onclick="switchTab('briefing',this)">
-    <span class="tab-btn-icon">💼</span>Operation
+    <span class="tab-btn-icon">🧑‍✈️</span>Flight Crew
+  </button>
+  <button class="tab-btn" id="tabBtn-cabin" onclick="switchTab('cabin',this)">
+    <span class="tab-btn-icon">👥</span>Cabin Crew
   </button>
   <button class="tab-btn" id="tabBtn-fr24" onclick="switchTab('fr24',this)">
     <span class="tab-btn-icon">📡</span>FR24
@@ -1233,7 +1449,7 @@ export function getSpaHtmlBody() {
       <button class="tab-util-btn tab-install-btn" id="tab-install-btn" onclick="showInstallGuide()" style="display:none">
         <span>📲</span>安裝
       </button>
-      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer" onclick="showAbout()">V6.191</span>
+      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer;text-decoration:underline" onclick="showAbout()">V8.0.15a</span>
     </div>
   </div>
 </div>
@@ -1260,18 +1476,100 @@ export function getSpaHtmlBody() {
 <div id="about-overlay" class="install-overlay" style="display:none" onclick="if(event.target===this)closeAbout()">
   <div class="install-card">
     <div style="font-size:.82em;color:var(--text);line-height:1.7;margin-bottom:14px;text-align:left">
-      <div style="margin-bottom:4px">📱 建議使用 <b>iPad 橫向</b>操作以獲得最佳體驗</div>
-      <div style="color:var(--muted)">Best experience on iPad in landscape mode</div>
+      <div style="margin-bottom:4px">📱 建議使用 <b>iPad 橫向</b>操作以獲得最佳體驗，Android 裝置可能無法正確顯示</div>
+      <div style="color:var(--muted)">Best experience on iPad in landscape mode. Android devices may not display correctly.</div>
     </div>
-    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V6.191</div>
+    <div style="max-height:50vh;overflow-y:auto;-webkit-overflow-scrolling:touch;margin-bottom:10px">
+    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V8.0.15a</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
-      <div>修復 Roster 同步後資料未儲存問題；班表改為本機離線儲存，顯示上次同步時間</div>
-      <div>Fix roster data not saved after sync; roster now stored locally for offline access, showing last sync time</div>
+      <div>Groups grid 修正：iPad 垂直捲動 + 水平卷軸修正、.ts/.js 同步修正</div>
+      <div>Groups grid fix: iPad vertical scroll + horizontal scrollbar fix, .ts/.js sync fix</div>
     </div>
-    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V6.190</div>
+    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V8.0.14</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
-      <div>修正 Cold Temp 左側字型放大時計算按鈕被擋住無法捲動、右側表格底部永遠被切掉</div>
-      <div>Fix Cold Temp left form not scrollable on enlarged font, and right-side table rows permanently cut off</div>
+      <div>Overtime Calculator 結果文字調整：強調額外營運成本提示</div>
+      <div>Overtime Calculator result text update: highlight additional operational costs warning</div>
+    </div>
+    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V8.0.13</div>
+    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
+      <div>Overtime Calculator UI 優化：header 精簡、航班選單與月份同行、iPad 橫拿捲動修正、已完成航班警語</div>
+      <div>Overtime Calculator UI improvements: compact header, inline month & flight selector, iPad landscape scroll fix, completed flight warning</div>
+    </div>
+    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V8.0.12</div>
+    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
+      <div>新增 Overtime Calculator subtab（Flight Crew），從班表自動帶入航班時間、月份切換、跨月航班支援、手動輸入模式、24hr 快取</div>
+      <div>New Overtime Calculator subtab (Flight Crew): auto-load flights from roster, month navigation, cross-month flight support, manual input mode, 24hr cache</div>
+    </div>
+    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V8.0.11</div>
+    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
+      <div>Groups All 群組篩選修正：CC 不顯示機隊下拉；Groups / Friends 記憶上次選擇的群組（30 天快取）</div>
+      <div>Groups All filter fix: hide fleet dropdown for CC; Groups / Friends remember last selected group (30-day cache)</div>
+    </div>
+    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V8.0.10</div>
+    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
+      <div>Groups 移除分享 toggle，加入群組即啟用分享，退出所有群組自動停止；預設群組改下拉選單 + 已加入標籤；新增 FC/CC/職級篩選器；Friends header 加 ⓘ、名稱/機隊欄位預設顯示、自動載入第一個群組班表；CC Rest Calculator 移除密碼鎖正式開放、新增 Crew Prep 欄位、休時取整至 5 min、新增重設按鈕與 24hr 快取、表單寬度優化；好友圈說明文字更新；PA dep-min 手動修改 flag 修正</div>
+      <div>Groups: remove share toggle, join = auto-share, leave all = auto-stop; presets changed to dropdown + joined tags; added FC/CC/rank filter; Friends: ⓘ in header, name/fleet shown by default, auto-load first group roster; CC Rest Calculator: removed password lock, added Crew Prep field, rest rounded to 5 min, Reset button, 24hr cache, form width optimized; friend group description updated; PA dep-min manual flag fix</div>
+    </div>
+    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V8.0.08</div>
+    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
+      <div>Friends 拿掉分享 toggle、說明文字更新；Groups ⓘ 修正；加入群組自動開分享；0 人群組自動刪除；離線快取 30 天過期</div>
+      <div>Friends remove share toggle, updated descriptions; Groups ⓘ fix; auto-share on join; auto-delete empty groups; 30-day cache expiry</div>
+    </div>
+    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V8.0.07</div>
+    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
+      <div>Cabin Crew Rest Calculator（Beta）、FC/CC 身分連動 Friends、Cabin subtab 拖移排序、時區加場站名</div>
+      <div>Cabin Crew Rest Calculator (Beta), FC/CC role sync with Friends, Cabin subtab drag reorder, timezone with station names</div>
+    </div>
+    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V8.0.06</div>
+    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
+      <div>新增 Cabin Crew tab + 預設群組改版（FC 6 + CC 3 + All）、手機 tab bar 可捲動、分享選 FC/CC 身分</div>
+      <div>New Cabin Crew tab, preset groups redesign (FC 6 + CC 3 + All), mobile tab bar scrollable, FC/CC role selection</div>
+    </div>
+    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V8.0.05</div>
+    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
+      <div>Training duty（RT）拆分 PT/PC 子項目、每天獨立組員名單；Groups 排版修正、toggle 與名稱同行、ⓘ 修正</div>
+      <div>Training duty (RT) split into PT/PC sub-items with per-day crew; Groups layout fix, inline toggles, ⓘ fix</div>
+    </div>
+    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V8.0.03</div>
+    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
+      <div>Groups 排版修正：隱藏不符合群組、header 固定、toggle 與名稱同行、ⓘ 修正、Friends 重複按鈕修正</div>
+      <div>Groups layout fix: hide non-matching groups, fixed header, inline toggles, ⓘ fix, Friends duplicate button fix</div>
+    </div>
+    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V8.0.02</div>
+    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
+      <div>Groups 手機版排版修正：隱藏不符合機隊/職級的群組、header 固定不捲動</div>
+      <div>Groups mobile layout fix: hide non-matching groups, fixed header</div>
+    </div>
+    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V8.0.01</div>
+    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
+      <div>新增 Groups 群組功能：10 個預設群組（All + 9 個機隊職級）、自訂好友圈、邀請碼加入、員工編號邀請、紅點通知</div>
+      <div>New Groups feature: 10 preset groups (All + 9 fleet/rank), custom friend circles, invite code, employee ID invitation, notification badge</div>
+    </div>
+    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V7.0.15</div>
+    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
+      <div>Briefing 日期切換改 ◀ M/D ▶ 支援前一天；Gate Info 移除標題、警語改黃色；隱私權政策補齊第三方服務</div>
+      <div>Briefing date nav changed to ◀ M/D ▶ with yesterday support; Gate Info title removed, warning in yellow; privacy policy third-party services updated</div>
+    </div>
+    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V7.0.14</div>
+    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
+      <div>About card 加註 Android 裝置可能無法正確顯示；FAQ 修正日曆授權說明以符合隱私權政策</div>
+      <div>About card adds Android display note; FAQ corrects calendar authorization description to align with privacy policy</div>
+    </div>
+    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V7.0.13</div>
+    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
+      <div>PA Welcome 出發分鐘數快取保留、Descent 點選場站帶入中文目的地</div>
+      <div>PA Welcome departure minutes persisted; Descent tap-to-select fills Chinese destination</div>
+    </div>
+    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V7.0.12</div>
+    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
+      <div>WX 單一機場更新按鈕加入載入狀態，清除 24hr 快取強制重新抓取</div>
+      <div>WX single airport refresh button shows loading state, clears 24hr cache</div>
+    </div>
+    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V7.0.11</div>
+    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
+      <div>手機直拿 Friends header 分兩行排列，第一行可滑動、第二行月份置中+篩選靠右</div>
+      <div>Mobile portrait Friends header split into two rows</div>
+    </div>
     </div>
     <div style="font-size:.68em;color:var(--muted);margin-top:12px;margin-bottom:10px;display:flex;gap:16px;justify-content:center">
       <a href="/privacy" onclick="openLegal('/privacy');return false" style="color:var(--muted);text-decoration:underline">Privacy Policy 隱私權政策</a>
