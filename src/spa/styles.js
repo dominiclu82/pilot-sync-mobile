@@ -1,5 +1,5 @@
-export function getSpaStyles() {
-    return `
+export function getSpaStyles(): string {
+  return `
 html{overscroll-behavior:none}
 html::before{content:'';position:fixed;top:0;left:0;right:0;height:env(safe-area-inset-top,0px);background:var(--bg);z-index:9999}
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
@@ -23,9 +23,10 @@ body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSy
   padding-bottom:env(safe-area-inset-bottom,0px);
   overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch;scrollbar-width:none}
 .tab-bar::-webkit-scrollbar{display:none}
-.tab-btn{flex:1 0 56px;display:flex;flex-direction:column;align-items:center;justify-content:center;
+.tab-btn{flex:0 0 auto;min-width:70px;display:flex;flex-direction:column;align-items:center;justify-content:center;
   gap:2px;border:none;background:none;color:var(--muted);font-size:.7em;font-weight:600;
-  cursor:pointer;transition:color .15s;-webkit-appearance:none}
+  cursor:pointer;transition:color .15s;-webkit-appearance:none;padding:0 8px;white-space:nowrap}
+@media(min-width:768px){.tab-btn{flex:1 1 0;min-width:auto;padding:0}.tab-btn.tab-util{flex:1 1 0}}
 .tab-btn.tab-active{color:var(--accent)}
 .tab-btn-icon{font-size:1.5em;line-height:1}
 .tab-util{cursor:default;gap:1px}
