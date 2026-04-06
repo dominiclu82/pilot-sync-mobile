@@ -428,6 +428,7 @@ function _frRenderInternal(gridEl) {
   }
 
   html += '</div>'; // end grid
+  html += '<div style="height:120px;flex-shrink:0"></div>'; // bottom spacer for tab bar
   html += '</div>'; // end scroll container
 
   gridEl.innerHTML = html;
