@@ -245,7 +245,7 @@ export function getSpaHtmlBody(): string {
 
 <!-- ── Friends panel ── -->
 <div id="roster-friends" class="roster-panel">
-  <div>
+  <div style="display:flex;flex-direction:column;height:100%">
     <!-- Friends header: desktop 一行 / mobile portrait 兩行 -->
     <div class="fr-header">
       <!-- Row 1: ⓘ + 機隊 + 名稱（手機可左右滑） -->
@@ -301,7 +301,7 @@ export function getSpaHtmlBody(): string {
     </div>
     <style>#fr-share-toggle:checked+span{background:var(--accent)!important}#fr-share-toggle:checked~#fr-share-dot{transform:translateX(16px)}</style>
     <!-- Friends grid -->
-    <div id="fr-grid" style="padding:0"></div>
+    <div id="fr-grid" style="padding:0;flex:1;min-height:0"></div>
   </div>
 </div>
 
@@ -1449,7 +1449,7 @@ export function getSpaHtmlBody(): string {
       <button class="tab-util-btn tab-install-btn" id="tab-install-btn" onclick="showInstallGuide()" style="display:none">
         <span>📲</span>安裝
       </button>
-      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer;text-decoration:underline" onclick="showAbout()">V8.0.16c</span>
+      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer;text-decoration:underline" onclick="showAbout()">V8.0.16d</span>
     </div>
   </div>
 </div>
@@ -1480,7 +1480,12 @@ export function getSpaHtmlBody(): string {
       <div style="color:var(--muted)">Best experience on iPad in landscape mode. Android devices may not display correctly.</div>
     </div>
     <div style="max-height:50vh;overflow-y:auto;-webkit-overflow-scrolling:touch;margin-bottom:10px">
-    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V8.0.16c</div>
+    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V8.0.16d</div>
+    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
+      <div>Tab bar 改用 grid 強制 6 等分（修正 iPad 直拿靠左）、Friends 外層改用 flex 佈局修正最後一列被切問題</div>
+      <div>Tab bar uses grid for forced 6-column layout (fix iPad portrait left-align), Friends outer rebuilt with flex layout to fix last row cutoff</div>
+    </div>
+    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V8.0.16c</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
       <div>Friends/Groups grid 改用 calc 計算高度精準對應 tab bar、tab bar 加 overflow-x:visible 修正 iPad 直拿均分</div>
       <div>Friends/Groups grid heights now use calc to match tab bar precisely, tab-bar overflow-x:visible to fix iPad portrait even distribution</div>
