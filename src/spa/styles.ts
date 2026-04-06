@@ -26,7 +26,7 @@ body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSy
 .tab-btn{flex:0 0 auto;min-width:70px;display:flex;flex-direction:column;align-items:center;justify-content:center;
   gap:2px;border:none;background:none;color:var(--muted);font-size:.7em;font-weight:600;
   cursor:pointer;transition:color .15s;-webkit-appearance:none;padding:0 8px;white-space:nowrap}
-@media(min-width:700px){.tab-btn{flex:1 1 0%;min-width:auto;padding:0}}
+@media(min-width:700px){.tab-bar{overflow-x:visible}.tab-btn{flex:1 1 0%;min-width:auto;padding:0}}
 .tab-btn.tab-active{color:var(--accent)}
 .tab-btn-icon{font-size:1.5em;line-height:1}
 .tab-util{cursor:default;gap:1px}
@@ -211,7 +211,7 @@ details.how-to[open] summary::after{transform:rotate(90deg)}
     height:calc(100dvh - 56px - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px));
     min-height:unset;overflow:hidden;padding:0}
   .roster-subtabs{flex-shrink:0;top:0}
-  .roster-panel.active{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;min-height:0;overscroll-behavior:none;padding-bottom:calc(56px + env(safe-area-inset-bottom,0px))}
+  .roster-panel.active{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;min-height:0;overscroll-behavior:none}
   #roster-crew.active{justify-content:flex-start}
   #roster-cal.active{overflow:hidden}
   .gcal-wrap{height:100%;overflow:hidden}
@@ -426,7 +426,7 @@ div.brief-auto-val[contenteditable]{outline:none;white-space:pre-wrap;cursor:tex
     height:calc(100dvh - calc(56px + env(safe-area-inset-bottom,0px)));
     min-height:unset;overflow:hidden;padding:0}
   .roster-subtabs{position:sticky;top:0;z-index:100;flex-shrink:0;justify-content:space-evenly;gap:0;overflow-x:visible}
-  .roster-panel.active{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;min-height:0;overscroll-behavior:none;padding-bottom:calc(56px + env(safe-area-inset-bottom,0px))}
+  .roster-panel.active{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;min-height:0;overscroll-behavior:none}
   #roster-cal.active{overflow:hidden}
   .gcal-week-row{flex:none;height:120px}
   .gcal-grid{padding-bottom:40px}

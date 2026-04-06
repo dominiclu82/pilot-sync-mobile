@@ -1449,7 +1449,7 @@ export function getSpaHtmlBody(): string {
       <button class="tab-util-btn tab-install-btn" id="tab-install-btn" onclick="showInstallGuide()" style="display:none">
         <span>📲</span>安裝
       </button>
-      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer;text-decoration:underline" onclick="showAbout()">V8.0.16b</span>
+      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer;text-decoration:underline" onclick="showAbout()">V8.0.16c</span>
     </div>
   </div>
 </div>
@@ -1480,7 +1480,12 @@ export function getSpaHtmlBody(): string {
       <div style="color:var(--muted)">Best experience on iPad in landscape mode. Android devices may not display correctly.</div>
     </div>
     <div style="max-height:50vh;overflow-y:auto;-webkit-overflow-scrolling:touch;margin-bottom:10px">
-    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V8.0.16b</div>
+    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V8.0.16c</div>
+    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
+      <div>Friends/Groups grid 改用 calc 計算高度精準對應 tab bar、tab bar 加 overflow-x:visible 修正 iPad 直拿均分</div>
+      <div>Friends/Groups grid heights now use calc to match tab bar precisely, tab-bar overflow-x:visible to fix iPad portrait even distribution</div>
+    </div>
+    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V8.0.16b</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
       <div>Friends grid 最後一列被 tab bar 蓋住修正、tab bar 平均分散斷點下調至 700px（涵蓋 iPad mini 直拿）</div>
       <div>Friends grid last row tab bar overlap fix, tab bar even distribution breakpoint lowered to 700px (covers iPad mini portrait)</div>
