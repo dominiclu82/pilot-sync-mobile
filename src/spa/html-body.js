@@ -1485,31 +1485,6 @@ export function getSpaHtmlBody(): string {
       <div>Friends/Groups grid 加入底部 120px spacer 修正最後一列被切、Tab bar 斷點下調至 600px 修正 iPad 直拿</div>
       <div>Friends/Groups grid added 120px bottom spacer for last row, tab bar breakpoint lowered to 600px for iPad portrait</div>
     </div>
-    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V8.0.16d</div>
-    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
-      <div>Tab bar 改用 grid 強制 6 等分（修正 iPad 直拿靠左）、Friends 外層改用 flex 佈局修正最後一列被切問題</div>
-      <div>Tab bar uses grid for forced 6-column layout (fix iPad portrait left-align), Friends outer rebuilt with flex layout to fix last row cutoff</div>
-    </div>
-    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V8.0.16c</div>
-    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
-      <div>Friends/Groups grid 改用 calc 計算高度精準對應 tab bar、tab bar 加 overflow-x:visible 修正 iPad 直拿均分</div>
-      <div>Friends/Groups grid heights now use calc to match tab bar precisely, tab-bar overflow-x:visible to fix iPad portrait even distribution</div>
-    </div>
-    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V8.0.16b</div>
-    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
-      <div>Friends grid 最後一列被 tab bar 蓋住修正、tab bar 平均分散斷點下調至 700px（涵蓋 iPad mini 直拿）</div>
-      <div>Friends grid last row tab bar overlap fix, tab bar even distribution breakpoint lowered to 700px (covers iPad mini portrait)</div>
-    </div>
-    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V8.0.16a</div>
-    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
-      <div>Roster panel padding-bottom 改用 calc 精準對應 tab bar 高度</div>
-      <div>Roster panel padding-bottom now uses calc to match tab bar height precisely</div>
-    </div>
-    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V8.0.16</div>
-    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
-      <div>Roster panel 加入 padding-bottom，修正 Friends/Groups 最後一列被 tab bar 蓋住</div>
-      <div>Roster panel padding-bottom fix: last row no longer hidden behind tab bar in Friends/Groups</div>
-    </div>
     <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V8.0.15a</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
       <div>Groups grid 修正：iPad 垂直捲動 + 水平卷軸修正、.ts/.js 同步修正</div>
