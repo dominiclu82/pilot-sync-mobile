@@ -5,10 +5,225 @@
 import express from 'express';
 import fs from 'fs';
 import path from 'path';
+import pg from 'pg';
 import { ROOT } from './config.js';
+import { buildMorningReport } from './morning-builder.js';
 
-export const MORNING_VERSION = 'M1.0.3';
-const MORNING_CACHE = 'morning-v1-0-3';
+export const MORNING_VERSION = 'M1.1.0';
+const MORNING_CACHE = 'morning-v1-1-0';
+
+// ─── Postgres ────────────────────────────────────────────────────────
+let _pgPool: pg.Pool | null = null;
+let _pgReady = false;
+function getPool() {
+  if (!_pgPool && process.env.DATABASE_URL) {
+    _pgPool = new pg.Pool({
+      connectionString: process.env.DATABASE_URL,
+      ssl: process.env.DATABASE_URL.includes('localhost') ? false : { rejectUnauthorized: false },
+    });
+  }
+  return _pgPool;
+}
+
+async function ensurePgTables() {
+  if (_pgReady) return true;
+  const pool = getPool();
+  if (!pool) return false;
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS morning_reports (
+        date DATE PRIMARY KEY,
+        data JSONB NOT NULL,
+        generated_at TIMESTAMPTZ DEFAULT NOW()
+      );
+    `);
+    _pgReady = true;
+    return true;
+  } catch (e) {
+    console.warn('[morning] ensurePgTables failed:', e instanceof Error ? e.message : String(e));
+    return false;
+  }
+}
+
+// 取得資料：優先 Postgres → fallback 本地 JSON 檔
+async function getReportByDate(date: string) {
+  const pool = getPool();
+  if (pool && await ensurePgTables()) {
+    try {
+      const r = await pool.query('SELECT data, generated_at FROM morning_reports WHERE date = $1', [date]);
+      if (r.rows.length > 0) return r.rows[0].data;
+    } catch (e) {
+      console.warn('[morning] getReportByDate db error:', e instanceof Error ? e.message : String(e));
+    }
+  }
+  // Fallback 本地檔案
+  const file = path.join(DATA_DIR, `${date}.json`);
+  if (fs.existsSync(file)) {
+    try { return JSON.parse(fs.readFileSync(file, 'utf-8')); } catch (e) {}
+  }
+  return null;
+}
+
+async function getLatestDate() {
+  const pool = getPool();
+  if (pool && await ensurePgTables()) {
+    try {
+      const r = await pool.query('SELECT date::text FROM morning_reports ORDER BY date DESC LIMIT 1');
+      if (r.rows.length > 0) return r.rows[0].date;
+    } catch (e) {}
+  }
+  return latestDataDate();
+}
+
+async function getAllDates() {
+  const pool = getPool();
+  if (pool && await ensurePgTables()) {
+    try {
+      const r = await pool.query('SELECT date::text FROM morning_reports ORDER BY date DESC');
+      return r.rows.map((row: any) => row.date);
+    } catch (e) {}
+  }
+  // Fallback 本地
+  ensureDataDir();
+  try {
+    return fs.readdirSync(DATA_DIR)
+      .filter(f => /^\d{4}-\d{2}-\d{2}\.json$/.test(f))
+      .map(f => f.replace('.json', ''))
+      .sort()
+      .reverse();
+  } catch (e) { return []; }
+}
+
+async function saveReport(date: string, data: any) {
+  const pool = getPool();
+  if (pool && await ensurePgTables()) {
+    try {
+      await pool.query(
+        'INSERT INTO morning_reports (date, data, generated_at) VALUES ($1, $2, NOW()) ON CONFLICT (date) DO UPDATE SET data = EXCLUDED.data, generated_at = NOW()',
+        [date, JSON.stringify(data)]
+      );
+      console.log('[morning] saved to Postgres:', date);
+      return true;
+    } catch (e) {
+      console.warn('[morning] saveReport db error:', e instanceof Error ? e.message : String(e));
+    }
+  }
+  // Fallback 本地
+  ensureDataDir();
+  try {
+    fs.writeFileSync(path.join(DATA_DIR, `${date}.json`), JSON.stringify(data, null, 2), 'utf-8');
+    console.log('[morning] saved to local JSON:', date);
+    return true;
+  } catch (e) {
+    console.warn('[morning] saveReport local error:', e instanceof Error ? e.message : String(e));
+    return false;
+  }
+}
+
+// ─── 建構鎖 + 節流 ───────────────────────────────────────────────────
+let _buildInProgress = false;
+let _lastBuildAt = 0;  // Unix ms
+const REFRESH_THROTTLE_MS = 30 * 60 * 1000;  // 30 分鐘
+
+// 觸發建構並寫入儲存
+async function runBuild(force = false) {
+  if (_buildInProgress) {
+    return { ok: false, reason: 'already_running' };
+  }
+  if (!force && (Date.now() - _lastBuildAt) < REFRESH_THROTTLE_MS) {
+    return { ok: false, reason: 'throttled', nextAvailableIn: REFRESH_THROTTLE_MS - (Date.now() - _lastBuildAt) };
+  }
+  _buildInProgress = true;
+  try {
+    const report = await buildMorningReport();
+    await saveReport(report.date, report);
+    _lastBuildAt = Date.now();
+    return { ok: true, date: report.date, errors: (report as any).build_errors };
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    console.error('[morning] runBuild error:', msg);
+    return { ok: false, reason: 'error', error: msg };
+  } finally {
+    _buildInProgress = false;
+  }
+}
+
+// ─── Cron 排程 ───────────────────────────────────────────────────────
+// 每分鐘檢查：如果現在 > 06:30 台北時間且今天還沒資料，去跑
+function taipeiNow() {
+  const now = new Date();
+  return new Date(now.getTime() + (8 * 60 + now.getTimezoneOffset()) * 60000);
+}
+function taipeiDateStr(d: Date) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${dd}`;
+}
+
+let _cronStarted = false;
+let _cronLastRunDate = '';  // 最後一次「官方 06:30 觸發」跑的日期，用來確保每天正式版只跑一次
+async function cronTick() {
+  const tpe = taipeiNow();
+  const hour = tpe.getHours();
+  const minute = tpe.getMinutes();
+  const today = taipeiDateStr(tpe);
+
+  // 早於 06:30 → 完全不做任何事
+  if (hour < 6 || (hour === 6 && minute < 30)) return;
+
+  // 剛好 06:30 那一分鐘的 tick → 強制跑（無論今天有沒有資料、無論節流）
+  // 會覆蓋使用者之前提早按 ↻ 拿到的那份（06:30 才是正式版）
+  if (hour === 6 && minute === 30 && _cronLastRunDate !== today) {
+    _cronLastRunDate = today;
+    console.log('[morning] 06:30 daily trigger (force rebuild)', today);
+    await runBuild(true);
+    return;
+  }
+
+  // 06:31 之後：只有今天沒資料才重試（失敗補救機制）
+  const existing = await getReportByDate(today);
+  if (existing) {
+    _cronLastRunDate = today;  // 有資料就記一下，避免之後再觸發
+    return;
+  }
+  // 5 分鐘內剛失敗就別再試
+  if (Date.now() - _lastBuildAt < 5 * 60 * 1000) return;
+  console.log('[morning] cron retry (missing data) for', today);
+  await runBuild(true);
+}
+
+export function startMorningCron() {
+  if (_cronStarted) return;
+  _cronStarted = true;
+
+  // 啟動時的補跑檢查（無延遲立即檢查，確保錯過的 06:30 能補上）
+  (async () => {
+    try {
+      const tpe = taipeiNow();
+      const today = taipeiDateStr(tpe);
+      const pastCutoff = tpe.getHours() > 6 || (tpe.getHours() === 6 && tpe.getMinutes() >= 30);
+      if (pastCutoff) {
+        const existing = await getReportByDate(today);
+        if (!existing) {
+          console.log('[morning] startup recovery: 06:30 missed, forcing rebuild for', today);
+          await runBuild(true);
+        } else {
+          console.log('[morning] startup: today already has data', today);
+          _cronLastRunDate = today;
+        }
+      } else {
+        console.log('[morning] startup: before 06:30, cron will wait');
+      }
+    } catch (e) {
+      console.warn('[morning] startup recovery error:', e instanceof Error ? e.message : String(e));
+    }
+  })();
+
+  // 之後每分鐘檢查
+  setInterval(() => { cronTick().catch(e => console.warn('[morning] cron tick error:', e)); }, 60 * 1000);
+  console.log('[morning] cron started');
+}
 
 const DATA_DIR = path.join(ROOT, 'data', 'morning');
 
@@ -125,25 +340,24 @@ self.addEventListener('fetch', e => {
 });
 
 // ─── /api/morning-report?date=YYYY-MM-DD ─────────────────────────────
-morningRouter.get('/api/morning-report', (req, res) => {
+morningRouter.get('/api/morning-report', async (req, res) => {
   try {
-    ensureDataDir();
     let date = String(req.query.date || '');
     if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
-      date = latestDataDate() || todayTaipei();
+      date = (await getLatestDate()) || todayTaipei();
     }
-    const file = path.join(DATA_DIR, `${date}.json`);
-    if (!fs.existsSync(file)) {
+    const data = await getReportByDate(date);
+    if (!data) {
       // fallback 最新一份
-      const latest = latestDataDate();
+      const latest = await getLatestDate();
       if (latest && latest !== date) {
-        const fallback = path.join(DATA_DIR, `${latest}.json`);
-        const data = JSON.parse(fs.readFileSync(fallback, 'utf-8'));
-        return res.json({ ...data, _requestedDate: date, _actualDate: latest, _fallback: true });
+        const fallbackData = await getReportByDate(latest);
+        if (fallbackData) {
+          return res.json({ ...fallbackData, _requestedDate: date, _actualDate: latest, _fallback: true });
+        }
       }
       return res.status(404).json({ error: 'no_data', date });
     }
-    const data = JSON.parse(fs.readFileSync(file, 'utf-8'));
     res.json({ ...data, _requestedDate: date, _actualDate: date });
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
@@ -152,18 +366,24 @@ morningRouter.get('/api/morning-report', (req, res) => {
 });
 
 // ─── /api/morning-report/dates — 歷史日期列表 ─────────────────────────
-morningRouter.get('/api/morning-report/dates', (_req, res) => {
+morningRouter.get('/api/morning-report/dates', async (_req, res) => {
   try {
-    ensureDataDir();
-    const files = fs.readdirSync(DATA_DIR)
-      .filter(f => /^\d{4}-\d{2}-\d{2}\.json$/.test(f))
-      .map(f => f.replace('.json', ''))
-      .sort()
-      .reverse();
-    res.json({ dates: files });
+    const dates = await getAllDates();
+    res.json({ dates });
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     res.status(500).json({ error: msg, dates: [] });
+  }
+});
+
+// ─── POST /api/morning-report/refresh — 手動觸發重建（30 分鐘節流） ────
+morningRouter.post('/api/morning-report/refresh', async (req, res) => {
+  const force = String(req.query.force || '') === '1';
+  const result = await runBuild(force);
+  if (result.ok) {
+    res.json({ ok: true, date: result.date, errors: result.errors });
+  } else {
+    res.status(result.reason === 'throttled' ? 429 : 503).json(result);
   }
 });
 
@@ -389,7 +609,7 @@ a:active { opacity: 0.6; }
   border: 1px solid var(--border);
   border-radius: 14px;
   overflow: hidden;
-  scroll-margin-top: 120px;
+  scroll-margin-top: calc(var(--top-stack-h, 120px) + 8px);
 }
 .sec-h {
   padding: 12px 14px 10px;
@@ -625,18 +845,45 @@ a:active { opacity: 0.6; }
   min-height: 60px;
 }
 .wx-cat {
-  margin-top: 10px;
+  margin-top: 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
 }
 .wx-cat-title {
   font-size: .82em;
   font-weight: 700;
   color: var(--accent);
-  margin-bottom: 6px;
+  padding: 8px 12px;
+  cursor: pointer;
+  user-select: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: rgba(255,255,255,0.03);
 }
-.wx-chk-grid {
-  display: grid;
+.wx-cat-title:active { opacity: .7; }
+.wx-cat-title .arrow {
+  transition: transform 0.15s;
+  font-size: .8em;
+  color: var(--muted);
+}
+.wx-cat.expanded .wx-cat-title .arrow {
+  transform: rotate(90deg);
+}
+.wx-cat-title .cnt {
+  font-size: .82em;
+  color: var(--muted);
+  font-weight: 500;
+}
+.wx-cat .wx-chk-grid {
+  display: none;
   grid-template-columns: repeat(2, 1fr);
   gap: 6px;
+  padding: 8px 10px;
+}
+.wx-cat.expanded .wx-chk-grid {
+  display: grid;
 }
 .wx-chk {
   display: flex;
@@ -751,9 +998,10 @@ a:active { opacity: 0.6; }
     <hr style="border:none;border-top:1px solid var(--border);margin:12px 0">
     <div class="changelog-v">${MORNING_VERSION}</div>
     <div class="changelog-txt">
-      設定改為分散式：右上角統一 ⚙️ 移除，天氣/台股/美股/匯率每個 section 標題右邊各自有獨立 ⚙️，點哪區就只開那區的設定（修正匯率要拉很下面的問題）；台股加內建勾選清單（半導體/電子/金融/傳產航運 4 類約 30 支）；美股加內建勾選清單（科技/ETF/金融/消費 4 類約 30 支）；匯率改支援跨幣種不限對台幣（對台幣/主要貨幣對/交叉盤 3 類約 25 對，舊版 ['USD','JPY'] 自動遷移成 ['USD/TWD','JPY/TWD']）；天氣預設調整為台北 + 桃園龜山；台股預設調整為 2330 + 3231；修正假資料「台北福華」→「台北」讓勾選「台北」能看到資料。<br>
-      Per-section settings: unified top-right ⚙️ removed, each of Weather/TW Stocks/US Stocks/FX sections now has its own ⚙️ in the header right (fixes the pain of scrolling past weather to reach FX); built-in checkbox presets for TW stocks (~30 across Semiconductor/Electronics/Finance/Traditional&Shipping) and US stocks (~30 across Tech/ETF/Finance/Consumer); FX now supports cross-currency pairs beyond just vs-TWD (~25 pairs across vs-TWD/Majors/Crosses, legacy ['USD','JPY'] auto-migrated to ['USD/TWD','JPY/TWD']); default weather selection tuned to Taipei + Taoyuan Guishan; default TW stocks tuned to 2330 + 3231; fix placeholder data name mismatch "台北福華" → "台北" so selecting "台北" now shows data.
+      晨報升級為真實資料每日自動更新：新增 src/morning-builder.ts 整合 5 個資料源（Open-Meteo 145+ 地點天氣 / cnyes JSON API 台美股 / 台銀 CSV 匯率含交叉盤自動計算 / Google News RSS / Google Translate），資料存 Postgres morning_reports 表（本地 JSON fallback）。內建 cron 每分鐘檢查：06:30 台北時間那一分鐘強制重建（不受節流與既有資料影響，06:30 是正式版），06:31+ 只在今天缺資料時重試；伺服器啟動時立即檢查補跑錯過的 06:30（當機/重啟自動恢復）。⟳ 按鈕升級為「聰明重抓」：真的觸發重建、30 分鐘節流、建構中鎖定。新增 POST /api/morning-report/refresh 端點。所有 API 路由改 async。部分失敗容錯。新增 🛫 國際機場 7 大類 76 個機場（依據 CrewSync Airport WX Ops Spec C-6 清單），天氣地點從 69 擴增至 145。設定頁分類改為收合式（天氣 10 類 / 台股 4 類 / 美股 4 類 / 匯率 3 類），預設收合、有勾選項自動展開、顯示 N/M 計數。修正 nav bar 點擊捲動時 section header 被 nav 壓住的 bug（M1.0.3 帶入）：scroll-margin-top 改用動態測量的 --top-stack-h 變數。<br>
+      Morning Report upgraded to real data with daily auto-refresh: new src/morning-builder.ts integrates 5 sources (Open-Meteo for 145+ weather locations / cnyes JSON API for TW+US stocks / BOT CSV for FX with cross-pair calculation / Google News RSS / Google Translate), stored in Postgres morning_reports table (local JSON fallback). Built-in cron ticks every minute: at exactly 06:30 Asia/Taipei force-rebuilds (the official version), 06:31+ retries only if today's missing; startup immediate recovery check for missed 06:30 after downtime/restart. ⟳ button upgraded to "smart refresh" — actually re-fetches with 30-min throttle and build lock. New POST /api/morning-report/refresh endpoint. All API routes rewritten async. Partial-failure tolerant. Added 🛫 International Airports category with 7 sub-groups and 76 airports (from CrewSync Airport WX Ops Spec C-6 list), weather locations expanded from 69 to 145. Settings page categories now collapsible (Weather 10 / TW 4 / US 4 / FX 3 categories): collapsed by default, categories with selected items auto-expand on first open, N/M selected count shown. Fix nav bar click bug inherited from M1.0.3 where section header gets hidden under sticky nav: scroll-margin-top now uses dynamic --top-stack-h CSS variable.
     </div>
+    <div class="changelog-v old">M1.0.3</div>
     <div class="changelog-v old">M1.0.2</div>
     <div class="changelog-txt">
       A+/A− 字型按鈕間距拉開，改回兩顆獨立上下排列；修正 nav bar 橫向捲動時回彈反彈效果（overscroll-behavior-x: contain）、整頁防 iOS 橡皮筋反彈（overscroll-behavior: none）。<br>
@@ -877,6 +1125,7 @@ const WX_PRESETS = {
     ['tw-taoyuan', '桃園', 24.99, 121.31],
     ['tw-bade', '桃園八德', 24.93, 121.28],
     ['tw-guishan', '桃園龜山', 25.04, 121.35],
+    ['tw-dayuan', '桃園大園', 25.07, 121.21],
     ['tw-hsinchu', '新竹', 24.81, 120.97],
     ['tw-zhubei', '新竹竹北', 24.83, 121.00],
     ['tw-miaoli', '苗栗', 24.56, 120.82],
@@ -948,6 +1197,96 @@ const WX_PRESETS = {
     ['in-zrh', '蘇黎世 ZRH', 47.37, 8.55],
     ['in-prg', '布拉格 PRG', 50.08, 14.44],
     ['in-phx', '鳳凰城 PHX', 33.45, -112.07],
+  ],
+  '🛫 港澳/菲律賓/越柬機場': [
+    ['ap-VHHH', 'VHHH 香港赤鱲角', 22.309, 113.914],
+    ['ap-VMMC', 'VMMC 澳門', 22.149, 113.592],
+    ['ap-RPLC', 'RPLC 克拉克', 15.186, 120.560],
+    ['ap-RPLL', 'RPLL 馬尼拉', 14.508, 121.019],
+    ['ap-RPMD', 'RPMD 達沃', 7.125, 125.646],
+    ['ap-RPVM', 'RPVM 宿霧', 10.307, 123.978],
+    ['ap-VVNB', 'VVNB 河內內排', 21.221, 105.807],
+    ['ap-VVPQ', 'VVPQ 富國', 10.227, 103.967],
+    ['ap-VVTS', 'VVTS 胡志明', 10.819, 106.652],
+    ['ap-VDPP', 'VDPP 金邊', 11.547, 104.844],
+    ['ap-VVCR', 'VVCR 芽莊', 12.227, 109.192],
+    ['ap-VVDN', 'VVDN 峴港', 16.044, 108.199],
+  ],
+  '🛫 日本機場': [
+    ['ap-RJAA', 'RJAA 成田', 35.764, 140.386],
+    ['ap-RJBB', 'RJBB 關西', 34.427, 135.244],
+    ['ap-RJBE', 'RJBE 神戶', 34.633, 135.224],
+    ['ap-RJCC', 'RJCC 新千歲', 42.775, 141.692],
+    ['ap-RJCH', 'RJCH 函館', 41.770, 140.822],
+    ['ap-RJFF', 'RJFF 福岡', 33.585, 130.451],
+    ['ap-RJFK', 'RJFK 鹿兒島', 31.804, 130.719],
+    ['ap-RJFT', 'RJFT 熊本', 32.837, 130.855],
+    ['ap-RJFU', 'RJFU 長崎', 32.917, 129.914],
+    ['ap-RJGG', 'RJGG 中部', 34.858, 136.805],
+    ['ap-RJNK', 'RJNK 小松', 36.395, 136.407],
+    ['ap-RJOS', 'RJOS 德島', 34.133, 134.607],
+    ['ap-RJOT', 'RJOT 高松', 34.214, 134.016],
+    ['ap-RJSN', 'RJSN 新潟', 37.956, 139.121],
+    ['ap-RJSS', 'RJSS 仙台', 38.140, 140.917],
+    ['ap-RJTT', 'RJTT 羽田', 35.552, 139.780],
+    ['ap-ROAH', 'ROAH 那霸', 26.196, 127.646],
+    ['ap-ROIG', 'ROIG 石垣', 24.397, 124.245],
+    ['ap-RORS', 'RORS 下地島', 24.827, 125.145],
+  ],
+  '🛫 韓國機場': [
+    ['ap-RKPC', 'RKPC 濟州', 33.511, 126.493],
+    ['ap-RKPK', 'RKPK 釜山', 35.180, 128.938],
+    ['ap-RKSI', 'RKSI 仁川', 37.463, 126.440],
+    ['ap-RKSS', 'RKSS 金浦', 37.558, 126.790],
+    ['ap-RKTN', 'RKTN 大邱', 35.894, 128.659],
+  ],
+  '🛫 東南亞機場 (泰馬印新)': [
+    ['ap-VTBS', 'VTBS 素萬那普', 13.690, 100.750],
+    ['ap-VTBD', 'VTBD 廊曼', 13.912, 100.606],
+    ['ap-VTBU', 'VTBU 烏達保', 12.680, 101.005],
+    ['ap-VTCC', 'VTCC 清邁', 18.766, 98.963],
+    ['ap-VTSP', 'VTSP 普吉', 8.113, 98.317],
+    ['ap-WSSS', 'WSSS 新加坡樟宜', 1.364, 103.991],
+    ['ap-WMKK', 'WMKK 吉隆坡', 2.746, 101.707],
+    ['ap-WMKP', 'WMKP 檳城', 5.297, 100.277],
+    ['ap-WBGG', 'WBGG 古晉', 1.485, 110.347],
+    ['ap-WIII', 'WIII 雅加達蘇卡諾', -6.126, 106.656],
+    ['ap-WARR', 'WARR 泗水朱安達', -7.379, 112.787],
+    ['ap-WADD', 'WADD 峇里島', -8.748, 115.167],
+  ],
+  '🛫 美國機場': [
+    ['ap-KLAX', 'KLAX 洛杉磯', 33.942, -118.408],
+    ['ap-KSFO', 'KSFO 舊金山', 37.619, -122.375],
+    ['ap-KSEA', 'KSEA 西雅圖', 47.449, -122.309],
+    ['ap-KPHX', 'KPHX 鳳凰城', 33.434, -112.012],
+    ['ap-KLAS', 'KLAS 拉斯維加斯', 36.080, -115.152],
+    ['ap-KONT', 'KONT 安大略', 34.056, -117.601],
+    ['ap-KOAK', 'KOAK 奧克蘭', 37.721, -122.221],
+    ['ap-KPDX', 'KPDX 波特蘭', 45.589, -122.595],
+    ['ap-KSMF', 'KSMF 沙加緬度', 38.695, -121.591],
+    ['ap-KTUS', 'KTUS 土森', 32.116, -110.941],
+  ],
+  '🛫 太平洋機場': [
+    ['ap-PHNL', 'PHNL 檀香山', 21.319, -157.922],
+    ['ap-PANC', 'PANC 安克拉治', 61.174, -149.998],
+    ['ap-PAFA', 'PAFA 費爾班克斯', 64.815, -147.856],
+    ['ap-PGUM', 'PGUM 關島', 13.484, 144.800],
+    ['ap-PGSN', 'PGSN 塞班', 15.119, 145.729],
+    ['ap-PTRO', 'PTRO 帛琉', 7.367, 134.544],
+    ['ap-PACD', 'PACD Cold Bay', 55.206, -162.725],
+    ['ap-PAKN', 'PAKN King Salmon', 58.677, -156.649],
+    ['ap-PASY', 'PASY Shemya', 52.712, 174.114],
+    ['ap-PMDY', 'PMDY 中途島', 28.212, -177.381],
+    ['ap-PWAK', 'PWAK 威克島', 19.281, 166.638],
+  ],
+  '🛫 歐洲/加拿大機場': [
+    ['ap-LKPR', 'LKPR 布拉格', 50.101, 14.264],
+    ['ap-EDDB', 'EDDB 柏林布蘭登堡', 52.366, 13.503],
+    ['ap-EDDM', 'EDDM 慕尼黑', 48.354, 11.786],
+    ['ap-EPWA', 'EPWA 華沙蕭邦', 52.166, 20.967],
+    ['ap-LOWL', 'LOWL 林茲', 48.233, 14.188],
+    ['ap-LOWW', 'LOWW 維也納', 48.110, 16.570],
+    ['ap-CYVR', 'CYVR 溫哥華', 49.195, -123.184],
   ],
 };
 const WX_PRESET_MAP = {};
@@ -1354,12 +1693,30 @@ function countWxCustomValid() {
     return p.length >= 3 && p[0].trim() && !isNaN(parseFloat(p[1])) && !isNaN(parseFloat(p[2]));
   }).length;
 }
+// 收合狀態：開 modal 時依勾選情況決定（有勾選的展開，沒勾的收合），session 期間記憶使用者手動切換
+const _catExpanded = {};
+function catKey(section, cat) { return section + ':' + cat; }
+function toggleCat(section, cat) {
+  const k = catKey(section, cat);
+  _catExpanded[k] = !_catExpanded[k];
+  return _catExpanded[k];
+}
+
 function renderWxPresets() {
   const wrap = document.getElementById('wx-presets');
   let html = '';
   for (const cat of Object.keys(WX_PRESETS)) {
-    html += '<div class="wx-cat"><div class="wx-cat-title">' + cat + '</div><div class="wx-chk-grid">';
-    for (const p of WX_PRESETS[cat]) {
+    const items = WX_PRESETS[cat];
+    const sel = items.filter(p => _wxSelectedIds.includes(p[0])).length;
+    const k = catKey('wx', cat);
+    // 首次開啟時：有勾選 → 展開；沒勾 → 收合
+    if (_catExpanded[k] === undefined) _catExpanded[k] = sel > 0;
+    const expCls = _catExpanded[k] ? ' expanded' : '';
+    html += '<div class="wx-cat' + expCls + '" data-cat="' + cat + '">'
+      + '<div class="wx-cat-title"><span>' + cat + '</span>'
+      + '<span><span class="cnt">' + sel + ' / ' + items.length + '</span> <span class="arrow">▶</span></span>'
+      + '</div><div class="wx-chk-grid">';
+    for (const p of items) {
       const [id, name] = p;
       const checked = _wxSelectedIds.includes(id);
       html += '<label class="wx-chk ' + (checked ? 'checked' : '') + '" data-id="' + id + '">'
@@ -1369,9 +1726,19 @@ function renderWxPresets() {
     html += '</div></div>';
   }
   wrap.innerHTML = html;
+  // Category title click → toggle expand
+  wrap.querySelectorAll('.wx-cat-title').forEach(el => {
+    el.addEventListener('click', () => {
+      const cat = el.parentElement.getAttribute('data-cat');
+      toggleCat('wx', cat);
+      el.parentElement.classList.toggle('expanded');
+    });
+  });
+  // Checkbox click
   wrap.querySelectorAll('.wx-chk').forEach(el => {
     el.addEventListener('click', (e) => {
       e.preventDefault();
+      e.stopPropagation();
       const id = el.getAttribute('data-id');
       const idx = _wxSelectedIds.indexOf(id);
       if (idx >= 0) {
@@ -1408,8 +1775,16 @@ function renderTwPresets() {
   const wrap = document.getElementById('tw-presets');
   let html = '';
   for (const cat of Object.keys(TW_PRESETS)) {
-    html += '<div class="wx-cat"><div class="wx-cat-title">' + cat + '</div><div class="wx-chk-grid">';
-    for (const p of TW_PRESETS[cat]) {
+    const items = TW_PRESETS[cat];
+    const sel = items.filter(p => _twSelected.includes(p[0])).length;
+    const k = catKey('tw', cat);
+    if (_catExpanded[k] === undefined) _catExpanded[k] = sel > 0;
+    const expCls = _catExpanded[k] ? ' expanded' : '';
+    html += '<div class="wx-cat' + expCls + '" data-cat="' + cat + '">'
+      + '<div class="wx-cat-title"><span>' + cat + '</span>'
+      + '<span><span class="cnt">' + sel + ' / ' + items.length + '</span> <span class="arrow">▶</span></span>'
+      + '</div><div class="wx-chk-grid">';
+    for (const p of items) {
       const code = p[0], name = p[1];
       const checked = _twSelected.includes(code);
       html += '<label class="wx-chk ' + (checked ? 'checked' : '') + '" data-code="' + code + '">'
@@ -1419,9 +1794,17 @@ function renderTwPresets() {
     html += '</div></div>';
   }
   wrap.innerHTML = html;
+  wrap.querySelectorAll('.wx-cat-title').forEach(el => {
+    el.addEventListener('click', () => {
+      const cat = el.parentElement.getAttribute('data-cat');
+      toggleCat('tw', cat);
+      el.parentElement.classList.toggle('expanded');
+    });
+  });
   wrap.querySelectorAll('.wx-chk').forEach(el => {
     el.addEventListener('click', (e) => {
       e.preventDefault();
+      e.stopPropagation();
       const code = el.getAttribute('data-code');
       const idx = _twSelected.indexOf(code);
       if (idx >= 0) {
@@ -1450,8 +1833,16 @@ function renderUsPresets() {
   const wrap = document.getElementById('us-presets');
   let html = '';
   for (const cat of Object.keys(US_PRESETS)) {
-    html += '<div class="wx-cat"><div class="wx-cat-title">' + cat + '</div><div class="wx-chk-grid">';
-    for (const p of US_PRESETS[cat]) {
+    const items = US_PRESETS[cat];
+    const sel = items.filter(p => _usSelected.includes(p[0])).length;
+    const k = catKey('us', cat);
+    if (_catExpanded[k] === undefined) _catExpanded[k] = sel > 0;
+    const expCls = _catExpanded[k] ? ' expanded' : '';
+    html += '<div class="wx-cat' + expCls + '" data-cat="' + cat + '">'
+      + '<div class="wx-cat-title"><span>' + cat + '</span>'
+      + '<span><span class="cnt">' + sel + ' / ' + items.length + '</span> <span class="arrow">▶</span></span>'
+      + '</div><div class="wx-chk-grid">';
+    for (const p of items) {
       const code = p[0], name = p[1];
       const checked = _usSelected.includes(code);
       html += '<label class="wx-chk ' + (checked ? 'checked' : '') + '" data-code="' + code + '">'
@@ -1461,9 +1852,17 @@ function renderUsPresets() {
     html += '</div></div>';
   }
   wrap.innerHTML = html;
+  wrap.querySelectorAll('.wx-cat-title').forEach(el => {
+    el.addEventListener('click', () => {
+      const cat = el.parentElement.getAttribute('data-cat');
+      toggleCat('us', cat);
+      el.parentElement.classList.toggle('expanded');
+    });
+  });
   wrap.querySelectorAll('.wx-chk').forEach(el => {
     el.addEventListener('click', (e) => {
       e.preventDefault();
+      e.stopPropagation();
       const code = el.getAttribute('data-code');
       const idx = _usSelected.indexOf(code);
       if (idx >= 0) {
@@ -1492,8 +1891,16 @@ function renderFxPresets() {
   const wrap = document.getElementById('fx-presets');
   let html = '';
   for (const cat of Object.keys(FX_PRESETS)) {
-    html += '<div class="wx-cat"><div class="wx-cat-title">' + cat + '</div><div class="wx-chk-grid">';
-    for (const pair of FX_PRESETS[cat]) {
+    const items = FX_PRESETS[cat];
+    const sel = items.filter(p => _fxSelected.includes(p)).length;
+    const k = catKey('fx', cat);
+    if (_catExpanded[k] === undefined) _catExpanded[k] = sel > 0;
+    const expCls = _catExpanded[k] ? ' expanded' : '';
+    html += '<div class="wx-cat' + expCls + '" data-cat="' + cat + '">'
+      + '<div class="wx-cat-title"><span>' + cat + '</span>'
+      + '<span><span class="cnt">' + sel + ' / ' + items.length + '</span> <span class="arrow">▶</span></span>'
+      + '</div><div class="wx-chk-grid">';
+    for (const pair of items) {
       const checked = _fxSelected.includes(pair);
       html += '<label class="wx-chk ' + (checked ? 'checked' : '') + '" data-code="' + pair + '">'
         + '<input type="checkbox"' + (checked ? ' checked' : '') + '>'
@@ -1502,9 +1909,17 @@ function renderFxPresets() {
     html += '</div></div>';
   }
   wrap.innerHTML = html;
+  wrap.querySelectorAll('.wx-cat-title').forEach(el => {
+    el.addEventListener('click', () => {
+      const cat = el.parentElement.getAttribute('data-cat');
+      toggleCat('fx', cat);
+      el.parentElement.classList.toggle('expanded');
+    });
+  });
   wrap.querySelectorAll('.wx-chk').forEach(el => {
     el.addEventListener('click', (e) => {
       e.preventDefault();
+      e.stopPropagation();
       const pair = el.getAttribute('data-code');
       const idx = _fxSelected.indexOf(pair);
       if (idx >= 0) {
@@ -1660,8 +2075,39 @@ function bumpFont(dir) {
 }
 applyFontScale();
 
+// ↻ Refresh button → triggers server rebuild if throttle allows, then reloads
+async function smartRefresh() {
+  const btn = document.getElementById('btn-refresh');
+  const origText = btn.textContent;
+  btn.textContent = '…';
+  btn.disabled = true;
+  try {
+    const r = await fetch('/api/morning-report/refresh', { method: 'POST' });
+    const j = await r.json();
+    if (r.ok) {
+      await loadAndRender();
+    } else if (j.reason === 'throttled') {
+      const mins = Math.ceil((j.nextAvailableIn || 0) / 60000);
+      alert('剛剛才重新抓過，請 ' + mins + ' 分鐘後再試（或直接看現有資料）');
+      await loadAndRender();
+    } else if (j.reason === 'already_running') {
+      alert('正在重新抓資料中，請稍候');
+      await loadAndRender();
+    } else {
+      alert('重新抓取失敗：' + (j.error || j.reason || '未知錯誤'));
+      await loadAndRender();
+    }
+  } catch (e) {
+    alert('連線失敗：' + e.message);
+    await loadAndRender();
+  } finally {
+    btn.textContent = origText;
+    btn.disabled = false;
+  }
+}
+
 // Event bindings
-document.getElementById('btn-refresh').addEventListener('click', () => loadAndRender());
+document.getElementById('btn-refresh').addEventListener('click', smartRefresh);
 document.getElementById('btn-date').addEventListener('click', showDate);
 document.getElementById('btn-theme').addEventListener('click', toggleTheme);
 document.getElementById('btn-font-up').addEventListener('click', () => bumpFont(1));
@@ -1682,13 +2128,18 @@ document.querySelectorAll('.nav-btn').forEach(btn => {
   });
 });
 
-// Measure header height for sticky nav top offset
+// Measure top-stack (header + nav) height for sticky + scroll-margin-top offset
 function updateHdrH() {
   const h = document.querySelector('.hdr');
   if (h) document.documentElement.style.setProperty('--hdr-h', h.offsetHeight + 'px');
+  const ts = document.querySelector('.top-stack');
+  if (ts) document.documentElement.style.setProperty('--top-stack-h', ts.offsetHeight + 'px');
 }
 updateHdrH();
 window.addEventListener('resize', updateHdrH);
+// Measure again after initial render + fonts load
+setTimeout(updateHdrH, 100);
+setTimeout(updateHdrH, 500);
 
 // Service Worker
 if ('serviceWorker' in navigator) {

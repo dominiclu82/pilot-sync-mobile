@@ -53,8 +53,8 @@ function fmtTime(pubDate) {
   try {
     const d = new Date(pubDate);
     if (isNaN(d.getTime())) return '';
-    // 轉成台北時間 HH:MM
-    const tpe = new Date(d.getTime() + 8 * 3600 * 1000 - d.getTimezoneOffset() * 60000);
+    // 轉成台北時間 HH:MM（同時對 UTC 和 Taipei local 都正確）
+    const tpe = new Date(d.getTime() + (8 * 60 + d.getTimezoneOffset()) * 60000);
     const hh = String(tpe.getHours()).padStart(2, '0');
     const mm = String(tpe.getMinutes()).padStart(2, '0');
     return `${hh}:${mm}`;

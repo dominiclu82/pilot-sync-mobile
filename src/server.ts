@@ -25,7 +25,7 @@ import { getSpaSubtabReorderJs } from './spa/js-subtab-reorder.js';
 import { getSpaRosterGridJs } from './spa/js-roster-grid.js';
 import { getSpaFriendsJs } from './spa/js-friends.js';
 import { getSpaGroupsJs } from './spa/js-groups.js';
-import { morningRouter } from './morning.js';
+import { morningRouter, startMorningCron } from './morning.js';
 import FR24Pkg from 'flightradarapi';
 import pg from 'pg';
 
@@ -1612,6 +1612,8 @@ app.get('/status/:jobId', (req, res) => {
 
 app.listen(Number(PORT), '0.0.0.0', () => {
   console.log(`🚀 CrewSync 伺服器啟動：${BASE_URL}`);
+  // 啟動晨報 cron（每分鐘檢查是否到 06:30 台北時間）
+  startMorningCron();
 });
 
 // If the registered redirect URI is on a different port, start a second mini-server for it
