@@ -257,12 +257,12 @@ async function fetchWeather(locs: Array<{ name: string; lat: number; lon: number
 // ────────────────────────────────────────────────────────────────────
 // 2) cnyes 台股（批次）
 // ────────────────────────────────────────────────────────────────────
-async function fetchCnyesStocks(codes, marketPrefix) {
-  // marketPrefix: 'TWS' for TW, 'USS' for US
+async function cnyesBatch(codes, marketPrefix) {
+  if (!codes || codes.length === 0) return {};
   const symbols = codes.map(c => `${marketPrefix}:${c}:STOCK`).join(',');
   const url = `https://ws.api.cnyes.com/ws/api/v1/quote/quotes/${symbols}`;
   const r = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0' } });
-  if (!r.ok) throw new Error('cnyes HTTP ' + r.status);
+  if (!r.ok) return {};
   const json = await r.json();
   const out = {};
   for (const row of (json.data || [])) {
@@ -283,9 +283,22 @@ async function fetchCnyesStocks(codes, marketPrefix) {
   return out;
 }
 
+// 台股：先試 TWS（上市）→ 沒撈到的 fallback 到 TWG（興櫃）
 async function fetchTwStocks(codes: string[] = TW_STOCK_CODES) {
   if (!codes || codes.length === 0) return {};
-  return fetchCnyesStocks(codes, 'TWS');
+  const out = await cnyesBatch(codes, 'TWS');
+  const missing = codes.filter(c => !out[c]);
+  if (missing.length > 0) {
+    try {
+      const twgOut = await cnyesBatch(missing, 'TWG');
+      Object.assign(out, twgOut);
+    } catch (e) { /* 興櫃 fallback 失敗就算了 */ }
+  }
+  return out;
+}
+
+async function fetchCnyesStocks(codes, marketPrefix) {
+  return cnyesBatch(codes, marketPrefix);
 }
 async function fetchUsStocks(codes: string[] = US_STOCK_CODES) {
   if (!codes || codes.length === 0) return {};

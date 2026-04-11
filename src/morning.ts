@@ -9,8 +9,8 @@ import pg from 'pg';
 import { ROOT } from './config.js';
 import { buildMorningReport } from './morning-builder.js';
 
-export const MORNING_VERSION = 'V1.1.1';
-const MORNING_CACHE = 'morning-v1-1-1';
+export const MORNING_VERSION = 'V1.1.02';
+const MORNING_CACHE = 'morning-v1-1-02';
 
 // ─── Postgres ────────────────────────────────────────────────────────
 let _pgPool: pg.Pool | null = null;
@@ -1203,30 +1203,35 @@ a:active { opacity: 0.6; }
     <hr style="border:none;border-top:1px solid var(--border);margin:12px 0">
     <div class="changelog-v">${MORNING_VERSION}</div>
     <div class="changelog-txt">
-      大幅重構為多使用者架構（暱稱當 user_id）：Postgres schema 擴充 morning_reports 加 user_id 欄位、PK 改 (user_id, date)、新增 morning_prefs 表；前端首次開 /morning 跳出暱稱輸入 modal 存 localStorage，重裝或換裝置用同名找回歷史；所有 /api/morning-* 改 per-user（X-User-Id header 必備，缺失回 400）；新端點 POST/GET /api/morning-prefs；設定存檔自動上傳並觸發該使用者重建；Builder 支援 multi-user，cron 06:30 iterate 所有使用者 prefs、計算 union 批次抓、分發給各使用者；設定頁底部加「切換使用者」按鈕；header 標題顯示為「暱稱 的晨報」；runBuildUser 加 waitForLock 避免 race；版次前綴 M→V；新增 test/smoke-m.ts 含 JS parse 檢查；補回 V1.0.3 changelog 在 V1.1.0 推版被誤刪；移除本地 JSON 檔 fallback（多使用者下會洩漏共享資料）。<br>
-      Major refactor to multi-user architecture (nickname as user_id): Postgres schema expands morning_reports with user_id column and composite PK, new morning_prefs table; nickname modal on first visit, recoverable via same name across reinstalls/devices; all /api/morning-* now per-user via X-User-Id header; new POST/GET /api/morning-prefs endpoints; settings save auto-uploads and triggers per-user rebuild; builder supports multi-user with cron iterating all users, computing union, batch fetching and distributing; switch-user button in settings; header shows personalized "[nickname]'s Morning Report"; runBuildUser waits for lock to avoid races; version prefix M→V; new test/smoke-m.ts with inline JS parse check; restored V1.0.3 changelog; removed local JSON fallback (leaked shared data in multi-user mode).
+      修正 cnyes 台股 API 對興櫃股（如 7827 漢康-KY）回傳 404 的 bug：TWS market prefix 只涵蓋上市，7827 在 cnyes 系統歸類為 TWG 興櫃。解法：cnyesBatch 拆成小 helper、fetchTwStocks 先 TWS 批次抓、沒命中的 codes fallback TWG 再抓一次。順便把版次格式改為 PATCH 兩位數（V1.1.02），about card 歷史條目全部補 0。<br>
+      Fix cnyes TW stocks failing on OTC (興櫃) codes like 7827: cnyesBatch tries TWS market prefix first, retries missing codes with TWG. Version format switched to 2-digit patch (V1.1.02), all history entries padded with leading zero.
     </div>
-    <div class="changelog-v old">V1.1.0</div>
+    <div class="changelog-v old">V1.1.01</div>
+    <div class="changelog-txt">
+      大幅重構為多使用者架構（暱稱當 user_id）：Postgres schema 擴充、首次開 modal 輸入暱稱、所有 API 改 per-user X-User-Id、POST /api/morning-prefs、cron 多使用者 union 抓取、切換使用者、header 顯示「暱稱 的晨報」、版次 M→V、新增 smoke-m 含 JS parse 檢查、補回 V1.0.03 changelog、移除本地 JSON fallback。<br>
+      Major refactor to multi-user architecture (nickname as user_id): Postgres schema expanded, first-visit nickname modal, all APIs per-user via X-User-Id, POST /api/morning-prefs, multi-user cron with union fetching, switch-user button, personalized header, M→V prefix, smoke-m with JS parse check, restored V1.0.03 changelog, removed local JSON fallback.
+    </div>
+    <div class="changelog-v old">V1.1.00</div>
     <div class="changelog-txt">
       晨報升級為真實資料每日自動更新：新增 src/morning-builder.ts 整合 5 個資料源（Open-Meteo 145+ 地點天氣 / cnyes JSON API 台美股 / 台銀 CSV 匯率含交叉盤自動計算 / Google News RSS / Google Translate），資料存 Postgres morning_reports 表（本地 JSON fallback）。內建 cron 每分鐘檢查：06:30 台北時間那一分鐘強制重建（06:30 是正式版），06:31+ 只在今天缺資料時重試；伺服器啟動時立即檢查補跑錯過的 06:30。⟳ 按鈕升級為「聰明重抓」：真的觸發重建、30 分鐘節流、建構中鎖定。新增 POST /api/morning-report/refresh 端點。所有 API 路由改 async。部分失敗容錯。新增 🛫 國際機場 7 大類 76 個機場（依據 CrewSync Airport WX Ops Spec C-6 清單），天氣地點從 69 擴增至 145。設定頁分類改為收合式（天氣 10 類 / 台股 4 類 / 美股 4 類 / 匯率 3 類），預設收合、有勾選項自動展開、顯示 N/M 計數。修正 nav bar 點擊捲動時 section header 被 nav 壓住的 bug（V1.0.3 帶入）：scroll-margin-top 改用動態測量的 --top-stack-h 變數。<br>
       Morning Report upgraded to real data with daily auto-refresh via built-in cron at 06:30 Asia/Taipei; Postgres storage; smart refresh button with 30-min throttle; new POST /api/morning-report/refresh; all routes async; partial-failure tolerant; added International Airports category with 76 airports (from Ops Spec C-6), weather locations expanded from 69 to 145; settings categories now collapsible with auto-expand for selected and N/M counts; fixed nav scroll header hidden bug.
     </div>
-    <div class="changelog-v old">V1.0.3</div>
+    <div class="changelog-v old">V1.0.03</div>
     <div class="changelog-txt">
       設定改為分散式：右上角統一 ⚙️ 移除，天氣/台股/美股/匯率每個 section 標題右邊各自有獨立 ⚙️，點哪區就只開那區的設定（修正匯率要拉很下面的問題）；台股加內建勾選清單（半導體/電子/金融/傳產航運 4 類約 30 支）；美股加內建勾選清單（科技/ETF/金融/消費 4 類約 30 支）；匯率改支援跨幣種不限對台幣（對台幣/主要貨幣對/交叉盤 3 類約 25 對，舊版 ['USD','JPY'] 自動遷移）；天氣預設調整為台北 + 桃園龜山；台股預設調整為 2330 + 3231；修正假資料「台北福華」→「台北」。<br>
       Per-section settings: unified top-right ⚙️ removed, each section now has its own ⚙️ (fixes scrolling past weather to reach FX); built-in presets for TW/US stocks and FX with cross-currency pair support; default tweaks; placeholder data name fix.
     </div>
-    <div class="changelog-v old">V1.0.2</div>
+    <div class="changelog-v old">V1.0.02</div>
     <div class="changelog-txt">
       A+/A− 字型按鈕間距拉開，改回兩顆獨立上下排列；修正 nav bar 橫向捲動時回彈反彈效果（overscroll-behavior-x: contain）、整頁防 iOS 橡皮筋反彈（overscroll-behavior: none）。<br>
       A+/A− font buttons spaced apart, restored as two separate stacked buttons; fix nav bar horizontal overscroll bounce, disable iOS rubber-band bounce on full page.
     </div>
-    <div class="changelog-v old">V1.0.1</div>
+    <div class="changelog-v old">V1.0.01</div>
     <div class="changelog-txt">
       天氣地點設定改成勾選式：內建 3 大類共 68 個預設點位（🇹🇼 台灣城市 23 個 / 🏞️ 台灣景點 17 個 / 🌏 國際城市 33 個，含蘇黎世、布拉格、鳳凰城），保留手動輸入經緯度功能，總上限 10 個地點；Header 按鈕列在手機過寬修正：A+/A− 合併為上下複合按鈕省一格、整列緊湊化；Nav bar 在手機被推走修正：header 與 nav 改為同一 sticky 容器一起釘頂。<br>
       Weather location setting switched to checkbox UI with 68 built-in presets, manual lat/lon input retained, max 10 total; Fix header button row overflowing on mobile; Fix nav bar being pushed off on mobile.
     </div>
-    <div class="changelog-v old">V1.0.0</div>
+    <div class="changelog-v old">V1.0.00</div>
     <div class="changelog-txt">
       晨報首次上線：每日天氣（4 地點、風向箭頭、knot 風速）、台股/美股（連 cnyes 頁面）、匯率（對台幣）、台灣新聞（Google News RSS，同來源最多 2 條，🇹🇼 國旗圖示）、世界新聞（英文原文 + 繁中翻譯）、PWA 安裝（獨立 icon/manifest/SW）、快速導覽列、月曆歷史檢視（金色高亮有資料日期）、日/夜模式、字型放大縮小、設定頁自選追蹤項目。<br>
       Morning Report first release: daily weather (4 locations with wind arrow + knots), TW/US stocks, FX, TW+World news, installable PWA, quick-nav bar, calendar history, day/night theme, font scaling, customizable watchlists.
