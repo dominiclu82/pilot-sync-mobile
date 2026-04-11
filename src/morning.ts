@@ -7,8 +7,8 @@ import fs from 'fs';
 import path from 'path';
 import { ROOT } from './config.js';
 
-export const MORNING_VERSION = 'M1.0.0';
-const MORNING_CACHE = 'morning-v1';
+export const MORNING_VERSION = 'M1.0.1';
+const MORNING_CACHE = 'morning-v1-0-1';
 
 const DATA_DIR = path.join(ROOT, 'data', 'morning');
 
@@ -283,13 +283,19 @@ body {
 a { color: var(--accent); text-decoration: none; }
 a:active { opacity: 0.6; }
 
+/* Sticky stack (header + nav move together) */
+.top-stack {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+}
+
 /* Header */
 .hdr {
-  position: sticky; top: 0; z-index: 50;
   background: linear-gradient(180deg, var(--hdr-grad-1) 0%, var(--hdr-grad-2) 100%);
-  padding: calc(env(safe-area-inset-top) + 14px) 16px 12px;
+  padding: calc(env(safe-area-inset-top) + 10px) 12px 8px;
   border-bottom: 1px solid var(--border);
-  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
 }
 .hdr-title { font-size: 1.15em; font-weight: 700; display: flex; align-items: center; gap: 8px; }
 .hdr-title .emoji { font-size: 1.2em; }
@@ -306,23 +312,47 @@ a:active { opacity: 0.6; }
 }
 .hdr-title .ver:active { opacity: .7; }
 .hdr-date { font-size: .85em; color: var(--muted); font-variant-numeric: tabular-nums; }
-.hdr-btns { display: flex; gap: 8px; }
+.hdr-btns { display: flex; gap: 6px; flex-shrink: 0; }
 .hdr-btn {
   background: rgba(255,255,255,0.08);
   border: 1px solid var(--border);
   color: var(--text);
-  padding: 6px 10px;
+  padding: 6px 9px;
   border-radius: 8px;
   font-size: .82em;
   cursor: pointer;
+  min-width: 34px;
+  line-height: 1.1;
 }
 .hdr-btn:active { opacity: 0.7; }
 
+/* Compound font-scale button (A+/A- stacked) */
+.hdr-btn-font {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+.hdr-btn-font button {
+  background: rgba(255,255,255,0.08);
+  border: none;
+  color: var(--text);
+  padding: 1px 8px;
+  font-size: .62em;
+  font-weight: 700;
+  cursor: pointer;
+  line-height: 1.3;
+  min-width: 28px;
+}
+.hdr-btn-font button:not(:last-child) {
+  border-bottom: 1px solid var(--border);
+}
+.hdr-btn-font button:active { opacity: 0.7; }
+
 /* Nav bar (fixed under header) */
 .nav {
-  position: sticky;
-  top: var(--hdr-h, 0);
-  z-index: 45;
   background: var(--nav-bg);
   backdrop-filter: blur(8px);
   border-bottom: 1px solid var(--border);
@@ -576,6 +606,52 @@ a:active { opacity: 0.6; }
   resize: vertical;
   min-height: 60px;
 }
+.wx-cat {
+  margin-top: 10px;
+}
+.wx-cat-title {
+  font-size: .82em;
+  font-weight: 700;
+  color: var(--accent);
+  margin-bottom: 6px;
+}
+.wx-chk-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 6px;
+}
+.wx-chk {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: .78em;
+  cursor: pointer;
+  user-select: none;
+}
+.wx-chk input[type="checkbox"] {
+  margin: 0;
+  cursor: pointer;
+}
+.wx-chk.checked {
+  background: rgba(244,196,48,0.14);
+  border-color: rgba(244,196,48,0.45);
+  color: var(--accent);
+  font-weight: 600;
+}
+.wx-chk.disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.wx-counter {
+  font-size: .76em;
+  color: var(--muted);
+  margin-bottom: 6px;
+}
+.wx-counter.full { color: var(--accent2); font-weight: 600; }
 .set-btn {
   background: var(--accent);
   color: #1F2D3D;
@@ -604,31 +680,35 @@ a:active { opacity: 0.6; }
 </head>
 <body>
 
-<div class="hdr">
-  <div>
-    <div class="hdr-title">
-      <span class="emoji">🌅</span>晨報
-      <span class="ver" onclick="showAbout()">${MORNING_VERSION}</span>
+<div class="top-stack">
+  <div class="hdr">
+    <div style="min-width:0;flex:1">
+      <div class="hdr-title">
+        <span class="emoji">🌅</span>晨報
+        <span class="ver" onclick="showAbout()">${MORNING_VERSION}</span>
+      </div>
+      <div class="hdr-date" id="hdr-date">—</div>
     </div>
-    <div class="hdr-date" id="hdr-date">—</div>
+    <div class="hdr-btns">
+      <div class="hdr-btn-font" title="字型大小">
+        <button id="btn-font-up">A+</button>
+        <button id="btn-font-dn">A−</button>
+      </div>
+      <button class="hdr-btn" id="btn-theme" title="日/夜">🌙</button>
+      <button class="hdr-btn" id="btn-date" title="歷史">📅</button>
+      <button class="hdr-btn" id="btn-set" title="設定">⚙️</button>
+      <button class="hdr-btn" id="btn-refresh" title="重新整理">↻</button>
+    </div>
   </div>
-  <div class="hdr-btns">
-    <button class="hdr-btn" id="btn-font-dn" title="字型縮小">A−</button>
-    <button class="hdr-btn" id="btn-font-up" title="字型放大">A+</button>
-    <button class="hdr-btn" id="btn-theme" title="日/夜">🌙</button>
-    <button class="hdr-btn" id="btn-date" title="歷史">📅</button>
-    <button class="hdr-btn" id="btn-set" title="設定">⚙️</button>
-    <button class="hdr-btn" id="btn-refresh" title="重新整理">↻</button>
-  </div>
-</div>
 
-<nav class="nav" id="nav">
-  <button class="nav-btn" data-target="sec-wx">🌤️ 天氣</button>
-  <button class="nav-btn" data-target="sec-stw">📈 台股</button>
-  <button class="nav-btn" data-target="sec-sus">🇺🇸 美股</button>
-  <button class="nav-btn" data-target="sec-ntw">🇹🇼 台灣新聞</button>
-  <button class="nav-btn" data-target="sec-nww">🌍 世界新聞</button>
-</nav>
+  <nav class="nav" id="nav">
+    <button class="nav-btn" data-target="sec-wx">🌤️ 天氣</button>
+    <button class="nav-btn" data-target="sec-stw">📈 台股</button>
+    <button class="nav-btn" data-target="sec-sus">🇺🇸 美股</button>
+    <button class="nav-btn" data-target="sec-ntw">🇹🇼 台灣新聞</button>
+    <button class="nav-btn" data-target="sec-nww">🌍 世界新聞</button>
+  </nav>
+</div>
 
 <div id="root">
   <div class="loading">載入中 Loading…</div>
@@ -654,6 +734,11 @@ a:active { opacity: 0.6; }
     <hr style="border:none;border-top:1px solid var(--border);margin:12px 0">
     <div class="changelog-v">${MORNING_VERSION}</div>
     <div class="changelog-txt">
+      天氣地點設定改成勾選式：內建 3 大類共 68 個預設點位（🇹🇼 台灣城市 23 個 / 🏞️ 台灣景點 17 個 / 🌏 國際城市 33 個，含蘇黎世、布拉格、鳳凰城），保留手動輸入經緯度功能，總上限 10 個地點；Header 按鈕列在手機過寬修正：A+/A− 合併為上下複合按鈕省一格、整列緊湊化；Nav bar 在手機被推走修正：header 與 nav 改為同一 sticky 容器一起釘頂。<br>
+      Weather location setting switched to checkbox UI with 68 built-in presets (TW cities 23 / TW attractions 17 / International cities 33, incl. Zurich, Prague, Phoenix), manual lat/lon input retained, max 10 total; Fix header button row overflowing on mobile: A+/A− combined into vertical compound button saving one slot, buttons tightened; Fix nav bar being pushed off on mobile: header and nav now share a single sticky container so they pin together.
+    </div>
+    <div class="changelog-v old">M1.0.0</div>
+    <div class="changelog-txt">
       晨報首次上線：每日天氣（4 地點、風向箭頭、knot 風速）、台股/美股（連 cnyes 頁面）、匯率（對台幣）、台灣新聞（Google News RSS，同來源最多 2 條，🇹🇼 國旗圖示）、世界新聞（英文原文 + 繁中翻譯）、PWA 安裝（獨立 icon/manifest/SW）、快速導覽列、月曆歷史檢視（金色高亮有資料日期）、日/夜模式、字型放大縮小、設定頁自選追蹤項目。⚠️ 目前資料為 placeholder（除新聞外），GitHub Actions 爬蟲尚未部署。<br>
       Morning Report first release: daily weather (4 locations with wind arrow + knots), TW/US stocks linked to cnyes, FX rates vs TWD, TW news via Google News RSS (max 2 per source, 🇹🇼 flag icon), world news with EN original + zh-TW translation, installable PWA (independent icon/manifest/SW), quick-nav bar, month calendar history (available dates highlighted in gold), day/night theme, font scaling, customizable watchlists. ⚠️ Data is placeholder (except news); GitHub Actions crawler not yet deployed.
     </div>
@@ -671,8 +756,13 @@ a:active { opacity: 0.6; }
 
     <div class="set-sec">
       <h4>🌤️ 天氣地點</h4>
-      <p>一行一個地點，格式：<code>名稱,緯度,經度</code>（留空用預設）</p>
-      <textarea id="set-wx" placeholder="台北福華,25.04,121.55"></textarea>
+      <p>勾選預設地點（最多 10 個，與手動輸入加總）</p>
+      <div class="wx-counter" id="wx-counter">已選 0 / 10</div>
+      <div id="wx-presets"></div>
+      <div style="margin-top:14px">
+        <p style="margin-top:0">也可以手動加地點（一行一個，格式：<code>名稱,緯度,經度</code>）</p>
+        <textarea id="set-wx-custom" placeholder="自選地點,24.99,121.31"></textarea>
+      </div>
     </div>
 
     <div class="set-sec">
@@ -727,18 +817,104 @@ ${getMorningClientJs()}
 function getMorningClientJs() {
   return `
 const LS = {
-  wx: 'morning_wx_locs',
+  wxPresets: 'morning_wx_presets',  // array of preset IDs
+  wxCustom: 'morning_wx_custom',    // array of {name,lat,lon}
+  wxLegacy: 'morning_wx_locs',      // 舊版相容：{name,lat,lon}[]
   tw: 'morning_tw_stocks',
   us: 'morning_us_stocks',
   fx: 'morning_fx_currencies',
 };
-const DEFAULTS = {
-  wx: [
-    { name: '台北福華', lat: 25.04, lon: 121.55 },
-    { name: '桃園八德', lat: 24.93, lon: 121.28 },
-    { name: '桃園龜山', lat: 25.04, lon: 121.35 },
-    { name: '新竹竹北', lat: 24.83, lon: 121.00 },
+
+// 天氣預設地點清單（分 3 類）
+// 每筆：[id, name, lat, lon]
+const WX_PRESETS = {
+  '🇹🇼 台灣城市': [
+    ['tw-taipei', '台北', 25.03, 121.56],
+    ['tw-xinbei', '新北', 24.98, 121.54],
+    ['tw-keelung', '基隆', 25.13, 121.74],
+    ['tw-taoyuan', '桃園', 24.99, 121.31],
+    ['tw-bade', '桃園八德', 24.93, 121.28],
+    ['tw-guishan', '桃園龜山', 25.04, 121.35],
+    ['tw-hsinchu', '新竹', 24.81, 120.97],
+    ['tw-zhubei', '新竹竹北', 24.83, 121.00],
+    ['tw-miaoli', '苗栗', 24.56, 120.82],
+    ['tw-taichung', '台中', 24.14, 120.68],
+    ['tw-changhua', '彰化', 24.08, 120.54],
+    ['tw-nantou', '南投', 23.91, 120.68],
+    ['tw-yunlin', '雲林', 23.71, 120.54],
+    ['tw-chiayi', '嘉義', 23.48, 120.45],
+    ['tw-tainan', '台南', 22.99, 120.22],
+    ['tw-kaohsiung', '高雄', 22.63, 120.30],
+    ['tw-pingtung', '屏東', 22.67, 120.49],
+    ['tw-yilan', '宜蘭', 24.76, 121.75],
+    ['tw-hualien', '花蓮', 23.98, 121.61],
+    ['tw-taitung', '台東', 22.76, 121.14],
+    ['tw-penghu', '澎湖(馬公)', 23.57, 119.58],
+    ['tw-kinmen', '金門', 24.45, 118.32],
+    ['tw-matsu', '馬祖(南竿)', 26.15, 119.95],
   ],
+  '🏞️ 台灣景點': [
+    ['at-sunmoon', '日月潭', 23.86, 120.91],
+    ['at-alishan', '阿里山', 23.51, 120.80],
+    ['at-yushan', '玉山', 23.47, 120.95],
+    ['at-hehuan', '合歡山', 24.14, 121.27],
+    ['at-yangmingshan', '陽明山', 25.17, 121.55],
+    ['at-kenting', '墾丁', 21.95, 120.79],
+    ['at-taroko', '太魯閣', 24.15, 121.49],
+    ['at-jiufen', '九份', 25.11, 121.85],
+    ['at-qingjing', '清境農場', 24.05, 121.17],
+    ['at-wuling', '武陵農場', 24.37, 121.30],
+    ['at-lalashan', '拉拉山', 24.69, 121.43],
+    ['at-xitou', '溪頭', 23.67, 120.80],
+    ['at-dasyueshan', '大雪山', 24.26, 121.00],
+    ['at-aowanda', '奧萬大', 24.03, 121.18],
+    ['at-fulong', '福隆', 25.02, 121.94],
+    ['at-greenisland', '綠島', 22.67, 121.49],
+    ['at-lanyu', '蘭嶼', 22.05, 121.55],
+  ],
+  '🌏 國際城市': [
+    ['in-tyo', '東京 TYO', 35.68, 139.69],
+    ['in-osa', '大阪 OSA', 34.69, 135.50],
+    ['in-spk', '札幌 SPK', 43.06, 141.35],
+    ['in-fuk', '福岡 FUK', 33.59, 130.40],
+    ['in-oki', '沖繩 OKA', 26.21, 127.68],
+    ['in-sel', '首爾 SEL', 37.57, 126.98],
+    ['in-pus', '釜山 PUS', 35.18, 129.08],
+    ['in-bjs', '北京 BJS', 39.90, 116.41],
+    ['in-sha', '上海 SHA', 31.23, 121.47],
+    ['in-can', '廣州 CAN', 23.13, 113.26],
+    ['in-hkg', '香港 HKG', 22.32, 114.17],
+    ['in-mfm', '澳門 MFM', 22.20, 113.54],
+    ['in-sin', '新加坡 SIN', 1.35, 103.82],
+    ['in-bkk', '曼谷 BKK', 13.75, 100.50],
+    ['in-kul', '吉隆坡 KUL', 3.14, 101.69],
+    ['in-han', '河內 HAN', 21.03, 105.83],
+    ['in-sgn', '胡志明 SGN', 10.82, 106.63],
+    ['in-mnl', '馬尼拉 MNL', 14.60, 120.98],
+    ['in-dps', '峇里島 DPS', -8.65, 115.22],
+    ['in-syd', '雪梨 SYD', -33.87, 151.21],
+    ['in-mel', '墨爾本 MEL', -37.81, 144.96],
+    ['in-lax', '洛杉磯 LAX', 34.05, -118.24],
+    ['in-sfo', '舊金山 SFO', 37.77, -122.42],
+    ['in-sea', '西雅圖 SEA', 47.60, -122.33],
+    ['in-nyc', '紐約 NYC', 40.71, -74.01],
+    ['in-yvr', '溫哥華 YVR', 49.28, -123.12],
+    ['in-lhr', '倫敦 LON', 51.51, -0.13],
+    ['in-par', '巴黎 PAR', 48.86, 2.35],
+    ['in-fra', '法蘭克福 FRA', 50.11, 8.68],
+    ['in-ams', '阿姆斯特丹 AMS', 52.37, 4.90],
+    ['in-zrh', '蘇黎世 ZRH', 47.37, 8.55],
+    ['in-prg', '布拉格 PRG', 50.08, 14.44],
+    ['in-phx', '鳳凰城 PHX', 33.45, -112.07],
+  ],
+};
+const WX_PRESET_MAP = {};
+Object.values(WX_PRESETS).forEach(arr => arr.forEach(p => { WX_PRESET_MAP[p[0]] = { id: p[0], name: p[1], lat: p[2], lon: p[3] }; }));
+const WX_MAX = 10;
+
+const DEFAULTS = {
+  wxPresets: ['tw-taipei', 'tw-bade', 'tw-guishan', 'tw-zhubei'],
+  wxCustom: [],
   tw: ['1773','2330','3231','5392','6919','7827'],
   us: ['NVDA','TSLA','VST','VT','VOO','QQQ'],
   fx: ['USD','JPY','EUR','SGD','CNY'],
@@ -753,6 +929,33 @@ function loadSetting(key, fallback) {
 }
 function saveSetting(key, val) {
   try { localStorage.setItem(LS[key], JSON.stringify(val)); } catch (e) {}
+}
+
+// 取得目前要顯示的天氣地點（合併 presets + custom，並保留排序、套上限）
+function getActiveWxLocs() {
+  // 舊版相容：若 legacy 存在，轉成 custom 並清掉 legacy
+  try {
+    const legacy = localStorage.getItem(LS.wxLegacy);
+    if (legacy) {
+      const arr = JSON.parse(legacy);
+      if (Array.isArray(arr) && arr.length > 0) {
+        saveSetting('wxCustom', arr);
+        localStorage.removeItem(LS.wxLegacy);
+      }
+    }
+  } catch (e) {}
+  const presetIds = loadSetting('wxPresets', DEFAULTS.wxPresets);
+  const custom = loadSetting('wxCustom', DEFAULTS.wxCustom);
+  const out = [];
+  for (const id of presetIds) {
+    if (WX_PRESET_MAP[id]) out.push(WX_PRESET_MAP[id]);
+    if (out.length >= WX_MAX) return out;
+  }
+  for (const c of custom) {
+    if (c && c.name && typeof c.lat === 'number' && typeof c.lon === 'number') out.push(c);
+    if (out.length >= WX_MAX) return out;
+  }
+  return out;
 }
 
 function fmtNum(n, dec) {
@@ -808,7 +1011,13 @@ function renderReport(data) {
   const userUs = loadSetting('us', DEFAULTS.us);
   const userFx = loadSetting('fx', DEFAULTS.fx);
 
-  const wxBlocks = (data.weather || []).map(w => renderWx(w)).join('');
+  const activeWx = getActiveWxLocs();
+  const wxByName = {};
+  (data.weather || []).forEach(w => { if (w && w.name) wxByName[w.name] = w; });
+  const wxBlocks = activeWx.map(loc => {
+    const w = wxByName[loc.name] || { name: loc.name, temp: null, feels: null, humidity: null, wind: null, windDir: null, uv: null, code: null, sunrise: '—', sunset: '—', forecast: [] };
+    return renderWx(w);
+  }).join('');
   const twRows = userTw.map(code => renderStock(code, 'tw', (data.stocks_tw || {})[code])).join('') || emptyRow();
   const usRows = userUs.map(code => renderStock(code, 'us', (data.stocks_us || {})[code])).join('') || emptyRow();
   const fxRows = userFx.map(c => renderFx(c, (data.fx || {})[c])).join('') || emptyRow();
@@ -842,11 +1051,13 @@ function setupNavActive() {
 }
 
 function renderWx(w) {
+  const fmtT = v => (v == null || isNaN(v)) ? '—' : Math.round(v) + '°';
+  const fmtN = v => (v == null || isNaN(v)) ? '—' : v;
   const forecast = (w.forecast || []).slice(0, 7).map(f => \`
     <div class="wx-day">
       <div class="d">\${f.day || '—'}</div>
       <div class="i">\${wxEmoji(f.code)}</div>
-      <div class="t">\${Math.round(f.tmax)}° / \${Math.round(f.tmin)}°</div>
+      <div class="t">\${fmtT(f.tmax)} / \${fmtT(f.tmin)}</div>
     </div>
   \`).join('');
   const windArrow = (w.windDir != null)
@@ -858,10 +1069,10 @@ function renderWx(w) {
       <div class="wx-loc-name">\${w.name || '—'}</div>
       <div class="wx-loc-main">
         <div class="wx-icon">\${wxEmoji(w.code)}</div>
-        <div class="wx-temp">\${Math.round(w.temp)}°</div>
+        <div class="wx-temp">\${fmtT(w.temp)}</div>
         <div class="wx-detail">
-          <div>體感 \${Math.round(w.feels)}° · 濕度 \${w.humidity ?? '—'}%</div>
-          <div>風 \${windArrow}\${windDirLabel} \${w.wind ?? '—'} kt · UV \${w.uv ?? '—'}</div>
+          <div>體感 \${fmtT(w.feels)} · 濕度 \${fmtN(w.humidity)}%</div>
+          <div>風 \${windArrow}\${windDirLabel} \${fmtN(w.wind)} kt · UV \${fmtN(w.uv)}</div>
           <div>🌅 \${w.sunrise || '—'} · 🌇 \${w.sunset || '—'}</div>
         </div>
       </div>
@@ -955,22 +1166,84 @@ window.showAbout = showAbout;
 window.hideAbout = hideAbout;
 
 // Settings modal
+let _wxSelectedIds = [];  // 在設定頁開啟期間暫存的勾選狀態
+
 function showSet() {
-  const wx = loadSetting('wx', DEFAULTS.wx);
-  document.getElementById('set-wx').value = wx.map(w => \`\${w.name},\${w.lat},\${w.lon}\`).join('\\n');
+  _wxSelectedIds = [...loadSetting('wxPresets', DEFAULTS.wxPresets)];
+  renderWxPresets();
+  const custom = loadSetting('wxCustom', DEFAULTS.wxCustom);
+  document.getElementById('set-wx-custom').value = custom.map(w => \`\${w.name},\${w.lat},\${w.lon}\`).join('\\n');
   document.getElementById('set-tw').value = loadSetting('tw', DEFAULTS.tw).join(',');
   document.getElementById('set-us').value = loadSetting('us', DEFAULTS.us).join(',');
   document.getElementById('set-fx').value = loadSetting('fx', DEFAULTS.fx).join(',');
   document.getElementById('set-wrap').classList.add('show');
 }
 function hideSet() { document.getElementById('set-wrap').classList.remove('show'); }
+
+function countCustomValid() {
+  const txt = document.getElementById('set-wx-custom').value || '';
+  return txt.trim().split(/\\n/).map(l => l.trim()).filter(Boolean).filter(line => {
+    const p = line.split(',');
+    return p.length >= 3 && p[0].trim() && !isNaN(parseFloat(p[1])) && !isNaN(parseFloat(p[2]));
+  }).length;
+}
+
+function renderWxPresets() {
+  const wrap = document.getElementById('wx-presets');
+  let html = '';
+  for (const cat of Object.keys(WX_PRESETS)) {
+    html += '<div class="wx-cat"><div class="wx-cat-title">' + cat + '</div><div class="wx-chk-grid">';
+    for (const p of WX_PRESETS[cat]) {
+      const [id, name] = p;
+      const checked = _wxSelectedIds.includes(id);
+      html += '<label class="wx-chk ' + (checked ? 'checked' : '') + '" data-id="' + id + '">'
+        + '<input type="checkbox"' + (checked ? ' checked' : '') + '>'
+        + '<span>' + name + '</span></label>';
+    }
+    html += '</div></div>';
+  }
+  wrap.innerHTML = html;
+  wrap.querySelectorAll('.wx-chk').forEach(el => {
+    el.addEventListener('click', (e) => {
+      e.preventDefault();
+      const id = el.getAttribute('data-id');
+      const idx = _wxSelectedIds.indexOf(id);
+      const customN = countCustomValid();
+      if (idx >= 0) {
+        _wxSelectedIds.splice(idx, 1);
+      } else {
+        if (_wxSelectedIds.length + customN >= WX_MAX) {
+          alert('最多只能選 ' + WX_MAX + ' 個地點（預設 + 手動加總）');
+          return;
+        }
+        _wxSelectedIds.push(id);
+      }
+      renderWxPresets();
+      updateWxCounter();
+    });
+  });
+  updateWxCounter();
+}
+
+function updateWxCounter() {
+  const customN = countCustomValid();
+  const total = _wxSelectedIds.length + customN;
+  const el = document.getElementById('wx-counter');
+  el.textContent = '已選 ' + total + ' / ' + WX_MAX + '（預設 ' + _wxSelectedIds.length + ' + 手動 ' + customN + '）';
+  if (total >= WX_MAX) el.classList.add('full'); else el.classList.remove('full');
+}
+
 function saveSettings() {
-  const wxLines = document.getElementById('set-wx').value.trim().split(/\\n/).map(l => l.trim()).filter(Boolean);
-  const wx = wxLines.map(line => {
+  // Weather presets
+  saveSetting('wxPresets', _wxSelectedIds);
+  // Weather custom
+  const lines = document.getElementById('set-wx-custom').value.trim().split(/\\n/).map(l => l.trim()).filter(Boolean);
+  const custom = lines.map(line => {
     const [name, lat, lon] = line.split(',').map(s => s.trim());
     return { name, lat: parseFloat(lat), lon: parseFloat(lon) };
   }).filter(w => w.name && !isNaN(w.lat) && !isNaN(w.lon));
-  if (wx.length > 0) saveSetting('wx', wx); else localStorage.removeItem(LS.wx);
+  saveSetting('wxCustom', custom);
+  // Stocks / FX
   const parseList = v => v.split(',').map(s => s.trim().toUpperCase()).filter(Boolean);
   const tw = parseList(document.getElementById('set-tw').value);
   const us = parseList(document.getElementById('set-us').value);
@@ -1099,6 +1372,7 @@ document.getElementById('btn-font-up').addEventListener('click', () => bumpFont(
 document.getElementById('btn-font-dn').addEventListener('click', () => bumpFont(-1));
 document.getElementById('cal-prev').addEventListener('click', () => calNav(-1));
 document.getElementById('cal-next').addEventListener('click', () => calNav(1));
+document.getElementById('set-wx-custom').addEventListener('input', updateWxCounter);
 
 // Nav bar click → scroll to section
 document.querySelectorAll('.nav-btn').forEach(btn => {
