@@ -9,8 +9,8 @@ import pg from 'pg';
 import { ROOT } from './config.js';
 import { buildMorningReport } from './morning-builder.js';
 
-export const MORNING_VERSION = 'M1.1.0';
-const MORNING_CACHE = 'morning-v1-1-0';
+export const MORNING_VERSION = 'V1.1.1';
+const MORNING_CACHE = 'morning-v1-1-1';
 
 // ─── Postgres ────────────────────────────────────────────────────────
 let _pgPool: pg.Pool | null = null;
@@ -30,13 +30,33 @@ async function ensurePgTables() {
   const pool = getPool();
   if (!pool) return false;
   try {
+    // morning_reports：先建表（新 schema），若舊表存在則加上 user_id 欄位
     await pool.query(`
       CREATE TABLE IF NOT EXISTS morning_reports (
-        date DATE PRIMARY KEY,
+        user_id TEXT NOT NULL DEFAULT '__legacy',
+        date DATE NOT NULL,
         data JSONB NOT NULL,
-        generated_at TIMESTAMPTZ DEFAULT NOW()
+        generated_at TIMESTAMPTZ DEFAULT NOW(),
+        PRIMARY KEY (user_id, date)
       );
     `);
+    // Migration: 舊表沒 user_id 欄位 → 加上 (ALTER 安全，若欄位已存在無動作)
+    await pool.query(`ALTER TABLE morning_reports ADD COLUMN IF NOT EXISTS user_id TEXT NOT NULL DEFAULT '__legacy'`).catch(() => {});
+    // 若原本 PK 只有 date，需要重建 PK 包含 user_id（會失敗若 PK 正確）
+    try {
+      await pool.query(`ALTER TABLE morning_reports DROP CONSTRAINT IF EXISTS morning_reports_pkey`);
+      await pool.query(`ALTER TABLE morning_reports ADD PRIMARY KEY (user_id, date)`);
+    } catch (e) { /* 已經是正確 PK 就忽略 */ }
+
+    // morning_prefs：每個使用者一筆
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS morning_prefs (
+        user_id TEXT PRIMARY KEY,
+        prefs JSONB NOT NULL,
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+      );
+    `);
+
     _pgReady = true;
     return true;
   } catch (e) {
@@ -45,70 +65,69 @@ async function ensurePgTables() {
   }
 }
 
-// 取得資料：優先 Postgres → fallback 本地 JSON 檔
-async function getReportByDate(date: string) {
+// ─── 每個使用者的資料讀寫 ────────────────────────────────────────────
+// 取得指定使用者某日的快照（多使用者模式，不使用共享檔案 fallback）
+async function getReportByDate(userId: string, date: string) {
   const pool = getPool();
   if (pool && await ensurePgTables()) {
     try {
-      const r = await pool.query('SELECT data, generated_at FROM morning_reports WHERE date = $1', [date]);
+      const r = await pool.query(
+        'SELECT data FROM morning_reports WHERE user_id = $1 AND date = $2',
+        [userId, date]
+      );
       if (r.rows.length > 0) return r.rows[0].data;
     } catch (e) {
       console.warn('[morning] getReportByDate db error:', e instanceof Error ? e.message : String(e));
     }
   }
-  // Fallback 本地檔案
-  const file = path.join(DATA_DIR, `${date}.json`);
-  if (fs.existsSync(file)) {
-    try { return JSON.parse(fs.readFileSync(file, 'utf-8')); } catch (e) {}
+  return null;
+}
+
+async function getLatestDate(userId: string) {
+  const pool = getPool();
+  if (pool && await ensurePgTables()) {
+    try {
+      const r = await pool.query(
+        'SELECT date::text FROM morning_reports WHERE user_id = $1 ORDER BY date DESC LIMIT 1',
+        [userId]
+      );
+      if (r.rows.length > 0) return r.rows[0].date;
+    } catch (e) {}
   }
   return null;
 }
 
-async function getLatestDate() {
+async function getAllDates(userId: string): Promise<string[]> {
   const pool = getPool();
   if (pool && await ensurePgTables()) {
     try {
-      const r = await pool.query('SELECT date::text FROM morning_reports ORDER BY date DESC LIMIT 1');
-      if (r.rows.length > 0) return r.rows[0].date;
-    } catch (e) {}
-  }
-  return latestDataDate();
-}
-
-async function getAllDates() {
-  const pool = getPool();
-  if (pool && await ensurePgTables()) {
-    try {
-      const r = await pool.query('SELECT date::text FROM morning_reports ORDER BY date DESC');
+      const r = await pool.query(
+        'SELECT date::text FROM morning_reports WHERE user_id = $1 ORDER BY date DESC',
+        [userId]
+      );
       return r.rows.map((row: any) => row.date);
     } catch (e) {}
   }
-  // Fallback 本地
-  ensureDataDir();
-  try {
-    return fs.readdirSync(DATA_DIR)
-      .filter(f => /^\d{4}-\d{2}-\d{2}\.json$/.test(f))
-      .map(f => f.replace('.json', ''))
-      .sort()
-      .reverse();
-  } catch (e) { return []; }
+  return [];
 }
 
-async function saveReport(date: string, data: any) {
+async function saveReport(userId: string, date: string, data: any) {
   const pool = getPool();
   if (pool && await ensurePgTables()) {
     try {
       await pool.query(
-        'INSERT INTO morning_reports (date, data, generated_at) VALUES ($1, $2, NOW()) ON CONFLICT (date) DO UPDATE SET data = EXCLUDED.data, generated_at = NOW()',
-        [date, JSON.stringify(data)]
+        `INSERT INTO morning_reports (user_id, date, data, generated_at)
+         VALUES ($1, $2, $3, NOW())
+         ON CONFLICT (user_id, date)
+         DO UPDATE SET data = EXCLUDED.data, generated_at = NOW()`,
+        [userId, date, JSON.stringify(data)]
       );
-      console.log('[morning] saved to Postgres:', date);
+      console.log('[morning] saved to Postgres:', userId, date);
       return true;
     } catch (e) {
       console.warn('[morning] saveReport db error:', e instanceof Error ? e.message : String(e));
     }
   }
-  // Fallback 本地
   ensureDataDir();
   try {
     fs.writeFileSync(path.join(DATA_DIR, `${date}.json`), JSON.stringify(data, null, 2), 'utf-8');
@@ -120,28 +139,184 @@ async function saveReport(date: string, data: any) {
   }
 }
 
-// ─── 建構鎖 + 節流 ───────────────────────────────────────────────────
-let _buildInProgress = false;
-let _lastBuildAt = 0;  // Unix ms
-const REFRESH_THROTTLE_MS = 30 * 60 * 1000;  // 30 分鐘
+// ─── 使用者偏好讀寫 (morning_prefs) ──────────────────────────────────
+interface UserPrefs {
+  wx?: Array<{ name: string; lat: number; lon: number }>;  // [{name,lat,lon},...]
+  tw?: string[];  // 股票代號
+  us?: string[];
+  fx?: string[];  // 貨幣對 'USD/TWD'
+}
 
-// 觸發建構並寫入儲存
-async function runBuild(force = false) {
-  if (_buildInProgress) {
-    return { ok: false, reason: 'already_running' };
+async function getPrefs(userId: string): Promise<UserPrefs | null> {
+  const pool = getPool();
+  if (pool && await ensurePgTables()) {
+    try {
+      const r = await pool.query('SELECT prefs FROM morning_prefs WHERE user_id = $1', [userId]);
+      if (r.rows.length > 0) return r.rows[0].prefs;
+    } catch (e) {
+      console.warn('[morning] getPrefs db error:', e instanceof Error ? e.message : String(e));
+    }
   }
-  if (!force && (Date.now() - _lastBuildAt) < REFRESH_THROTTLE_MS) {
-    return { ok: false, reason: 'throttled', nextAvailableIn: REFRESH_THROTTLE_MS - (Date.now() - _lastBuildAt) };
+  return null;
+}
+
+async function savePrefs(userId: string, prefs: UserPrefs): Promise<boolean> {
+  const pool = getPool();
+  if (pool && await ensurePgTables()) {
+    try {
+      await pool.query(
+        `INSERT INTO morning_prefs (user_id, prefs, updated_at)
+         VALUES ($1, $2, NOW())
+         ON CONFLICT (user_id)
+         DO UPDATE SET prefs = EXCLUDED.prefs, updated_at = NOW()`,
+        [userId, JSON.stringify(prefs)]
+      );
+      return true;
+    } catch (e) {
+      console.warn('[morning] savePrefs db error:', e instanceof Error ? e.message : String(e));
+    }
   }
+  return false;
+}
+
+async function getAllUserPrefs(): Promise<Array<{ userId: string; prefs: UserPrefs }>> {
+  const pool = getPool();
+  if (pool && await ensurePgTables()) {
+    try {
+      const r = await pool.query('SELECT user_id, prefs FROM morning_prefs');
+      return r.rows.map((row: any) => ({ userId: row.user_id, prefs: row.prefs }));
+    } catch (e) {
+      console.warn('[morning] getAllUserPrefs error:', e instanceof Error ? e.message : String(e));
+    }
+  }
+  return [];
+}
+
+// 正規化 userId：trim、限制長度；空字串/過長 → null
+function normalizeUserId(raw: string | undefined | null): string | null {
+  if (!raw) return null;
+  const t = String(raw).trim();
+  if (t.length < 2 || t.length > 20) return null;
+  if (t.startsWith('__')) return null;  // 保留 __legacy 等系統前綴
+  return t;
+}
+
+// ─── 建構鎖 ──────────────────────────────────────────────────────────
+let _buildInProgress = false;
+let _lastBuildAt = 0;  // Unix ms，cron 內部用來決定 retry backoff
+
+// 給某個使用者的 prefs 抓資料並存成該使用者的當日快照
+async function buildForUser(userId: string, prefs: UserPrefs) {
+  const report = await buildMorningReport({
+    wxLocs: prefs.wx || [],
+    twCodes: prefs.tw || [],
+    usCodes: prefs.us || [],
+    fxPairs: prefs.fx || [],
+  });
+  await saveReport(userId, report.date, report);
+  return report;
+}
+
+// 從 union 快照中擷取某使用者要的子集
+function extractUserSubset(unionReport: any, prefs: UserPrefs) {
+  const subset: any = {
+    date: unionReport.date,
+    generated_at: unionReport.generated_at,
+    weather: [],
+    stocks_tw: {},
+    stocks_us: {},
+    fx: {},
+    news_tw: unionReport.news_tw || [],
+    news_world: unionReport.news_world || [],
+    build_errors: unionReport.build_errors,
+  };
+  // 依 prefs.wx 的順序挑出
+  const wxByName: any = {};
+  (unionReport.weather || []).forEach((w: any) => { if (w && w.name) wxByName[w.name] = w; });
+  for (const loc of (prefs.wx || [])) {
+    if (wxByName[loc.name]) subset.weather.push(wxByName[loc.name]);
+  }
+  for (const code of (prefs.tw || [])) {
+    if (unionReport.stocks_tw && unionReport.stocks_tw[code]) subset.stocks_tw[code] = unionReport.stocks_tw[code];
+  }
+  for (const code of (prefs.us || [])) {
+    if (unionReport.stocks_us && unionReport.stocks_us[code]) subset.stocks_us[code] = unionReport.stocks_us[code];
+  }
+  for (const pair of (prefs.fx || [])) {
+    if (unionReport.fx && unionReport.fx[pair]) subset.fx[pair] = unionReport.fx[pair];
+  }
+  return subset;
+}
+
+// 等 _buildInProgress 釋放，最多等 15 秒（避免 503 與 cron 衝突）
+async function waitForLock(maxMs = 15000) {
+  const start = Date.now();
+  while (_buildInProgress) {
+    if (Date.now() - start > maxMs) return false;
+    await new Promise(r => setTimeout(r, 200));
+  }
+  return true;
+}
+
+// 單一使用者模式：抓該使用者的 prefs 重建
+async function runBuildUser(userId: string) {
+  if (!await waitForLock()) return { ok: false, reason: 'lock_timeout' };
   _buildInProgress = true;
   try {
-    const report = await buildMorningReport();
-    await saveReport(report.date, report);
+    const prefs = await getPrefs(userId);
+    if (!prefs) return { ok: false, reason: 'no_prefs' };
+    const report = await buildForUser(userId, prefs);
     _lastBuildAt = Date.now();
     return { ok: true, date: report.date, errors: (report as any).build_errors };
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
-    console.error('[morning] runBuild error:', msg);
+    console.error('[morning] runBuildUser error:', userId, msg);
+    return { ok: false, reason: 'error', error: msg };
+  } finally {
+    _buildInProgress = false;
+  }
+}
+
+// 全站模式（cron 每日呼叫）：取 union 抓一次、分發給所有使用者
+async function runBuildAll() {
+  if (_buildInProgress) return { ok: false, reason: 'already_running' };
+  _buildInProgress = true;
+  try {
+    const allPrefs = await getAllUserPrefs();
+    if (allPrefs.length === 0) {
+      console.log('[morning] runBuildAll: no users with prefs, skipping');
+      _lastBuildAt = Date.now();
+      return { ok: true, users: 0 };
+    }
+    // 計算 union
+    const wxMap = new Map<string, { name: string; lat: number; lon: number }>();
+    const twSet = new Set<string>();
+    const usSet = new Set<string>();
+    const fxSet = new Set<string>();
+    for (const { prefs } of allPrefs) {
+      (prefs.wx || []).forEach(w => wxMap.set(`${w.name}|${w.lat}|${w.lon}`, w));
+      (prefs.tw || []).forEach(c => twSet.add(c));
+      (prefs.us || []).forEach(c => usSet.add(c));
+      (prefs.fx || []).forEach(p => fxSet.add(p));
+    }
+    console.log(`[morning] runBuildAll: ${allPrefs.length} users, union wx=${wxMap.size} tw=${twSet.size} us=${usSet.size} fx=${fxSet.size}`);
+    // 一次抓 union
+    const unionReport = await buildMorningReport({
+      wxLocs: Array.from(wxMap.values()),
+      twCodes: Array.from(twSet),
+      usCodes: Array.from(usSet),
+      fxPairs: Array.from(fxSet),
+    });
+    // 分發給每個使用者
+    for (const { userId, prefs } of allPrefs) {
+      const subset = extractUserSubset(unionReport, prefs);
+      await saveReport(userId, unionReport.date, subset);
+    }
+    _lastBuildAt = Date.now();
+    return { ok: true, date: unionReport.date, users: allPrefs.length };
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    console.error('[morning] runBuildAll error:', msg);
     return { ok: false, reason: 'error', error: msg };
   } finally {
     _buildInProgress = false;
@@ -162,7 +337,7 @@ function taipeiDateStr(d: Date) {
 }
 
 let _cronStarted = false;
-let _cronLastRunDate = '';  // 最後一次「官方 06:30 觸發」跑的日期，用來確保每天正式版只跑一次
+let _cronLastRunDate = '';  // 最後一次「官方每日觸發」跑的日期，用來確保每天正式版只跑一次
 async function cronTick() {
   const tpe = taipeiNow();
   const hour = tpe.getHours();
@@ -172,46 +347,33 @@ async function cronTick() {
   // 早於 06:30 → 完全不做任何事
   if (hour < 6 || (hour === 6 && minute < 30)) return;
 
-  // 剛好 06:30 那一分鐘的 tick → 強制跑（無論今天有沒有資料、無論節流）
-  // 會覆蓋使用者之前提早按 ↻ 拿到的那份（06:30 才是正式版）
-  if (hour === 6 && minute === 30 && _cronLastRunDate !== today) {
-    _cronLastRunDate = today;
-    console.log('[morning] 06:30 daily trigger (force rebuild)', today);
-    await runBuild(true);
-    return;
+  // 今天還沒跑過 → 跑全站建構（所有使用者）
+  if (_cronLastRunDate !== today) {
+    // 5 分鐘失敗退避（只限有跑過的情況）
+    if (_cronLastRunDate && Date.now() - _lastBuildAt < 5 * 60 * 1000) return;
+    console.log('[morning] cron daily trigger (build all users)', today);
+    const result = await runBuildAll();
+    if (result.ok) {
+      _cronLastRunDate = today;
+    } else {
+      // 失敗就不標記，下個 tick（1 分鐘後）會再試（有 5 分鐘退避）
+      console.warn('[morning] cron runBuildAll failed:', result);
+    }
   }
-
-  // 06:31 之後：只有今天沒資料才重試（失敗補救機制）
-  const existing = await getReportByDate(today);
-  if (existing) {
-    _cronLastRunDate = today;  // 有資料就記一下，避免之後再觸發
-    return;
-  }
-  // 5 分鐘內剛失敗就別再試
-  if (Date.now() - _lastBuildAt < 5 * 60 * 1000) return;
-  console.log('[morning] cron retry (missing data) for', today);
-  await runBuild(true);
 }
 
 export function startMorningCron() {
   if (_cronStarted) return;
   _cronStarted = true;
 
-  // 啟動時的補跑檢查（無延遲立即檢查，確保錯過的 06:30 能補上）
+  // 啟動時立刻跑一次 cronTick（補跑錯過的 06:30）
   (async () => {
     try {
       const tpe = taipeiNow();
-      const today = taipeiDateStr(tpe);
       const pastCutoff = tpe.getHours() > 6 || (tpe.getHours() === 6 && tpe.getMinutes() >= 30);
       if (pastCutoff) {
-        const existing = await getReportByDate(today);
-        if (!existing) {
-          console.log('[morning] startup recovery: 06:30 missed, forcing rebuild for', today);
-          await runBuild(true);
-        } else {
-          console.log('[morning] startup: today already has data', today);
-          _cronLastRunDate = today;
-        }
+        console.log('[morning] startup: running cronTick for recovery');
+        await cronTick();
       } else {
         console.log('[morning] startup: before 06:30, cron will wait');
       }
@@ -239,20 +401,6 @@ function todayTaipei() {
   const m = String(tpe.getMonth() + 1).padStart(2, '0');
   const d = String(tpe.getDate()).padStart(2, '0');
   return `${y}-${m}-${d}`;
-}
-
-// 找出最新一份資料檔
-function latestDataDate() {
-  ensureDataDir();
-  try {
-    const files = fs.readdirSync(DATA_DIR)
-      .filter(f => /^\d{4}-\d{2}-\d{2}\.json$/.test(f))
-      .sort()
-      .reverse();
-    return files.length > 0 ? files[0].replace('.json', '') : null;
-  } catch (e) {
-    return null;
-  }
 }
 
 export const morningRouter = express.Router();
@@ -339,19 +487,26 @@ self.addEventListener('fetch', e => {
 `);
 });
 
+// 從 request 取得 userId（X-User-Id header）
+function reqUserId(req: express.Request): string | null {
+  const raw = req.header('X-User-Id') || req.query.uid;
+  return normalizeUserId(Array.isArray(raw) ? String(raw[0]) : (raw as string | undefined));
+}
+
 // ─── /api/morning-report?date=YYYY-MM-DD ─────────────────────────────
 morningRouter.get('/api/morning-report', async (req, res) => {
   try {
+    const userId = reqUserId(req);
+    if (!userId) return res.status(400).json({ error: 'missing_or_invalid_user_id' });
     let date = String(req.query.date || '');
     if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
-      date = (await getLatestDate()) || todayTaipei();
+      date = (await getLatestDate(userId)) || todayTaipei();
     }
-    const data = await getReportByDate(date);
+    const data = await getReportByDate(userId, date);
     if (!data) {
-      // fallback 最新一份
-      const latest = await getLatestDate();
+      const latest = await getLatestDate(userId);
       if (latest && latest !== date) {
-        const fallbackData = await getReportByDate(latest);
+        const fallbackData = await getReportByDate(userId, latest);
         if (fallbackData) {
           return res.json({ ...fallbackData, _requestedDate: date, _actualDate: latest, _fallback: true });
         }
@@ -366,9 +521,11 @@ morningRouter.get('/api/morning-report', async (req, res) => {
 });
 
 // ─── /api/morning-report/dates — 歷史日期列表 ─────────────────────────
-morningRouter.get('/api/morning-report/dates', async (_req, res) => {
+morningRouter.get('/api/morning-report/dates', async (req, res) => {
   try {
-    const dates = await getAllDates();
+    const userId = reqUserId(req);
+    if (!userId) return res.status(400).json({ error: 'missing_or_invalid_user_id' });
+    const dates = await getAllDates(userId);
     res.json({ dates });
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
@@ -376,14 +533,62 @@ morningRouter.get('/api/morning-report/dates', async (_req, res) => {
   }
 });
 
-// ─── POST /api/morning-report/refresh — 手動觸發重建（30 分鐘節流） ────
+// ─── POST /api/morning-prefs — 使用者儲存/更新自己的設定 ────────────
+morningRouter.post('/api/morning-prefs', async (req, res) => {
+  try {
+    const userId = reqUserId(req);
+    if (!userId) return res.status(400).json({ error: 'missing_or_invalid_user_id' });
+    const body = req.body || {};
+    const prefs: UserPrefs = {
+      wx: Array.isArray(body.wx) ? body.wx.filter((w: any) => w && w.name && typeof w.lat === 'number' && typeof w.lon === 'number') : [],
+      tw: Array.isArray(body.tw) ? body.tw.filter((c: any) => typeof c === 'string') : [],
+      us: Array.isArray(body.us) ? body.us.filter((c: any) => typeof c === 'string') : [],
+      fx: Array.isArray(body.fx) ? body.fx.filter((c: any) => typeof c === 'string') : [],
+    };
+    const saved = await savePrefs(userId, prefs);
+    if (!saved) return res.status(503).json({ error: 'save_failed' });
+    res.json({ ok: true, userId });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    res.status(500).json({ error: msg });
+  }
+});
+
+// ─── GET /api/morning-prefs — 使用者取回自己的設定（跨裝置同步用） ────
+morningRouter.get('/api/morning-prefs', async (req, res) => {
+  try {
+    const userId = reqUserId(req);
+    if (!userId) return res.status(400).json({ error: 'missing_or_invalid_user_id' });
+    const prefs = await getPrefs(userId);
+    if (!prefs) return res.status(404).json({ error: 'no_prefs' });
+    res.json(prefs);
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    res.status(500).json({ error: msg });
+  }
+});
+
+// ─── POST /api/morning-report/refresh — 手動觸發重建（只重建該使用者） ────
 morningRouter.post('/api/morning-report/refresh', async (req, res) => {
-  const force = String(req.query.force || '') === '1';
-  const result = await runBuild(force);
+  const userId = reqUserId(req);
+  if (!userId) return res.status(400).json({ error: 'missing_or_invalid_user_id' });
+  // 如果沒 prefs（新使用者第一次），先用 body 初始化一份 prefs 再 build
+  const body = req.body || {};
+  const hasInitPrefs = body && (Array.isArray(body.wx) || Array.isArray(body.tw) || Array.isArray(body.us) || Array.isArray(body.fx));
+  if (hasInitPrefs) {
+    const prefs: UserPrefs = {
+      wx: Array.isArray(body.wx) ? body.wx.filter((w: any) => w && w.name && typeof w.lat === 'number' && typeof w.lon === 'number') : [],
+      tw: Array.isArray(body.tw) ? body.tw.filter((c: any) => typeof c === 'string') : [],
+      us: Array.isArray(body.us) ? body.us.filter((c: any) => typeof c === 'string') : [],
+      fx: Array.isArray(body.fx) ? body.fx.filter((c: any) => typeof c === 'string') : [],
+    };
+    await savePrefs(userId, prefs);
+  }
+  const result = await runBuildUser(userId);
   if (result.ok) {
     res.json({ ok: true, date: result.date, errors: result.errors });
   } else {
-    res.status(result.reason === 'throttled' ? 429 : 503).json(result);
+    res.status(503).json(result);
   }
 });
 
@@ -949,7 +1154,7 @@ a:active { opacity: 0.6; }
   <div class="hdr">
     <div style="min-width:0;flex:1">
       <div class="hdr-title">
-        <span class="emoji">🌅</span>晨報
+        <span class="emoji">🌅</span><span id="hdr-user-title">晨報</span>
         <span class="ver" onclick="showAbout()">${MORNING_VERSION}</span>
       </div>
       <div class="hdr-date" id="hdr-date">—</div>
@@ -998,24 +1203,33 @@ a:active { opacity: 0.6; }
     <hr style="border:none;border-top:1px solid var(--border);margin:12px 0">
     <div class="changelog-v">${MORNING_VERSION}</div>
     <div class="changelog-txt">
-      晨報升級為真實資料每日自動更新：新增 src/morning-builder.ts 整合 5 個資料源（Open-Meteo 145+ 地點天氣 / cnyes JSON API 台美股 / 台銀 CSV 匯率含交叉盤自動計算 / Google News RSS / Google Translate），資料存 Postgres morning_reports 表（本地 JSON fallback）。內建 cron 每分鐘檢查：06:30 台北時間那一分鐘強制重建（不受節流與既有資料影響，06:30 是正式版），06:31+ 只在今天缺資料時重試；伺服器啟動時立即檢查補跑錯過的 06:30（當機/重啟自動恢復）。⟳ 按鈕升級為「聰明重抓」：真的觸發重建、30 分鐘節流、建構中鎖定。新增 POST /api/morning-report/refresh 端點。所有 API 路由改 async。部分失敗容錯。新增 🛫 國際機場 7 大類 76 個機場（依據 CrewSync Airport WX Ops Spec C-6 清單），天氣地點從 69 擴增至 145。設定頁分類改為收合式（天氣 10 類 / 台股 4 類 / 美股 4 類 / 匯率 3 類），預設收合、有勾選項自動展開、顯示 N/M 計數。修正 nav bar 點擊捲動時 section header 被 nav 壓住的 bug（M1.0.3 帶入）：scroll-margin-top 改用動態測量的 --top-stack-h 變數。<br>
-      Morning Report upgraded to real data with daily auto-refresh: new src/morning-builder.ts integrates 5 sources (Open-Meteo for 145+ weather locations / cnyes JSON API for TW+US stocks / BOT CSV for FX with cross-pair calculation / Google News RSS / Google Translate), stored in Postgres morning_reports table (local JSON fallback). Built-in cron ticks every minute: at exactly 06:30 Asia/Taipei force-rebuilds (the official version), 06:31+ retries only if today's missing; startup immediate recovery check for missed 06:30 after downtime/restart. ⟳ button upgraded to "smart refresh" — actually re-fetches with 30-min throttle and build lock. New POST /api/morning-report/refresh endpoint. All API routes rewritten async. Partial-failure tolerant. Added 🛫 International Airports category with 7 sub-groups and 76 airports (from CrewSync Airport WX Ops Spec C-6 list), weather locations expanded from 69 to 145. Settings page categories now collapsible (Weather 10 / TW 4 / US 4 / FX 3 categories): collapsed by default, categories with selected items auto-expand on first open, N/M selected count shown. Fix nav bar click bug inherited from M1.0.3 where section header gets hidden under sticky nav: scroll-margin-top now uses dynamic --top-stack-h CSS variable.
+      大幅重構為多使用者架構（暱稱當 user_id）：Postgres schema 擴充 morning_reports 加 user_id 欄位、PK 改 (user_id, date)、新增 morning_prefs 表；前端首次開 /morning 跳出暱稱輸入 modal 存 localStorage，重裝或換裝置用同名找回歷史；所有 /api/morning-* 改 per-user（X-User-Id header 必備，缺失回 400）；新端點 POST/GET /api/morning-prefs；設定存檔自動上傳並觸發該使用者重建；Builder 支援 multi-user，cron 06:30 iterate 所有使用者 prefs、計算 union 批次抓、分發給各使用者；設定頁底部加「切換使用者」按鈕；header 標題顯示為「暱稱 的晨報」；runBuildUser 加 waitForLock 避免 race；版次前綴 M→V；新增 test/smoke-m.ts 含 JS parse 檢查；補回 V1.0.3 changelog 在 V1.1.0 推版被誤刪；移除本地 JSON 檔 fallback（多使用者下會洩漏共享資料）。<br>
+      Major refactor to multi-user architecture (nickname as user_id): Postgres schema expands morning_reports with user_id column and composite PK, new morning_prefs table; nickname modal on first visit, recoverable via same name across reinstalls/devices; all /api/morning-* now per-user via X-User-Id header; new POST/GET /api/morning-prefs endpoints; settings save auto-uploads and triggers per-user rebuild; builder supports multi-user with cron iterating all users, computing union, batch fetching and distributing; switch-user button in settings; header shows personalized "[nickname]'s Morning Report"; runBuildUser waits for lock to avoid races; version prefix M→V; new test/smoke-m.ts with inline JS parse check; restored V1.0.3 changelog; removed local JSON fallback (leaked shared data in multi-user mode).
     </div>
-    <div class="changelog-v old">M1.0.3</div>
-    <div class="changelog-v old">M1.0.2</div>
+    <div class="changelog-v old">V1.1.0</div>
+    <div class="changelog-txt">
+      晨報升級為真實資料每日自動更新：新增 src/morning-builder.ts 整合 5 個資料源（Open-Meteo 145+ 地點天氣 / cnyes JSON API 台美股 / 台銀 CSV 匯率含交叉盤自動計算 / Google News RSS / Google Translate），資料存 Postgres morning_reports 表（本地 JSON fallback）。內建 cron 每分鐘檢查：06:30 台北時間那一分鐘強制重建（06:30 是正式版），06:31+ 只在今天缺資料時重試；伺服器啟動時立即檢查補跑錯過的 06:30。⟳ 按鈕升級為「聰明重抓」：真的觸發重建、30 分鐘節流、建構中鎖定。新增 POST /api/morning-report/refresh 端點。所有 API 路由改 async。部分失敗容錯。新增 🛫 國際機場 7 大類 76 個機場（依據 CrewSync Airport WX Ops Spec C-6 清單），天氣地點從 69 擴增至 145。設定頁分類改為收合式（天氣 10 類 / 台股 4 類 / 美股 4 類 / 匯率 3 類），預設收合、有勾選項自動展開、顯示 N/M 計數。修正 nav bar 點擊捲動時 section header 被 nav 壓住的 bug（V1.0.3 帶入）：scroll-margin-top 改用動態測量的 --top-stack-h 變數。<br>
+      Morning Report upgraded to real data with daily auto-refresh via built-in cron at 06:30 Asia/Taipei; Postgres storage; smart refresh button with 30-min throttle; new POST /api/morning-report/refresh; all routes async; partial-failure tolerant; added International Airports category with 76 airports (from Ops Spec C-6), weather locations expanded from 69 to 145; settings categories now collapsible with auto-expand for selected and N/M counts; fixed nav scroll header hidden bug.
+    </div>
+    <div class="changelog-v old">V1.0.3</div>
+    <div class="changelog-txt">
+      設定改為分散式：右上角統一 ⚙️ 移除，天氣/台股/美股/匯率每個 section 標題右邊各自有獨立 ⚙️，點哪區就只開那區的設定（修正匯率要拉很下面的問題）；台股加內建勾選清單（半導體/電子/金融/傳產航運 4 類約 30 支）；美股加內建勾選清單（科技/ETF/金融/消費 4 類約 30 支）；匯率改支援跨幣種不限對台幣（對台幣/主要貨幣對/交叉盤 3 類約 25 對，舊版 ['USD','JPY'] 自動遷移）；天氣預設調整為台北 + 桃園龜山；台股預設調整為 2330 + 3231；修正假資料「台北福華」→「台北」。<br>
+      Per-section settings: unified top-right ⚙️ removed, each section now has its own ⚙️ (fixes scrolling past weather to reach FX); built-in presets for TW/US stocks and FX with cross-currency pair support; default tweaks; placeholder data name fix.
+    </div>
+    <div class="changelog-v old">V1.0.2</div>
     <div class="changelog-txt">
       A+/A− 字型按鈕間距拉開，改回兩顆獨立上下排列；修正 nav bar 橫向捲動時回彈反彈效果（overscroll-behavior-x: contain）、整頁防 iOS 橡皮筋反彈（overscroll-behavior: none）。<br>
       A+/A− font buttons spaced apart, restored as two separate stacked buttons; fix nav bar horizontal overscroll bounce, disable iOS rubber-band bounce on full page.
     </div>
-    <div class="changelog-v old">M1.0.1</div>
+    <div class="changelog-v old">V1.0.1</div>
     <div class="changelog-txt">
       天氣地點設定改成勾選式：內建 3 大類共 68 個預設點位（🇹🇼 台灣城市 23 個 / 🏞️ 台灣景點 17 個 / 🌏 國際城市 33 個，含蘇黎世、布拉格、鳳凰城），保留手動輸入經緯度功能，總上限 10 個地點；Header 按鈕列在手機過寬修正：A+/A− 合併為上下複合按鈕省一格、整列緊湊化；Nav bar 在手機被推走修正：header 與 nav 改為同一 sticky 容器一起釘頂。<br>
-      Weather location setting switched to checkbox UI with 68 built-in presets (TW cities 23 / TW attractions 17 / International cities 33, incl. Zurich, Prague, Phoenix), manual lat/lon input retained, max 10 total; Fix header button row overflowing on mobile: A+/A− combined into vertical compound button saving one slot, buttons tightened; Fix nav bar being pushed off on mobile: header and nav now share a single sticky container so they pin together.
+      Weather location setting switched to checkbox UI with 68 built-in presets, manual lat/lon input retained, max 10 total; Fix header button row overflowing on mobile; Fix nav bar being pushed off on mobile.
     </div>
-    <div class="changelog-v old">M1.0.0</div>
+    <div class="changelog-v old">V1.0.0</div>
     <div class="changelog-txt">
-      晨報首次上線：每日天氣（4 地點、風向箭頭、knot 風速）、台股/美股（連 cnyes 頁面）、匯率（對台幣）、台灣新聞（Google News RSS，同來源最多 2 條，🇹🇼 國旗圖示）、世界新聞（英文原文 + 繁中翻譯）、PWA 安裝（獨立 icon/manifest/SW）、快速導覽列、月曆歷史檢視（金色高亮有資料日期）、日/夜模式、字型放大縮小、設定頁自選追蹤項目。⚠️ 目前資料為 placeholder（除新聞外），GitHub Actions 爬蟲尚未部署。<br>
-      Morning Report first release: daily weather (4 locations with wind arrow + knots), TW/US stocks linked to cnyes, FX rates vs TWD, TW news via Google News RSS (max 2 per source, 🇹🇼 flag icon), world news with EN original + zh-TW translation, installable PWA (independent icon/manifest/SW), quick-nav bar, month calendar history (available dates highlighted in gold), day/night theme, font scaling, customizable watchlists. ⚠️ Data is placeholder (except news); GitHub Actions crawler not yet deployed.
+      晨報首次上線：每日天氣（4 地點、風向箭頭、knot 風速）、台股/美股（連 cnyes 頁面）、匯率（對台幣）、台灣新聞（Google News RSS，同來源最多 2 條，🇹🇼 國旗圖示）、世界新聞（英文原文 + 繁中翻譯）、PWA 安裝（獨立 icon/manifest/SW）、快速導覽列、月曆歷史檢視（金色高亮有資料日期）、日/夜模式、字型放大縮小、設定頁自選追蹤項目。<br>
+      Morning Report first release: daily weather (4 locations with wind arrow + knots), TW/US stocks, FX, TW+World news, installable PWA, quick-nav bar, calendar history, day/night theme, font scaling, customizable watchlists.
     </div>
   </div>
 </div>
@@ -1074,6 +1288,25 @@ a:active { opacity: 0.6; }
     </div>
 
     <button class="set-btn" onclick="saveSettings()">儲存並重新載入</button>
+    <div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--border);text-align:center">
+      <div style="font-size:.72em;color:var(--muted);margin-bottom:6px">目前使用者：<span id="set-current-uid" style="color:var(--accent);font-weight:600">—</span></div>
+      <button type="button" onclick="switchUser()" style="background:none;border:none;color:var(--muted);font-size:.76em;text-decoration:underline;cursor:pointer;padding:4px 8px">👤 切換使用者</button>
+    </div>
+  </div>
+</div>
+
+<!-- Nickname onboarding modal -->
+<div class="modal-wrap" id="nick-wrap" style="display:none">
+  <div class="modal" style="max-width:360px">
+    <h3 style="margin-bottom:6px">🌅 晨報</h3>
+    <div style="font-size:.85em;color:var(--muted);margin-bottom:14px;line-height:1.6">
+      幫你的晨報取個名字<br>
+      <span style="font-size:.85em">（重灌或換裝置時用同一個名字就能找回歷史）</span>
+    </div>
+    <input id="nick-input" type="text" maxlength="20" placeholder="你的暱稱 (2-20 字)" autocomplete="off"
+      style="width:100%;background:var(--bg2);border:1px solid var(--border);color:var(--text);border-radius:10px;padding:12px 14px;font-size:1em;font-family:inherit;margin-bottom:6px">
+    <div id="nick-hint" style="font-size:.72em;color:var(--muted);min-height:1.2em;margin-bottom:10px"></div>
+    <button class="set-btn" id="nick-submit">開始</button>
   </div>
 </div>
 
@@ -1107,6 +1340,7 @@ ${getMorningClientJs()}
 function getMorningClientJs() {
   return `
 const LS = {
+  uid: 'morning_uid',
   wxPresets: 'morning_wx_presets',  // array of preset IDs
   wxCustom: 'morning_wx_custom',    // array of {name,lat,lon}
   wxLegacy: 'morning_wx_locs',      // 舊版相容：{name,lat,lon}[]
@@ -1114,6 +1348,30 @@ const LS = {
   us: 'morning_us_stocks',
   fx: 'morning_fx_currencies',
 };
+
+function getUid() {
+  try { return localStorage.getItem(LS.uid) || ''; } catch (e) { return ''; }
+}
+function setUid(uid) {
+  try { localStorage.setItem(LS.uid, uid); } catch (e) {}
+  updateHdrTitle();
+}
+
+function updateHdrTitle() {
+  const el = document.getElementById('hdr-user-title');
+  if (!el) return;
+  const uid = getUid();
+  el.textContent = uid ? (uid + ' 的晨報') : '晨報';
+}
+
+// Wrapped fetch that always adds X-User-Id header
+function apiFetch(url, opts) {
+  opts = opts || {};
+  opts.headers = opts.headers || {};
+  const uid = getUid();
+  if (uid) opts.headers['X-User-Id'] = uid;
+  return fetch(url, opts);
+}
 
 // 天氣預設地點清單（分 3 類）
 // 每筆：[id, name, lat, lon]
@@ -1454,7 +1712,7 @@ function wxEmoji(code) {
 
 async function fetchReport(date) {
   const q = date ? ('?date=' + date) : '';
-  const r = await fetch('/api/morning-report' + q);
+  const r = await apiFetch('/api/morning-report' + q);
   if (!r.ok) throw new Error('HTTP ' + r.status);
   return r.json();
 }
@@ -1646,6 +1904,9 @@ const SET_TITLES = {
 
 function showSet(section) {
   section = section || 'all';
+  // Update current uid display
+  const uidEl = document.getElementById('set-current-uid');
+  if (uidEl) uidEl.textContent = getUid() || '—';
   // Load current values into modal
   _wxSelectedIds = [...loadSetting('wxPresets', DEFAULTS.wxPresets)];
   const customWx = loadSetting('wxCustom', DEFAULTS.wxCustom);
@@ -1944,7 +2205,7 @@ function updateFxCounter() {
   el.classList.toggle('full', total >= FX_MAX);
 }
 
-function saveSettings() {
+async function saveSettings() {
   // Weather
   saveSetting('wxPresets', _wxSelectedIds);
   const wxLines = document.getElementById('set-wx-custom').value.trim().split(/\\n/).map(l => l.trim()).filter(Boolean);
@@ -1963,11 +2224,110 @@ function saveSettings() {
   if (twAll.length > 0) saveSetting('tw', twAll); else localStorage.removeItem(LS.tw);
   if (usAll.length > 0) saveSetting('us', usAll); else localStorage.removeItem(LS.us);
   if (fxAll.length > 0) saveSetting('fx', fxAll); else localStorage.removeItem(LS.fx);
+  // 上傳 prefs 到伺服器（組成 per-user prefs 格式）
+  const wxAllLocs = [];
+  for (const id of _wxSelectedIds) {
+    if (WX_PRESET_MAP[id]) wxAllLocs.push({ name: WX_PRESET_MAP[id].name, lat: WX_PRESET_MAP[id].lat, lon: WX_PRESET_MAP[id].lon });
+  }
+  for (const c of wxCustom) wxAllLocs.push(c);
+  const serverPrefs = { wx: wxAllLocs, tw: twAll, us: usAll, fx: fxAll };
+  try {
+    await apiFetch('/api/morning-prefs', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(serverPrefs),
+    });
+  } catch (e) { console.warn('save prefs failed', e); }
   hideSet();
-  loadAndRender();
+  // 儲存完後觸發重建（只重建自己的）
+  await smartRefresh();
 }
 window.saveSettings = saveSettings;
 window.hideSet = hideSet;
+
+// ── Nickname onboarding ──────────────────────────────────────────
+function showNickModal() {
+  const wrap = document.getElementById('nick-wrap');
+  wrap.style.display = 'flex';
+  wrap.classList.add('show');
+  const input = document.getElementById('nick-input');
+  const hint = document.getElementById('nick-hint');
+  hint.textContent = '';
+  input.value = '';
+  setTimeout(() => input.focus(), 100);
+}
+function hideNickModal() {
+  const wrap = document.getElementById('nick-wrap');
+  wrap.style.display = 'none';
+  wrap.classList.remove('show');
+}
+async function submitNickname() {
+  const input = document.getElementById('nick-input');
+  const hint = document.getElementById('nick-hint');
+  const val = (input.value || '').trim();
+  if (val.length < 2) { hint.textContent = '至少 2 個字'; return; }
+  if (val.length > 20) { hint.textContent = '最多 20 個字'; return; }
+  if (val.startsWith('__')) { hint.textContent = '不能用 __ 開頭'; return; }
+  setUid(val);
+  hint.textContent = '初始化中…';
+  // 先取伺服器上有沒有這個使用者的 prefs（重裝找回用）
+  let serverPrefs = null;
+  try {
+    const r = await apiFetch('/api/morning-prefs');
+    if (r.ok) serverPrefs = await r.json();
+  } catch (e) {}
+  if (serverPrefs) {
+    // 把伺服器上的 prefs 同步回 localStorage
+    if (serverPrefs.wx) {
+      // 把 server 的 wx 拆成 presets 和 custom
+      const presets = [];
+      const custom = [];
+      const presetByName = {};
+      Object.values(WX_PRESETS).forEach(arr => arr.forEach(p => { presetByName[p[1]] = p[0]; }));
+      for (const w of serverPrefs.wx) {
+        if (presetByName[w.name]) presets.push(presetByName[w.name]);
+        else custom.push(w);
+      }
+      saveSetting('wxPresets', presets);
+      saveSetting('wxCustom', custom);
+    }
+    if (serverPrefs.tw) saveSetting('tw', serverPrefs.tw);
+    if (serverPrefs.us) saveSetting('us', serverPrefs.us);
+    if (serverPrefs.fx) saveSetting('fx', serverPrefs.fx);
+    hideNickModal();
+    await loadAndRender();
+  } else {
+    // 新使用者：用當前 localStorage 狀態（含預設）build 一份 prefs 送上去並觸發首次 build
+    const wxPresetIds = loadSetting('wxPresets', DEFAULTS.wxPresets);
+    const wxCustom = loadSetting('wxCustom', DEFAULTS.wxCustom);
+    const tw = loadSetting('tw', DEFAULTS.tw);
+    const us = loadSetting('us', DEFAULTS.us);
+    const fx = loadSetting('fx', DEFAULTS.fx);
+    const wxLocs = [];
+    for (const id of wxPresetIds) {
+      if (WX_PRESET_MAP[id]) wxLocs.push({ name: WX_PRESET_MAP[id].name, lat: WX_PRESET_MAP[id].lat, lon: WX_PRESET_MAP[id].lon });
+    }
+    for (const c of wxCustom) wxLocs.push(c);
+    const initPrefs = { wx: wxLocs, tw, us, fx };
+    try {
+      // 用 refresh endpoint 送初始 prefs，伺服器會存下並立刻 build 一份
+      await apiFetch('/api/morning-report/refresh', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(initPrefs),
+      });
+    } catch (e) { console.warn('first build failed', e); }
+    hideNickModal();
+    await loadAndRender();
+  }
+}
+function switchUser() {
+  if (!confirm('要清除目前暱稱嗎？\\n你還可以用同名重新輸入來找回歷史。')) return;
+  try { localStorage.removeItem(LS.uid); } catch (e) {}
+  hideSet();
+  showNickModal();
+}
+window.switchUser = switchUser;
 
 // Date picker (calendar view)
 let _availableDates = new Set();
@@ -1977,7 +2337,7 @@ let _calMonth = null; // { year, month (0-indexed) }
 async function showDate() {
   document.getElementById('date-wrap').classList.add('show');
   try {
-    const r = await fetch('/api/morning-report/dates');
+    const r = await apiFetch('/api/morning-report/dates');
     const j = await r.json();
     _availableDates = new Set(j.dates || []);
     // 初始月份：若有 currentDisplayedDate 用它，否則用最新一筆、再否則今天
@@ -2075,20 +2435,16 @@ function bumpFont(dir) {
 }
 applyFontScale();
 
-// ↻ Refresh button → triggers server rebuild if throttle allows, then reloads
+// ↻ Refresh button → 真的重新抓所有資料，無節流
 async function smartRefresh() {
   const btn = document.getElementById('btn-refresh');
   const origText = btn.textContent;
   btn.textContent = '…';
   btn.disabled = true;
   try {
-    const r = await fetch('/api/morning-report/refresh', { method: 'POST' });
+    const r = await apiFetch('/api/morning-report/refresh', { method: 'POST' });
     const j = await r.json();
     if (r.ok) {
-      await loadAndRender();
-    } else if (j.reason === 'throttled') {
-      const mins = Math.ceil((j.nextAvailableIn || 0) / 60000);
-      alert('剛剛才重新抓過，請 ' + mins + ' 分鐘後再試（或直接看現有資料）');
       await loadAndRender();
     } else if (j.reason === 'already_running') {
       alert('正在重新抓資料中，請稍候');
@@ -2146,7 +2502,18 @@ if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('/morning/sw.js', { scope: '/morning/' }).catch(e => console.warn('SW register failed', e));
 }
 
-// Initial load
-loadAndRender();
+// Nickname modal wiring
+document.getElementById('nick-submit').addEventListener('click', submitNickname);
+document.getElementById('nick-input').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') submitNickname();
+});
+
+// Initial load: check if uid exists; if not, show onboarding modal
+updateHdrTitle();
+if (!getUid()) {
+  showNickModal();
+} else {
+  loadAndRender();
+}
 `;
 }

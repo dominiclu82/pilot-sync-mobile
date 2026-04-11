@@ -186,9 +186,10 @@ const FX_PAIRS = {
 // ────────────────────────────────────────────────────────────────────
 // 1) Open-Meteo 天氣（批次多地點，一次 call）
 // ────────────────────────────────────────────────────────────────────
-async function fetchWeather() {
-  const lats = WX_LOCATIONS.map(l => l.lat).join(',');
-  const lons = WX_LOCATIONS.map(l => l.lon).join(',');
+async function fetchWeather(locs: Array<{ name: string; lat: number; lon: number }> = WX_LOCATIONS) {
+  if (!locs || locs.length === 0) return [];
+  const lats = locs.map(l => l.lat).join(',');
+  const lons = locs.map(l => l.lon).join(',');
   const params = new URLSearchParams({
     latitude: lats,
     longitude: lons,
@@ -204,7 +205,7 @@ async function fetchWeather() {
   const data = await r.json();
   // 多地點回傳是陣列（每個地點一個物件）；單地點回傳單一物件。統一成陣列。
   const arr = Array.isArray(data) ? data : [data];
-  return WX_LOCATIONS.map((loc, i) => {
+  return locs.map((loc, i) => {
     const d = arr[i];
     if (!d || !d.current) return { name: loc.name, _error: 'no_data' };
     const c = d.current;
@@ -282,17 +283,24 @@ async function fetchCnyesStocks(codes, marketPrefix) {
   return out;
 }
 
-async function fetchTwStocks() {
-  return fetchCnyesStocks(TW_STOCK_CODES, 'TWS');
+async function fetchTwStocks(codes: string[] = TW_STOCK_CODES) {
+  if (!codes || codes.length === 0) return {};
+  return fetchCnyesStocks(codes, 'TWS');
 }
-async function fetchUsStocks() {
-  return fetchCnyesStocks(US_STOCK_CODES, 'USS');
+async function fetchUsStocks(codes: string[] = US_STOCK_CODES) {
+  if (!codes || codes.length === 0) return {};
+  return fetchCnyesStocks(codes, 'USS');
 }
 
 // ────────────────────────────────────────────────────────────────────
 // 3) 台銀匯率 CSV
 // ────────────────────────────────────────────────────────────────────
-async function fetchFx() {
+async function fetchFx(pairs: string[] = []) {
+  // 若沒傳 pairs 則用預設清單（向後相容）
+  const usePairs = (pairs && pairs.length > 0) ? pairs : [
+    ...FX_PAIRS.vsTwd.map(c => `${c}/TWD`),
+    ...FX_PAIRS.cross.map(([a, b]) => `${a}/${b}`),
+  ];
   const url = 'https://rate.bot.com.tw/xrt/flcsv/0/day';
   const r = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0' } });
   if (!r.ok) throw new Error('BOT HTTP ' + r.status);
@@ -332,23 +340,17 @@ async function fetchFx() {
       spotSell: isNaN(spotSell) ? null : spotSell,
     };
   }
-  // 組成 pair-keyed 格式
-  const out = {};
-  // 對 TWD
-  for (const code of FX_PAIRS.vsTwd) {
-    if (twdRates[code]) {
-      out[`${code}/TWD`] = {
-        rate: twdRates[code].rate,
-        cashSell: twdRates[code].cashSell,
-      };
-    }
-  }
-  // 交叉盤：用台幣為中介算出 A/B = (A/TWD) / (B/TWD)
-  for (const [a, b] of FX_PAIRS.cross) {
-    const aRate = twdRates[a]?.rate;
-    const bRate = twdRates[b]?.rate;
-    if (aRate && bRate && bRate !== 0) {
-      out[`${a}/${b}`] = { rate: aRate / bRate };
+  // 組成 pair-keyed 格式：任何 A/B，都用 (A/TWD)/(B/TWD) 去算
+  const out: any = {};
+  for (const pair of usePairs) {
+    const [a, b] = pair.split('/');
+    if (!a || !b) continue;
+    if (b === 'TWD' && twdRates[a]) {
+      out[pair] = { rate: twdRates[a].rate, cashSell: twdRates[a].cashSell };
+    } else if (a === 'TWD' && twdRates[b] && twdRates[b].rate) {
+      out[pair] = { rate: 1 / twdRates[b].rate };
+    } else if (twdRates[a] && twdRates[b] && twdRates[a].rate && twdRates[b].rate) {
+      out[pair] = { rate: twdRates[a].rate / twdRates[b].rate };
     }
   }
   return out;
@@ -479,15 +481,26 @@ async function safeRun(label, fn) {
   }
 }
 
-export async function buildMorningReport() {
+export interface BuildOpts {
+  wxLocs?: Array<{ name: string; lat: number; lon: number }>;
+  twCodes?: string[];
+  usCodes?: string[];
+  fxPairs?: string[];
+}
+
+export async function buildMorningReport(opts: BuildOpts = {}) {
   const t0 = Date.now();
-  console.log('[morning-builder] start');
+  const wxLocs = opts.wxLocs;
+  const twCodes = opts.twCodes;
+  const usCodes = opts.usCodes;
+  const fxPairs = opts.fxPairs;
+  console.log(`[morning-builder] start (wx=${wxLocs ? wxLocs.length : 'default'} tw=${twCodes ? twCodes.length : 'default'} us=${usCodes ? usCodes.length : 'default'} fx=${fxPairs ? fxPairs.length : 'default'})`);
   // 5 個資料源並行（I/O 為主，記憶體低）
   const [weather, stocksTw, stocksUs, fx, newsTw, newsWorld] = await Promise.all([
-    safeRun('weather', fetchWeather),
-    safeRun('stocks_tw', fetchTwStocks),
-    safeRun('stocks_us', fetchUsStocks),
-    safeRun('fx', fetchFx),
+    safeRun('weather', () => fetchWeather(wxLocs)),
+    safeRun('stocks_tw', () => fetchTwStocks(twCodes)),
+    safeRun('stocks_us', () => fetchUsStocks(usCodes)),
+    safeRun('fx', () => fetchFx(fxPairs)),
     safeRun('news_tw', fetchNewsTw),
     safeRun('news_world', fetchNewsWorld),
   ]);
