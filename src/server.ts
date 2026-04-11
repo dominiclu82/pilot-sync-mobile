@@ -25,6 +25,7 @@ import { getSpaSubtabReorderJs } from './spa/js-subtab-reorder.js';
 import { getSpaRosterGridJs } from './spa/js-roster-grid.js';
 import { getSpaFriendsJs } from './spa/js-friends.js';
 import { getSpaGroupsJs } from './spa/js-groups.js';
+import { morningRouter } from './morning.js';
 import FR24Pkg from 'flightradarapi';
 import pg from 'pg';
 
@@ -169,6 +170,9 @@ setInterval(() => {
 
 const app = express();
 app.use(express.json());
+
+// Morning Report PWA (獨立模組，掛在 /morning 底下)
+app.use(morningRouter);
 
 app.get('/', (_req, res) => { res.redirect('/main'); });
 
@@ -352,8 +356,27 @@ for (const [route, tab] of Object.entries(_viewTabMap)) {
 app.get('/icon.svg', (_req, res) => {
   res.setHeader('Content-Type', 'image/svg+xml');
   res.send(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192">
-  <rect width="192" height="192" rx="38" fill="#1e2740"/>
-  <text x="96" y="145" text-anchor="middle" font-size="115"
+  <defs>
+    <linearGradient id="cs-bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#0F1B3C"/>
+      <stop offset="60%" stop-color="#1E2F5C"/>
+      <stop offset="100%" stop-color="#3A5488"/>
+    </linearGradient>
+  </defs>
+  <rect width="192" height="192" fill="url(#cs-bg)"/>
+  <circle cx="25" cy="30" r="1" fill="#fff" opacity="0.8"/>
+  <circle cx="160" cy="25" r="1.2" fill="#fff" opacity="0.9"/>
+  <circle cx="170" cy="60" r="0.8" fill="#fff" opacity="0.6"/>
+  <circle cx="30" cy="75" r="0.8" fill="#fff" opacity="0.7"/>
+  <circle cx="155" cy="90" r="1" fill="#fff" opacity="0.8"/>
+  <circle cx="15" cy="110" r="0.8" fill="#fff" opacity="0.5"/>
+  <circle cx="60" cy="45" r="0.8" fill="#fff" opacity="0.6"/>
+  <circle cx="130" cy="50" r="0.8" fill="#fff" opacity="0.7"/>
+  <ellipse cx="40" cy="165" rx="38" ry="8" fill="#6E8EC0" opacity="0.6"/>
+  <ellipse cx="100" cy="172" rx="50" ry="10" fill="#8AA6D0" opacity="0.7"/>
+  <ellipse cx="155" cy="168" rx="35" ry="8" fill="#6E8EC0" opacity="0.6"/>
+  <ellipse cx="70" cy="178" rx="30" ry="6" fill="#5A7BA8" opacity="0.5"/>
+  <text x="96" y="135" text-anchor="middle" font-size="105"
     font-family="Apple Color Emoji,Segoe UI Emoji,Noto Color Emoji,sans-serif">✈️</text>
 </svg>`);
 });
@@ -431,7 +454,7 @@ app.get('/sw.js', (_req, res) => {
   res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
   res.setHeader('Service-Worker-Allowed', '/');
   res.send(`
-const CACHE = 'crewsync-v8016e';
+const CACHE = 'crewsync-v8017';
 const SHELL = ['/', '/main', '/share'];
 self.addEventListener('install', e => {
   e.waitUntil(

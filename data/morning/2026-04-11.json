@@ -1,0 +1,462 @@
+{
+  "date": "2026-04-11",
+  "generated_at": "2026-04-11T06:30:00+08:00",
+  "weather": [
+    {
+      "name": "台北福華",
+      "temp": 23.5,
+      "feels": 24.1,
+      "humidity": 72,
+      "wind": 7,
+      "windDir": 60,
+      "uv": 5,
+      "code": 2,
+      "sunrise": "05:32",
+      "sunset": "18:14",
+      "forecast": [
+        {
+          "day": "今",
+          "code": 2,
+          "tmax": 26,
+          "tmin": 21
+        },
+        {
+          "day": "六",
+          "code": 3,
+          "tmax": 25,
+          "tmin": 20
+        },
+        {
+          "day": "日",
+          "code": 61,
+          "tmax": 24,
+          "tmin": 19
+        },
+        {
+          "day": "一",
+          "code": 63,
+          "tmax": 23,
+          "tmin": 18
+        },
+        {
+          "day": "二",
+          "code": 2,
+          "tmax": 26,
+          "tmin": 20
+        },
+        {
+          "day": "三",
+          "code": 1,
+          "tmax": 28,
+          "tmin": 21
+        },
+        {
+          "day": "四",
+          "code": 0,
+          "tmax": 29,
+          "tmin": 22
+        }
+      ]
+    },
+    {
+      "name": "桃園八德",
+      "temp": 22.8,
+      "feels": 23.4,
+      "humidity": 75,
+      "wind": 6,
+      "windDir": 80,
+      "uv": 5,
+      "code": 2,
+      "sunrise": "05:33",
+      "sunset": "18:15",
+      "forecast": [
+        {
+          "day": "今",
+          "code": 2,
+          "tmax": 25,
+          "tmin": 20
+        },
+        {
+          "day": "六",
+          "code": 3,
+          "tmax": 24,
+          "tmin": 19
+        },
+        {
+          "day": "日",
+          "code": 61,
+          "tmax": 23,
+          "tmin": 18
+        },
+        {
+          "day": "一",
+          "code": 63,
+          "tmax": 22,
+          "tmin": 17
+        },
+        {
+          "day": "二",
+          "code": 2,
+          "tmax": 25,
+          "tmin": 19
+        },
+        {
+          "day": "三",
+          "code": 1,
+          "tmax": 27,
+          "tmin": 20
+        },
+        {
+          "day": "四",
+          "code": 0,
+          "tmax": 28,
+          "tmin": 21
+        }
+      ]
+    },
+    {
+      "name": "桃園龜山",
+      "temp": 23.1,
+      "feels": 23.7,
+      "humidity": 73,
+      "wind": 6,
+      "windDir": 70,
+      "uv": 5,
+      "code": 2,
+      "sunrise": "05:33",
+      "sunset": "18:15",
+      "forecast": [
+        {
+          "day": "今",
+          "code": 2,
+          "tmax": 25,
+          "tmin": 20
+        },
+        {
+          "day": "六",
+          "code": 3,
+          "tmax": 24,
+          "tmin": 19
+        },
+        {
+          "day": "日",
+          "code": 61,
+          "tmax": 23,
+          "tmin": 18
+        },
+        {
+          "day": "一",
+          "code": 63,
+          "tmax": 22,
+          "tmin": 17
+        },
+        {
+          "day": "二",
+          "code": 2,
+          "tmax": 25,
+          "tmin": 19
+        },
+        {
+          "day": "三",
+          "code": 1,
+          "tmax": 27,
+          "tmin": 20
+        },
+        {
+          "day": "四",
+          "code": 0,
+          "tmax": 28,
+          "tmin": 21
+        }
+      ]
+    },
+    {
+      "name": "新竹竹北",
+      "temp": 22.3,
+      "feels": 22.9,
+      "humidity": 70,
+      "wind": 10,
+      "windDir": 30,
+      "uv": 6,
+      "code": 1,
+      "sunrise": "05:34",
+      "sunset": "18:16",
+      "forecast": [
+        {
+          "day": "今",
+          "code": 1,
+          "tmax": 25,
+          "tmin": 19
+        },
+        {
+          "day": "六",
+          "code": 2,
+          "tmax": 24,
+          "tmin": 18
+        },
+        {
+          "day": "日",
+          "code": 61,
+          "tmax": 23,
+          "tmin": 17
+        },
+        {
+          "day": "一",
+          "code": 63,
+          "tmax": 22,
+          "tmin": 16
+        },
+        {
+          "day": "二",
+          "code": 2,
+          "tmax": 25,
+          "tmin": 18
+        },
+        {
+          "day": "三",
+          "code": 1,
+          "tmax": 27,
+          "tmin": 19
+        },
+        {
+          "day": "四",
+          "code": 0,
+          "tmax": 28,
+          "tmin": 20
+        }
+      ]
+    }
+  ],
+  "stocks_tw": {
+    "1773": {
+      "name": "勝一",
+      "price": 142.5,
+      "change": 2.5,
+      "changePct": 1.79
+    },
+    "2330": {
+      "name": "台積電",
+      "price": 1125,
+      "change": 15,
+      "changePct": 1.35
+    },
+    "3231": {
+      "name": "緯創",
+      "price": 158.5,
+      "change": -2,
+      "changePct": -1.25
+    },
+    "5392": {
+      "name": "能率",
+      "price": 78.3,
+      "change": 0.8,
+      "changePct": 1.03
+    },
+    "6919": {
+      "name": "康霈",
+      "price": 412,
+      "change": 8,
+      "changePct": 1.98
+    },
+    "7827": {
+      "name": "漢康",
+      "price": 256.5,
+      "change": -3.5,
+      "changePct": -1.35
+    }
+  },
+  "stocks_us": {
+    "NVDA": {
+      "name": "NVIDIA",
+      "price": 172.45,
+      "change": 3.21,
+      "changePct": 1.89
+    },
+    "TSLA": {
+      "name": "Tesla",
+      "price": 298.12,
+      "change": -5.43,
+      "changePct": -1.79
+    },
+    "VST": {
+      "name": "Vistra",
+      "price": 142.88,
+      "change": 2.15,
+      "changePct": 1.53
+    },
+    "VT": {
+      "name": "Vanguard Total World",
+      "price": 128.55,
+      "change": 0.42,
+      "changePct": 0.33
+    },
+    "VOO": {
+      "name": "Vanguard S&P 500",
+      "price": 568.2,
+      "change": 1.85,
+      "changePct": 0.33
+    },
+    "QQQ": {
+      "name": "Invesco QQQ",
+      "price": 512.78,
+      "change": 3.44,
+      "changePct": 0.68
+    }
+  },
+  "fx": {
+    "USD": {
+      "rate": 32.485,
+      "cashSell": 32.585
+    },
+    "JPY": {
+      "rate": 0.2142,
+      "cashSell": 0.218
+    },
+    "EUR": {
+      "rate": 35.21,
+      "cashSell": 35.45
+    },
+    "SGD": {
+      "rate": 24.12,
+      "cashSell": 24.38
+    },
+    "CNY": {
+      "rate": 4.452,
+      "cashSell": 4.51
+    }
+  },
+  "news_tw": [
+    {
+      "title": "在北京見鄭麗文！ 習近平對兩岸關係提4點建議：歡迎台灣農漁產品赴中銷售| 政治",
+      "url": "https://news.google.com/rss/articles/CBMiW0FVX3lxTFA4TWtKVTdJanpOV29Ha25lQV9kaEVVUk10ejdpbEoxUDdjWF8xTzVoM05mUnh2ZHQ4U0k5eVpiN1NlWFFmWVpuYnJqSUpKYjB6RjF1YnFRd0hfak0?oc=5",
+      "source": "Newtalk新聞",
+      "time": "07:34"
+    },
+    {
+      "title": "白沙屯媽祖將起駕！「累了請上車」1行為踩雷 恐罰9000元",
+      "url": "https://news.google.com/rss/articles/CBMizgJBVV95cUxPVzlhVDFtTHpPMFd2NEJPeWI1OHVta0JrNlF3S0MyUUt5YnZlX05PcHowSWo4X2pTTWMyTHBCeXQzemlNNG02SGQwTWk1ZnNFUkM4TnRJaUFmQUxaMVozUTZZbzBGX1lWcjlyaE9hY1BNcjlUcVlobHlvbWI4cG8tb0FoVFFvOFhObkwzQ1JrOS1VZWx0M1BnTVV4b25ETEZiNW1zX0pjeFZobkFrdWt2SnFMa21pYlBoSmpjWDVuNF9PMVYzZ2ZVbEdTSElsMHNLU2VfWG8wNmd2aGhoTEJNMm43LWM4Yk1BS0NtNlY2ckNUaDFTMGdnRk1JRHIxNHRhc0Z3ZzZJWFVUZVY3TnBnaUlDWDBIX2J4S1N5eU5tbmxqMWZIUDF4bGNLbEE5TGVZLUZtN2pXY05Lck9XdDlINjNidEtyc29LSzdEMkNn?oc=5",
+      "source": "Yahoo新聞",
+      "time": "05:38"
+    },
+    {
+      "title": "「春藥片」都是假的！片商到底讓女優吃什麼？　星乃莉子給答案了",
+      "url": "https://news.google.com/rss/articles/CBMiWEFVX3lxTE1yd0h5N3RPRW41TzlNekZCc0FtY1RUaWtnMzFRMHhTZ0I5aEhrN01qaW9SZC00Y3J1S1FPUy00VzNRQnJCaHJRQXRwTVdUM2o1VS1vdGRsMlbSAV9BVV95cUxQYW1HTkxXeGE4NTE4NHFwWG1URjF4eUgwS2pvSU1DS0xEeGhFZGJnb1pEbXFDVUN2dV9mRmZmaExySkpzVmxBcXFDRDZxVTdVbW1ZcWtWRnVuWGl1STBZQQ?oc=5",
+      "source": "三立新聞網SETN.com",
+      "time": "17:03"
+    },
+    {
+      "title": "他分散消費取得1500多張發票 兌領獎金後下場曝光",
+      "url": "https://news.google.com/rss/articles/CBMiX0FVX3lxTE9NSUtCdUNxUWNrSXA2N2lUOFMteGhVVGlsMVhiR05tSmQ1ZEF3QVBmY3VRWWZiV3pnQndnT0tELV9vSjd3QVZCd3BaUlZCYWJIeFUzZV85R09rU2pHNWVj0gFkQVVfeXFMTjBwY3hXek4zNms3Mm9RM3FJZnlUazh6WmhNZm42WUhXNjk4QUhEaHkzYkd5YWFTOERyTFk4WGdBU2FzLTZmb1ItNnlRQUVyaXRITzd2QWFuTmtqYXhNNG5TYXhMdw?oc=5",
+      "source": "自由財經",
+      "time": "23:30"
+    },
+    {
+      "title": "停火談判倒數！伊朗代表團先到場、美副總統范斯將抵　警戒森嚴",
+      "url": "https://news.google.com/rss/articles/CBMiXkFVX3lxTE5kTHNtcXJLS3FDWWRwVlV5enlvSlFSczdQRDN0b1NTZVRPRm0wdTJEQU9EMzBBTlZZSjRybVJjZlMtSmFaeEprSWFKQlZIM2o5RVp6WjZKc3gzdUk2akHSAWhBVV95cUxOSXNmWGNHdHQ3YUZicHpTeXREZTN5NjVMX2dqTk5BOUJCZVBUMVQ0YVNGNTFwWG1YOGE2ZWdyZW5XLV9rN0xISzhIb1B0N2NpRGltZVQ2UmZoSEZqVWtPNmFXVmNOZW42Sw?oc=5",
+      "source": "ETtoday新聞雲",
+      "time": "03:10"
+    },
+    {
+      "title": "伊朗想強索荷姆茲「買路財」！英媒曝1殘酷現實",
+      "url": "https://news.google.com/rss/articles/CBMiX0FVX3lxTFBoVFd5a2p2bGE0TlpMUVFQOVNmUy1oaENsSm5HOUJoY01oSXA0eks5eExVclk5X09iaVNNNHc5VEh2R1RkUHM3cU5RUTFoc1F0aEM3UGcxVERFOEUtV1hF0gFkQVVfeXFMTmg4OUtMOVVvQml6R2dvaDZfY3lIdFcwR3RXVnV0NS1pbW1UQjZCZVFMOWNxYktHNHg2Z2RBSlZQenFmZnhHT3lidTQ1NzR5MkNBN3g2Y2ZYZGw4M1pKc1picVR3cw?oc=5",
+      "source": "自由財經",
+      "time": "14:47"
+    },
+    {
+      "title": "辛樂克將生成初估路徑「大迴轉」　飆速成長恐達中度颱風↑",
+      "url": "https://news.google.com/rss/articles/CBMiXkFVX3lxTE54S1lHZ0szaXNHZm9VbjRvWFdTWF9Mc1dRSW1BRGxfMXoxVHRJRkZIc25aSkNaVmZVMndHZjU5aXFLcTFKc2VXUzl4Um0wMlEwRzltZmhtWWZ6M0Zha1HSAWhBVV95cUxQZlY4UkxyRXdObXZXSzhOTXFFWUtlOHllWjFEcS1fbXpLVHhQVFg3SDFibHhWajVvUGFlaWxSRnludDVMX1lPV0RtenV5WjJ6WG5rZzZvdEMwUjA2YXhTQzFpV0V5YVpXNw?oc=5",
+      "source": "ETtoday新聞雲",
+      "time": "13:24"
+    },
+    {
+      "title": "柯文哲判決書爆關鍵！法官認定：柯指示「橘子」出境涉干擾偵查| 政治",
+      "url": "https://news.google.com/rss/articles/CBMiW0FVX3lxTE9WQ2d1MWZxWWVTX2F4SGZLMkVWZ1VIaWNmTnhZM2hDLUFJQ3pndTBkY1hiSUZwWDNIUVkzVmxrZVVCRktIMU5URjNoMkxvWHpsRlJKS2pWZEZaX2s?oc=5",
+      "source": "Newtalk新聞",
+      "time": "07:05"
+    },
+    {
+      "title": "台灣人口連27個月負成長但3月新生兒數有反轉 出生率最高在這裡",
+      "url": "https://news.google.com/rss/articles/CBMiUEFVX3lxTFBQQ191QzdWdlZKWWlEQ1BJSlZUT2xJNzZSMDNSSlpxV2oyM2Y0TUt6bHRDY1RSeFRpemhWUlk0SjQzLTFPcUN6MXFYeFZsVVRk0gFWQVVfeXFMTXB4MHA4RUNUOWZlUWVNaW84MWZnQzE3X3RFLUluMzQ5TzFIeVdlT1VjelV0Wm5qbkZSWlctaWF6WHdieUtRWl9Qc0F5REpWZXhhWkkyT2c?oc=5",
+      "source": "聯合新聞網",
+      "time": "02:56"
+    },
+    {
+      "title": "西班牙外長籲伊朗真誠談判 譴責以色列轟黎巴嫩「人類良知恥辱」",
+      "url": "https://news.google.com/rss/articles/CBMiZkFVX3lxTFBncjhwTXBUM24yYnFEb1dKYVVaak9IbkR6X2lSa2RncTRfMU9UaFlVcE9RLU5HMWx5UXd1OFdxRUdUUWgwTW1ob2dBODRua2tlWnZ5cmxmalUyd2xJRFNWTGgwc2RSQdIBa0FVX3lxTE1rTnZPQnNWeExpenN3SHMzdThTUktyaVhRanpZc1M2dzBwLWZjenl4VXVDMFQxUGtLN0I0bDdnTGVTQmhrZ1JLWUVfQnJWTGxYa2tsak4zdUF5YnRvSEdZX3RIRHdOT1dqVWY0?oc=5",
+      "source": "自由時報",
+      "time": "09:00"
+    }
+  ],
+  "news_world": [
+    {
+      "title": "Rep. Eric Swalwell, Candidate for California Governor, Is Accused of Sexual Assault",
+      "title_zh": "加州州長候選人眾議員埃里克·斯瓦爾韋爾被指控性侵犯",
+      "url": "https://news.google.com/rss/articles/CBMitgFBVV95cUxPTXNVWmxKY0RGMDJCMkp4UDlHQVFYWkI1Y3M4YXNiM0NsWE9QSkdaMWU0MjMxZVBsZXJEZllWMEFqZWhoTGdDR3pnck5CMjE0dHkwc21sX2QyS1ZqSldjQjVPVFpacGkyUWdtYkxKamNlNXlPTXNNUmJIdVZRLVlzRzNqdUJaWERXOTJHb0pNSUFfUHBRcDJUUHYyTW84WFd0ZnRVWDRxd2dnQkUyNzRjUzBLUHZFQQ?oc=5",
+      "source": "KQED",
+      "time": "01:43"
+    },
+    {
+      "title": "Iran War Live Updates: Vance Heads to Peace Talks as Lebanon Impasse Threatens Cease-Fire",
+      "title_zh": "伊朗戰爭即時更新：黎巴嫩僵局威脅停火，萬斯前往和平談判",
+      "url": "https://news.google.com/rss/articles/CBMigAFBVV95cUxPMEVFMUtBU0M0VXBGM25pbWk4b0hFNUxweGVNSFJDYTJlMUZjSnFuMXZicXNZNU9SZnhleEFaRVRQN1VUb0NJQ3RIYm9Fb0dLcjVKd3RuNVV3eXRCSm1yTzlURmdUWlN4NUZFQXBnZ29pR2Nxa0Y0YjlxRmNJc0Y5eQ?oc=5",
+      "source": "The New York Times",
+      "time": "00:23"
+    },
+    {
+      "title": "First Contact: Meet the Dive Medical Recovery Team of Artemis II",
+      "title_zh": "第一次接觸：認識阿耳忒彌斯二號的潛水醫療恢復團隊",
+      "url": "https://news.google.com/rss/articles/CBMiygFBVV95cUxNbl92T05EVldHTi1mU2VhM3J4eFdPTWZqZzdlVm52M1QwNHNnS25yLUF1dTJ6NGxNWlQ1M0dIYks0YzExak9RR0VZYkRyVlhOSGNFa0swT0NOVlFhRWxLZXVCWWZMbnZkSThmNjVVRGlKNEpUWnZjb2tVYTVzWjVsaTdjU3hUWV9SWDd3MFBfQ1QyNl93VVU2dTBsTXgxMTFjc0NBMHFMOXVBamZPTDBRVHhrdUJvbkJENHJkRjBPbDlMLXZhd0dOZTFB?oc=5",
+      "source": "usff.navy.mil",
+      "time": "22:23"
+    },
+    {
+      "title": "Epstein survivors have mixed feelings on Melania Trump's call for hearing in Congress",
+      "title_zh": "愛潑斯坦倖存者對梅蘭妮亞·川普呼籲在國會聽證會的感受複雜",
+      "url": "https://news.google.com/rss/articles/CBMif0FVX3lxTE5IUVFEQWVSV3hNbU9fTXY1eUljbHk2S29LNDN2cktfVFZNZGVNWVhxTFFadlRDUk9VVmlmQVhPMVdiMWt4MzBDWUZEcldiMUg5WUg2NTA5Zlk5aXRoVThLYm1GeFVXRl9GZ1lqS3BMMEtkbVdTNUhHTmlSXzZwWDg?oc=5",
+      "source": "NPR",
+      "time": "20:42"
+    },
+    {
+      "title": "Democrat Kamala Harris teases 2028 presidential bid, following Trump loss",
+      "title_zh": "川普落選後，民主黨人卡瑪拉哈里斯 (Kamala Harris) 嘲笑 2028 年總統競選",
+      "url": "https://news.google.com/rss/articles/CBMiswFBVV95cUxNdmhxc0k1WE9VU1FRXzRWM1lWLWlfMUpzS2U2SkQ1ZURqQk13Szc0Skh1QkVmWjFuWGNra3U4ZGcwNWNHRWl6Q0p3WkJFamNEcS03OVk1TW1VVVhTVWNzQ2RVWGJWRWVNWEhabTdZUmN2OUhCQzZTOEtwWGpoZUxuZFFSODdTdFJJZmpsc3NsWGRZMHRlY2E5UHhYMklUR1d4eWxSTTR1dXFDU29abWFMUE1Gc9IBuAFBVV95cUxPbEJVSk0tMHpGaHFNbEQwZ3paZmRfZGZyUUJZbXo2aWEydkxxWXZoYUVzaTBmOHQ5TEVjZkY4SnhiZE5YOFRGQUpzUW15ZVo4emhZQ1FfOUgyWWJGT2hodk5YS25sTlRTaXhBRHUwamtrTjM0MXJ2LVBCNndkcTBqeGcxOE10cjc3QXI2X01UQXdITXZHVndXcmJpekgyNVAxSzhEbUlqRkxNbldxb1c3NXJHTkNPbms3?oc=5",
+      "source": "Al Jazeera",
+      "time": "20:31"
+    },
+    {
+      "title": "Trump's 250-foot 'triumphal arch' would loom over Potomac, new renderings show",
+      "title_zh": "新效果圖顯示，川普250英尺高的「凱旋門」將聳立在波托馬克上空",
+      "url": "https://news.google.com/rss/articles/CBMid0FVX3lxTE1SOE51emVWa3B5QlhweTJJLXBNaEFGU3BIbWl6OVplRVVRSTFHTFpPenlzSGhsRGZlNlowTXRPOHF5ZWlRaVRhZE50RnFZZDlnTmhkYVRaVFF3RzBzWUpVcE55TTVlZk8wc0Z5SnF1WnNqYTJvdS1z0gF8QVVfeXFMTWtja3loVEF5dDdiODcwUFM3QTlVOGJOY3p0MVlDdHFSa0RjUEx6RkxsUFpLVmxCLUx0RXhwc1VpSmhpUXVlLUdKemJCNU5BVUstS25kR1M4WTdUT2EwUXVqU1djZUVvYmFyOEgzMld4bmV6ZXV5SDZjOFNqUQ?oc=5",
+      "source": "CNBC",
+      "time": "21:16"
+    },
+    {
+      "title": "Husband of American woman missing in Bahamas will remain in police custody after being questioned, attorney says",
+      "title_zh": "律師稱，在巴哈馬失蹤的美國婦女的丈夫在接受訊問後仍將被警方拘留",
+      "url": "https://news.google.com/rss/articles/CBMiiwFBVV95cUxQMVBFVUhaUjNtbGZzY0swWTJDa1g1ckZnUTZxVGI3Y3ZGN3ZtbXVvbkQyNTVHOVJCTXBoNEd6cVBsSlBiaUpNZHNwVWtNV3VZV1BYUURUVFFlWUtNVGdSVERGQVlwUjd6MmM4clZSNWxpRVZQVDEtRUphS3hsS05OT0FIams5ZGEzMUdJ?oc=5",
+      "source": "CNN",
+      "time": "12:06"
+    },
+    {
+      "title": "Former Rep. Eliot Engel, who worked on foreign affairs for decades, dies at 79",
+      "title_zh": "從事外交事務數十年的前眾議員艾略特·恩格爾去世，享年 79 歲",
+      "url": "https://news.google.com/rss/articles/CBMiiAFBVV95cUxNRWt3NzV4TDdXemlDbVRibllWOXNvNmlWdWxYR0lVSGF1VWpXaTY2OXhuZk0wdGh5eWs1cG5lLVBJaE5EejdqNXRWV0NMY2k2c1U2VTM2M2htaUtzdEJpSUEwRlZpS2dJbnJ0MENjdm5kQTZCMGNxV19VQ0xVWTZ3dlNuV3FtRW5p?oc=5",
+      "source": "Politico",
+      "time": "23:20"
+    },
+    {
+      "title": "Trump criticizes Iran not allowing more oil through Strait of Hormuz: 'Not the agreement we have'",
+      "title_zh": "川普批評伊朗不允許更多石油通過霍爾木茲海峽：“這不是我們達成的協議”",
+      "url": "https://news.google.com/rss/articles/CBMikgFBVV95cUxPU0c4dm1wVHFnbmNiMXJGRjBIX2VobEh6X1dtV1ozYmoxV3MyZ1VtRVAzWlRSYi15VmF2ZVp4TWlrSTNQcUtFWDhYaUM5LTJEandhLWxUOS01ajVDUGE3VEQ4YkJHUHVsVFdTeERjZEVrcVhtT1g4WUpXakxFTlgyZW1kVlNzcVBGNEx5dEg3VnVuUdIBlwFBVV95cUxObks4bGI2OERZZWNFUHlsQmp5aVVfNllPZENZdlU3WWdMQjFLWWpUc2NJRmNERFgyOTRYSmg2NE96YWtGT2ZQMnd1NEs2UFhlSThtZmhWYVBrcHFmeXN0OE1VN2xRNVQtdk9wMHpCSDRkNXJETThQT0FSbHJTS3F0ai0tYzc2TWVHLXpLdlp3Z3M3Sl9wbndz?oc=5",
+      "source": "Fox News",
+      "time": "22:35"
+    },
+    {
+      "title": "Five people charged with murder in deadly Northern California fireworks warehouse explosion",
+      "title_zh": "五人在北加州煙火倉庫爆炸中被控謀殺",
+      "url": "https://news.google.com/rss/articles/CBMiogFBVV95cUxONldnY180UmNITHF6Q1FWYm51WC14eUhycUxvaktTamFUbTVWUVl6ZlFCTjFiSVktd25MblJNYnZWX1kyOEpQWkpFUVJxeWVmc1RIOUQ5bHNCcUU0Ymktc1hHNkdzcEJvM25TZVRKcGlDRy0yTnd1SlBZZ1VXdXBkajJ6UWFoYy1XMU8tS1dVYjFHUmNCWEJhSF8wSFg2SlZXa3c?oc=5",
+      "source": "AP News",
+      "time": "22:18"
+    }
+  ]
+}

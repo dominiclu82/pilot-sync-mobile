@@ -1449,7 +1449,7 @@ export function getSpaHtmlBody(): string {
       <button class="tab-util-btn tab-install-btn" id="tab-install-btn" onclick="showInstallGuide()" style="display:none">
         <span>📲</span>安裝
       </button>
-      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer;text-decoration:underline" onclick="showAbout()">V8.0.16e</span>
+      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer;text-decoration:underline" onclick="showAbout()">V8.0.17</span>
     </div>
   </div>
 </div>
@@ -1480,7 +1480,12 @@ export function getSpaHtmlBody(): string {
       <div style="color:var(--muted)">Best experience on iPad in landscape mode. Android devices may not display correctly.</div>
     </div>
     <div style="max-height:50vh;overflow-y:auto;-webkit-overflow-scrolling:touch;margin-bottom:10px">
-    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V8.0.16e</div>
+    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V8.0.17</div>
+    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
+      <div>新增「晨報 Morning Report」PWA，掛在 /morning 獨立路由，擁有自己的 icon、manifest、Service Worker 和版次；CrewSync icon 升級為深藍夜空 + 雲海 + 飛機的新設計</div>
+      <div>Added Morning Report PWA at /morning with independent icon, manifest, Service Worker and versioning; CrewSync icon upgraded with night sky, clouds, and plane design</div>
+    </div>
+    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V8.0.16e</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
       <div>Friends/Groups grid 加入底部 120px spacer 修正最後一列被切、Tab bar 斷點下調至 600px 修正 iPad 直拿</div>
       <div>Friends/Groups grid added 120px bottom spacer for last row, tab bar breakpoint lowered to 600px for iPad portrait</div>
