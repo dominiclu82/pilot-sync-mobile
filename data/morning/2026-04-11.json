@@ -3,7 +3,7 @@
   "generated_at": "2026-04-11T06:30:00+08:00",
   "weather": [
     {
-      "name": "台北福華",
+      "name": "台北",
       "temp": 23.5,
       "feels": 24.1,
       "humidity": 72,
@@ -304,26 +304,21 @@
     }
   },
   "fx": {
-    "USD": {
-      "rate": 32.485,
-      "cashSell": 32.585
-    },
-    "JPY": {
-      "rate": 0.2142,
-      "cashSell": 0.218
-    },
-    "EUR": {
-      "rate": 35.21,
-      "cashSell": 35.45
-    },
-    "SGD": {
-      "rate": 24.12,
-      "cashSell": 24.38
-    },
-    "CNY": {
-      "rate": 4.452,
-      "cashSell": 4.51
-    }
+    "USD/TWD": { "rate": 32.485, "cashSell": 32.585 },
+    "JPY/TWD": { "rate": 0.2142, "cashSell": 0.218 },
+    "EUR/TWD": { "rate": 35.21, "cashSell": 35.45 },
+    "SGD/TWD": { "rate": 24.12, "cashSell": 24.38 },
+    "CNY/TWD": { "rate": 4.452, "cashSell": 4.51 },
+    "GBP/TWD": { "rate": 41.05, "cashSell": 41.35 },
+    "AUD/TWD": { "rate": 21.18, "cashSell": 21.38 },
+    "HKD/TWD": { "rate": 4.155, "cashSell": 4.195 },
+    "EUR/USD": { "rate": 1.0842, "change": 0.0012, "changePct": 0.11 },
+    "USD/JPY": { "rate": 151.65, "change": -0.32, "changePct": -0.21 },
+    "GBP/USD": { "rate": 1.2615, "change": 0.0035, "changePct": 0.28 },
+    "USD/CNY": { "rate": 7.295, "change": -0.005, "changePct": -0.07 },
+    "USD/HKD": { "rate": 7.815, "change": 0.001, "changePct": 0.01 },
+    "AUD/USD": { "rate": 0.6518, "change": 0.0022, "changePct": 0.34 },
+    "EUR/JPY": { "rate": 164.42, "change": 0.15, "changePct": 0.09 }
   },
   "news_tw": [
     {

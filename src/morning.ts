@@ -7,8 +7,8 @@ import fs from 'fs';
 import path from 'path';
 import { ROOT } from './config.js';
 
-export const MORNING_VERSION = 'M1.0.2';
-const MORNING_CACHE = 'morning-v1-0-2';
+export const MORNING_VERSION = 'M1.0.3';
+const MORNING_CACHE = 'morning-v1-0-3';
 
 const DATA_DIR = path.join(ROOT, 'data', 'morning');
 
@@ -399,6 +399,19 @@ a:active { opacity: 0.6; }
   border-bottom: 1px solid var(--border);
 }
 .sec-h .icon { font-size: 1.1em; margin-right: 6px; }
+.sec-set-btn {
+  background: rgba(255,255,255,0.06);
+  border: 1px solid var(--border);
+  color: var(--muted);
+  width: 30px;
+  height: 26px;
+  border-radius: 7px;
+  cursor: pointer;
+  font-size: .9em;
+  line-height: 1;
+  padding: 0;
+}
+.sec-set-btn:active { opacity: 0.6; }
 .sec-b { padding: 6px 0; }
 
 /* Weather */
@@ -421,6 +434,13 @@ a:active { opacity: 0.6; }
   scrollbar-width: none;
 }
 .wx-forecast::-webkit-scrollbar { display: none; }
+.wx-empty {
+  padding: 24px 16px;
+  text-align: center;
+  color: var(--muted);
+  font-size: .82em;
+  line-height: 1.6;
+}
 .wx-day {
   flex: 0 0 auto;
   min-width: 52px;
@@ -694,7 +714,6 @@ a:active { opacity: 0.6; }
       </div>
       <button class="hdr-btn" id="btn-theme" title="日/夜">🌙</button>
       <button class="hdr-btn" id="btn-date" title="歷史">📅</button>
-      <button class="hdr-btn" id="btn-set" title="設定">⚙️</button>
       <button class="hdr-btn" id="btn-refresh" title="重新整理">↻</button>
     </div>
   </div>
@@ -732,6 +751,11 @@ a:active { opacity: 0.6; }
     <hr style="border:none;border-top:1px solid var(--border);margin:12px 0">
     <div class="changelog-v">${MORNING_VERSION}</div>
     <div class="changelog-txt">
+      設定改為分散式：右上角統一 ⚙️ 移除，天氣/台股/美股/匯率每個 section 標題右邊各自有獨立 ⚙️，點哪區就只開那區的設定（修正匯率要拉很下面的問題）；台股加內建勾選清單（半導體/電子/金融/傳產航運 4 類約 30 支）；美股加內建勾選清單（科技/ETF/金融/消費 4 類約 30 支）；匯率改支援跨幣種不限對台幣（對台幣/主要貨幣對/交叉盤 3 類約 25 對，舊版 ['USD','JPY'] 自動遷移成 ['USD/TWD','JPY/TWD']）；天氣預設調整為台北 + 桃園龜山；台股預設調整為 2330 + 3231；修正假資料「台北福華」→「台北」讓勾選「台北」能看到資料。<br>
+      Per-section settings: unified top-right ⚙️ removed, each of Weather/TW Stocks/US Stocks/FX sections now has its own ⚙️ in the header right (fixes the pain of scrolling past weather to reach FX); built-in checkbox presets for TW stocks (~30 across Semiconductor/Electronics/Finance/Traditional&Shipping) and US stocks (~30 across Tech/ETF/Finance/Consumer); FX now supports cross-currency pairs beyond just vs-TWD (~25 pairs across vs-TWD/Majors/Crosses, legacy ['USD','JPY'] auto-migrated to ['USD/TWD','JPY/TWD']); default weather selection tuned to Taipei + Taoyuan Guishan; default TW stocks tuned to 2330 + 3231; fix placeholder data name mismatch "台北福華" → "台北" so selecting "台北" now shows data.
+    </div>
+    <div class="changelog-v old">M1.0.2</div>
+    <div class="changelog-txt">
       A+/A− 字型按鈕間距拉開，改回兩顆獨立上下排列；修正 nav bar 橫向捲動時回彈反彈效果（overscroll-behavior-x: contain）、整頁防 iOS 橡皮筋反彈（overscroll-behavior: none）。<br>
       A+/A− font buttons spaced apart, restored as two separate stacked buttons; fix nav bar horizontal overscroll bounce, disable iOS rubber-band bounce on full page.
     </div>
@@ -748,42 +772,57 @@ a:active { opacity: 0.6; }
   </div>
 </div>
 
-<!-- Settings modal -->
+<!-- Settings modal (per-section) -->
 <div class="modal-wrap" id="set-wrap" onclick="if(event.target===this)hideSet()">
   <div class="modal">
     <button class="close" onclick="hideSet()">✕</button>
-    <h3>⚙️ 設定 Settings</h3>
+    <h3 id="set-title">⚙️ 設定 Settings</h3>
     <div style="font-size:.75em;color:var(--muted);margin-bottom:12px">
       設定會存在這個裝置的瀏覽器裡，換裝置或清快取會重置。
     </div>
 
-    <div class="set-sec">
+    <div class="set-sec" data-section="wx">
       <h4>🌤️ 天氣地點</h4>
-      <p>勾選預設地點（最多 10 個，與手動輸入加總）</p>
+      <p>勾選預設或手動輸入，最多 10 個</p>
       <div class="wx-counter" id="wx-counter">已選 0 / 10</div>
       <div id="wx-presets"></div>
       <div style="margin-top:14px">
-        <p style="margin-top:0">也可以手動加地點（一行一個，格式：<code>名稱,緯度,經度</code>）</p>
+        <p style="margin-top:0">手動加地點（一行一個，格式：<code>名稱,緯度,經度</code>）</p>
         <textarea id="set-wx-custom" placeholder="自選地點,24.99,121.31"></textarea>
       </div>
     </div>
 
-    <div class="set-sec">
-      <h4>📈 台股代號</h4>
-      <p>用逗號分隔（例如 2330,1773,3231）</p>
-      <textarea id="set-tw" placeholder="1773,2330,3231,5392,6919,7827"></textarea>
+    <div class="set-sec" data-section="tw">
+      <h4>📈 台股</h4>
+      <p>勾選預設或手動輸入代號，最多 20 支</p>
+      <div class="wx-counter" id="tw-counter">已選 0 / 20</div>
+      <div id="tw-presets"></div>
+      <div style="margin-top:14px">
+        <p style="margin-top:0">手動加代號（用逗號分隔，例如 4968,3515）</p>
+        <textarea id="set-tw-custom" placeholder="4968,3515"></textarea>
+      </div>
     </div>
 
-    <div class="set-sec">
-      <h4>🇺🇸 美股代號</h4>
-      <p>用逗號分隔（例如 NVDA,TSLA,VOO）</p>
-      <textarea id="set-us" placeholder="NVDA,TSLA,VST,VT,VOO,QQQ"></textarea>
+    <div class="set-sec" data-section="us">
+      <h4>🇺🇸 美股</h4>
+      <p>勾選預設或手動輸入代號，最多 20 支</p>
+      <div class="wx-counter" id="us-counter">已選 0 / 20</div>
+      <div id="us-presets"></div>
+      <div style="margin-top:14px">
+        <p style="margin-top:0">手動加代號（用逗號分隔，例如 GME,AMC）</p>
+        <textarea id="set-us-custom" placeholder="GME,AMC"></textarea>
+      </div>
     </div>
 
-    <div class="set-sec">
-      <h4>💱 匯率幣別（對台幣）</h4>
-      <p>用逗號分隔（例如 USD,JPY,EUR）</p>
-      <textarea id="set-fx" placeholder="USD,JPY,EUR,SGD,CNY"></textarea>
+    <div class="set-sec" data-section="fx">
+      <h4>💱 匯率</h4>
+      <p>勾選常用貨幣對（不限對台幣），最多 15 個</p>
+      <div class="wx-counter" id="fx-counter">已選 0 / 15</div>
+      <div id="fx-presets"></div>
+      <div style="margin-top:14px">
+        <p style="margin-top:0">手動加貨幣對（用逗號分隔，例如 CHF/TWD,USD/THB）</p>
+        <textarea id="set-fx-custom" placeholder="CHF/TWD,USD/THB"></textarea>
+      </div>
     </div>
 
     <button class="set-btn" onclick="saveSettings()">儲存並重新載入</button>
@@ -915,19 +954,97 @@ const WX_PRESET_MAP = {};
 Object.values(WX_PRESETS).forEach(arr => arr.forEach(p => { WX_PRESET_MAP[p[0]] = { id: p[0], name: p[1], lat: p[2], lon: p[3] }; }));
 const WX_MAX = 10;
 
+// 台股預設清單（代號 + 名稱）
+const TW_PRESETS = {
+  '半導體': [
+    ['2330','台積電'],['2454','聯發科'],['2303','聯電'],['2408','南亞科'],
+    ['2379','瑞昱'],['3034','聯詠'],['3443','創意'],['3661','世芯-KY'],
+    ['3711','日月光投控'],['6488','環球晶'],['8046','南電'],
+  ],
+  '電子': [
+    ['2317','鴻海'],['2308','台達電'],['2382','廣達'],['2357','華碩'],
+    ['2353','宏碁'],['2376','技嘉'],['2356','英業達'],['3231','緯創'],
+    ['2324','仁寶'],['2412','中華電'],['2409','友達'],
+  ],
+  '金融': [
+    ['2881','富邦金'],['2882','國泰金'],['2884','玉山金'],['2886','兆豐金'],
+    ['2891','中信金'],['2892','第一金'],['5880','合庫金'],
+  ],
+  '傳產/航運': [
+    ['1216','統一'],['1301','台塑'],['1303','南亞'],['2002','中鋼'],
+    ['2603','長榮'],['2609','陽明'],['2610','華航'],['2618','長榮航'],['2912','統一超'],
+  ],
+};
+const TW_PRESET_SET = new Set();
+Object.values(TW_PRESETS).forEach(arr => arr.forEach(p => TW_PRESET_SET.add(p[0])));
+const TW_PRESET_NAMES = {};
+Object.values(TW_PRESETS).forEach(arr => arr.forEach(p => { TW_PRESET_NAMES[p[0]] = p[1]; }));
+
+// 美股預設清單
+const US_PRESETS = {
+  '科技': [
+    ['AAPL','Apple'],['MSFT','Microsoft'],['GOOGL','Alphabet'],['META','Meta'],
+    ['AMZN','Amazon'],['NVDA','NVIDIA'],['TSLA','Tesla'],['AMD','AMD'],
+    ['INTC','Intel'],['TSM','TSMC ADR'],['ORCL','Oracle'],['CRM','Salesforce'],
+    ['ADBE','Adobe'],['NFLX','Netflix'],
+  ],
+  'ETF': [
+    ['VOO','S&P 500'],['VT','Total World'],['VTI','Total US'],['QQQ','Nasdaq 100'],
+    ['SPY','S&P 500'],['DIA','Dow 30'],['IWM','Russell 2000'],['SCHD','Dividend'],
+  ],
+  '金融': [
+    ['BRK.B','Berkshire'],['JPM','JPMorgan'],['V','Visa'],['MA','Mastercard'],
+    ['BAC','Bank of America'],['WFC','Wells Fargo'],['GS','Goldman Sachs'],
+  ],
+  '消費/其他': [
+    ['DIS','Disney'],['NKE','Nike'],['COST','Costco'],['VST','Vistra'],
+    ['KO','Coca-Cola'],['PEP','PepsiCo'],['MCD','McDonalds'],
+  ],
+};
+const US_PRESET_SET = new Set();
+Object.values(US_PRESETS).forEach(arr => arr.forEach(p => US_PRESET_SET.add(p[0])));
+const US_PRESET_NAMES = {};
+Object.values(US_PRESETS).forEach(arr => arr.forEach(p => { US_PRESET_NAMES[p[0]] = p[1]; }));
+
+// 匯率預設清單（貨幣對）
+const FX_PRESETS = {
+  '對台幣': [
+    'USD/TWD','JPY/TWD','EUR/TWD','CNY/TWD','HKD/TWD',
+    'SGD/TWD','GBP/TWD','AUD/TWD','CAD/TWD','KRW/TWD','THB/TWD',
+  ],
+  '主要貨幣對': [
+    'EUR/USD','USD/JPY','GBP/USD','USD/CHF','USD/CNY',
+    'USD/HKD','USD/SGD','AUD/USD','NZD/USD','USD/CAD',
+  ],
+  '交叉盤': [
+    'EUR/JPY','GBP/JPY','EUR/GBP','AUD/JPY',
+  ],
+};
+const FX_PRESET_SET = new Set();
+Object.values(FX_PRESETS).forEach(arr => arr.forEach(p => FX_PRESET_SET.add(p)));
+
+const TW_MAX = 20;
+const US_MAX = 20;
+const FX_MAX = 15;
+
 const DEFAULTS = {
-  wxPresets: ['tw-taipei', 'tw-bade', 'tw-guishan', 'tw-zhubei'],
+  wxPresets: ['tw-taipei', 'tw-guishan'],
   wxCustom: [],
-  tw: ['1773','2330','3231','5392','6919','7827'],
+  tw: ['2330','3231'],
   us: ['NVDA','TSLA','VST','VT','VOO','QQQ'],
-  fx: ['USD','JPY','EUR','SGD','CNY'],
+  fx: ['USD/TWD','JPY/TWD','EUR/TWD','SGD/TWD','CNY/TWD'],
 };
 
 function loadSetting(key, fallback) {
   try {
     const v = localStorage.getItem(LS[key]);
     if (!v) return fallback;
-    return JSON.parse(v);
+    let parsed = JSON.parse(v);
+    // 舊版 fx 相容：['USD','JPY',...] → ['USD/TWD','JPY/TWD',...]
+    if (key === 'fx' && Array.isArray(parsed)) {
+      parsed = parsed.map(x => (typeof x === 'string' && !x.includes('/')) ? (x + '/TWD') : x);
+    }
+    return parsed;
   } catch (e) { return fallback; }
 }
 function saveSetting(key, val) {
@@ -1017,21 +1134,24 @@ function renderReport(data) {
   const activeWx = getActiveWxLocs();
   const wxByName = {};
   (data.weather || []).forEach(w => { if (w && w.name) wxByName[w.name] = w; });
-  const wxBlocks = activeWx.map(loc => {
-    const w = wxByName[loc.name] || { name: loc.name, temp: null, feels: null, humidity: null, wind: null, windDir: null, uv: null, code: null, sunrise: '—', sunset: '—', forecast: [] };
-    return renderWx(w);
-  }).join('');
+  const wxBlocks = activeWx.length === 0
+    ? '<div class="wx-empty">尚未選擇天氣地點，請點標題右邊的 ⚙️<br>No weather locations selected. Tap ⚙️ next to the title.</div>'
+    : activeWx.map(loc => {
+        const w = wxByName[loc.name] || { name: loc.name, temp: null, feels: null, humidity: null, wind: null, windDir: null, uv: null, code: null, sunrise: '—', sunset: '—', forecast: [] };
+        return renderWx(w);
+      }).join('');
   const twRows = userTw.map(code => renderStock(code, 'tw', (data.stocks_tw || {})[code])).join('') || emptyRow();
   const usRows = userUs.map(code => renderStock(code, 'us', (data.stocks_us || {})[code])).join('') || emptyRow();
   const fxRows = userFx.map(c => renderFx(c, (data.fx || {})[c])).join('') || emptyRow();
   const twNews = (data.news_tw || []).slice(0, 10).map(renderNews).join('') || emptyNews();
   const wwNews = (data.news_world || []).slice(0, 10).map(renderNewsWorld).join('') || emptyNews();
 
+  const setBtn = (sec) => \`<button class="sec-set-btn" title="設定" onclick="showSet('\${sec}')">⚙️</button>\`;
   root.innerHTML = \`
-    <div class="sec" id="sec-wx"><div class="sec-h"><span><span class="icon">🌤️</span>天氣 Weather</span></div><div class="sec-b">\${wxBlocks || emptyRow()}</div></div>
-    <div class="sec" id="sec-stw"><div class="sec-h"><span><span class="icon">📈</span>台股 TW Stocks</span></div><div class="sec-b">\${twRows}</div></div>
-    <div class="sec" id="sec-sus"><div class="sec-h"><span><span class="icon">🇺🇸</span>美股 US Stocks</span></div><div class="sec-b">\${usRows}</div></div>
-    <div class="sec" id="sec-fx"><div class="sec-h"><span><span class="icon">💱</span>匯率 FX (vs TWD)</span></div><div class="sec-b">\${fxRows}</div></div>
+    <div class="sec" id="sec-wx"><div class="sec-h"><span><span class="icon">🌤️</span>天氣 Weather</span>\${setBtn('wx')}</div><div class="sec-b">\${wxBlocks || emptyRow()}</div></div>
+    <div class="sec" id="sec-stw"><div class="sec-h"><span><span class="icon">📈</span>台股 TW Stocks</span>\${setBtn('tw')}</div><div class="sec-b">\${twRows}</div></div>
+    <div class="sec" id="sec-sus"><div class="sec-h"><span><span class="icon">🇺🇸</span>美股 US Stocks</span>\${setBtn('us')}</div><div class="sec-b">\${usRows}</div></div>
+    <div class="sec" id="sec-fx"><div class="sec-h"><span><span class="icon">💱</span>匯率 FX (vs TWD)</span>\${setBtn('fx')}</div><div class="sec-b">\${fxRows}</div></div>
     <div class="sec" id="sec-ntw"><div class="sec-h"><span><span class="icon">🇹🇼</span>台灣新聞 TW News</span></div><div class="sec-b">\${twNews}</div></div>
     <div class="sec" id="sec-nww"><div class="sec-h"><span><span class="icon">🌍</span>世界新聞 World News</span></div><div class="sec-b">\${wwNews}</div></div>
   \`;
@@ -1106,19 +1226,22 @@ function renderStock(code, market, s) {
   \`;
 }
 
-function renderFx(code, v) {
+function renderFx(pair, v) {
   if (!v) {
-    return \`<div class="row"><div class="row-l"><div class="n">\${code}</div><div class="c">—</div></div><div class="row-r flat">—</div></div>\`;
+    return \`<div class="row"><div class="row-l"><div class="n">\${pair}</div><div class="c">—</div></div><div class="row-r flat">—</div></div>\`;
   }
+  const isTwd = pair.endsWith('/TWD');
+  const sub = isTwd && v.cashSell != null
+    ? ('現金賣出 ' + fmtNum(v.cashSell, 4))
+    : (v.change != null ? (pct(v.changePct) + ' (' + (v.change > 0 ? '+' : '') + fmtNum(v.change, 4) + ')') : '即期');
   return \`
     <div class="row">
       <div class="row-l">
-        <div class="n">\${code}/TWD</div>
-        <div class="c">現金賣出 \${fmtNum(v.cashSell, 4)}</div>
+        <div class="n">\${pair}</div>
+        <div class="c">\${sub}</div>
       </div>
       <div class="row-r">
         <div class="p">\${fmtNum(v.rate, 4)}</div>
-        <div class="ch flat">即期</div>
       </div>
     </div>
   \`;
@@ -1168,29 +1291,69 @@ function hideAbout() { document.getElementById('about-wrap').classList.remove('s
 window.showAbout = showAbout;
 window.hideAbout = hideAbout;
 
-// Settings modal
-let _wxSelectedIds = [];  // 在設定頁開啟期間暫存的勾選狀態
+// Settings modal (per-section)
+let _wxSelectedIds = [];
+let _twSelected = [];
+let _usSelected = [];
+let _fxSelected = [];
 
-function showSet() {
+const SET_TITLES = {
+  wx: '🌤️ 天氣地點設定',
+  tw: '📈 台股設定',
+  us: '🇺🇸 美股設定',
+  fx: '💱 匯率設定',
+  all: '⚙️ 設定 Settings',
+};
+
+function showSet(section) {
+  section = section || 'all';
+  // Load current values into modal
   _wxSelectedIds = [...loadSetting('wxPresets', DEFAULTS.wxPresets)];
+  const customWx = loadSetting('wxCustom', DEFAULTS.wxCustom);
+  document.getElementById('set-wx-custom').value = customWx.map(w => \`\${w.name},\${w.lat},\${w.lon}\`).join('\\n');
+
+  const twList = loadSetting('tw', DEFAULTS.tw);
+  _twSelected = twList.filter(c => TW_PRESET_SET.has(c));
+  const twCustom = twList.filter(c => !TW_PRESET_SET.has(c));
+  document.getElementById('set-tw-custom').value = twCustom.join(',');
+
+  const usList = loadSetting('us', DEFAULTS.us);
+  _usSelected = usList.filter(c => US_PRESET_SET.has(c));
+  const usCustom = usList.filter(c => !US_PRESET_SET.has(c));
+  document.getElementById('set-us-custom').value = usCustom.join(',');
+
+  const fxList = loadSetting('fx', DEFAULTS.fx);
+  _fxSelected = fxList.filter(c => FX_PRESET_SET.has(c));
+  const fxCustom = fxList.filter(c => !FX_PRESET_SET.has(c));
+  document.getElementById('set-fx-custom').value = fxCustom.join(',');
+
+  // Render preset grids
   renderWxPresets();
-  const custom = loadSetting('wxCustom', DEFAULTS.wxCustom);
-  document.getElementById('set-wx-custom').value = custom.map(w => \`\${w.name},\${w.lat},\${w.lon}\`).join('\\n');
-  document.getElementById('set-tw').value = loadSetting('tw', DEFAULTS.tw).join(',');
-  document.getElementById('set-us').value = loadSetting('us', DEFAULTS.us).join(',');
-  document.getElementById('set-fx').value = loadSetting('fx', DEFAULTS.fx).join(',');
+  renderTwPresets();
+  renderUsPresets();
+  renderFxPresets();
+
+  // Show/hide sections based on requested section
+  document.querySelectorAll('.set-sec').forEach(el => {
+    const s = el.getAttribute('data-section');
+    el.style.display = (section === 'all' || s === section) ? '' : 'none';
+  });
+  document.getElementById('set-title').textContent = SET_TITLES[section] || SET_TITLES.all;
+
   document.getElementById('set-wrap').classList.add('show');
 }
+window.showSet = showSet;
+
 function hideSet() { document.getElementById('set-wrap').classList.remove('show'); }
 
-function countCustomValid() {
+// ── Weather ──
+function countWxCustomValid() {
   const txt = document.getElementById('set-wx-custom').value || '';
   return txt.trim().split(/\\n/).map(l => l.trim()).filter(Boolean).filter(line => {
     const p = line.split(',');
     return p.length >= 3 && p[0].trim() && !isNaN(parseFloat(p[1])) && !isNaN(parseFloat(p[2]));
   }).length;
 }
-
 function renderWxPresets() {
   const wrap = document.getElementById('wx-presets');
   let html = '';
@@ -1211,12 +1374,11 @@ function renderWxPresets() {
       e.preventDefault();
       const id = el.getAttribute('data-id');
       const idx = _wxSelectedIds.indexOf(id);
-      const customN = countCustomValid();
       if (idx >= 0) {
         _wxSelectedIds.splice(idx, 1);
       } else {
-        if (_wxSelectedIds.length + customN >= WX_MAX) {
-          alert('最多只能選 ' + WX_MAX + ' 個地點（預設 + 手動加總）');
+        if (_wxSelectedIds.length + countWxCustomValid() >= WX_MAX) {
+          alert('最多只能選 ' + WX_MAX + ' 個地點');
           return;
         }
         _wxSelectedIds.push(id);
@@ -1227,33 +1389,165 @@ function renderWxPresets() {
   });
   updateWxCounter();
 }
-
 function updateWxCounter() {
-  const customN = countCustomValid();
-  const total = _wxSelectedIds.length + customN;
+  const total = _wxSelectedIds.length + countWxCustomValid();
   const el = document.getElementById('wx-counter');
-  el.textContent = '已選 ' + total + ' / ' + WX_MAX + '（預設 ' + _wxSelectedIds.length + ' + 手動 ' + customN + '）';
-  if (total >= WX_MAX) el.classList.add('full'); else el.classList.remove('full');
+  el.textContent = '已選 ' + total + ' / ' + WX_MAX;
+  el.classList.toggle('full', total >= WX_MAX);
+}
+
+// ── Stocks / FX shared helpers ──
+function parseCsvList(txt) {
+  return (txt || '').split(',').map(s => s.trim().toUpperCase()).filter(Boolean);
+}
+function countCsv(id) {
+  return parseCsvList(document.getElementById(id).value).length;
+}
+
+function renderTwPresets() {
+  const wrap = document.getElementById('tw-presets');
+  let html = '';
+  for (const cat of Object.keys(TW_PRESETS)) {
+    html += '<div class="wx-cat"><div class="wx-cat-title">' + cat + '</div><div class="wx-chk-grid">';
+    for (const p of TW_PRESETS[cat]) {
+      const code = p[0], name = p[1];
+      const checked = _twSelected.includes(code);
+      html += '<label class="wx-chk ' + (checked ? 'checked' : '') + '" data-code="' + code + '">'
+        + '<input type="checkbox"' + (checked ? ' checked' : '') + '>'
+        + '<span>' + code + ' ' + name + '</span></label>';
+    }
+    html += '</div></div>';
+  }
+  wrap.innerHTML = html;
+  wrap.querySelectorAll('.wx-chk').forEach(el => {
+    el.addEventListener('click', (e) => {
+      e.preventDefault();
+      const code = el.getAttribute('data-code');
+      const idx = _twSelected.indexOf(code);
+      if (idx >= 0) {
+        _twSelected.splice(idx, 1);
+      } else {
+        if (_twSelected.length + countCsv('set-tw-custom') >= TW_MAX) {
+          alert('最多只能選 ' + TW_MAX + ' 支台股');
+          return;
+        }
+        _twSelected.push(code);
+      }
+      renderTwPresets();
+      updateTwCounter();
+    });
+  });
+  updateTwCounter();
+}
+function updateTwCounter() {
+  const total = _twSelected.length + countCsv('set-tw-custom');
+  const el = document.getElementById('tw-counter');
+  el.textContent = '已選 ' + total + ' / ' + TW_MAX;
+  el.classList.toggle('full', total >= TW_MAX);
+}
+
+function renderUsPresets() {
+  const wrap = document.getElementById('us-presets');
+  let html = '';
+  for (const cat of Object.keys(US_PRESETS)) {
+    html += '<div class="wx-cat"><div class="wx-cat-title">' + cat + '</div><div class="wx-chk-grid">';
+    for (const p of US_PRESETS[cat]) {
+      const code = p[0], name = p[1];
+      const checked = _usSelected.includes(code);
+      html += '<label class="wx-chk ' + (checked ? 'checked' : '') + '" data-code="' + code + '">'
+        + '<input type="checkbox"' + (checked ? ' checked' : '') + '>'
+        + '<span>' + code + ' ' + name + '</span></label>';
+    }
+    html += '</div></div>';
+  }
+  wrap.innerHTML = html;
+  wrap.querySelectorAll('.wx-chk').forEach(el => {
+    el.addEventListener('click', (e) => {
+      e.preventDefault();
+      const code = el.getAttribute('data-code');
+      const idx = _usSelected.indexOf(code);
+      if (idx >= 0) {
+        _usSelected.splice(idx, 1);
+      } else {
+        if (_usSelected.length + countCsv('set-us-custom') >= US_MAX) {
+          alert('最多只能選 ' + US_MAX + ' 支美股');
+          return;
+        }
+        _usSelected.push(code);
+      }
+      renderUsPresets();
+      updateUsCounter();
+    });
+  });
+  updateUsCounter();
+}
+function updateUsCounter() {
+  const total = _usSelected.length + countCsv('set-us-custom');
+  const el = document.getElementById('us-counter');
+  el.textContent = '已選 ' + total + ' / ' + US_MAX;
+  el.classList.toggle('full', total >= US_MAX);
+}
+
+function renderFxPresets() {
+  const wrap = document.getElementById('fx-presets');
+  let html = '';
+  for (const cat of Object.keys(FX_PRESETS)) {
+    html += '<div class="wx-cat"><div class="wx-cat-title">' + cat + '</div><div class="wx-chk-grid">';
+    for (const pair of FX_PRESETS[cat]) {
+      const checked = _fxSelected.includes(pair);
+      html += '<label class="wx-chk ' + (checked ? 'checked' : '') + '" data-code="' + pair + '">'
+        + '<input type="checkbox"' + (checked ? ' checked' : '') + '>'
+        + '<span>' + pair + '</span></label>';
+    }
+    html += '</div></div>';
+  }
+  wrap.innerHTML = html;
+  wrap.querySelectorAll('.wx-chk').forEach(el => {
+    el.addEventListener('click', (e) => {
+      e.preventDefault();
+      const pair = el.getAttribute('data-code');
+      const idx = _fxSelected.indexOf(pair);
+      if (idx >= 0) {
+        _fxSelected.splice(idx, 1);
+      } else {
+        if (_fxSelected.length + countCsv('set-fx-custom') >= FX_MAX) {
+          alert('最多只能選 ' + FX_MAX + ' 個匯率');
+          return;
+        }
+        _fxSelected.push(pair);
+      }
+      renderFxPresets();
+      updateFxCounter();
+    });
+  });
+  updateFxCounter();
+}
+function updateFxCounter() {
+  const total = _fxSelected.length + countCsv('set-fx-custom');
+  const el = document.getElementById('fx-counter');
+  el.textContent = '已選 ' + total + ' / ' + FX_MAX;
+  el.classList.toggle('full', total >= FX_MAX);
 }
 
 function saveSettings() {
-  // Weather presets
+  // Weather
   saveSetting('wxPresets', _wxSelectedIds);
-  // Weather custom
-  const lines = document.getElementById('set-wx-custom').value.trim().split(/\\n/).map(l => l.trim()).filter(Boolean);
-  const custom = lines.map(line => {
+  const wxLines = document.getElementById('set-wx-custom').value.trim().split(/\\n/).map(l => l.trim()).filter(Boolean);
+  const wxCustom = wxLines.map(line => {
     const [name, lat, lon] = line.split(',').map(s => s.trim());
     return { name, lat: parseFloat(lat), lon: parseFloat(lon) };
   }).filter(w => w.name && !isNaN(w.lat) && !isNaN(w.lon));
-  saveSetting('wxCustom', custom);
-  // Stocks / FX
-  const parseList = v => v.split(',').map(s => s.trim().toUpperCase()).filter(Boolean);
-  const tw = parseList(document.getElementById('set-tw').value);
-  const us = parseList(document.getElementById('set-us').value);
-  const fx = parseList(document.getElementById('set-fx').value);
-  if (tw.length > 0) saveSetting('tw', tw); else localStorage.removeItem(LS.tw);
-  if (us.length > 0) saveSetting('us', us); else localStorage.removeItem(LS.us);
-  if (fx.length > 0) saveSetting('fx', fx); else localStorage.removeItem(LS.fx);
+  saveSetting('wxCustom', wxCustom);
+  // Stocks / FX: merge preset + custom into single array
+  const twCustom = parseCsvList(document.getElementById('set-tw-custom').value);
+  const usCustom = parseCsvList(document.getElementById('set-us-custom').value);
+  const fxCustom = parseCsvList(document.getElementById('set-fx-custom').value);
+  const twAll = [..._twSelected, ...twCustom];
+  const usAll = [..._usSelected, ...usCustom];
+  const fxAll = [..._fxSelected, ...fxCustom];
+  if (twAll.length > 0) saveSetting('tw', twAll); else localStorage.removeItem(LS.tw);
+  if (usAll.length > 0) saveSetting('us', usAll); else localStorage.removeItem(LS.us);
+  if (fxAll.length > 0) saveSetting('fx', fxAll); else localStorage.removeItem(LS.fx);
   hideSet();
   loadAndRender();
 }
@@ -1368,7 +1662,6 @@ applyFontScale();
 
 // Event bindings
 document.getElementById('btn-refresh').addEventListener('click', () => loadAndRender());
-document.getElementById('btn-set').addEventListener('click', showSet);
 document.getElementById('btn-date').addEventListener('click', showDate);
 document.getElementById('btn-theme').addEventListener('click', toggleTheme);
 document.getElementById('btn-font-up').addEventListener('click', () => bumpFont(1));
@@ -1376,6 +1669,9 @@ document.getElementById('btn-font-dn').addEventListener('click', () => bumpFont(
 document.getElementById('cal-prev').addEventListener('click', () => calNav(-1));
 document.getElementById('cal-next').addEventListener('click', () => calNav(1));
 document.getElementById('set-wx-custom').addEventListener('input', updateWxCounter);
+document.getElementById('set-tw-custom').addEventListener('input', updateTwCounter);
+document.getElementById('set-us-custom').addEventListener('input', updateUsCounter);
+document.getElementById('set-fx-custom').addEventListener('input', updateFxCounter);
 
 // Nav bar click → scroll to section
 document.querySelectorAll('.nav-btn').forEach(btn => {
