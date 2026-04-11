@@ -7,8 +7,8 @@ import fs from 'fs';
 import path from 'path';
 import { ROOT } from './config.js';
 
-export const MORNING_VERSION = 'M1.0.1';
-const MORNING_CACHE = 'morning-v1-0-1';
+export const MORNING_VERSION = 'M1.0.2';
+const MORNING_CACHE = 'morning-v1-0-2';
 
 const DATA_DIR = path.join(ROOT, 'data', 'morning');
 
@@ -269,7 +269,7 @@ function getMorningHtml() {
   --nav-bg: rgba(255,255,255,0.92);
 }
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-html { font-size: 15px; }
+html { font-size: 15px; overscroll-behavior: none; }
 body {
   margin: 0; padding: 0;
   background: var(--bg);
@@ -279,6 +279,7 @@ body {
   line-height: 1.5;
   min-height: 100vh;
   padding-bottom: env(safe-area-inset-bottom);
+  overscroll-behavior: none;
 }
 a { color: var(--accent); text-decoration: none; }
 a:active { opacity: 0.6; }
@@ -326,28 +327,24 @@ a:active { opacity: 0.6; }
 }
 .hdr-btn:active { opacity: 0.7; }
 
-/* Compound font-scale button (A+/A- stacked) */
+/* Compound font-scale button (A+/A- stacked, separated) */
 .hdr-btn-font {
   display: flex;
   flex-direction: column;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  overflow: hidden;
+  gap: 4px;
   flex-shrink: 0;
 }
 .hdr-btn-font button {
   background: rgba(255,255,255,0.08);
-  border: none;
+  border: 1px solid var(--border);
   color: var(--text);
-  padding: 1px 8px;
+  padding: 3px 8px;
   font-size: .62em;
   font-weight: 700;
   cursor: pointer;
-  line-height: 1.3;
-  min-width: 28px;
-}
-.hdr-btn-font button:not(:last-child) {
-  border-bottom: 1px solid var(--border);
+  line-height: 1.1;
+  min-width: 30px;
+  border-radius: 6px;
 }
 .hdr-btn-font button:active { opacity: 0.7; }
 
@@ -360,6 +357,7 @@ a:active { opacity: 0.6; }
   gap: 4px;
   padding: 8px 10px;
   overflow-x: auto;
+  overscroll-behavior-x: contain;
   scrollbar-width: none;
   -webkit-overflow-scrolling: touch;
 }
@@ -733,6 +731,11 @@ a:active { opacity: 0.6; }
     </div>
     <hr style="border:none;border-top:1px solid var(--border);margin:12px 0">
     <div class="changelog-v">${MORNING_VERSION}</div>
+    <div class="changelog-txt">
+      A+/A− 字型按鈕間距拉開，改回兩顆獨立上下排列；修正 nav bar 橫向捲動時回彈反彈效果（overscroll-behavior-x: contain）、整頁防 iOS 橡皮筋反彈（overscroll-behavior: none）。<br>
+      A+/A− font buttons spaced apart, restored as two separate stacked buttons; fix nav bar horizontal overscroll bounce, disable iOS rubber-band bounce on full page.
+    </div>
+    <div class="changelog-v old">M1.0.1</div>
     <div class="changelog-txt">
       天氣地點設定改成勾選式：內建 3 大類共 68 個預設點位（🇹🇼 台灣城市 23 個 / 🏞️ 台灣景點 17 個 / 🌏 國際城市 33 個，含蘇黎世、布拉格、鳳凰城），保留手動輸入經緯度功能，總上限 10 個地點；Header 按鈕列在手機過寬修正：A+/A− 合併為上下複合按鈕省一格、整列緊湊化；Nav bar 在手機被推走修正：header 與 nav 改為同一 sticky 容器一起釘頂。<br>
       Weather location setting switched to checkbox UI with 68 built-in presets (TW cities 23 / TW attractions 17 / International cities 33, incl. Zurich, Prague, Phoenix), manual lat/lon input retained, max 10 total; Fix header button row overflowing on mobile: A+/A− combined into vertical compound button saving one slot, buttons tightened; Fix nav bar being pushed off on mobile: header and nav now share a single sticky container so they pin together.
