@@ -9,8 +9,8 @@ import pg from 'pg';
 import { ROOT } from './config.js';
 import { buildMorningReport } from './morning-builder.js';
 
-export const MORNING_VERSION = 'V1.1.02';
-const MORNING_CACHE = 'morning-v1-1-02';
+export const MORNING_VERSION = 'V1.1.03';
+const MORNING_CACHE = 'morning-v1-1-03';
 
 // ─── Postgres ────────────────────────────────────────────────────────
 let _pgPool: pg.Pool | null = null;
@@ -487,10 +487,15 @@ self.addEventListener('fetch', e => {
 `);
 });
 
-// 從 request 取得 userId（X-User-Id header）
+// 從 request 取得 userId（X-User-Id header 或 ?uid= query param）
+// header 值是 URL-encoded（因為非 ASCII 暱稱不能直接放 header）
 function reqUserId(req: express.Request): string | null {
   const raw = req.header('X-User-Id') || req.query.uid;
-  return normalizeUserId(Array.isArray(raw) ? String(raw[0]) : (raw as string | undefined));
+  const str = Array.isArray(raw) ? String(raw[0]) : (raw as string | undefined);
+  if (!str) return null;
+  let decoded = str;
+  try { decoded = decodeURIComponent(str); } catch (e) { /* 不是 encoded 就原樣用 */ }
+  return normalizeUserId(decoded);
 }
 
 // ─── /api/morning-report?date=YYYY-MM-DD ─────────────────────────────
@@ -1203,8 +1208,13 @@ a:active { opacity: 0.6; }
     <hr style="border:none;border-top:1px solid var(--border);margin:12px 0">
     <div class="changelog-v">${MORNING_VERSION}</div>
     <div class="changelog-txt">
+      Hotfix：使用者暱稱含非 ASCII 字元（中文、日文等）在 iOS Safari 會導致 fetch() 丟 TypeError，畫面顯示「載入失敗：Type error」。原因：HTTP header 值規範不允許非 ASCII，iOS Safari 嚴格執行。解法：前端 apiFetch 用 encodeURIComponent 包 X-User-Id header，後端 reqUserId 用 decodeURIComponent 還原。<br>
+      Hotfix: Non-ASCII nicknames (Chinese, Japanese, etc.) caused fetch() to throw TypeError on iOS Safari. Solution: frontend apiFetch encodes X-User-Id via encodeURIComponent, backend decodes.
+    </div>
+    <div class="changelog-v old">V1.1.02</div>
+    <div class="changelog-txt">
       修正 cnyes 台股 API 對興櫃股（如 7827 漢康-KY）回傳 404 的 bug：TWS market prefix 只涵蓋上市，7827 在 cnyes 系統歸類為 TWG 興櫃。解法：cnyesBatch 拆成小 helper、fetchTwStocks 先 TWS 批次抓、沒命中的 codes fallback TWG 再抓一次。順便把版次格式改為 PATCH 兩位數（V1.1.02），about card 歷史條目全部補 0。<br>
-      Fix cnyes TW stocks failing on OTC (興櫃) codes like 7827: cnyesBatch tries TWS market prefix first, retries missing codes with TWG. Version format switched to 2-digit patch (V1.1.02), all history entries padded with leading zero.
+      Fix cnyes TW stocks failing on OTC (興櫃) codes like 7827: cnyesBatch tries TWS first, retries missing with TWG. Version format switched to 2-digit patch (V1.1.02).
     </div>
     <div class="changelog-v old">V1.1.01</div>
     <div class="changelog-txt">
@@ -1370,11 +1380,13 @@ function updateHdrTitle() {
 }
 
 // Wrapped fetch that always adds X-User-Id header
+// 非 ASCII 暱稱（例如中文）在 iOS Safari 不能直接放 HTTP header，會丟 TypeError
+// 解法：encodeURIComponent 送 header，後端 decodeURIComponent 收
 function apiFetch(url, opts) {
   opts = opts || {};
   opts.headers = opts.headers || {};
   const uid = getUid();
-  if (uid) opts.headers['X-User-Id'] = uid;
+  if (uid) opts.headers['X-User-Id'] = encodeURIComponent(uid);
   return fetch(url, opts);
 }
 

@@ -218,6 +218,26 @@ async function run() {
     assert('translated' in j, 'response 缺少 translated 欄位');
   });
 
+  // 中文暱稱 round trip：header 必須 URL-encoded，避免 iOS Safari fetch TypeError
+  await check('中文暱稱 prefs round trip', async () => {
+    const nick = '測試用戶';
+    const encoded = encodeURIComponent(nick);
+    // Save
+    const save = await fetch(`${BASE}/api/morning-prefs`, {
+      method: 'POST',
+      headers: { 'X-User-Id': encoded, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ wx: [], tw: ['2330'], us: [], fx: [] }),
+    });
+    assert(save.ok, `Chinese nick save returned ${save.status}`);
+    // Retrieve
+    const get = await fetch(`${BASE}/api/morning-prefs`, {
+      headers: { 'X-User-Id': encoded },
+    });
+    assert(get.ok, `Chinese nick get returned ${get.status}`);
+    const j: any = await get.json();
+    assert(Array.isArray(j.tw) && j.tw.includes('2330'), '中文暱稱 prefs 讀不回');
+  });
+
   // 多使用者隔離測試：alice 的 report 只應含她自己的選擇
   await check('使用者隔離：alice 的 report 只含 alice 的 prefs', async () => {
     // alice 只選 2317（跟 smoketest 的 2330 不同）
