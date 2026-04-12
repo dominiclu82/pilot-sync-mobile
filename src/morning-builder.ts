@@ -389,7 +389,7 @@ function parseRss(xml) {
     const rawTitle = getTag('title')
       .replace(/&amp;/g,'&').replace(/&quot;/g,'"').replace(/&#39;/g,"'")
       .replace(/&lt;/g,'<').replace(/&gt;/g,'>');
-    const link = getTag('link');
+    let link = getTag('link').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>');
     const pubDate = getTag('pubDate');
     const source = getTag('source');
     // 只移除「 - 來源名」格式（dash 前後都有空格），避免砍掉 hard-fought、face-to-face 等

@@ -11,8 +11,8 @@ import { Readability } from '@mozilla/readability';
 import { ROOT } from './config.js';
 import { buildMorningReport } from './morning-builder.js';
 
-export const MORNING_VERSION = 'V1.2.01';
-const MORNING_CACHE = 'morning-v1-2-01';
+export const MORNING_VERSION = 'V1.2.02';
+const MORNING_CACHE = 'morning-v1-2-02';
 
 // ─── Postgres ────────────────────────────────────────────────────────
 let _pgPool: pg.Pool | null = null;
@@ -2097,8 +2097,13 @@ function renderNews(n) {
     </div>
   \`;
 }
+const PAYWALL_SOURCES = ['NYT', 'WSJ', 'The New York Times', 'Wall Street Journal'];
 function renderNewsWorld(n) {
   const encodedUrl = encodeURIComponent(n.url || '');
+  const isPaywall = PAYWALL_SOURCES.some(s => (n.source || '').includes(s));
+  const readerBtn = isPaywall
+    ? '<span style="font-size:.7em;color:var(--muted)">🔒 此來源無法翻譯</span>'
+    : '<button class="news-reader-btn" onclick="event.preventDefault();event.stopPropagation();openReader(\\'' + encodedUrl + '\\')">📖 雙語閱讀</button>';
   return \`
     <div class="news">
       <a href="\${n.url}" target="_blank" rel="noopener">
@@ -2106,9 +2111,7 @@ function renderNewsWorld(n) {
         \${n.title_zh && n.title ? '<div class="news-en">' + escapeHtml(n.title) + '</div>' : ''}
         <div class="news-meta"><span>\${escapeHtml(n.source || '')}</span><span>\${n.time || ''}</span></div>
       </a>
-      <div class="news-actions">
-        <button class="news-reader-btn" onclick="event.preventDefault();event.stopPropagation();openReader('\${encodedUrl}')">📖 雙語閱讀</button>
-      </div>
+      <div class="news-actions">\${readerBtn}</div>
     </div>
   \`;
 }
@@ -2776,12 +2779,12 @@ async function openReader(encodedUrl) {
     html += '<div class="reader-source">原文 Original: <a href="' + escapeHtml(url) + '" target="_blank" rel="noopener">' + escapeHtml(data.source || url) + '</a></div>';
     body.innerHTML = html;
   } catch (e) {
-    // Fallback：用 Google Translate 開翻譯版
+    // Fallback：用 Google Translate 連結
     const gtUrl = 'https://translate.google.com/translate?sl=en&tl=zh-TW&u=' + encodeURIComponent(url);
     body.innerHTML = '<div class="reader-error">'
       + '此來源不支援逐段雙語閱讀，已為您準備 Google 翻譯版本。<br><br>'
-      + '<a href="' + escapeHtml(gtUrl) + '" target="_blank" style="color:var(--accent);font-size:1.1em;font-weight:700">📖 Google 翻譯版 →</a><br><br>'
-      + '<a href="' + escapeHtml(url) + '" target="_blank" style="color:var(--muted);font-size:.85em">或直接開啟英文原文 →</a>'
+      + '<a href="' + gtUrl + '" target="_blank" rel="noopener" style="color:var(--accent);font-size:1.1em;font-weight:700">📖 Google 翻譯版 →</a><br><br>'
+      + '<a href="' + url + '" target="_blank" rel="noopener" style="color:var(--muted);font-size:.85em">或直接開啟英文原文 →</a>'
       + '</div>';
   }
 }

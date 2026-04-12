@@ -454,7 +454,7 @@ app.get('/sw.js', (_req, res) => {
   res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
   res.setHeader('Service-Worker-Allowed', '/');
   res.send(`
-const CACHE = 'crewsync-v8017';
+const CACHE = 'crewsync-v8018';
 const SHELL = ['/', '/main', '/share'];
 self.addEventListener('install', e => {
   e.waitUntil(
@@ -1329,6 +1329,12 @@ app.post('/api/groups/leave', async (req, res) => {
       if (+cnt.rows[0].c === 0) {
         await _pool.query(`DELETE FROM cs_groups WHERE id = $1`, [groupId]);
       }
+    }
+    // 退出後如果不在任何群組了 → 關閉 sharing + 刪除班表資料
+    const remaining = await _pool.query(`SELECT COUNT(*) AS c FROM cs_group_members WHERE employee_id = $1`, [eid]);
+    if (+remaining.rows[0].c === 0) {
+      await _pool.query(`UPDATE cs_users SET sharing = false WHERE employee_id = $1`, [eid]);
+      await _pool.query(`DELETE FROM cs_rosters WHERE employee_id = $1`, [eid]);
     }
     res.json({ ok: true });
   } catch (e: any) { res.json({ error: e.message }); }
