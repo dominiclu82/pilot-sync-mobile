@@ -11,8 +11,8 @@ import { Readability } from '@mozilla/readability';
 import { ROOT } from './config.js';
 import { buildMorningReport } from './morning-builder.js';
 
-export const MORNING_VERSION = 'V1.2.02';
-const MORNING_CACHE = 'morning-v1-2-02';
+export const MORNING_VERSION = 'V1.2.03';
+const MORNING_CACHE = 'morning-v1-2-03';
 
 // ─── Postgres ────────────────────────────────────────────────────────
 let _pgPool: pg.Pool | null = null;
@@ -921,6 +921,15 @@ a:active { opacity: 0.6; }
   border-color: rgba(244,196,48,0.5);
   color: var(--accent);
 }
+.nav-btn.nav-dragging {
+  opacity: 0.5;
+  transform: scale(1.1);
+  z-index: 10;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+}
+.nav-btn.nav-drag-over {
+  border-left: 3px solid var(--accent);
+}
 
 /* Section card */
 .sec {
@@ -932,13 +941,49 @@ a:active { opacity: 0.6; }
   scroll-margin-top: calc(var(--top-stack-h, 120px) + 8px);
 }
 .sec-h {
-  padding: 12px 14px 10px;
+  padding: 10px 10px 8px 6px;
   font-size: .95em;
   font-weight: 700;
   display: flex; align-items: center; justify-content: space-between;
   border-bottom: 1px solid var(--border);
+  user-select: none;
+  gap: 6px;
 }
-.sec-h .icon { font-size: 1.1em; margin-right: 6px; }
+.sec-h .icon { font-size: 1.1em; margin-right: 4px; }
+.sec-h .sec-left { display: flex; align-items: center; flex: 1; min-width: 0; cursor: pointer; }
+.sec-h .sec-right { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+
+/* Drag handle */
+.sec-drag {
+  cursor: grab;
+  color: var(--muted);
+  font-size: 1.1em;
+  padding: 4px 6px;
+  line-height: 1;
+  opacity: 0.5;
+  touch-action: none;
+}
+.sec-drag:active { cursor: grabbing; opacity: 1; }
+
+/* Collapse toggle */
+.sec-collapse-arrow {
+  font-size: .7em;
+  color: var(--muted);
+  transition: transform 0.15s;
+  margin-left: 4px;
+}
+.sec.collapsed .sec-collapse-arrow { transform: rotate(-90deg); }
+.sec.collapsed .sec-b { display: none; }
+
+/* Dragging state */
+.sec.dragging {
+  opacity: 0.5;
+  border: 2px dashed var(--accent);
+}
+.sec.drag-over {
+  border-top: 3px solid var(--accent);
+}
+
 .sec-set-btn {
   background: rgba(255,255,255,0.06);
   border: 1px solid var(--border);
@@ -1305,6 +1350,56 @@ a:active { opacity: 0.6; }
 .wx-cat.expanded .wx-chk-grid {
   display: grid;
 }
+
+/* 三層架構：region → county → district */
+.wx-region {
+  margin-top: 8px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+}
+.wx-region-title {
+  font-size: .88em;
+  font-weight: 700;
+  color: var(--accent);
+  padding: 10px 14px;
+  cursor: pointer;
+  user-select: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: rgba(255,255,255,0.03);
+}
+.wx-region-title:active { opacity: .7; }
+.wx-region-title .arrow { transition: transform 0.15s; font-size: .8em; color: var(--muted); }
+.wx-region.expanded .wx-region-title .arrow { transform: rotate(90deg); }
+.wx-region .wx-region-body { display: none; padding: 0 6px 6px; }
+.wx-region.expanded .wx-region-body { display: block; }
+
+/* Super-region（最外層，例如「台灣」） */
+.wx-super {
+  margin-top: 10px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+}
+.wx-super-title {
+  font-size: .95em;
+  font-weight: 700;
+  color: var(--accent);
+  padding: 12px 14px;
+  cursor: pointer;
+  user-select: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: rgba(255,255,255,0.03);
+}
+.wx-super-title:active { opacity: .7; }
+.wx-super-title .arrow { transition: transform 0.15s; font-size: .8em; color: var(--muted); }
+.wx-super.expanded .wx-super-title .arrow { transform: rotate(90deg); }
+.wx-super .wx-super-body { display: none; padding: 4px 6px 8px; }
+.wx-super.expanded .wx-super-body { display: block; }
 .wx-chk {
   display: flex;
   align-items: center;
@@ -1389,6 +1484,7 @@ a:active { opacity: 0.6; }
     <button class="nav-btn" data-target="sec-wx">🌤️ 天氣</button>
     <button class="nav-btn" data-target="sec-stw">📈 台股</button>
     <button class="nav-btn" data-target="sec-sus">🇺🇸 美股</button>
+    <button class="nav-btn" data-target="sec-fx">💱 匯率</button>
     <button class="nav-btn" data-target="sec-ntw">🇹🇼 台灣新聞</button>
     <button class="nav-btn" data-target="sec-nww">🌍 世界新聞</button>
   </nav>
@@ -1582,12 +1678,14 @@ function getMorningClientJs() {
   return `
 const LS = {
   uid: 'morning_uid',
-  wxPresets: 'morning_wx_presets',  // array of preset IDs
-  wxCustom: 'morning_wx_custom',    // array of {name,lat,lon}
-  wxLegacy: 'morning_wx_locs',      // 舊版相容：{name,lat,lon}[]
+  wxPresets: 'morning_wx_presets',
+  wxCustom: 'morning_wx_custom',
+  wxLegacy: 'morning_wx_locs',
   tw: 'morning_tw_stocks',
   us: 'morning_us_stocks',
   fx: 'morning_fx_currencies',
+  secOrder: 'morning_sec_order',       // 段落順序 ['sec-wx','sec-stw',...]
+  secCollapsed: 'morning_sec_collapsed', // 收合狀態 {sec-wx: true, ...}
 };
 
 function getUid() {
@@ -1619,31 +1717,318 @@ function apiFetch(url, opts) {
 // 天氣預設地點清單（分 3 類）
 // 每筆：[id, name, lat, lon]
 const WX_PRESETS = {
-  '🇹🇼 台灣城市': [
-    ['tw-taipei', '台北', 25.03, 121.56],
-    ['tw-xinbei', '新北', 24.98, 121.54],
-    ['tw-keelung', '基隆', 25.13, 121.74],
-    ['tw-taoyuan', '桃園', 24.99, 121.31],
-    ['tw-bade', '桃園八德', 24.93, 121.28],
-    ['tw-guishan', '桃園龜山', 25.04, 121.35],
-    ['tw-dayuan', '桃園大園', 25.07, 121.21],
-    ['tw-hsinchu', '新竹', 24.81, 120.97],
-    ['tw-zhubei', '新竹竹北', 24.83, 121.00],
-    ['tw-miaoli', '苗栗', 24.56, 120.82],
-    ['tw-taichung', '台中', 24.14, 120.68],
-    ['tw-changhua', '彰化', 24.08, 120.54],
-    ['tw-nantou', '南投', 23.91, 120.68],
-    ['tw-yunlin', '雲林', 23.71, 120.54],
-    ['tw-chiayi', '嘉義', 23.48, 120.45],
-    ['tw-tainan', '台南', 22.99, 120.22],
-    ['tw-kaohsiung', '高雄', 22.63, 120.30],
-    ['tw-pingtung', '屏東', 22.67, 120.49],
-    ['tw-yilan', '宜蘭', 24.76, 121.75],
-    ['tw-hualien', '花蓮', 23.98, 121.61],
-    ['tw-taitung', '台東', 22.76, 121.14],
-    ['tw-penghu', '澎湖(馬公)', 23.57, 119.58],
-    ['tw-kinmen', '金門', 24.45, 118.32],
-    ['tw-matsu', '馬祖(南竿)', 26.15, 119.95],
+  '🇹🇼 台北市': [
+    ['tw-tp-songshan', '松山區', 25.06, 121.55],
+    ['tw-tp-xinyi', '信義區', 25.03, 121.57],
+    ['tw-tp-daan', '大安區', 25.03, 121.54],
+    ['tw-tp-zhongzheng', '中正區', 25.03, 121.52],
+    ['tw-tp-wanhua', '萬華區', 25.04, 121.50],
+    ['tw-tp-datong', '大同區', 25.06, 121.51],
+    ['tw-tp-zhongshan', '中山區', 25.07, 121.53],
+    ['tw-tp-neihu', '內湖區', 25.08, 121.59],
+    ['tw-tp-nangang', '南港區', 25.05, 121.61],
+    ['tw-tp-shilin', '士林區', 25.09, 121.52],
+    ['tw-tp-beitou', '北投區', 25.13, 121.50],
+    ['tw-tp-wenshan', '文山區', 24.99, 121.57],
+  ],
+  '🇹🇼 新北市': [
+    ['tw-nt-banqiao', '板橋區', 25.01, 121.46],
+    ['tw-nt-sanchong', '三重區', 25.06, 121.49],
+    ['tw-nt-zhonghe', '中和區', 24.99, 121.49],
+    ['tw-nt-yonghe', '永和區', 25.01, 121.51],
+    ['tw-nt-xinzhuang', '新莊區', 25.04, 121.44],
+    ['tw-nt-xindian', '新店區', 24.97, 121.54],
+    ['tw-nt-tucheng', '土城區', 24.97, 121.44],
+    ['tw-nt-luzhou', '蘆洲區', 25.08, 121.47],
+    ['tw-nt-xizhi', '汐止區', 25.07, 121.64],
+    ['tw-nt-shulin', '樹林區', 24.99, 121.41],
+    ['tw-nt-yingge', '鶯歌區', 24.96, 121.35],
+    ['tw-nt-sanxia', '三峽區', 24.93, 121.37],
+    ['tw-nt-tamsui', '淡水區', 25.17, 121.44],
+    ['tw-nt-ruifang', '瑞芳區', 25.11, 121.81],
+    ['tw-nt-wugu', '五股區', 25.08, 121.44],
+    ['tw-nt-taishan', '泰山區', 25.06, 121.43],
+    ['tw-nt-linkou', '林口區', 25.08, 121.39],
+    ['tw-nt-shenkeng', '深坑區', 25.00, 121.62],
+    ['tw-nt-shiding', '石碇區', 24.99, 121.66],
+    ['tw-nt-pinglin', '坪林區', 24.94, 121.71],
+    ['tw-nt-sanzhi', '三芝區', 25.21, 121.50],
+    ['tw-nt-shimen', '石門區', 25.24, 121.57],
+    ['tw-nt-bali', '八里區', 25.13, 121.40],
+    ['tw-nt-pingxi', '平溪區', 25.03, 121.74],
+    ['tw-nt-shuangxi', '雙溪區', 25.03, 121.87],
+    ['tw-nt-gongliao', '貢寮區', 25.02, 121.91],
+    ['tw-nt-jinshan', '金山區', 25.22, 121.64],
+    ['tw-nt-wanli', '萬里區', 25.18, 121.69],
+    ['tw-nt-wulai', '烏來區', 24.87, 121.55],
+  ],
+  '🇹🇼 桃園市': [
+    ['tw-ty-taoyuan', '桃園區', 24.99, 121.31],
+    ['tw-ty-zhongli', '中壢區', 24.97, 121.23],
+    ['tw-ty-bade', '八德區', 24.93, 121.28],
+    ['tw-ty-guishan', '龜山區', 25.04, 121.35],
+    ['tw-ty-dayuan', '大園區', 25.07, 121.21],
+    ['tw-ty-daxi', '大溪區', 24.88, 121.29],
+    ['tw-ty-yangmei', '楊梅區', 24.91, 121.15],
+    ['tw-ty-luzhu', '蘆竹區', 25.05, 121.28],
+    ['tw-ty-pingzhen', '平鎮區', 24.94, 121.22],
+    ['tw-ty-longtan', '龍潭區', 24.86, 121.22],
+    ['tw-ty-guanyin', '觀音區', 25.03, 121.12],
+    ['tw-ty-xinwu', '新屋區', 24.97, 121.11],
+    ['tw-ty-fuxing', '復興區', 24.82, 121.35],
+  ],
+  '🇹🇼 台中市': [
+    ['tw-tc-central', '中區', 24.14, 120.68],
+    ['tw-tc-east', '東區', 24.14, 120.70],
+    ['tw-tc-south', '南區', 24.13, 120.68],
+    ['tw-tc-west', '西區', 24.14, 120.67],
+    ['tw-tc-north', '北區', 24.16, 120.68],
+    ['tw-tc-beitun', '北屯區', 24.18, 120.69],
+    ['tw-tc-xitun', '西屯區', 24.18, 120.64],
+    ['tw-tc-nantun', '南屯區', 24.14, 120.64],
+    ['tw-tc-taiping', '太平區', 24.13, 120.72],
+    ['tw-tc-dali', '大里區', 24.10, 120.68],
+    ['tw-tc-wufeng', '霧峰區', 24.06, 120.70],
+    ['tw-tc-fengyuan', '豐原區', 24.25, 120.72],
+    ['tw-tc-houli', '后里區', 24.31, 120.71],
+    ['tw-tc-tanzi', '潭子區', 24.21, 120.71],
+    ['tw-tc-daya', '大雅區', 24.22, 120.65],
+    ['tw-tc-shengang', '神岡區', 24.26, 120.66],
+    ['tw-tc-shalu', '沙鹿區', 24.23, 120.57],
+    ['tw-tc-longjing', '龍井區', 24.19, 120.55],
+    ['tw-tc-wuqi', '梧棲區', 24.26, 120.53],
+    ['tw-tc-qingshui', '清水區', 24.27, 120.56],
+    ['tw-tc-dajia', '大甲區', 24.35, 120.62],
+    ['tw-tc-waipu', '外埔區', 24.33, 120.65],
+    ['tw-tc-dadu', '大肚區', 24.15, 120.54],
+    ['tw-tc-heping', '和平區', 24.18, 121.00],
+    ['tw-tc-dongshi', '東勢區', 24.26, 120.83],
+    ['tw-tc-shigang', '石岡區', 24.28, 120.78],
+    ['tw-tc-xinshe', '新社區', 24.23, 120.81],
+  ],
+  '🇹🇼 台南市': [
+    ['tw-tn-central', '中西區', 22.99, 120.20],
+    ['tw-tn-east', '東區', 22.98, 120.22],
+    ['tw-tn-south', '南區', 22.96, 120.20],
+    ['tw-tn-north', '北區', 23.00, 120.21],
+    ['tw-tn-anping', '安平區', 22.99, 120.17],
+    ['tw-tn-annan', '安南區', 23.05, 120.18],
+    ['tw-tn-yongkang', '永康區', 23.03, 120.25],
+    ['tw-tn-rende', '仁德區', 22.97, 120.25],
+    ['tw-tn-guiren', '歸仁區', 22.97, 120.29],
+    ['tw-tn-xinhua', '新化區', 23.04, 120.32],
+    ['tw-tn-shanhua', '善化區', 23.13, 120.30],
+    ['tw-tn-xinying', '新營區', 23.31, 120.32],
+    ['tw-tn-yanshui', '鹽水區', 23.32, 120.27],
+    ['tw-tn-baihe', '白河區', 23.35, 120.42],
+    ['tw-tn-madou', '麻豆區', 23.18, 120.25],
+    ['tw-tn-jiali', '佳里區', 23.17, 120.18],
+    ['tw-tn-xuejia', '學甲區', 23.25, 120.18],
+    ['tw-tn-houbi', '後壁區', 23.37, 120.36],
+    ['tw-tn-liuying', '柳營區', 23.28, 120.35],
+    ['tw-tn-guanmiao', '關廟區', 22.96, 120.33],
+  ],
+  '🇹🇼 高雄市': [
+    ['tw-ks-xinxing', '新興區', 22.63, 120.30],
+    ['tw-ks-lingya', '苓雅區', 22.62, 120.32],
+    ['tw-ks-qianjin', '前金區', 22.63, 120.29],
+    ['tw-ks-yancheng', '鹽埕區', 22.63, 120.28],
+    ['tw-ks-gushan', '鼓山區', 22.65, 120.27],
+    ['tw-ks-qijin', '旗津區', 22.61, 120.27],
+    ['tw-ks-qianzhen', '前鎮區', 22.59, 120.33],
+    ['tw-ks-sanmin', '三民區', 22.65, 120.30],
+    ['tw-ks-zuoying', '左營區', 22.69, 120.29],
+    ['tw-ks-nanzi', '楠梓區', 22.73, 120.32],
+    ['tw-ks-xiaogang', '小港區', 22.56, 120.35],
+    ['tw-ks-fengshan', '鳳山區', 22.63, 120.36],
+    ['tw-ks-daliao', '大寮區', 22.60, 120.40],
+    ['tw-ks-linyuan', '林園區', 22.51, 120.40],
+    ['tw-ks-niaosong', '鳥松區', 22.65, 120.37],
+    ['tw-ks-dashe', '大社區', 22.73, 120.35],
+    ['tw-ks-renwu', '仁武區', 22.70, 120.35],
+    ['tw-ks-dashu', '大樹區', 22.72, 120.43],
+    ['tw-ks-gangshan', '岡山區', 22.79, 120.30],
+    ['tw-ks-qiaotou', '橋頭區', 22.76, 120.30],
+    ['tw-ks-yanchao', '燕巢區', 22.79, 120.36],
+    ['tw-ks-tianliao', '田寮區', 22.87, 120.36],
+    ['tw-ks-hunei', '湖內區', 22.91, 120.22],
+    ['tw-ks-luzhu', '路竹區', 22.86, 120.26],
+    ['tw-ks-alian', '阿蓮區', 22.88, 120.33],
+    ['tw-ks-meinong', '美濃區', 22.90, 120.55],
+    ['tw-ks-qishan', '旗山區', 22.89, 120.48],
+    ['tw-ks-liugui', '六龜區', 22.99, 120.63],
+    ['tw-ks-maolin', '茂林區', 22.89, 120.68],
+    ['tw-ks-taoyuan-ks', '桃源區', 23.16, 120.76],
+    ['tw-ks-namaxia', '那瑪夏區', 23.28, 120.71],
+  ],
+  '🇹🇼 基隆市': [
+    ['tw-kl-renai', '仁愛區', 25.13, 121.74],
+    ['tw-kl-xinyi', '信義區', 25.13, 121.77],
+    ['tw-kl-zhongzheng', '中正區', 25.14, 121.73],
+    ['tw-kl-zhongshan', '中山區', 25.15, 121.73],
+    ['tw-kl-anle', '安樂區', 25.13, 121.72],
+    ['tw-kl-qidu', '七堵區', 25.10, 121.71],
+    ['tw-kl-nuannuan', '暖暖區', 25.10, 121.74],
+  ],
+  '🇹🇼 新竹市': [
+    ['tw-hcc-east', '東區', 24.80, 120.98],
+    ['tw-hcc-north', '北區', 24.82, 120.97],
+    ['tw-hcc-xiangshan', '香山區', 24.77, 120.93],
+  ],
+  '🇹🇼 新竹縣': [
+    ['tw-hc-zhubei', '竹北市', 24.83, 121.00],
+    ['tw-hc-hukou', '湖口鄉', 24.90, 121.04],
+    ['tw-hc-zhudong', '竹東鎮', 24.73, 121.09],
+    ['tw-hc-xinfeng', '新豐鄉', 24.90, 120.98],
+    ['tw-hc-guanxi', '關西鎮', 24.79, 121.18],
+    ['tw-hc-xinpu', '新埔鎮', 24.83, 121.08],
+    ['tw-hc-baoshan', '寶山鄉', 24.76, 120.99],
+    ['tw-hc-emei', '峨眉鄉', 24.69, 121.01],
+    ['tw-hc-beipu', '北埔鄉', 24.70, 121.06],
+    ['tw-hc-hengshan', '橫山鄉', 24.72, 121.12],
+    ['tw-hc-qionglin', '芎林鄉', 24.77, 121.08],
+    ['tw-hc-jianshi', '尖石鄉', 24.71, 121.20],
+    ['tw-hc-wufeng', '五峰鄉', 24.63, 121.10],
+  ],
+  '🇹🇼 苗栗縣': [
+    ['tw-ml-miaoli', '苗栗市', 24.56, 120.82],
+    ['tw-ml-toufen', '頭份市', 24.69, 120.90],
+    ['tw-ml-zhunan', '竹南鎮', 24.69, 120.87],
+    ['tw-ml-houlong', '後龍鎮', 24.63, 120.79],
+    ['tw-ml-tongxiao', '通霄鎮', 24.49, 120.68],
+    ['tw-ml-yuanli', '苑裡鎮', 24.44, 120.66],
+    ['tw-ml-dahu', '大湖鄉', 24.42, 120.86],
+    ['tw-ml-gongguan', '公館鄉', 24.50, 120.83],
+    ['tw-ml-sanyi', '三義鄉', 24.41, 120.76],
+    ['tw-ml-nanzhuang', '南庄鄉', 24.60, 121.00],
+    ['tw-ml-zaoqiao', '造橋鄉', 24.64, 120.86],
+    ['tw-ml-touwu', '頭屋鄉', 24.58, 120.85],
+  ],
+  '🇹🇼 彰化縣': [
+    ['tw-ch-changhua', '彰化市', 24.08, 120.54],
+    ['tw-ch-yuanlin', '員林市', 23.96, 120.57],
+    ['tw-ch-lukang', '鹿港鎮', 24.06, 120.43],
+    ['tw-ch-hemei', '和美鎮', 24.11, 120.50],
+    ['tw-ch-beidou', '北斗鎮', 23.87, 120.52],
+    ['tw-ch-xihu', '溪湖鎮', 23.96, 120.48],
+    ['tw-ch-tianzhong', '田中鎮', 23.86, 120.58],
+    ['tw-ch-erlin', '二林鎮', 23.90, 120.37],
+    ['tw-ch-huatan', '花壇鄉', 24.03, 120.54],
+    ['tw-ch-shengang', '伸港鄉', 24.15, 120.48],
+    ['tw-ch-fenyuan', '芬園鄉', 24.01, 120.63],
+  ],
+  '🇹🇼 南投縣': [
+    ['tw-nt-nantouc', '南投市', 23.91, 120.68],
+    ['tw-nt-caotun', '草屯鎮', 23.97, 120.68],
+    ['tw-nt-puli', '埔里鎮', 23.96, 120.97],
+    ['tw-nt-zhushan', '竹山鎮', 23.66, 120.67],
+    ['tw-nt-jiji', '集集鎮', 23.83, 120.69],
+    ['tw-nt-nantou-yc', '魚池鄉', 23.90, 120.94],
+    ['tw-nt-lugu', '鹿谷鄉', 23.75, 120.75],
+    ['tw-nt-ren-ai', '仁愛鄉', 24.02, 121.13],
+    ['tw-nt-xinyi', '信義鄉', 23.72, 120.86],
+  ],
+  '🇹🇼 雲林縣': [
+    ['tw-yl-douliou', '斗六市', 23.71, 120.54],
+    ['tw-yl-huwei', '虎尾鎮', 23.71, 120.43],
+    ['tw-yl-douliu', '斗南鎮', 23.68, 120.48],
+    ['tw-yl-beigang', '北港鎮', 23.57, 120.30],
+    ['tw-yl-xiluo', '西螺鎮', 23.80, 120.47],
+    ['tw-yl-tuku', '土庫鎮', 23.68, 120.39],
+    ['tw-yl-mailiao', '麥寮鄉', 23.75, 120.25],
+    ['tw-yl-lunbei', '崙背鄉', 23.76, 120.35],
+    ['tw-yl-gukeng', '古坑鄉', 23.64, 120.56],
+  ],
+  '🇹🇼 嘉義市': [
+    ['tw-cyc-east', '東區', 23.48, 120.46],
+    ['tw-cyc-west', '西區', 23.48, 120.43],
+  ],
+  '🇹🇼 嘉義縣': [
+    ['tw-cy-taibao', '太保市', 23.46, 120.33],
+    ['tw-cy-puzi', '朴子市', 23.46, 120.25],
+    ['tw-cy-minxiong', '民雄鄉', 23.55, 120.43],
+    ['tw-cy-dalin', '大林鎮', 23.60, 120.47],
+    ['tw-cy-shuishang', '水上鄉', 23.43, 120.40],
+    ['tw-cy-zhongpu', '中埔鄉', 23.42, 120.52],
+    ['tw-cy-zhuqi', '竹崎鄉', 23.52, 120.55],
+    ['tw-cy-fanlu', '番路鄉', 23.47, 120.56],
+    ['tw-cy-meishan', '梅山鄉', 23.59, 120.56],
+    ['tw-cy-xingang', '新港鄉', 23.56, 120.35],
+    ['tw-cy-budai', '布袋鎮', 23.38, 120.17],
+    ['tw-cy-dongshi-cy', '東石鄉', 23.46, 120.15],
+    ['tw-cy-yizhu', '義竹鄉', 23.36, 120.24],
+  ],
+  '🇹🇼 屏東縣': [
+    ['tw-pt-pingtung', '屏東市', 22.67, 120.49],
+    ['tw-pt-chaozhou', '潮州鎮', 22.55, 120.54],
+    ['tw-pt-donggang', '東港鎮', 22.47, 120.45],
+    ['tw-pt-hengchun', '恆春鎮', 22.00, 120.75],
+    ['tw-pt-wandan', '萬丹鄉', 22.59, 120.48],
+    ['tw-pt-changzhi', '長治鄉', 22.68, 120.53],
+    ['tw-pt-neipu', '內埔鄉', 22.61, 120.57],
+    ['tw-pt-yanpu', '鹽埔鄉', 22.75, 120.57],
+    ['tw-pt-fangliao', '枋寮鄉', 22.37, 120.59],
+    ['tw-pt-manjhou', '滿州鄉', 22.02, 120.83],
+    ['tw-pt-liuqiu', '琉球鄉(小琉球)', 22.34, 120.37],
+  ],
+  '🇹🇼 宜蘭縣': [
+    ['tw-il-yilan', '宜蘭市', 24.76, 121.75],
+    ['tw-il-luodong', '羅東鎮', 24.68, 121.77],
+    ['tw-il-suao', '蘇澳鎮', 24.60, 121.84],
+    ['tw-il-toucheng', '頭城鎮', 24.86, 121.82],
+    ['tw-il-jiaoxi', '礁溪鄉', 24.83, 121.77],
+    ['tw-il-zhuangwei', '壯圍鄉', 24.75, 121.78],
+    ['tw-il-wujie', '五結鄉', 24.69, 121.80],
+    ['tw-il-dongshan', '冬山鄉', 24.64, 121.79],
+    ['tw-il-sanxing', '三星鄉', 24.67, 121.66],
+    ['tw-il-datong', '大同鄉', 24.68, 121.53],
+    ['tw-il-nanao', '南澳鄉', 24.46, 121.80],
+  ],
+  '🇹🇼 花蓮縣': [
+    ['tw-hl-hualien', '花蓮市', 23.98, 121.61],
+    ['tw-hl-jian', '吉安鄉', 23.96, 121.57],
+    ['tw-hl-xincheng', '新城鄉', 24.04, 121.60],
+    ['tw-hl-shoufeng', '壽豐鄉', 23.87, 121.51],
+    ['tw-hl-fenglin', '鳳林鎮', 23.75, 121.45],
+    ['tw-hl-guangfu', '光復鄉', 23.67, 121.42],
+    ['tw-hl-ruisui', '瑞穗鄉', 23.50, 121.38],
+    ['tw-hl-yuli', '玉里鎮', 23.33, 121.31],
+    ['tw-hl-fuli', '富里鄉', 23.18, 121.25],
+    ['tw-hl-xiulin', '秀林鄉', 24.12, 121.53],
+  ],
+  '🇹🇼 台東縣': [
+    ['tw-tt-taitung', '台東市', 22.76, 121.14],
+    ['tw-tt-chenggong', '成功鎮', 23.10, 121.38],
+    ['tw-tt-guanshan', '關山鎮', 23.05, 121.16],
+    ['tw-tt-beinan', '卑南鄉', 22.79, 121.10],
+    ['tw-tt-taimali', '太麻里鄉', 22.62, 121.01],
+    ['tw-tt-dawu', '大武鄉', 22.34, 120.89],
+    ['tw-tt-donghe', '東河鄉', 22.97, 121.30],
+    ['tw-tt-luye', '鹿野鄉', 22.91, 121.14],
+    ['tw-tt-chishang', '池上鄉', 23.12, 121.22],
+    ['tw-tt-ludao', '綠島', 22.67, 121.49],
+    ['tw-tt-lanyu', '蘭嶼', 22.05, 121.55],
+  ],
+  '🇹🇼 澎湖縣': [
+    ['tw-ph-magong', '馬公市', 23.57, 119.58],
+    ['tw-ph-huxi', '湖西鄉', 23.59, 119.66],
+    ['tw-ph-baisha', '白沙鄉', 23.66, 119.60],
+    ['tw-ph-xiyu', '西嶼鄉', 23.60, 119.51],
+    ['tw-ph-wangan', '望安鄉', 23.37, 119.50],
+    ['tw-ph-qimei', '七美鄉', 23.21, 119.43],
+  ],
+  '🇹🇼 金門縣': [
+    ['tw-km-jincheng', '金城鎮', 24.43, 118.32],
+    ['tw-km-jinhu', '金湖鎮', 24.45, 118.40],
+    ['tw-km-jinsha', '金沙鎮', 24.47, 118.40],
+    ['tw-km-jinning', '金寧鄉', 24.46, 118.33],
+    ['tw-km-lieyu', '烈嶼鄉(小金門)', 24.43, 118.24],
+  ],
+  '🇹🇼 馬祖(連江縣)': [
+    ['tw-lj-nangan', '南竿鄉', 26.15, 119.95],
+    ['tw-lj-beigan', '北竿鄉', 26.22, 120.00],
+    ['tw-lj-dongyin', '東引鄉', 26.37, 120.49],
+    ['tw-lj-juguang', '莒光鄉', 25.97, 119.94],
   ],
   '🏞️ 台灣景點': [
     ['at-sunmoon', '日月潭', 23.86, 120.91],
@@ -1664,40 +2049,130 @@ const WX_PRESETS = {
     ['at-greenisland', '綠島', 22.67, 121.49],
     ['at-lanyu', '蘭嶼', 22.05, 121.55],
   ],
-  '🌏 國際城市': [
-    ['in-tyo', '東京 TYO', 35.68, 139.69],
-    ['in-osa', '大阪 OSA', 34.69, 135.50],
-    ['in-spk', '札幌 SPK', 43.06, 141.35],
-    ['in-fuk', '福岡 FUK', 33.59, 130.40],
-    ['in-oki', '沖繩 OKA', 26.21, 127.68],
-    ['in-sel', '首爾 SEL', 37.57, 126.98],
-    ['in-pus', '釜山 PUS', 35.18, 129.08],
-    ['in-bjs', '北京 BJS', 39.90, 116.41],
-    ['in-sha', '上海 SHA', 31.23, 121.47],
-    ['in-can', '廣州 CAN', 23.13, 113.26],
-    ['in-hkg', '香港 HKG', 22.32, 114.17],
-    ['in-mfm', '澳門 MFM', 22.20, 113.54],
-    ['in-sin', '新加坡 SIN', 1.35, 103.82],
-    ['in-bkk', '曼谷 BKK', 13.75, 100.50],
-    ['in-kul', '吉隆坡 KUL', 3.14, 101.69],
-    ['in-han', '河內 HAN', 21.03, 105.83],
-    ['in-sgn', '胡志明 SGN', 10.82, 106.63],
-    ['in-mnl', '馬尼拉 MNL', 14.60, 120.98],
-    ['in-dps', '峇里島 DPS', -8.65, 115.22],
-    ['in-syd', '雪梨 SYD', -33.87, 151.21],
-    ['in-mel', '墨爾本 MEL', -37.81, 144.96],
-    ['in-lax', '洛杉磯 LAX', 34.05, -118.24],
-    ['in-sfo', '舊金山 SFO', 37.77, -122.42],
-    ['in-sea', '西雅圖 SEA', 47.60, -122.33],
-    ['in-nyc', '紐約 NYC', 40.71, -74.01],
-    ['in-yvr', '溫哥華 YVR', 49.28, -123.12],
-    ['in-lhr', '倫敦 LON', 51.51, -0.13],
-    ['in-par', '巴黎 PAR', 48.86, 2.35],
-    ['in-fra', '法蘭克福 FRA', 50.11, 8.68],
-    ['in-ams', '阿姆斯特丹 AMS', 52.37, 4.90],
-    ['in-zrh', '蘇黎世 ZRH', 47.37, 8.55],
-    ['in-prg', '布拉格 PRG', 50.08, 14.44],
-    ['in-phx', '鳳凰城 PHX', 33.45, -112.07],
+  '🌏 日本': [
+    ['in-tyo', '東京', 35.68, 139.69],
+    ['in-osa', '大阪', 34.69, 135.50],
+    ['in-spk', '札幌', 43.06, 141.35],
+    ['in-fuk', '福岡', 33.59, 130.40],
+    ['in-ngo', '名古屋', 35.18, 136.91],
+    ['in-sdj', '仙台', 38.27, 140.87],
+    ['in-kmj', '熊本', 32.79, 130.74],
+    ['in-kgn', '鹿兒島', 31.60, 130.55],
+    ['in-nah', '那霸(沖繩)', 26.21, 127.68],
+    ['in-kbe', '神戶', 34.69, 135.20],
+    ['in-hir', '廣島', 34.40, 132.46],
+    ['in-kij', '新潟', 37.92, 139.04],
+  ],
+  '🌏 韓國': [
+    ['in-sel', '首爾', 37.57, 126.98],
+    ['in-pus', '釜山', 35.18, 129.08],
+  ],
+  '🌏 中國大陸': [
+    ['in-bjs', '北京', 39.90, 116.41],
+    ['in-sha', '上海', 31.23, 121.47],
+    ['in-can', '廣州', 23.13, 113.26],
+  ],
+  '🌏 港澳': [
+    ['in-hkg', '香港', 22.32, 114.17],
+    ['in-mfm', '澳門', 22.20, 113.54],
+  ],
+  '🌏 東南亞': [
+    ['in-sin', '新加坡', 1.35, 103.82],
+    ['in-bkk', '曼谷', 13.75, 100.50],
+    ['in-kul', '吉隆坡', 3.14, 101.69],
+    ['in-han', '河內', 21.03, 105.83],
+    ['in-sgn', '胡志明市', 10.82, 106.63],
+    ['in-mnl', '馬尼拉', 14.60, 120.98],
+    ['in-dps', '峇里島', -8.65, 115.22],
+  ],
+  '🌏 大洋洲': [
+    ['in-syd', '雪梨', -33.87, 151.21],
+    ['in-mel', '墨爾本', -37.81, 144.96],
+  ],
+  '🌏 美國': [
+    ['in-nyc', '紐約', 40.71, -74.01],
+    ['in-lax', '洛杉磯', 34.05, -118.24],
+    ['in-sfo', '舊金山', 37.77, -122.42],
+    ['in-chi', '芝加哥', 41.88, -87.63],
+    ['in-hou', '休士頓', 29.76, -95.37],
+    ['in-dfw', '達拉斯', 32.78, -96.80],
+    ['in-atl', '亞特蘭大', 33.75, -84.39],
+    ['in-mia', '邁阿密', 25.76, -80.19],
+    ['in-bos', '波士頓', 42.36, -71.06],
+    ['in-sea', '西雅圖', 47.60, -122.33],
+    ['in-den', '丹佛', 39.74, -104.99],
+    ['in-phx', '鳳凰城', 33.45, -112.07],
+    ['in-lv', '拉斯維加斯', 36.17, -115.14],
+    ['in-dc', '華盛頓 DC', 38.91, -77.04],
+    ['in-msp', '明尼亞波利斯', 44.98, -93.27],
+    ['in-det', '底特律', 42.33, -83.05],
+    ['in-pdx', '波特蘭', 45.52, -122.68],
+    ['in-sd', '聖地牙哥', 32.72, -117.16],
+    ['in-orl', '奧蘭多', 28.54, -81.38],
+    ['in-hnl', '檀香山', 21.31, -157.86],
+  ],
+  '🌏 加拿大': [
+    ['in-yvr', '溫哥華', 49.28, -123.12],
+    ['in-yyz', '多倫多', 43.65, -79.38],
+    ['in-yul', '蒙特婁', 45.50, -73.57],
+    ['in-yyc', '卡加利', 51.05, -114.07],
+    ['in-yow', '渥太華', 45.42, -75.70],
+  ],
+  '🌏 墨西哥': [
+    ['in-mex', '墨西哥城', 19.43, -99.13],
+    ['in-cun', '坎昆', 21.16, -86.85],
+  ],
+  '🌏 中南美洲': [
+    ['in-gru', '聖保羅(巴西)', -23.55, -46.63],
+    ['in-gig', '里約熱內盧(巴西)', -22.91, -43.17],
+    ['in-bog', '波哥大(哥倫比亞)', 4.71, -74.07],
+    ['in-lim', '利馬(秘魯)', -12.05, -77.04],
+    ['in-scl', '聖地牙哥(智利)', -33.45, -70.67],
+    ['in-eze', '布宜諾斯艾利斯(阿根廷)', -34.60, -58.38],
+    ['in-pan', '巴拿馬城(巴拿馬)', 8.98, -79.52],
+    ['in-hav', '哈瓦那(古巴)', 23.11, -82.37],
+  ],
+  '🌏 歐洲': [
+    ['in-lhr', '倫敦(英國)', 51.51, -0.13],
+    ['in-par', '巴黎(法國)', 48.86, 2.35],
+    ['in-fra', '法蘭克福(德國)', 50.11, 8.68],
+    ['in-ber', '柏林(德國)', 52.52, 13.41],
+    ['in-muc', '慕尼黑(德國)', 48.14, 11.58],
+    ['in-ams', '阿姆斯特丹(荷蘭)', 52.37, 4.90],
+    ['in-zrh', '蘇黎世(瑞士)', 47.37, 8.55],
+    ['in-prg', '布拉格(捷克)', 50.08, 14.44],
+    ['in-mad', '馬德里(西班牙)', 40.42, -3.70],
+    ['in-bcn', '巴塞隆納(西班牙)', 41.39, 2.17],
+    ['in-rom', '羅馬(義大利)', 41.90, 12.50],
+    ['in-mil', '米蘭(義大利)', 45.46, 9.19],
+    ['in-vie', '維也納(奧地利)', 48.21, 16.37],
+    ['in-waw', '華沙(波蘭)', 52.23, 21.01],
+    ['in-bru', '布魯塞爾(比利時)', 50.85, 4.35],
+    ['in-cph', '哥本哈根(丹麥)', 55.68, 12.57],
+    ['in-sto', '斯德哥爾摩(瑞典)', 59.33, 18.07],
+    ['in-hel', '赫爾辛基(芬蘭)', 60.17, 24.94],
+    ['in-osl', '奧斯陸(挪威)', 59.91, 10.75],
+    ['in-lis', '里斯本(葡萄牙)', 38.72, -9.14],
+    ['in-ath', '雅典(希臘)', 37.98, 23.73],
+    ['in-ist', '伊斯坦堡(土耳其)', 41.01, 28.98],
+    ['in-mow', '莫斯科(俄羅斯)', 55.76, 37.62],
+    ['in-dub', '都柏林(愛爾蘭)', 53.35, -6.26],
+  ],
+  '🌏 中東/非洲': [
+    ['in-dxb', '杜拜(阿聯)', 25.20, 55.27],
+    ['in-doh', '杜哈(卡達)', 25.29, 51.53],
+    ['in-ruh', '利雅德(沙烏地)', 24.69, 46.72],
+    ['in-tlv', '特拉維夫(以色列)', 32.08, 34.78],
+    ['in-cai', '開羅(埃及)', 30.04, 31.24],
+    ['in-jnb', '約翰尼斯堡(南非)', -26.20, 28.05],
+    ['in-cpt', '開普敦(南非)', -33.92, 18.42],
+    ['in-nbo', '奈洛比(肯亞)', -1.29, 36.82],
+  ],
+  '🌏 南亞': [
+    ['in-del', '新德里(印度)', 28.61, 77.21],
+    ['in-bom', '孟買(印度)', 19.08, 72.88],
+    ['in-dac', '達卡(孟加拉)', 23.81, 90.41],
+    ['in-cmb', '可倫坡(斯里蘭卡)', 6.93, 79.85],
   ],
   '🛫 港澳/菲律賓/越柬機場': [
     ['ap-VHHH', 'VHHH 香港赤鱲角', 22.309, 113.914],
@@ -1780,19 +2255,50 @@ const WX_PRESETS = {
     ['ap-PMDY', 'PMDY 中途島', 28.212, -177.381],
     ['ap-PWAK', 'PWAK 威克島', 19.281, 166.638],
   ],
-  '🛫 歐洲/加拿大機場': [
+  '🛫 加拿大機場': [
+    ['ap-CYVR', 'CYVR 溫哥華', 49.195, -123.184],
+  ],
+  '🛫 歐洲機場': [
     ['ap-LKPR', 'LKPR 布拉格', 50.101, 14.264],
     ['ap-EDDB', 'EDDB 柏林布蘭登堡', 52.366, 13.503],
     ['ap-EDDM', 'EDDM 慕尼黑', 48.354, 11.786],
     ['ap-EPWA', 'EPWA 華沙蕭邦', 52.166, 20.967],
     ['ap-LOWL', 'LOWL 林茲', 48.233, 14.188],
     ['ap-LOWW', 'LOWW 維也納', 48.110, 16.570],
-    ['ap-CYVR', 'CYVR 溫哥華', 49.195, -123.184],
   ],
 };
 const WX_PRESET_MAP = {};
 Object.values(WX_PRESETS).forEach(arr => arr.forEach(p => { WX_PRESET_MAP[p[0]] = { id: p[0], name: p[1], lat: p[2], lon: p[3] }; }));
 const WX_MAX = 10;
+
+// 三層架構：區域 → 縣市(WX_PRESETS key) → 行政區(checkbox)
+// 台灣的 region 先包在「台灣」super-region 底下
+const WX_TAIWAN_REGIONS = ['北北基', '桃竹苗', '中彰投', '雲嘉南', '高高屏', '宜花東', '外島', '台灣景點'];
+
+// 順序：台灣全部 → 國際城市 → 國際機場
+const WX_REGIONS = {
+  // ── 台灣 ──
+  '北北基': ['🇹🇼 台北市', '🇹🇼 新北市', '🇹🇼 基隆市'],
+  '桃竹苗': ['🇹🇼 桃園市', '🇹🇼 新竹市', '🇹🇼 新竹縣', '🇹🇼 苗栗縣'],
+  '中彰投': ['🇹🇼 台中市', '🇹🇼 彰化縣', '🇹🇼 南投縣'],
+  '雲嘉南': ['🇹🇼 雲林縣', '🇹🇼 嘉義市', '🇹🇼 嘉義縣', '🇹🇼 台南市'],
+  '高高屏': ['🇹🇼 高雄市', '🇹🇼 屏東縣'],
+  '宜花東': ['🇹🇼 宜蘭縣', '🇹🇼 花蓮縣', '🇹🇼 台東縣'],
+  '外島': ['🇹🇼 澎湖縣', '🇹🇼 金門縣', '🇹🇼 馬祖(連江縣)'],
+  // ── 台灣景點（放在台灣底下） ──
+  '台灣景點': ['🏞️ 台灣景點'],
+  // ── 國際城市 ──
+  '東北亞城市': ['🌏 日本', '🌏 韓國', '🌏 中國大陸', '🌏 港澳'],
+  '東南亞城市': ['🌏 東南亞'],
+  '南亞城市': ['🌏 南亞'],
+  '大洋洲城市': ['🌏 大洋洲'],
+  '中東/非洲城市': ['🌏 中東/非洲'],
+  '歐洲城市': ['🌏 歐洲'],
+  '北美城市': ['🌏 美國', '🌏 加拿大'],
+  '中南美洲城市': ['🌏 墨西哥', '🌏 中南美洲'],
+  // ── 國際機場（全部在一個 region 底下再分區） ──
+  '國際機場': ['🛫 日本機場', '🛫 韓國機場', '🛫 港澳/菲律賓/越柬機場', '🛫 東南亞機場 (泰馬印新)', '🛫 美國機場', '🛫 加拿大機場', '🛫 太平洋機場', '🛫 歐洲機場'],
+};
 
 // 台股預設清單（代號 + 名稱）
 const TW_PRESETS = {
@@ -1987,20 +2493,292 @@ function renderReport(data) {
   const wwNews = (data.news_world || []).slice(0, 10).map(renderNewsWorld).join('') || emptyNews();
 
   const setBtn = (sec) => \`<button class="sec-set-btn" title="設定" onclick="showSet('\${sec}')">⚙️</button>\`;
-  root.innerHTML = \`
-    <div class="sec" id="sec-wx"><div class="sec-h"><span><span class="icon">🌤️</span>天氣 Weather</span>\${setBtn('wx')}</div><div class="sec-b">\${wxBlocks || emptyRow()}</div></div>
-    <div class="sec" id="sec-stw"><div class="sec-h"><span><span class="icon">📈</span>台股 TW Stocks</span>\${setBtn('tw')}</div><div class="sec-b">\${twRows}</div></div>
-    <div class="sec" id="sec-sus"><div class="sec-h"><span><span class="icon">🇺🇸</span>美股 US Stocks</span>\${setBtn('us')}</div><div class="sec-b">\${usRows}</div></div>
-    <div class="sec" id="sec-fx"><div class="sec-h"><span><span class="icon">💱</span>匯率 FX (vs TWD)</span>\${setBtn('fx')}</div><div class="sec-b">\${fxRows}</div></div>
-    <div class="sec" id="sec-ntw"><div class="sec-h"><span><span class="icon">🇹🇼</span>台灣新聞 TW News</span></div><div class="sec-b">\${twNews}</div></div>
-    <div class="sec" id="sec-nww"><div class="sec-h"><span><span class="icon">🌍</span>世界新聞 World News</span></div><div class="sec-b">\${wwNews}</div></div>
-  \`;
+  const secOrder = loadSetting('secOrder', ['sec-wx','sec-stw','sec-sus','sec-fx','sec-ntw','sec-nww']);
+  const secDefs = {
+    'sec-wx':  { icon: '🌤️', label: '天氣 Weather', body: wxBlocks || emptyRow(), set: setBtn('wx') },
+    'sec-stw': { icon: '📈', label: '台股 TW Stocks', body: twRows, set: setBtn('tw') },
+    'sec-sus': { icon: '🇺🇸', label: '美股 US Stocks', body: usRows, set: setBtn('us') },
+    'sec-fx':  { icon: '💱', label: '匯率 FX', body: fxRows, set: setBtn('fx') },
+    'sec-ntw': { icon: '🇹🇼', label: '台灣新聞 TW News', body: twNews, set: '' },
+    'sec-nww': { icon: '🌍', label: '世界新聞 World News', body: wwNews, set: '' },
+  };
+  const collapsed = loadSetting('secCollapsed', {});
+  root.innerHTML = secOrder.map(id => {
+    const s = secDefs[id];
+    if (!s) return '';
+    const cls = collapsed[id] ? ' collapsed' : '';
+    return \`<div class="sec\${cls}" id="\${id}" draggable="false">
+      <div class="sec-h">
+        <span class="sec-drag" title="拖移排序">≡</span>
+        <div class="sec-left" data-collapse="\${id}">
+          <span class="icon">\${s.icon}</span>\${s.label}
+          <span class="sec-collapse-arrow">▼</span>
+        </div>
+        <div class="sec-right">\${s.set}</div>
+      </div>
+      <div class="sec-b">\${s.body}</div>
+    </div>\`;
+  }).join('');
   setupNavActive();
+  setupSectionCollapse();
+  setupSectionDrag();
+  updateNavOrder();
+  setupNavDrag();
+}
+
+// ── Section collapse ─────────────────────────────────────────────
+function setupSectionCollapse() {
+  document.querySelectorAll('.sec-left[data-collapse]').forEach(el => {
+    el.addEventListener('click', () => {
+      const id = el.getAttribute('data-collapse');
+      const sec = document.getElementById(id);
+      if (!sec) return;
+      sec.classList.toggle('collapsed');
+      // Save state
+      const collapsed = loadSetting('secCollapsed', {});
+      collapsed[id] = sec.classList.contains('collapsed');
+      saveSetting('secCollapsed', collapsed);
+    });
+  });
+}
+
+// ── Section drag-to-reorder (touch + mouse) ──────────────────────
+function setupSectionDrag() {
+  const root = document.getElementById('root');
+  if (!root) return;
+  let dragId = null;
+  let placeholder = null;
+
+  function getSections() { return Array.from(root.querySelectorAll('.sec')); }
+
+  function saveOrder() {
+    const order = getSections().map(s => s.id);
+    saveSetting('secOrder', order);
+    // Also sync to server prefs
+    try {
+      apiFetch('/api/morning-prefs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ secOrder: order }),
+      }).catch(() => {});
+    } catch (e) {}
+    updateNavOrder();
+  }
+
+  // Mouse drag
+  root.querySelectorAll('.sec-drag').forEach(handle => {
+    handle.addEventListener('mousedown', (e) => {
+      e.preventDefault();
+      const sec = handle.closest('.sec');
+      if (!sec) return;
+      dragId = sec.id;
+      sec.classList.add('dragging');
+      const onMove = (ev) => {
+        const secs = getSections();
+        const y = ev.clientY;
+        let target = null;
+        for (const s of secs) {
+          if (s.id === dragId) continue;
+          const r = s.getBoundingClientRect();
+          if (y < r.top + r.height / 2) { target = s; break; }
+        }
+        secs.forEach(s => s.classList.remove('drag-over'));
+        if (target) target.classList.add('drag-over');
+        placeholder = target;
+      };
+      const onUp = () => {
+        document.removeEventListener('mousemove', onMove);
+        document.removeEventListener('mouseup', onUp);
+        const sec2 = document.getElementById(dragId);
+        if (sec2) sec2.classList.remove('dragging');
+        getSections().forEach(s => s.classList.remove('drag-over'));
+        if (placeholder && dragId) {
+          root.insertBefore(document.getElementById(dragId), placeholder);
+          saveOrder();
+        }
+        dragId = null;
+        placeholder = null;
+      };
+      document.addEventListener('mousemove', onMove);
+      document.addEventListener('mouseup', onUp);
+    });
+
+    // Touch drag
+    handle.addEventListener('touchstart', (e) => {
+      const sec = handle.closest('.sec');
+      if (!sec) return;
+      dragId = sec.id;
+      sec.classList.add('dragging');
+      const onMove = (ev) => {
+        ev.preventDefault();
+        const touch = ev.touches[0];
+        const y = touch.clientY;
+        const secs = getSections();
+        let target = null;
+        for (const s of secs) {
+          if (s.id === dragId) continue;
+          const r = s.getBoundingClientRect();
+          if (y < r.top + r.height / 2) { target = s; break; }
+        }
+        secs.forEach(s => s.classList.remove('drag-over'));
+        if (target) target.classList.add('drag-over');
+        placeholder = target;
+      };
+      const onEnd = () => {
+        document.removeEventListener('touchmove', onMove);
+        document.removeEventListener('touchend', onEnd);
+        const sec2 = document.getElementById(dragId);
+        if (sec2) sec2.classList.remove('dragging');
+        getSections().forEach(s => s.classList.remove('drag-over'));
+        if (placeholder && dragId) {
+          root.insertBefore(document.getElementById(dragId), placeholder);
+          saveOrder();
+        }
+        dragId = null;
+        placeholder = null;
+      };
+      document.addEventListener('touchmove', onMove, { passive: false });
+      document.addEventListener('touchend', onEnd);
+    }, { passive: true });
+  });
+}
+
+// ── Nav bar follows section order ─────────────────────────────────
+function updateNavOrder() {
+  const nav = document.getElementById('nav');
+  if (!nav) return;
+  const order = loadSetting('secOrder', ['sec-wx','sec-stw','sec-sus','sec-fx','sec-ntw','sec-nww']);
+  const buttons = Array.from(nav.querySelectorAll('.nav-btn'));
+  const btnMap = {};
+  buttons.forEach(b => { btnMap[b.getAttribute('data-target')] = b; });
+  order.forEach(id => {
+    if (btnMap[id]) nav.appendChild(btnMap[id]);
+  });
+}
+
+// ── Nav bar drag-to-reorder (長按 300ms 進入拖移) ─────────────────
+function setupNavDrag() {
+  const nav = document.getElementById('nav');
+  if (!nav) return;
+  let longPressTimer = null;
+  let dragBtn = null;
+
+  function getNavBtns() { return Array.from(nav.querySelectorAll('.nav-btn')); }
+
+  function saveNavOrder() {
+    const order = getNavBtns().map(b => b.getAttribute('data-target'));
+    saveSetting('secOrder', order);
+    // Reorder sections in DOM to match
+    const root = document.getElementById('root');
+    if (root) {
+      order.forEach(id => {
+        const sec = document.getElementById(id);
+        if (sec) root.appendChild(sec);
+      });
+    }
+    // Sync to server
+    try {
+      apiFetch('/api/morning-prefs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ secOrder: order }),
+      }).catch(() => {});
+    } catch (e) {}
+  }
+
+  nav.querySelectorAll('.nav-btn').forEach(btn => {
+    // Touch: long press to start drag
+    btn.addEventListener('touchstart', (e) => {
+      longPressTimer = setTimeout(() => {
+        dragBtn = btn;
+        btn.classList.add('nav-dragging');
+        // Disable nav scroll during drag
+        nav.style.overflowX = 'hidden';
+      }, 300);
+    }, { passive: true });
+
+    btn.addEventListener('touchmove', (e) => {
+      if (!dragBtn) { clearTimeout(longPressTimer); return; }
+      e.preventDefault();
+      const touch = e.touches[0];
+      const x = touch.clientX;
+      const btns = getNavBtns();
+      btns.forEach(b => b.classList.remove('nav-drag-over'));
+      for (const b of btns) {
+        if (b === dragBtn) continue;
+        const r = b.getBoundingClientRect();
+        if (x < r.left + r.width / 2) {
+          b.classList.add('nav-drag-over');
+          break;
+        }
+      }
+    }, { passive: false });
+
+    btn.addEventListener('touchend', () => {
+      clearTimeout(longPressTimer);
+      if (!dragBtn) return;
+      const btns = getNavBtns();
+      const target = btns.find(b => b.classList.contains('nav-drag-over'));
+      btns.forEach(b => b.classList.remove('nav-drag-over'));
+      dragBtn.classList.remove('nav-dragging');
+      nav.style.overflowX = '';
+      if (target) {
+        nav.insertBefore(dragBtn, target);
+        saveNavOrder();
+      }
+      dragBtn = null;
+    });
+
+    btn.addEventListener('touchcancel', () => {
+      clearTimeout(longPressTimer);
+      if (dragBtn) {
+        dragBtn.classList.remove('nav-dragging');
+        nav.style.overflowX = '';
+      }
+      getNavBtns().forEach(b => b.classList.remove('nav-drag-over'));
+      dragBtn = null;
+    });
+
+    // Mouse: mousedown to start drag
+    btn.addEventListener('mousedown', (e) => {
+      e.preventDefault();
+      dragBtn = btn;
+      btn.classList.add('nav-dragging');
+      const onMove = (ev) => {
+        const x = ev.clientX;
+        const btns = getNavBtns();
+        btns.forEach(b => b.classList.remove('nav-drag-over'));
+        for (const b of btns) {
+          if (b === dragBtn) continue;
+          const r = b.getBoundingClientRect();
+          if (x < r.left + r.width / 2) {
+            b.classList.add('nav-drag-over');
+            break;
+          }
+        }
+      };
+      const onUp = () => {
+        document.removeEventListener('mousemove', onMove);
+        document.removeEventListener('mouseup', onUp);
+        const btns = getNavBtns();
+        const target = btns.find(b => b.classList.contains('nav-drag-over'));
+        btns.forEach(b => b.classList.remove('nav-drag-over'));
+        dragBtn.classList.remove('nav-dragging');
+        if (target) {
+          nav.insertBefore(dragBtn, target);
+          saveNavOrder();
+        }
+        dragBtn = null;
+      };
+      document.addEventListener('mousemove', onMove);
+      document.addEventListener('mouseup', onUp);
+    });
+  });
 }
 
 function setupNavActive() {
   const btns = document.querySelectorAll('.nav-btn');
-  const secs = ['sec-wx','sec-stw','sec-sus','sec-ntw','sec-nww'].map(id => document.getElementById(id));
+  const secs = ['sec-wx','sec-stw','sec-sus','sec-fx','sec-ntw','sec-nww'].map(id => document.getElementById(id));
   if (!secs[0]) return;
   const obs = new IntersectionObserver((entries) => {
     entries.forEach(e => {
@@ -2216,28 +2994,101 @@ function toggleCat(section, cat) {
 function renderWxPresets() {
   const wrap = document.getElementById('wx-presets');
   let html = '';
-  for (const cat of Object.keys(WX_PRESETS)) {
-    const items = WX_PRESETS[cat];
-    const sel = items.filter(p => _wxSelectedIds.includes(p[0])).length;
-    const k = catKey('wx', cat);
-    // 首次開啟時：有勾選 → 展開；沒勾 → 收合
-    if (_catExpanded[k] === undefined) _catExpanded[k] = sel > 0;
-    const expCls = _catExpanded[k] ? ' expanded' : '';
-    html += '<div class="wx-cat' + expCls + '" data-cat="' + cat + '">'
-      + '<div class="wx-cat-title"><span>' + cat + '</span>'
-      + '<span><span class="cnt">' + sel + ' / ' + items.length + '</span> <span class="arrow">▶</span></span>'
-      + '</div><div class="wx-chk-grid">';
+
+  // Helper: 渲染 checkbox grid 內容
+  function renderItems(items) {
+    let h = '';
     for (const p of items) {
       const [id, name] = p;
       const checked = _wxSelectedIds.includes(id);
-      html += '<label class="wx-chk ' + (checked ? 'checked' : '') + '" data-id="' + id + '">'
+      h += '<label class="wx-chk ' + (checked ? 'checked' : '') + '" data-id="' + id + '">'
         + '<input type="checkbox"' + (checked ? ' checked' : '') + '>'
         + '<span>' + name + '</span></label>';
     }
-    html += '</div></div>';
+    return h;
   }
+
+  // Helper: 渲染一個 category（縣市層）
+  function renderCat(cat, displayName) {
+    const items = WX_PRESETS[cat] || [];
+    if (items.length === 0) return '';
+    const sel = items.filter(p => _wxSelectedIds.includes(p[0])).length;
+    const k = catKey('wx', cat);
+    if (_catExpanded[k] === undefined) _catExpanded[k] = sel > 0;
+    const expCls = _catExpanded[k] ? ' expanded' : '';
+    return '<div class="wx-cat' + expCls + '" data-cat="' + cat + '">'
+      + '<div class="wx-cat-title"><span>' + displayName + '</span>'
+      + '<span><span class="cnt">' + sel + '/' + items.length + '</span> <span class="arrow">▶</span></span>'
+      + '</div><div class="wx-chk-grid">' + renderItems(items) + '</div></div>';
+  }
+
+  // Helper: 渲染一個 region（區域層）
+  function renderRegion(region) {
+    const catNames = WX_REGIONS[region];
+    if (!catNames) return '';
+    const isSingle = catNames.length === 1;
+    let regionSel = 0, regionTotal = 0;
+    catNames.forEach(cn => { const items = WX_PRESETS[cn] || []; regionTotal += items.length; regionSel += items.filter(p => _wxSelectedIds.includes(p[0])).length; });
+    if (isSingle) {
+      // 只有一個 sub-category → flat，用 region 名稱
+      return renderCat(catNames[0], region);
+    }
+    const rk = catKey('wx-r', region);
+    if (_catExpanded[rk] === undefined) _catExpanded[rk] = regionSel > 0;
+    const rExpCls = _catExpanded[rk] ? ' expanded' : '';
+    let h = '<div class="wx-region' + rExpCls + '" data-region="' + region + '">'
+      + '<div class="wx-region-title"><span>' + region + '</span>'
+      + '<span><span class="cnt">' + regionSel + '/' + regionTotal + '</span> <span class="arrow">▶</span></span>'
+      + '</div><div class="wx-region-body">';
+    for (const cat of catNames) {
+      const shortName = cat.includes(' ') ? cat.substring(cat.indexOf(' ') + 1) : cat;
+      h += renderCat(cat, shortName);
+    }
+    h += '</div></div>';
+    return h;
+  }
+
+  // ── 台灣 super-region ──
+  const twRegions = WX_TAIWAN_REGIONS;
+  let twSel = 0, twTotal = 0;
+  twRegions.forEach(r => {
+    (WX_REGIONS[r] || []).forEach(cn => { const items = WX_PRESETS[cn] || []; twTotal += items.length; twSel += items.filter(p => _wxSelectedIds.includes(p[0])).length; });
+  });
+  const twk = catKey('wx-s', 'taiwan');
+  if (_catExpanded[twk] === undefined) _catExpanded[twk] = twSel > 0;
+  const twExpCls = _catExpanded[twk] ? ' expanded' : '';
+  html += '<div class="wx-super' + twExpCls + '" data-super="taiwan">'
+    + '<div class="wx-super-title"><span>🇹🇼 台灣</span>'
+    + '<span><span class="cnt">' + twSel + '/' + twTotal + '</span> <span class="arrow">▶</span></span>'
+    + '</div><div class="wx-super-body">';
+  for (const r of twRegions) html += renderRegion(r);
+  html += '</div></div>';
+
+  // ── 其他 regions（國際城市 + 機場，不在 WX_TAIWAN_REGIONS 裡的） ──
+  const twSet = new Set(twRegions);
+  for (const region of Object.keys(WX_REGIONS)) {
+    if (twSet.has(region)) continue;
+    html += renderRegion(region);
+  }
+
   wrap.innerHTML = html;
-  // Category title click → toggle expand
+  // Super-region title click
+  wrap.querySelectorAll('.wx-super-title').forEach(el => {
+    el.addEventListener('click', () => {
+      const s = el.parentElement.getAttribute('data-super');
+      toggleCat('wx-s', s);
+      el.parentElement.classList.toggle('expanded');
+    });
+  });
+  // Region title click
+  wrap.querySelectorAll('.wx-region-title').forEach(el => {
+    el.addEventListener('click', () => {
+      const region = el.parentElement.getAttribute('data-region');
+      toggleCat('wx-r', region);
+      el.parentElement.classList.toggle('expanded');
+    });
+  });
+  // Category title click
   wrap.querySelectorAll('.wx-cat-title').forEach(el => {
     el.addEventListener('click', () => {
       const cat = el.parentElement.getAttribute('data-cat');
@@ -2480,7 +3331,8 @@ async function saveSettings() {
     if (WX_PRESET_MAP[id]) wxAllLocs.push({ name: WX_PRESET_MAP[id].name, lat: WX_PRESET_MAP[id].lat, lon: WX_PRESET_MAP[id].lon });
   }
   for (const c of wxCustom) wxAllLocs.push(c);
-  const serverPrefs = { wx: wxAllLocs, tw: twAll, us: usAll, fx: fxAll };
+  const curSecOrder = loadSetting('secOrder', null);
+  const serverPrefs = { wx: wxAllLocs, tw: twAll, us: usAll, fx: fxAll, secOrder: curSecOrder };
   try {
     await apiFetch('/api/morning-prefs', {
       method: 'POST',
@@ -2828,6 +3680,7 @@ async function syncPrefsFromServer() {
     if (serverPrefs.tw) saveSetting('tw', serverPrefs.tw);
     if (serverPrefs.us) saveSetting('us', serverPrefs.us);
     if (serverPrefs.fx) saveSetting('fx', serverPrefs.fx);
+    if (serverPrefs.secOrder) saveSetting('secOrder', serverPrefs.secOrder);
   } catch (e) { /* 靜默失敗，不影響正常載入 */ }
 }
 
