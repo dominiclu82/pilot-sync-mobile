@@ -13,12 +13,14 @@
     "test:all": "tsx test/smoke.ts && tsx test/smoke-m.ts"
   },
   "dependencies": {
+    "@mozilla/readability": "^0.6.0",
     "cors": "^2.8.5",
     "dotenv": "^16.5.0",
     "express": "^5.1.0",
     "flightradarapi": "^1.4.0",
     "googleapis": "^150.0.1",
     "ical": "^0.8.0",
+    "jsdom": "^29.0.2",
     "pg": "^8.20.0",
     "playwright": "^1.53.1"
   },
@@ -26,6 +28,7 @@
     "@types/cors": "^2.8.17",
     "@types/express": "^5.0.0",
     "@types/ical": "^0.8.1",
+    "@types/jsdom": "^28.0.1",
     "@types/node": "^22.0.0",
     "@types/pg": "^8.20.0",
     "tsx": "^4.19.0",

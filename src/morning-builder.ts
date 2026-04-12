@@ -392,7 +392,8 @@ function parseRss(xml) {
     const link = getTag('link');
     const pubDate = getTag('pubDate');
     const source = getTag('source');
-    const cleanTitle = rawTitle.replace(/\s*[-–—]\s*[^-–—]+$/, '').trim();
+    // 只移除「 - 來源名」格式（dash 前後都有空格），避免砍掉 hard-fought、face-to-face 等
+    const cleanTitle = rawTitle.replace(/\s+[-–—]\s+[^-–—]+$/, '').trim();
     if (cleanTitle && link) items.push({ title: cleanTitle, url: link, source, pubDate });
   }
   return items;
@@ -446,15 +447,46 @@ async function translate(text) {
   } catch (e) { return ''; }
 }
 
+// 世界新聞：從多個新聞社的 RSS 直接抓（不經 Google News redirect，URL 是真實文章連結）
+const WORLD_RSS_FEEDS = [
+  { url: 'https://feeds.bbci.co.uk/news/world/rss.xml', name: 'BBC' },
+  { url: 'https://www.theguardian.com/world/rss', name: 'Guardian' },
+  { url: 'https://feeds.npr.org/1004/rss.xml', name: 'NPR' },
+  { url: 'https://www.aljazeera.com/xml/rss/all.xml', name: 'Al Jazeera' },
+  { url: 'https://rss.nytimes.com/services/xml/rss/nyt/World.xml', name: 'NYT' },
+  { url: 'https://feeds.a.dj.com/rss/RSSWorldNews.xml', name: 'WSJ' },
+  { url: 'http://rss.cnn.com/rss/edition_world.rss', name: 'CNN' },
+  // Reuters 已停用公開 RSS feed（2023 年起）
+];
+
 async function fetchNewsWorld() {
-  const r = await fetch('https://news.google.com/rss?hl=en-US&gl=US&ceid=US:en', {
-    headers: { 'User-Agent': 'Mozilla/5.0' },
-  });
-  if (!r.ok) throw new Error('google news World HTTP ' + r.status);
-  const xml = await r.text();
-  const items = parseRss(xml);
-  const top = dedupeBySource(items, 10, 2);
-  // 翻譯標題（10 個序列跑，避免一次打 Google 太多）
+  // 並行抓所有 feeds
+  const results = await Promise.all(
+    WORLD_RSS_FEEDS.map(async (feed) => {
+      try {
+        const r = await fetch(feed.url, { headers: { 'User-Agent': 'Mozilla/5.0' } });
+        if (!r.ok) return [];
+        const xml = await r.text();
+        const items = parseRss(xml);
+        // 用 feed name 當 source（有些 RSS 的 <source> tag 可能空）
+        return items.map(it => ({ ...it, source: it.source || feed.name }));
+      } catch (e) {
+        console.warn('[morning-builder] world feed failed:', feed.name, e instanceof Error ? e.message : String(e));
+        return [];
+      }
+    })
+  );
+  // 過濾掉非真正文章的 item（live update 標頭、太短標題等）
+  const JUNK_TITLES = /^(here[\u2018\u2019'']?s the latest|live updates?|breaking news|latest news|watch live|the latest)/i;
+  const allItems = results.flat()
+    .filter(it => it.title && it.title.length > 15 && !JUNK_TITLES.test(it.title))
+    .sort((a, b) => {
+      const da = new Date(a.pubDate || 0).getTime();
+      const db = new Date(b.pubDate || 0).getTime();
+      return db - da;  // newest first
+    });
+  const top = dedupeBySource(allItems, 10, 2);
+  // 翻譯標題（序列跑）
   const out = [];
   for (const it of top) {
     const title_zh = await translate(it.title);

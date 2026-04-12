@@ -6,11 +6,13 @@ import express from 'express';
 import fs from 'fs';
 import path from 'path';
 import pg from 'pg';
+import { JSDOM } from 'jsdom';
+import { Readability } from '@mozilla/readability';
 import { ROOT } from './config.js';
 import { buildMorningReport } from './morning-builder.js';
 
-export const MORNING_VERSION = 'V1.1.03';
-const MORNING_CACHE = 'morning-v1-1-03';
+export const MORNING_VERSION = 'V1.2.00';
+const MORNING_CACHE = 'morning-v1-2-00';
 
 // ─── Postgres ────────────────────────────────────────────────────────
 let _pgPool: pg.Pool | null = null;
@@ -573,6 +575,114 @@ morningRouter.get('/api/morning-prefs', async (req, res) => {
   }
 });
 
+// ─── GET /api/morning-reader — 雙語閱讀器（抓原文 → 擷取正文 → 逐段翻譯） ────
+const _readerCache = new Map<string, { data: any; at: number }>();
+const READER_CACHE_TTL = 60 * 60 * 1000;  // 1 小時快取
+
+async function translateParagraph(text: string): Promise<string> {
+  if (!text || text.trim().length === 0) return '';
+  try {
+    const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=zh-TW&dt=t&q=${encodeURIComponent(text)}`;
+    const r = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0' } });
+    const data = await r.json();
+    if (Array.isArray(data) && Array.isArray(data[0])) {
+      return (data[0] as any[]).map((seg: any) => seg[0]).join('');
+    }
+    return '';
+  } catch (e) { return ''; }
+}
+
+morningRouter.get('/api/morning-reader', async (req, res) => {
+  try {
+    const rawUrl = String(req.query.url || '').trim();
+    if (!rawUrl) return res.status(400).json({ error: 'missing url' });
+
+    // Check cache
+    const cached = _readerCache.get(rawUrl);
+    if (cached && Date.now() - cached.at < READER_CACHE_TTL) {
+      return res.json(cached.data);
+    }
+
+    // Fetch the article (follow redirects — Google News URLs redirect to actual article)
+    const articleRes = await fetch(rawUrl, {
+      headers: { 'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15' },
+      redirect: 'follow',
+    });
+    if (!articleRes.ok) return res.status(502).json({ error: 'fetch_failed', status: articleRes.status });
+    const html = await articleRes.text();
+
+    // Parse with JSDOM + Readability to extract article content
+    const dom = new JSDOM(html, { url: articleRes.url || rawUrl });
+    const reader = new Readability(dom.window.document);
+    const article = reader.parse();
+    if (!article || !article.textContent) {
+      return res.status(422).json({ error: 'cannot_extract', message: '無法擷取文章正文' });
+    }
+
+    // 用 HTML content 的 <p> tag 分段（比 textContent 的 \n 更精確）
+    const contentHtml = article.content || '';
+    const pTagRegex = /<p[^>]*>([\s\S]*?)<\/p>/gi;
+    const rawParagraphs: string[] = [];
+    let pMatch;
+    while ((pMatch = pTagRegex.exec(contentHtml)) !== null) {
+      // 去掉 HTML tag，只留文字
+      const text = pMatch[1].replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim();
+      if (text.length > 30) rawParagraphs.push(text);  // 太短的跳過（caption、byline）
+    }
+    // 如果 <p> 分段太少，fallback 到 textContent 的 \n 分段
+    if (rawParagraphs.length < 3 && article.textContent) {
+      rawParagraphs.length = 0;
+      article.textContent.split(/\n+/).forEach((line: string) => {
+        const t = line.replace(/\s+/g, ' ').trim();
+        if (t.length > 30) rawParagraphs.push(t);
+      });
+    }
+
+    // 批次翻譯：用分隔符號合併多段一次翻、再拆回來（50 段 → 3-5 次 call，快 10 倍）
+    const BATCH_SEP = ' ||| ';
+    const BATCH_SIZE = 15;  // 每批最多 15 段（避免超過 Google Translate 字數限制）
+    const paragraphs: Array<{ en: string; zh: string }> = [];
+    for (let i = 0; i < rawParagraphs.length; i += BATCH_SIZE) {
+      const batch = rawParagraphs.slice(i, i + BATCH_SIZE);
+      const combined = batch.join(BATCH_SEP);
+      const translatedCombined = await translateParagraph(combined);
+      const translatedParts = translatedCombined.split(/\s*\|\|\|\s*/);
+      for (let j = 0; j < batch.length; j++) {
+        paragraphs.push({
+          en: batch[j],
+          zh: (translatedParts[j] || '').trim() || '（翻譯失敗）',
+        });
+      }
+    }
+
+    // Translate title
+    const titleZh = await translateParagraph(article.title || '');
+
+    const result = {
+      title: article.title || '',
+      title_zh: titleZh,
+      source: articleRes.url || rawUrl,
+      paragraphs,
+      excerpt: article.excerpt || '',
+    };
+
+    // Cache
+    _readerCache.set(rawUrl, { data: result, at: Date.now() });
+    // Cleanup old cache entries
+    if (_readerCache.size > 100) {
+      const now = Date.now();
+      for (const [k, v] of _readerCache) {
+        if (now - v.at > READER_CACHE_TTL) _readerCache.delete(k);
+      }
+    }
+
+    res.json(result);
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    res.status(500).json({ error: msg });
+  }
+});
+
 // ─── POST /api/morning-report/refresh — 手動觸發重建（只重建該使用者） ────
 morningRouter.post('/api/morning-report/refresh', async (req, res) => {
   const userId = reqUserId(req);
@@ -871,6 +981,106 @@ a:active { opacity: 0.6; }
   font-size: .82em;
   line-height: 1.6;
 }
+
+/* Bilingual reader */
+.news-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+}
+.news-reader-btn {
+  background: rgba(244,196,48,0.12);
+  border: 1px solid rgba(244,196,48,0.3);
+  color: var(--accent);
+  padding: 3px 8px;
+  border-radius: 6px;
+  font-size: .7em;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.news-reader-btn:active { opacity: .6; }
+
+.reader-wrap {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: var(--bg);
+  z-index: 200;
+  flex-direction: column;
+  overflow: hidden;
+}
+.reader-wrap.show { display: flex; }
+.reader-hdr {
+  padding: calc(env(safe-area-inset-top) + 10px) 14px 10px;
+  background: var(--card);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+.reader-back {
+  background: rgba(255,255,255,0.08);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 6px 12px;
+  border-radius: 8px;
+  font-size: .85em;
+  cursor: pointer;
+}
+.reader-back:active { opacity: .6; }
+.reader-title {
+  flex: 1;
+  min-width: 0;
+  font-size: .85em;
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.reader-body {
+  flex: 1;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: 16px 14px;
+  padding-bottom: calc(env(safe-area-inset-bottom) + 20px);
+}
+.reader-para-en {
+  font-size: .92em;
+  line-height: 1.7;
+  color: var(--text);
+  margin-bottom: 6px;
+}
+.reader-para-zh {
+  font-size: .88em;
+  line-height: 1.6;
+  color: var(--accent);
+  margin-bottom: 18px;
+  padding-left: 10px;
+  border-left: 2px solid var(--accent);
+  opacity: 0.85;
+}
+.reader-loading {
+  padding: 40px 20px;
+  text-align: center;
+  color: var(--muted);
+  font-size: .88em;
+}
+.reader-error {
+  padding: 20px;
+  color: #ff8a8a;
+  font-size: .82em;
+}
+.reader-source {
+  font-size: .72em;
+  color: var(--muted);
+  margin-top: 20px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+}
+.reader-source a { color: var(--accent); }
 .wx-day {
   flex: 0 0 auto;
   min-width: 52px;
@@ -1208,8 +1418,13 @@ a:active { opacity: 0.6; }
     <hr style="border:none;border-top:1px solid var(--border);margin:12px 0">
     <div class="changelog-v">${MORNING_VERSION}</div>
     <div class="changelog-txt">
-      Hotfix：使用者暱稱含非 ASCII 字元（中文、日文等）在 iOS Safari 會導致 fetch() 丟 TypeError，畫面顯示「載入失敗：Type error」。原因：HTTP header 值規範不允許非 ASCII，iOS Safari 嚴格執行。解法：前端 apiFetch 用 encodeURIComponent 包 X-User-Id header，後端 reqUserId 用 decodeURIComponent 還原。<br>
-      Hotfix: Non-ASCII nicknames (Chinese, Japanese, etc.) caused fetch() to throw TypeError on iOS Safari. Solution: frontend apiFetch encodes X-User-Id via encodeURIComponent, backend decodes.
+      新增 📖 雙語閱讀器：世界新聞每條加「📖 雙語閱讀」按鈕，點擊後全螢幕顯示一行英文一行中文逐段對照；使用 @mozilla/readability + jsdom 擷取原文正文、Google Translate 批次翻譯（15 段/批，50 段約 8 秒）；擷取失敗自動 fallback 到 Google Translate 翻譯頁面。世界新聞來源從 Google News RSS 改為 7 家新聞社直接 RSS（BBC/Guardian/NPR/Al Jazeera/NYT/WSJ/CNN），URL 為真實文章連結不再經 Google redirect。修正標題截斷 bug（hard-fought/face-to-face 等連字號不再被誤砍）。過濾非文章項目（Here's the latest 等 live update 標頭）。<br>
+      New 📖 Bilingual Reader: world news items get a bilingual reading button; opens fullscreen view with alternating EN/ZH paragraphs using readability + jsdom + Google Translate batch (15/batch, ~8s for 50 paragraphs); auto-fallback to Google Translate page if extraction fails. World news RSS switched from Google News to 7 direct outlet feeds (BBC/Guardian/NPR/Al Jazeera/NYT/WSJ/CNN) with real article URLs. Fix title truncation bug (compound-word hyphens). Filter junk items (live update headers).
+    </div>
+    <div class="changelog-v old">V1.1.03</div>
+    <div class="changelog-txt">
+      Hotfix：使用者暱稱含非 ASCII 字元（中文、日文等）在 iOS Safari 會導致 fetch() 丟 TypeError。解法：前端 apiFetch 用 encodeURIComponent 包 X-User-Id header，後端 reqUserId 用 decodeURIComponent 還原。<br>
+      Hotfix: Non-ASCII nicknames caused fetch() TypeError on iOS Safari. Solution: encode/decode X-User-Id header.
     </div>
     <div class="changelog-v old">V1.1.02</div>
     <div class="changelog-txt">
@@ -1339,6 +1554,17 @@ a:active { opacity: 0.6; }
     <div style="margin-top:10px;font-size:.72em;color:var(--muted);text-align:center">
       金色 = 有資料可點 · 外框 = 今天 · 填滿 = 目前顯示
     </div>
+  </div>
+</div>
+
+<!-- Bilingual reader overlay -->
+<div class="reader-wrap" id="reader-wrap">
+  <div class="reader-hdr">
+    <button class="reader-back" id="reader-back">← 返回</button>
+    <div class="reader-title" id="reader-title">—</div>
+  </div>
+  <div class="reader-body" id="reader-body">
+    <div class="reader-loading">載入中…</div>
   </div>
 </div>
 
@@ -1872,6 +2098,7 @@ function renderNews(n) {
   \`;
 }
 function renderNewsWorld(n) {
+  const encodedUrl = encodeURIComponent(n.url || '');
   return \`
     <div class="news">
       <a href="\${n.url}" target="_blank" rel="noopener">
@@ -1879,6 +2106,9 @@ function renderNewsWorld(n) {
         \${n.title_zh && n.title ? '<div class="news-en">' + escapeHtml(n.title) + '</div>' : ''}
         <div class="news-meta"><span>\${escapeHtml(n.source || '')}</span><span>\${n.time || ''}</span></div>
       </a>
+      <div class="news-actions">
+        <button class="news-reader-btn" onclick="event.preventDefault();event.stopPropagation();openReader('\${encodedUrl}')">📖 雙語閱讀</button>
+      </div>
     </div>
   \`;
 }
@@ -2513,6 +2743,53 @@ window.addEventListener('resize', updateHdrH);
 // Measure again after initial render + fonts load
 setTimeout(updateHdrH, 100);
 setTimeout(updateHdrH, 500);
+
+// ── Bilingual Reader ─────────────────────────────────────────────
+async function openReader(encodedUrl) {
+  const url = decodeURIComponent(encodedUrl);
+  const wrap = document.getElementById('reader-wrap');
+  const title = document.getElementById('reader-title');
+  const body = document.getElementById('reader-body');
+  wrap.classList.add('show');
+  title.textContent = '載入中…';
+  body.innerHTML = '<div class="reader-loading">正在擷取文章並翻譯，約需 10-30 秒…</div>';
+  try {
+    const r = await apiFetch('/api/morning-reader?url=' + encodeURIComponent(url));
+    if (!r.ok) {
+      const err = await r.json().catch(() => ({}));
+      throw new Error(err.message || err.error || 'HTTP ' + r.status);
+    }
+    const data = await r.json();
+    title.textContent = data.title_zh || data.title || '—';
+    let html = '';
+    // Title bilingual
+    if (data.title) {
+      html += '<div class="reader-para-en" style="font-size:1.1em;font-weight:700;margin-bottom:4px">' + escapeHtml(data.title) + '</div>';
+      if (data.title_zh) html += '<div class="reader-para-zh" style="font-size:1em;font-weight:700;margin-bottom:20px">' + escapeHtml(data.title_zh) + '</div>';
+    }
+    // Paragraphs
+    for (const p of (data.paragraphs || [])) {
+      html += '<div class="reader-para-en">' + escapeHtml(p.en) + '</div>';
+      html += '<div class="reader-para-zh">' + escapeHtml(p.zh || '（翻譯失敗）') + '</div>';
+    }
+    // Source link
+    html += '<div class="reader-source">原文 Original: <a href="' + escapeHtml(url) + '" target="_blank" rel="noopener">' + escapeHtml(data.source || url) + '</a></div>';
+    body.innerHTML = html;
+  } catch (e) {
+    // Fallback：用 Google Translate 開翻譯版
+    const gtUrl = 'https://translate.google.com/translate?sl=en&tl=zh-TW&u=' + encodeURIComponent(url);
+    body.innerHTML = '<div class="reader-error">'
+      + '此來源不支援逐段雙語閱讀，已為您準備 Google 翻譯版本。<br><br>'
+      + '<a href="' + escapeHtml(gtUrl) + '" target="_blank" style="color:var(--accent);font-size:1.1em;font-weight:700">📖 Google 翻譯版 →</a><br><br>'
+      + '<a href="' + escapeHtml(url) + '" target="_blank" style="color:var(--muted);font-size:.85em">或直接開啟英文原文 →</a>'
+      + '</div>';
+  }
+}
+function closeReader() {
+  document.getElementById('reader-wrap').classList.remove('show');
+}
+window.openReader = openReader;
+document.getElementById('reader-back').addEventListener('click', closeReader);
 
 // Service Worker
 if ('serviceWorker' in navigator) {
