@@ -11,8 +11,8 @@ import { Readability } from '@mozilla/readability';
 import { ROOT } from './config.js';
 import { buildMorningReport } from './morning-builder.js';
 
-export const MORNING_VERSION = 'V1.2.00';
-const MORNING_CACHE = 'morning-v1-2-00';
+export const MORNING_VERSION = 'V1.2.01';
+const MORNING_CACHE = 'morning-v1-2-01';
 
 // ─── Postgres ────────────────────────────────────────────────────────
 let _pgPool: pg.Pool | null = null;
@@ -2802,12 +2802,39 @@ document.getElementById('nick-input').addEventListener('keydown', (e) => {
   if (e.key === 'Enter') submitNickname();
 });
 
+// 每次開 app 自動同步 server 上最新的 prefs → localStorage（跨裝置同步）
+async function syncPrefsFromServer() {
+  try {
+    const r = await apiFetch('/api/morning-prefs');
+    if (!r.ok) return;
+    const serverPrefs = await r.json();
+    if (!serverPrefs) return;
+    // wx：反向對應 server 的 {name,lat,lon} → preset ID + custom
+    if (serverPrefs.wx) {
+      const presetByName = {};
+      Object.values(WX_PRESETS).forEach(arr => arr.forEach(p => { presetByName[p[1]] = p[0]; }));
+      const presets = [];
+      const custom = [];
+      for (const w of serverPrefs.wx) {
+        if (presetByName[w.name]) presets.push(presetByName[w.name]);
+        else custom.push(w);
+      }
+      saveSetting('wxPresets', presets);
+      saveSetting('wxCustom', custom);
+    }
+    if (serverPrefs.tw) saveSetting('tw', serverPrefs.tw);
+    if (serverPrefs.us) saveSetting('us', serverPrefs.us);
+    if (serverPrefs.fx) saveSetting('fx', serverPrefs.fx);
+  } catch (e) { /* 靜默失敗，不影響正常載入 */ }
+}
+
 // Initial load: check if uid exists; if not, show onboarding modal
 updateHdrTitle();
 if (!getUid()) {
   showNickModal();
 } else {
-  loadAndRender();
+  // 有 uid → 先同步 prefs 再載入
+  syncPrefsFromServer().then(() => loadAndRender());
 }
 `;
 }
