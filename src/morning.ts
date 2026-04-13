@@ -11,8 +11,8 @@ import { Readability } from '@mozilla/readability';
 import { ROOT } from './config.js';
 import { buildMorningReport } from './morning-builder.js';
 
-export const MORNING_VERSION = 'V1.3.00';
-const MORNING_CACHE = 'morning-v1-3-00';
+export const MORNING_VERSION = 'V1.3.01';
+const MORNING_CACHE = 'morning-v1-3-01';
 
 // ─── Postgres ────────────────────────────────────────────────────────
 let _pgPool: pg.Pool | null = null;
@@ -1174,7 +1174,7 @@ a:active { opacity: 0.6; }
 }
 .news-cat:last-child { border-bottom: none; }
 .news-cat-title {
-  padding: 10px 14px;
+  padding: 10px 10px 10px 6px;
   font-size: .9em;
   font-weight: 700;
   color: var(--accent);
@@ -1183,10 +1183,14 @@ a:active { opacity: 0.6; }
   justify-content: space-between;
   cursor: pointer;
   user-select: none;
+  gap: 6px;
 }
 .news-cat-title:active { opacity: .7; }
+.news-cat-title .nc-left { display: flex; align-items: center; flex: 1; gap: 6px; }
 .news-cat.collapsed .sec-collapse-arrow { transform: rotate(-90deg); }
 .news-cat.collapsed .news-cat-body { display: none; }
+.news-cat.nc-dragging { opacity: 0.5; border: 2px dashed var(--accent); }
+.news-cat.nc-drag-over { border-top: 3px solid var(--accent); }
 
 .loading {
   padding: 40px 20px;
@@ -1704,8 +1708,9 @@ const LS = {
   tw: 'morning_tw_stocks',
   us: 'morning_us_stocks',
   fx: 'morning_fx_currencies',
-  secOrder: 'morning_sec_order',       // 段落順序 ['sec-wx','sec-stw',...]
-  secCollapsed: 'morning_sec_collapsed', // 收合狀態 {sec-wx: true, ...}
+  secOrder: 'morning_sec_order',
+  secCollapsed: 'morning_sec_collapsed',
+  newsCatOrder: 'morning_news_cat_order', // 台灣新聞分類順序
 };
 
 function getUid() {
@@ -2517,22 +2522,29 @@ function renderReport(data) {
     twNews = twNewsData.slice(0, 10).map(renderNews).join('') || emptyNews();
   } else {
     // 新格式：分類物件 { 熱門: [...], 娛樂: [...], ... }
-    const cats = Object.keys(twNewsData);
-    if (cats.length === 0) {
+    const defaultCatOrder = ['熱門','娛樂','股市','國際','天氣','玩樂','理財','電影','時尚','健康'];
+    const savedCatOrder = loadSetting('newsCatOrder', null);
+    const allCats = Object.keys(twNewsData);
+    const catOrder = savedCatOrder ? savedCatOrder.filter(c => allCats.includes(c)) : defaultCatOrder.filter(c => allCats.includes(c));
+    allCats.forEach(c => { if (!catOrder.includes(c)) catOrder.push(c); });
+    if (catOrder.length === 0) {
       twNews = emptyNews();
     } else {
-      twNews = cats.map(cat => {
+      twNews = '<div id="tw-news-cats">' + catOrder.map(cat => {
         const items = twNewsData[cat] || [];
         if (items.length === 0) return '';
         const ck = 'tw-news-' + cat;
         const collapsed = loadSetting('secCollapsed', {});
-        const isCollapsed = collapsed[ck] !== false;  // 預設收合
+        const isCollapsed = collapsed[ck] !== false;
         return '<div class="news-cat' + (isCollapsed ? ' collapsed' : '') + '" data-newscat="' + cat + '">'
-          + '<div class="news-cat-title" onclick="toggleNewsCat(\\'' + cat + '\\')">'
-          + '<span>' + cat + ' <span style="font-size:.8em;color:var(--muted)">(' + items.length + ')</span></span>'
-          + '<span class="sec-collapse-arrow">▼</span></div>'
+          + '<div class="news-cat-title">'
+          + '<div class="nc-left">'
+          + '<span class="sec-drag nc-drag" title="拖移排序">≡</span>'
+          + '<span onclick="toggleNewsCat(\\'' + cat + '\\')">' + cat + ' <span style="font-size:.8em;color:var(--muted)">(' + items.length + ')</span></span>'
+          + '</div>'
+          + '<span class="sec-collapse-arrow" onclick="toggleNewsCat(\\'' + cat + '\\')">▼</span></div>'
           + '<div class="news-cat-body">' + items.map(renderNews).join('') + '</div></div>';
-      }).join('');
+      }).join('') + '</div>';
     }
   }
   const wwNews = (data.news_world || []).slice(0, 10).map(renderNewsWorld).join('') || emptyNews();
@@ -2569,6 +2581,7 @@ function renderReport(data) {
   setupSectionDrag();
   updateNavOrder();
   setupNavDrag();
+  setupNewsCatDrag();
 }
 
 // ── Section collapse ─────────────────────────────────────────────
@@ -3377,7 +3390,8 @@ async function saveSettings() {
   }
   for (const c of wxCustom) wxAllLocs.push(c);
   const curSecOrder = loadSetting('secOrder', null);
-  const serverPrefs = { wx: wxAllLocs, tw: twAll, us: usAll, fx: fxAll, secOrder: curSecOrder };
+  const curNewsCatOrder = loadSetting('newsCatOrder', null);
+  const serverPrefs = { wx: wxAllLocs, tw: twAll, us: usAll, fx: fxAll, secOrder: curSecOrder, newsCatOrder: curNewsCatOrder };
   try {
     await apiFetch('/api/morning-prefs', {
       method: 'POST',
@@ -3655,6 +3669,85 @@ function toggleNewsCat(cat) {
 }
 window.toggleNewsCat = toggleNewsCat;
 
+// ── News category drag-to-reorder ────────────────────────────────
+function setupNewsCatDrag() {
+  const wrap = document.getElementById('tw-news-cats');
+  if (!wrap) return;
+  let dragCat = null;
+  let placeholder = null;
+
+  function getCats() { return Array.from(wrap.querySelectorAll('.news-cat')); }
+  function saveNewsCatOrder() {
+    const order = getCats().map(c => c.getAttribute('data-newscat'));
+    saveSetting('newsCatOrder', order);
+    try {
+      apiFetch('/api/morning-prefs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ newsCatOrder: order }),
+      }).catch(() => {});
+    } catch (e) {}
+  }
+
+  wrap.querySelectorAll('.nc-drag').forEach(handle => {
+    // Touch
+    handle.addEventListener('touchstart', (e) => {
+      const cat = handle.closest('.news-cat');
+      if (!cat) return;
+      dragCat = cat;
+      cat.classList.add('nc-dragging');
+    }, { passive: true });
+    handle.addEventListener('touchmove', (e) => {
+      if (!dragCat) return;
+      e.preventDefault();
+      const y = e.touches[0].clientY;
+      const cats = getCats();
+      cats.forEach(c => c.classList.remove('nc-drag-over'));
+      for (const c of cats) {
+        if (c === dragCat) continue;
+        const r = c.getBoundingClientRect();
+        if (y < r.top + r.height / 2) { c.classList.add('nc-drag-over'); placeholder = c; break; }
+      }
+    }, { passive: false });
+    handle.addEventListener('touchend', () => {
+      if (!dragCat) return;
+      dragCat.classList.remove('nc-dragging');
+      getCats().forEach(c => c.classList.remove('nc-drag-over'));
+      if (placeholder) { wrap.insertBefore(dragCat, placeholder); saveNewsCatOrder(); }
+      dragCat = null; placeholder = null;
+    });
+
+    // Mouse
+    handle.addEventListener('mousedown', (e) => {
+      e.preventDefault(); e.stopPropagation();
+      const cat = handle.closest('.news-cat');
+      if (!cat) return;
+      dragCat = cat;
+      cat.classList.add('nc-dragging');
+      const onMove = (ev) => {
+        const y = ev.clientY;
+        const cats = getCats();
+        cats.forEach(c => c.classList.remove('nc-drag-over'));
+        for (const c of cats) {
+          if (c === dragCat) continue;
+          const r = c.getBoundingClientRect();
+          if (y < r.top + r.height / 2) { c.classList.add('nc-drag-over'); placeholder = c; break; }
+        }
+      };
+      const onUp = () => {
+        document.removeEventListener('mousemove', onMove);
+        document.removeEventListener('mouseup', onUp);
+        if (dragCat) dragCat.classList.remove('nc-dragging');
+        getCats().forEach(c => c.classList.remove('nc-drag-over'));
+        if (placeholder && dragCat) { wrap.insertBefore(dragCat, placeholder); saveNewsCatOrder(); }
+        dragCat = null; placeholder = null;
+      };
+      document.addEventListener('mousemove', onMove);
+      document.addEventListener('mouseup', onUp);
+    });
+  });
+}
+
 // ── Bilingual Reader ─────────────────────────────────────────────
 async function openReader(encodedUrl) {
   const url = decodeURIComponent(encodedUrl);
@@ -3737,6 +3830,7 @@ async function syncPrefsFromServer() {
     if (serverPrefs.us) saveSetting('us', serverPrefs.us);
     if (serverPrefs.fx) saveSetting('fx', serverPrefs.fx);
     if (serverPrefs.secOrder) saveSetting('secOrder', serverPrefs.secOrder);
+    if (serverPrefs.newsCatOrder) saveSetting('newsCatOrder', serverPrefs.newsCatOrder);
   } catch (e) { /* 靜默失敗，不影響正常載入 */ }
 }
 
