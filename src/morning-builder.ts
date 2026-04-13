@@ -422,16 +422,46 @@ function dedupeBySource(items, limit, maxPerSource) {
   return out;
 }
 
+// 台灣新聞分 10 類，每類 30 條
+const TW_NEWS_CATEGORIES = [
+  { key: '熱門', query: '' },  // 空 query = 首頁 trending
+  { key: '娛樂', query: '娛樂' },
+  { key: '股市', query: '股市+台股' },
+  { key: '國際', query: '國際新聞' },
+  { key: '天氣', query: '天氣+氣象' },
+  { key: '玩樂', query: '旅遊+玩樂+景點' },
+  { key: '理財', query: '理財+投資+基金' },
+  { key: '電影', query: '電影+影評' },
+  { key: '時尚', query: '時尚+穿搭+美妝' },
+  { key: '健康', query: '健康+醫療+養生' },
+];
+
 async function fetchNewsTw() {
-  const r = await fetch('https://news.google.com/rss?hl=zh-TW&gl=TW&ceid=TW:zh-Hant', {
-    headers: { 'User-Agent': 'Mozilla/5.0' },
-  });
-  if (!r.ok) throw new Error('google news TW HTTP ' + r.status);
-  const xml = await r.text();
-  const items = parseRss(xml);
-  return dedupeBySource(items, 10, 2).map(it => ({
-    title: it.title, url: it.url, source: it.source || '', time: fmtTime(it.pubDate),
-  }));
+  const results = await Promise.all(
+    TW_NEWS_CATEGORIES.map(async (cat) => {
+      try {
+        const base = 'https://news.google.com/rss';
+        const url = cat.query
+          ? base + '/search?q=' + encodeURIComponent(cat.query) + '&hl=zh-TW&gl=TW&ceid=TW:zh-Hant'
+          : base + '?hl=zh-TW&gl=TW&ceid=TW:zh-Hant';
+        const r = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0' } });
+        if (!r.ok) return { key: cat.key, items: [] };
+        const xml = await r.text();
+        const items = parseRss(xml);
+        const top = dedupeBySource(items, 30, 2).map(it => ({
+          title: it.title, url: it.url, source: it.source || '', time: fmtTime(it.pubDate),
+        }));
+        return { key: cat.key, items: top };
+      } catch (e) {
+        console.warn('[morning-builder] TW news category failed:', cat.key, e instanceof Error ? e.message : String(e));
+        return { key: cat.key, items: [] };
+      }
+    })
+  );
+  // 回傳 object: { 熱門: [...], 娛樂: [...], ... }
+  const out = {};
+  for (const r of results) out[r.key] = r.items;
+  return out;
 }
 
 async function translate(text) {

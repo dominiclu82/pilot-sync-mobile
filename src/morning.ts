@@ -11,8 +11,8 @@ import { Readability } from '@mozilla/readability';
 import { ROOT } from './config.js';
 import { buildMorningReport } from './morning-builder.js';
 
-export const MORNING_VERSION = 'V1.2.03';
-const MORNING_CACHE = 'morning-v1-2-03';
+export const MORNING_VERSION = 'V1.3.00';
+const MORNING_CACHE = 'morning-v1-3-00';
 
 // ─── Postgres ────────────────────────────────────────────────────────
 let _pgPool: pg.Pool | null = null;
@@ -1167,6 +1167,26 @@ a:active { opacity: 0.6; }
 .news-t { font-size: .9em; line-height: 1.4; font-weight: 500; }
 .news-meta { font-size: .72em; color: var(--muted); margin-top: 4px; display: flex; gap: 8px; }
 .news-en { font-size: .72em; color: var(--muted); margin-top: 4px; font-style: italic; }
+
+/* News categories (collapsible) */
+.news-cat {
+  border-bottom: 1px solid var(--border);
+}
+.news-cat:last-child { border-bottom: none; }
+.news-cat-title {
+  padding: 10px 14px;
+  font-size: .9em;
+  font-weight: 700;
+  color: var(--accent);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+  user-select: none;
+}
+.news-cat-title:active { opacity: .7; }
+.news-cat.collapsed .sec-collapse-arrow { transform: rotate(-90deg); }
+.news-cat.collapsed .news-cat-body { display: none; }
 
 .loading {
   padding: 40px 20px;
@@ -2489,7 +2509,32 @@ function renderReport(data) {
   const twRows = userTw.map(code => renderStock(code, 'tw', (data.stocks_tw || {})[code])).join('') || emptyRow();
   const usRows = userUs.map(code => renderStock(code, 'us', (data.stocks_us || {})[code])).join('') || emptyRow();
   const fxRows = userFx.map(c => renderFx(c, (data.fx || {})[c])).join('') || emptyRow();
-  const twNews = (data.news_tw || []).slice(0, 10).map(renderNews).join('') || emptyNews();
+  // 台灣新聞：支援舊格式（陣列）+ 新格式（分類物件）
+  let twNews = '';
+  const twNewsData = data.news_tw || {};
+  if (Array.isArray(twNewsData)) {
+    // 舊格式 fallback
+    twNews = twNewsData.slice(0, 10).map(renderNews).join('') || emptyNews();
+  } else {
+    // 新格式：分類物件 { 熱門: [...], 娛樂: [...], ... }
+    const cats = Object.keys(twNewsData);
+    if (cats.length === 0) {
+      twNews = emptyNews();
+    } else {
+      twNews = cats.map(cat => {
+        const items = twNewsData[cat] || [];
+        if (items.length === 0) return '';
+        const ck = 'tw-news-' + cat;
+        const collapsed = loadSetting('secCollapsed', {});
+        const isCollapsed = collapsed[ck] !== false;  // 預設收合
+        return '<div class="news-cat' + (isCollapsed ? ' collapsed' : '') + '" data-newscat="' + cat + '">'
+          + '<div class="news-cat-title" onclick="toggleNewsCat(\\'' + cat + '\\')">'
+          + '<span>' + cat + ' <span style="font-size:.8em;color:var(--muted)">(' + items.length + ')</span></span>'
+          + '<span class="sec-collapse-arrow">▼</span></div>'
+          + '<div class="news-cat-body">' + items.map(renderNews).join('') + '</div></div>';
+      }).join('');
+    }
+  }
   const wwNews = (data.news_world || []).slice(0, 10).map(renderNewsWorld).join('') || emptyNews();
 
   const setBtn = (sec) => \`<button class="sec-set-btn" title="設定" onclick="showSet('\${sec}')">⚙️</button>\`;
@@ -3598,6 +3643,17 @@ window.addEventListener('resize', updateHdrH);
 // Measure again after initial render + fonts load
 setTimeout(updateHdrH, 100);
 setTimeout(updateHdrH, 500);
+
+// ── News category collapse ───────────────────────────────────────
+function toggleNewsCat(cat) {
+  const el = document.querySelector('.news-cat[data-newscat="' + cat + '"]');
+  if (!el) return;
+  el.classList.toggle('collapsed');
+  const collapsed = loadSetting('secCollapsed', {});
+  collapsed['tw-news-' + cat] = el.classList.contains('collapsed');
+  saveSetting('secCollapsed', collapsed);
+}
+window.toggleNewsCat = toggleNewsCat;
 
 // ── Bilingual Reader ─────────────────────────────────────────────
 async function openReader(encodedUrl) {
