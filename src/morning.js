@@ -11,8 +11,8 @@ import { Readability } from '@mozilla/readability';
 import { ROOT } from './config.js';
 import { buildMorningReport } from './morning-builder.js';
 
-export const MORNING_VERSION = 'V1.3.02';
-const MORNING_CACHE = 'morning-v1-3-02';
+export const MORNING_VERSION = 'V1.3.03';
+const MORNING_CACHE = 'morning-v1-3-03';
 
 // ─── Postgres ────────────────────────────────────────────────────────
 let _pgPool: pg.Pool | null = null;
@@ -973,6 +973,27 @@ a:active { opacity: 0.6; }
 }
 .sec-drag:active { cursor: grabbing; opacity: 1; }
 
+/* 主畫面 item-level drag（wx/tw/us/fx 各自可拖移排序） */
+.item-drag {
+  cursor: grab;
+  color: var(--muted);
+  font-size: 1em;
+  padding: 2px 6px 2px 0;
+  line-height: 1;
+  opacity: 0.45;
+  touch-action: none;
+  user-select: none;
+  flex-shrink: 0;
+}
+.item-drag:active { cursor: grabbing; opacity: 1; }
+.wx-loc.item-dragging,
+.row.item-dragging { opacity: 0.5; border: 2px dashed var(--accent); }
+.wx-loc.item-drag-over,
+.row.item-drag-over { border-top: 3px solid var(--accent); }
+/* .row 現在多了 ≡，要調整 flex 以容納 */
+.row { position: relative; }
+.row > .item-drag { align-self: center; }
+
 /* Collapse toggle */
 .sec-collapse-arrow {
   font-size: .7em;
@@ -1007,25 +1028,52 @@ a:active { opacity: 0.6; }
 .sec-set-btn:active { opacity: 0.6; }
 .sec-b { padding: 6px 0; }
 
-/* Weather */
+/* Weather（收合版：r1 + r2 永遠顯示，r3 展開後才顯示） */
 .wx-loc {
-  padding: 10px 14px;
+  padding: 8px 14px;
   border-bottom: 1px solid var(--border);
 }
 .wx-loc:last-child { border-bottom: none; }
-.wx-loc-name { font-size: .88em; color: var(--muted); margin-bottom: 4px; }
-.wx-loc-main {
-  display: flex; align-items: center; gap: 14px;
+.wx-r1 {
+  display: flex; align-items: center; gap: 8px;
+  font-size: .88em;
+  cursor: pointer;
+  user-select: none;
+  flex-wrap: wrap;
 }
-.wx-icon { font-size: 2.4em; line-height: 1; }
-.wx-temp { font-size: 1.8em; font-weight: 700; font-variant-numeric: tabular-nums; }
-.wx-detail { flex: 1; font-size: .78em; color: var(--muted); }
-.wx-detail div { line-height: 1.5; }
+.wx-r1 .name { font-weight: 600; color: var(--text); flex-shrink: 0; }
+.wx-r1 .ic { font-size: 1.2em; line-height: 1; flex-shrink: 0; }
+.wx-r1 .tmp { font-weight: 700; font-variant-numeric: tabular-nums; color: var(--text); flex-shrink: 0; }
+.wx-r1 .fl { color: var(--muted); font-size: .9em; flex-shrink: 0; }
+.wx-r1 .sun { color: var(--muted); font-size: .88em; margin-left: auto; flex-shrink: 0; }
+.wx-r1 .tog {
+  color: var(--muted); font-size: .8em; margin-left: 6px;
+  transition: transform .2s;
+  flex-shrink: 0;
+}
+.wx-loc.expanded .wx-r1 .tog { transform: rotate(180deg); }
+.wx-r2 {
+  display: flex; gap: 10px; flex-wrap: wrap;
+  font-size: .78em; color: var(--muted);
+  margin-top: 4px;
+  font-variant-numeric: tabular-nums;
+}
+.wx-r2 span { display: inline-flex; align-items: center; gap: 3px; }
+/* AQI / PM2.5 EPA 色階 */
+.aq-1 { color: #00e400; }  /* 良好 */
+.aq-2 { color: #ffff00; }  /* 普通 */
+.aq-3 { color: #ff7e00; }  /* 敏感族不健康 */
+.aq-4 { color: #ff0000; }  /* 不健康 */
+.aq-5 { color: #8f3f97; }  /* 非常不健康 */
+.aq-6 { color: #7e0023; }  /* 危害 */
+[data-theme="light"] .aq-1 { color: #00b800; }
+[data-theme="light"] .aq-2 { color: #c9a800; }
 .wx-forecast {
-  display: flex; gap: 6px; margin-top: 8px; overflow-x: auto;
+  display: none; gap: 6px; margin-top: 8px; overflow-x: auto;
   -webkit-overflow-scrolling: touch;
   scrollbar-width: none;
 }
+.wx-loc.expanded .wx-forecast { display: flex; }
 .wx-forecast::-webkit-scrollbar { display: none; }
 .wx-empty {
   padding: 24px 16px;
@@ -1154,7 +1202,10 @@ a:active { opacity: 0.6; }
   font-size: .9em;
 }
 .row:last-child { border-bottom: none; }
-.row a { color: var(--text); display: flex; align-items: center; justify-content: space-between; width: 100%; }
+.row a { color: var(--text); display: flex; align-items: center; justify-content: space-between; flex: 1; min-width: 0; }
+.row > .row-l, .row > .row-r { flex: 1; }
+.row > .row-l { flex: 1; }
+.row > .row-r { flex: 0 0 auto; }
 .row-l { display: flex; flex-direction: column; }
 .row-l .n { font-weight: 600; }
 .row-l .c { font-size: .78em; color: var(--muted); font-variant-numeric: tabular-nums; }
@@ -1464,6 +1515,7 @@ a:active { opacity: 0.6; }
   margin-bottom: 6px;
 }
 .wx-counter.full { color: var(--accent2); font-weight: 600; }
+
 .set-btn {
   background: var(--accent);
   color: #1F2D3D;
@@ -1545,6 +1597,11 @@ a:active { opacity: 0.6; }
     </div>
     <hr style="border:none;border-top:1px solid var(--border);margin:12px 0">
     <div class="changelog-v">${MORNING_VERSION}</div>
+    <div class="changelog-txt">
+      主畫面自選項目可拖移排序（天氣/台股/美股/匯率，每區各自內部排序），每列左邊 ≡ 把手，拖移手感跟 section 排序一致。順序存 server 跨裝置同步、新勾的自動加到最後。天氣卡片改為預設收合，只顯示「地名 / 圖示 / 溫度 / 體感 / 日出 / 日落」第一行 + 「濕度 / 風（含箭頭）/ UV / AQI / PM2.5」第二行，點一下展開 7 天預報。展開狀態本機記住（per location）。新增 Open-Meteo 空氣品質資料（AQI + PM2.5），依美國 EPA 6 級色階上色（只有數值變色，AQI/PM2.5 文字保持灰），點數值彈出色階說明表。<br>
+      Main-view item drag-to-reorder (weather/TW/US/FX, each section sorts within itself). ≡ handle on left of each row, same drag UX as section ordering. Order synced to server for cross-device. New picks auto-append to end. Weather cards collapsed by default: row 1 shows location/icon/temp/feels/sunrise/sunset, row 2 shows humidity/wind (with arrow)/UV/AQI/PM2.5; tap to expand 7-day forecast. Expand state remembered per location in localStorage. Added air quality (AQI + PM2.5) from Open-Meteo, color-coded by US EPA 6-tier scale (only the value is colored, the label stays muted); tap value to see legend.
+    </div>
+    <div class="changelog-v old">V1.3.02</div>
     <div class="changelog-txt">
       嚴重 bug 修正（資料被洗空）：(1) 拖移區塊/nav bar/新聞分類順序時，後端 POST /api/morning-prefs 會誤把天氣/台股/美股/匯率欄位一起覆蓋成空陣列 → 改為 merge 模式，只更新 body 裡有的欄位。(2) 每日 06:30 cron 在 union 全空（所有使用者自選被洗）時仍會寫入空報告並標記當日完成 → 改為偵測空 union 就跳過、下個 tick 重試。(3) 前端 syncPrefsFromServer 用 truthy 判斷，空陣列也會覆蓋本機 localStorage → 改為 Array.isArray + 非空檢查。新增自動還原：開 app 偵測到 server 四大自選全空但有歷史報告，自動從最近一份非空快照反推天氣/台股/美股/匯率清單寫回（自訂 wx 點無法還原，只還原 preset 點）。<br>
       Critical bug fixes (data wipe): (1) Reordering sections/nav bar/news categories was silently overwriting weather/TW-stocks/US-stocks/FX as empty arrays on POST /api/morning-prefs — switched to merge mode so partial updates only touch sent fields. (2) Daily 06:30 cron would write an empty report and mark the day done even when the union of user prefs was empty — now detects empty union and skips, retrying on next tick. (3) Frontend syncPrefsFromServer used truthy guards, letting empty arrays overwrite localStorage — switched to Array.isArray + non-empty check. Added auto-recovery: if server prefs are all empty on page open but history reports exist, reverse-extracts weather/TW/US/FX selections from the latest non-empty snapshot and writes back (custom wx points cannot be recovered, only presets).
@@ -1700,6 +1757,35 @@ a:active { opacity: 0.6; }
   </div>
 </div>
 
+<!-- AQI / PM2.5 色階說明 modal -->
+<div class="modal-wrap" id="aqi-legend-wrap" onclick="if(event.target===this)hideAqiLegend()">
+  <div class="modal">
+    <button class="close" onclick="hideAqiLegend()">✕</button>
+    <h3>🌫️ 空氣品質色階說明</h3>
+    <div style="font-size:.82em;line-height:1.8;color:var(--muted)">
+      <div style="margin-bottom:8px">顏色依據 <strong>美國 EPA</strong> 標準分級（數字越高越不健康）：</div>
+      <table style="width:100%;border-collapse:collapse;font-size:.9em;font-variant-numeric:tabular-nums">
+        <thead>
+          <tr style="border-bottom:1px solid var(--border);color:var(--text);font-weight:600">
+            <th style="text-align:left;padding:6px 4px">等級</th>
+            <th style="text-align:right;padding:6px 4px">AQI</th>
+            <th style="text-align:right;padding:6px 4px">PM2.5</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr style="border-bottom:1px solid var(--border)"><td style="padding:6px 4px"><span class="aq-1">● 良好</span></td><td style="text-align:right;padding:6px 4px" class="aq-1">0–50</td><td style="text-align:right;padding:6px 4px" class="aq-1">0–12</td></tr>
+          <tr style="border-bottom:1px solid var(--border)"><td style="padding:6px 4px"><span class="aq-2">● 普通</span></td><td style="text-align:right;padding:6px 4px" class="aq-2">51–100</td><td style="text-align:right;padding:6px 4px" class="aq-2">12–35</td></tr>
+          <tr style="border-bottom:1px solid var(--border)"><td style="padding:6px 4px"><span class="aq-3">● 敏感族不健康</span></td><td style="text-align:right;padding:6px 4px" class="aq-3">101–150</td><td style="text-align:right;padding:6px 4px" class="aq-3">35–55</td></tr>
+          <tr style="border-bottom:1px solid var(--border)"><td style="padding:6px 4px"><span class="aq-4">● 不健康</span></td><td style="text-align:right;padding:6px 4px" class="aq-4">151–200</td><td style="text-align:right;padding:6px 4px" class="aq-4">55–150</td></tr>
+          <tr style="border-bottom:1px solid var(--border)"><td style="padding:6px 4px"><span class="aq-5">● 非常不健康</span></td><td style="text-align:right;padding:6px 4px" class="aq-5">201–300</td><td style="text-align:right;padding:6px 4px" class="aq-5">150–250</td></tr>
+          <tr><td style="padding:6px 4px"><span class="aq-6">● 危害</span></td><td style="text-align:right;padding:6px 4px" class="aq-6">301+</td><td style="text-align:right;padding:6px 4px" class="aq-6">250+</td></tr>
+        </tbody>
+      </table>
+      <div style="margin-top:10px;font-size:.78em">PM2.5 單位為 μg/m³（微克/立方公尺）。資料來源：Open-Meteo Air Quality API。</div>
+    </div>
+  </div>
+</div>
+
 <!-- Bilingual reader overlay -->
 <div class="reader-wrap" id="reader-wrap">
   <div class="reader-hdr">
@@ -1734,6 +1820,7 @@ const LS = {
   secOrder: 'morning_sec_order',
   secCollapsed: 'morning_sec_collapsed',
   newsCatOrder: 'morning_news_cat_order', // 台灣新聞分類順序
+  wxExpanded: 'morning_wx_expanded', // 天氣地點展開狀態（陣列：展開的 location name）
 };
 
 function getUid() {
@@ -2491,6 +2578,41 @@ function chgSign(c) {
   return '·';
 }
 
+// 天氣展開狀態（每個地點獨立）
+function getWxExpandedSet() {
+  try {
+    const raw = localStorage.getItem(LS.wxExpanded);
+    if (!raw) return new Set();
+    const arr = JSON.parse(raw);
+    return new Set(Array.isArray(arr) ? arr : []);
+  } catch (e) { return new Set(); }
+}
+function isWxExpanded(name) {
+  return getWxExpandedSet().has(String(name || ''));
+}
+function toggleWx(name) {
+  const s = getWxExpandedSet();
+  const key = String(name || '');
+  if (s.has(key)) s.delete(key); else s.add(key);
+  try { localStorage.setItem(LS.wxExpanded, JSON.stringify(Array.from(s))); } catch (e) {}
+  // 直接切 DOM class，不用 re-render
+  document.querySelectorAll('.wx-loc').forEach(el => {
+    if (el.getAttribute('data-wxname') === key) el.classList.toggle('expanded');
+  });
+}
+window.toggleWx = toggleWx;
+
+function showAqiLegend() {
+  const el = document.getElementById('aqi-legend-wrap');
+  if (el) el.classList.add('show');
+}
+function hideAqiLegend() {
+  const el = document.getElementById('aqi-legend-wrap');
+  if (el) el.classList.remove('show');
+}
+window.showAqiLegend = showAqiLegend;
+window.hideAqiLegend = hideAqiLegend;
+
 // 天氣代碼 → emoji（WMO weather code）
 function wxEmoji(code) {
   if (code == null) return '❓';
@@ -2605,6 +2727,141 @@ function renderReport(data) {
   updateNavOrder();
   setupNavDrag();
   setupNewsCatDrag();
+  // 主畫面自選項目拖移排序（天氣/台股/美股/匯率）
+  setupItemDrag('#sec-wx .sec-b', '.wx-loc', 'wx');
+  setupItemDrag('#sec-stw .sec-b', '.row', 'tw');
+  setupItemDrag('#sec-sus .sec-b', '.row', 'us');
+  setupItemDrag('#sec-fx .sec-b', '.row', 'fx');
+}
+
+// ── 主畫面 item-level drag（長按 ≡ 把手拖移，跟 section 相同手感） ──
+function setupItemDrag(containerSelector, itemSelector, section) {
+  const container = document.querySelector(containerSelector);
+  if (!container) return;
+  let dragItem = null;
+  let placeholder = null;
+  function items() { return Array.from(container.querySelectorAll(itemSelector)); }
+  function saveOrder() {
+    const order = items().map(el => el.getAttribute('data-itemkey')).filter(Boolean);
+    saveItemOrder(section, order);
+  }
+  container.querySelectorAll('.item-drag').forEach(handle => {
+    const item = handle.closest(itemSelector);
+    if (!item) return;
+    // Mouse
+    handle.addEventListener('mousedown', (e) => {
+      e.preventDefault();
+      dragItem = item;
+      item.classList.add('item-dragging');
+      const onMove = (ev) => {
+        const y = ev.clientY;
+        const its = items();
+        let target = null;
+        for (const s of its) {
+          if (s === dragItem) continue;
+          const r = s.getBoundingClientRect();
+          if (y < r.top + r.height / 2) { target = s; break; }
+        }
+        its.forEach(s => s.classList.remove('item-drag-over'));
+        if (target) target.classList.add('item-drag-over');
+        placeholder = target;
+      };
+      const onUp = () => {
+        document.removeEventListener('mousemove', onMove);
+        document.removeEventListener('mouseup', onUp);
+        items().forEach(s => s.classList.remove('item-drag-over'));
+        if (dragItem) dragItem.classList.remove('item-dragging');
+        if (placeholder && dragItem) {
+          container.insertBefore(dragItem, placeholder);
+          saveOrder();
+        }
+        dragItem = null;
+        placeholder = null;
+      };
+      document.addEventListener('mousemove', onMove);
+      document.addEventListener('mouseup', onUp);
+    });
+    // Touch
+    handle.addEventListener('touchstart', (e) => {
+      dragItem = item;
+      item.classList.add('item-dragging');
+      const onMove = (ev) => {
+        ev.preventDefault();
+        const touch = ev.touches[0];
+        const y = touch.clientY;
+        const its = items();
+        let target = null;
+        for (const s of its) {
+          if (s === dragItem) continue;
+          const r = s.getBoundingClientRect();
+          if (y < r.top + r.height / 2) { target = s; break; }
+        }
+        its.forEach(s => s.classList.remove('item-drag-over'));
+        if (target) target.classList.add('item-drag-over');
+        placeholder = target;
+      };
+      const onEnd = () => {
+        document.removeEventListener('touchmove', onMove);
+        document.removeEventListener('touchend', onEnd);
+        items().forEach(s => s.classList.remove('item-drag-over'));
+        if (dragItem) dragItem.classList.remove('item-dragging');
+        if (placeholder && dragItem) {
+          container.insertBefore(dragItem, placeholder);
+          saveOrder();
+        }
+        dragItem = null;
+        placeholder = null;
+      };
+      document.addEventListener('touchmove', onMove, { passive: false });
+      document.addEventListener('touchend', onEnd);
+    }, { passive: true });
+  });
+}
+
+function saveItemOrder(section, orderedKeys) {
+  if (!orderedKeys || orderedKeys.length === 0) return;
+  if (section === 'wx') {
+    // orderedKeys = location names；拆回 wxPresets（ID 序列）+ wxCustom（物件序列）
+    const nameToId = {};
+    const nameToLatLon = {};
+    Object.values(WX_PRESETS).forEach(arr => arr.forEach(p => { nameToId[p[1]] = p[0]; nameToLatLon[p[1]] = { lat: p[2], lon: p[3] }; }));
+    const oldCustom = loadSetting('wxCustom', []);
+    const customByName = {};
+    oldCustom.forEach(c => { if (c && c.name) customByName[c.name] = c; });
+    const newPresetIds = [];
+    const newCustom = [];
+    const flat = [];
+    for (const name of orderedKeys) {
+      if (nameToId[name]) {
+        newPresetIds.push(nameToId[name]);
+        flat.push({ name, lat: nameToLatLon[name].lat, lon: nameToLatLon[name].lon });
+      } else if (customByName[name]) {
+        newCustom.push(customByName[name]);
+        flat.push(customByName[name]);
+      }
+    }
+    saveSetting('wxPresets', newPresetIds);
+    saveSetting('wxCustom', newCustom);
+    postPrefsPartial({ wx: flat });
+  } else if (section === 'tw') {
+    saveSetting('tw', orderedKeys);
+    postPrefsPartial({ tw: orderedKeys });
+  } else if (section === 'us') {
+    saveSetting('us', orderedKeys);
+    postPrefsPartial({ us: orderedKeys });
+  } else if (section === 'fx') {
+    saveSetting('fx', orderedKeys);
+    postPrefsPartial({ fx: orderedKeys });
+  }
+}
+function postPrefsPartial(body) {
+  try {
+    apiFetch('/api/morning-prefs', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    }).catch(() => {});
+  } catch (e) {}
 }
 
 // ── Section collapse ─────────────────────────────────────────────
@@ -2872,6 +3129,24 @@ function setupNavActive() {
   secs.forEach(s => s && obs.observe(s));
 }
 
+function aqiClass(aqi) {
+  if (aqi == null) return '';
+  if (aqi <= 50) return 'aq-1';
+  if (aqi <= 100) return 'aq-2';
+  if (aqi <= 150) return 'aq-3';
+  if (aqi <= 200) return 'aq-4';
+  if (aqi <= 300) return 'aq-5';
+  return 'aq-6';
+}
+function pm25Class(pm) {
+  if (pm == null) return '';
+  if (pm <= 12) return 'aq-1';
+  if (pm <= 35) return 'aq-2';
+  if (pm <= 55) return 'aq-3';
+  if (pm <= 150) return 'aq-4';
+  if (pm <= 250) return 'aq-5';
+  return 'aq-6';
+}
 function renderWx(w) {
   const fmtT = v => (v == null || isNaN(v)) ? '—' : Math.round(v) + '°';
   const fmtN = v => (v == null || isNaN(v)) ? '—' : v;
@@ -2886,17 +3161,31 @@ function renderWx(w) {
     ? \`<span style="display:inline-block;transform:rotate(\${(w.windDir + 180) % 360}deg);font-size:1.1em;line-height:1;color:var(--accent)">↑</span>\`
     : '';
   const windDirLabel = (w.windDir != null) ? \` \${w.windDir}°\` : '';
+  const expanded = isWxExpanded(w.name) ? 'expanded' : '';
+  const safeName = String(w.name || '').replace(/'/g, "\\\\'");
+  const aqiHtml = (w.aqi != null)
+    ? \`<span onclick="event.stopPropagation();showAqiLegend()" style="cursor:pointer">🌫️ AQI <b class="\${aqiClass(w.aqi)}">\${w.aqi}</b></span>\`
+    : '';
+  const pm25Html = (w.pm25 != null)
+    ? \`<span onclick="event.stopPropagation();showAqiLegend()" style="cursor:pointer">PM2.5 <b class="\${pm25Class(w.pm25)}">\${w.pm25}</b></span>\`
+    : '';
   return \`
-    <div class="wx-loc">
-      <div class="wx-loc-name">\${w.name || '—'}</div>
-      <div class="wx-loc-main">
-        <div class="wx-icon">\${wxEmoji(w.code)}</div>
-        <div class="wx-temp">\${fmtT(w.temp)}</div>
-        <div class="wx-detail">
-          <div>體感 \${fmtT(w.feels)} · 濕度 \${fmtN(w.humidity)}%</div>
-          <div>風 \${windArrow}\${windDirLabel} \${fmtN(w.wind)} kt · UV \${fmtN(w.uv)}</div>
-          <div>🌅 \${w.sunrise || '—'} · 🌇 \${w.sunset || '—'}</div>
-        </div>
+    <div class="wx-loc \${expanded}" data-wxname="\${safeName}" data-itemkey="\${safeName}">
+      <div class="wx-r1" onclick="toggleWx('\${safeName}')">
+        <span class="item-drag" title="拖移" onclick="event.stopPropagation()">≡</span>
+        <span class="name">\${w.name || '—'}</span>
+        <span class="ic">\${wxEmoji(w.code)}</span>
+        <span class="tmp">\${fmtT(w.temp)}</span>
+        <span class="fl">體感 \${fmtT(w.feels)}</span>
+        <span class="sun">🌅 \${w.sunrise || '—'} · 🌇 \${w.sunset || '—'}</span>
+        <span class="tog">▼</span>
+      </div>
+      <div class="wx-r2">
+        <span>💧 \${fmtN(w.humidity)}%</span>
+        <span>💨 \${windArrow}\${windDirLabel} \${fmtN(w.wind)} kt</span>
+        <span>UV \${fmtN(w.uv)}</span>
+        \${aqiHtml}
+        \${pm25Html}
       </div>
       <div class="wx-forecast">\${forecast}</div>
     </div>
@@ -2906,11 +3195,12 @@ function renderWx(w) {
 function renderStock(code, market, s) {
   const base = market === 'tw' ? 'https://www.cnyes.com/twstock/' : 'https://invest.cnyes.com/usstock/detail/';
   if (!s) {
-    return \`<div class="row"><a href="\${base}\${code}" target="_blank"><div class="row-l"><div class="n">\${code}</div><div class="c">—</div></div><div class="row-r flat">—</div></a></div>\`;
+    return \`<div class="row" data-itemkey="\${code}"><span class="item-drag" title="拖移">≡</span><a href="\${base}\${code}" target="_blank"><div class="row-l"><div class="n">\${code}</div><div class="c">—</div></div><div class="row-r flat">—</div></a></div>\`;
   }
   const cls = chgClass(s.change);
   return \`
-    <div class="row">
+    <div class="row" data-itemkey="\${code}">
+      <span class="item-drag" title="拖移">≡</span>
       <a href="\${base}\${code}" target="_blank">
         <div class="row-l">
           <div class="n">\${s.name || code}</div>
@@ -2927,14 +3217,15 @@ function renderStock(code, market, s) {
 
 function renderFx(pair, v) {
   if (!v) {
-    return \`<div class="row"><div class="row-l"><div class="n">\${pair}</div><div class="c">—</div></div><div class="row-r flat">—</div></div>\`;
+    return \`<div class="row" data-itemkey="\${pair}"><span class="item-drag" title="拖移">≡</span><div class="row-l"><div class="n">\${pair}</div><div class="c">—</div></div><div class="row-r flat">—</div></div>\`;
   }
   const isTwd = pair.endsWith('/TWD');
   const sub = isTwd && v.cashSell != null
     ? ('現金賣出 ' + fmtNum(v.cashSell, 4))
     : (v.change != null ? (pct(v.changePct) + ' (' + (v.change > 0 ? '+' : '') + fmtNum(v.change, 4) + ')') : '即期');
   return \`
-    <div class="row">
+    <div class="row" data-itemkey="\${pair}">
+      <span class="item-drag" title="拖移">≡</span>
       <div class="row-l">
         <div class="n">\${pair}</div>
         <div class="c">\${sub}</div>
