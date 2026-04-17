@@ -599,6 +599,15 @@ export interface BuildOpts {
   fxPairs?: string[];
 }
 
+// 單一欄位重抓（給 /api/morning-report/refresh-partial 用）
+export async function fetchSection(section: string, opts: BuildOpts = {}) {
+  if (section === 'weather') return await fetchWeather(opts.wxLocs);
+  if (section === 'stocks_tw') return await fetchTwStocks(opts.twCodes);
+  if (section === 'stocks_us') return await fetchUsStocks(opts.usCodes);
+  if (section === 'fx') return await fetchFx(opts.fxPairs);
+  throw new Error('unknown section: ' + section);
+}
+
 export async function buildMorningReport(opts: BuildOpts = {}) {
   const t0 = Date.now();
   const wxLocs = opts.wxLocs;

@@ -9,10 +9,10 @@ import pg from 'pg';
 import { JSDOM } from 'jsdom';
 import { Readability } from '@mozilla/readability';
 import { ROOT } from './config.js';
-import { buildMorningReport } from './morning-builder.js';
+import { buildMorningReport, fetchSection } from './morning-builder.js';
 
-export const MORNING_VERSION = 'V1.3.03';
-const MORNING_CACHE = 'morning-v1-3-03';
+export const MORNING_VERSION = 'V1.3.04';
+const MORNING_CACHE = 'morning-v1-3-04';
 
 // ─── Postgres ────────────────────────────────────────────────────────
 let _pgPool: pg.Pool | null = null;
@@ -142,11 +142,15 @@ async function saveReport(userId: string, date: string, data: any) {
 }
 
 // ─── 使用者偏好讀寫 (morning_prefs) ──────────────────────────────────
+interface HoldingMap { [code: string]: { qty: number; cost: number } }
 interface UserPrefs {
   wx?: Array<{ name: string; lat: number; lon: number }>;  // [{name,lat,lon},...]
   tw?: string[];  // 股票代號
   us?: string[];
   fx?: string[];  // 貨幣對 'USD/TWD'
+  tw_holdings?: HoldingMap;  // 台股持倉 { code: { qty, cost } }
+  us_holdings?: HoldingMap;  // 美股持倉
+  fx_decimals?: number;  // 匯率換算結果小數位數 0/2/4（跨裝置同步的顯示偏好）
 }
 
 async function getPrefs(userId: string): Promise<UserPrefs | null> {
@@ -560,6 +564,32 @@ morningRouter.post('/api/morning-prefs', async (req, res) => {
     if (Array.isArray(body.fx)) merged.fx = body.fx.filter((c: any) => typeof c === 'string');
     if (Array.isArray(body.secOrder)) merged.secOrder = body.secOrder.filter((s: any) => typeof s === 'string');
     if (Array.isArray(body.newsCatOrder)) merged.newsCatOrder = body.newsCatOrder.filter((s: any) => typeof s === 'string');
+    // Holdings：物件 { code: { qty:number, cost:number } }
+    const cleanHoldings = (h: any) => {
+      if (!h || typeof h !== 'object') return null;
+      const out: any = {};
+      for (const k of Object.keys(h)) {
+        const v = h[k];
+        if (v && typeof v === 'object') {
+          const qty = Number(v.qty);
+          const cost = Number(v.cost);
+          if (!isNaN(qty) && !isNaN(cost)) out[String(k)] = { qty, cost };
+        }
+      }
+      return out;
+    };
+    if (body.tw_holdings !== undefined) {
+      const c = cleanHoldings(body.tw_holdings);
+      if (c) merged.tw_holdings = c;
+    }
+    if (body.us_holdings !== undefined) {
+      const c = cleanHoldings(body.us_holdings);
+      if (c) merged.us_holdings = c;
+    }
+    if (body.fx_decimals !== undefined) {
+      const d = Number(body.fx_decimals);
+      if ([0, 2, 4].includes(d)) merged.fx_decimals = d;
+    }
     const saved = await savePrefs(userId, merged);
     if (!saved) return res.status(503).json({ error: 'save_failed' });
     res.json({ ok: true, userId });
@@ -712,6 +742,38 @@ morningRouter.post('/api/morning-report/refresh', async (req, res) => {
     res.json({ ok: true, date: result.date, errors: result.errors });
   } else {
     res.status(503).json(result);
+  }
+});
+
+// ─── POST /api/morning-report/refresh-partial — 只重抓指定區塊 ────
+// body: { section: 'weather'|'stocks_tw'|'stocks_us'|'fx' }
+morningRouter.post('/api/morning-report/refresh-partial', async (req, res) => {
+  try {
+    const userId = reqUserId(req);
+    if (!userId) return res.status(400).json({ error: 'missing_or_invalid_user_id' });
+    const section = String((req.body && req.body.section) || '');
+    if (!['weather', 'stocks_tw', 'stocks_us', 'fx'].includes(section)) {
+      return res.status(400).json({ error: 'invalid_section' });
+    }
+    const prefs = await getPrefs(userId);
+    if (!prefs) return res.status(404).json({ error: 'no_prefs' });
+    const today = todayTaipei();
+    const existing = (await getReportByDate(userId, today)) || {};
+    // 只抓該區塊
+    const opts: any = {};
+    if (section === 'weather') opts.wxLocs = prefs.wx || [];
+    if (section === 'stocks_tw') opts.twCodes = prefs.tw || [];
+    if (section === 'stocks_us') opts.usCodes = prefs.us || [];
+    if (section === 'fx') opts.fxPairs = prefs.fx || [];
+    const value = await fetchSection(section, opts);
+    const merged: any = { ...existing, date: today, generated_at: new Date().toISOString() };
+    merged[section] = value;
+    await saveReport(userId, today, merged);
+    res.json({ ok: true, section, date: today });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    console.error('[morning] refresh-partial error:', msg);
+    res.status(500).json({ error: msg });
   }
 });
 
@@ -1202,10 +1264,233 @@ a:active { opacity: 0.6; }
   font-size: .9em;
 }
 .row:last-child { border-bottom: none; }
-.row a { color: var(--text); display: flex; align-items: center; justify-content: space-between; flex: 1; min-width: 0; }
-.row > .row-l, .row > .row-r { flex: 1; }
-.row > .row-l { flex: 1; }
-.row > .row-r { flex: 0 0 auto; }
+.row a { color: var(--text); }
+.row a.n { color: var(--accent); text-decoration: none; align-self: flex-start; display: inline-block; }
+.row a.n:hover { text-decoration: underline; }
+.row > .row-l { flex: 1; min-width: 0; }
+.row > .row-r { flex: 0 0 auto; margin-left: 8px; }
+/* 持倉 sub-row：單獨一行放在該股票列下方，左對齊（不搶股價位置） */
+.row > .row-hold-sub {
+  flex-basis: 100%;
+  margin-top: 4px;
+  padding: 4px 0 0 22px;
+  font-size: .8em;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  border-top: 1px dashed var(--border);
+}
+.row > .row-hold-sub b { color: var(--text); font-weight: 700; margin: 0 2px; }
+.row > .row-hold-sub b.up { color: var(--up); }
+.row > .row-hold-sub b.down { color: var(--down); }
+.row > .row-hold-sub b.flat { color: var(--text); }
+.row > .row-hold-sub .lbl { color: var(--muted); font-weight: 400; font-size: .92em; }
+.row > .row-hold-sub .hold-x {
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--muted);
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  font-size: .7em;
+  cursor: pointer;
+  padding: 0;
+  line-height: 1;
+  margin-left: 6px;
+  vertical-align: middle;
+}
+.row > .row-hold-sub .hold-x:active { background: rgba(255,100,100,0.12); color: #ff8a8a; }
+/* 區塊頂端加總：跟每列 row-hold-sub 一致的樣式（左對齊、同一種 inline 表達方式） */
+.stock-summary {
+  padding: 10px 14px 10px 36px;
+  border-bottom: 1px solid var(--border);
+  background: rgba(255,255,255,0.02);
+  font-size: .85em;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  position: relative;
+}
+.stock-summary::before {
+  content: '';
+  position: absolute;
+  left: 14px;
+  top: 0; bottom: 0;
+}
+.stock-summary .lbl { color: var(--muted); font-weight: 400; font-size: .92em; }
+.stock-summary b { color: var(--text); font-weight: 700; margin: 0 2px; }
+.stock-summary b.up { color: var(--up); }
+.stock-summary b.down { color: var(--down); }
+.stock-summary b.flat { color: var(--text); }
+/* 點列展開持倉編輯 panel */
+.row.stock-row { flex-wrap: wrap; cursor: pointer; }
+.row > .stock-expand {
+  flex-basis: 100%;
+  display: none;
+  padding: 10px 4px 2px;
+  margin-top: 6px;
+  border-top: 1px dashed var(--border);
+  cursor: default;
+}
+.row.stock-row.expanded > .stock-expand { display: block; }
+.se-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.se-grid label {
+  display: flex;
+  flex-direction: column;
+  font-size: .7em;
+  color: var(--muted);
+  gap: 2px;
+}
+.se-grid input {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 6px 8px;
+  border-radius: 6px;
+  font-size: .92em;
+  font-variant-numeric: tabular-nums;
+  -moz-appearance: textfield;
+}
+.se-grid input::-webkit-outer-spin-button,
+.se-grid input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.se-clear {
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--muted);
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: .74em;
+  cursor: pointer;
+}
+.se-clear:active { background: rgba(255,100,100,0.12); color: #ff8a8a; }
+
+/* 設定 modal 裡的持倉表格 */
+.holdings-table {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: .82em;
+}
+.holdings-table .ht-row {
+  display: grid;
+  grid-template-columns: 1.3fr 1fr 1fr 28px;
+  gap: 8px;
+  align-items: center;
+}
+.holdings-table .ht-head {
+  font-size: .7em;
+  color: var(--muted);
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--border);
+}
+.holdings-table .ht-code {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+}
+.holdings-table input {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 4px 6px;
+  border-radius: 6px;
+  font-size: .92em;
+  font-variant-numeric: tabular-nums;
+  width: 100%;
+  -moz-appearance: textfield;
+}
+.holdings-table input::-webkit-outer-spin-button,
+.holdings-table input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.holdings-table .ht-x {
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--muted);
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  font-size: .8em;
+  cursor: pointer;
+  padding: 0;
+  line-height: 1;
+}
+.holdings-table .ht-empty {
+  font-size: .76em;
+  color: var(--muted);
+  padding: 8px 0;
+  text-align: center;
+}
+.danger-btn {
+  background: none;
+  border: 1px solid #ff8a8a;
+  color: #ff8a8a;
+  padding: 8px 14px;
+  border-radius: 8px;
+  font-size: .84em;
+  cursor: pointer;
+  margin-top: 10px;
+  width: 100%;
+}
+.danger-btn:active { background: rgba(255,100,100,0.12); }
+
+/* FX 計算機（每列） */
+.fx-row { flex-wrap: wrap; }
+.fx-calc {
+  flex-basis: 100%;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+  padding-top: 8px;
+  border-top: 1px dashed var(--border);
+  font-size: .82em;
+  font-variant-numeric: tabular-nums;
+  flex-wrap: wrap;
+}
+.fx-calc input {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 4px 6px;
+  border-radius: 6px;
+  font-size: .9em;
+  width: 80px;
+  font-variant-numeric: tabular-nums;
+  -moz-appearance: textfield;
+}
+.fx-calc input::-webkit-outer-spin-button,
+.fx-calc input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.fx-calc .fx-ccy { color: var(--muted); font-weight: 600; min-width: 32px; }
+.fx-calc .fx-dir {
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--muted);
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  font-size: .9em;
+  cursor: pointer;
+  padding: 0;
+  line-height: 1;
+}
+.fx-calc .fx-dir:active { background: rgba(244,196,48,0.12); color: var(--accent); }
+.fx-calc .fx-result { flex: 1; font-weight: 600; color: var(--accent); min-width: 60px; }
+.fx-calc .fx-x {
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--muted);
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  font-size: .78em;
+  cursor: pointer;
+  padding: 0;
+  line-height: 1;
+}
+.fx-calc .fx-x:active { background: rgba(255,100,100,0.12); color: #ff8a8a; }
 .row-l { display: flex; flex-direction: column; }
 .row-l .n { font-weight: 600; }
 .row-l .c { font-size: .78em; color: var(--muted); font-variant-numeric: tabular-nums; }
@@ -1598,6 +1883,11 @@ a:active { opacity: 0.6; }
     <hr style="border:none;border-top:1px solid var(--border);margin:12px 0">
     <div class="changelog-v">${MORNING_VERSION}</div>
     <div class="changelog-txt">
+      新增「持倉」功能（台股/美股）：點主畫面空白處展開輸入股數/成本，即時計算市值與損益，每列下方 sub-row 顯示、區塊頂端加總市值與總損益（紅漲綠跌）；設定 modal 有批次編輯表格；持倉資料跨裝置同步。匯率加「計算機」：每列輸入金額即時算換算結果，⇄ 切換方向、✕ 清該列；小數位數可切（0/2/4），header 有循環按鈕 <code>.0</code>/<code>.2</code>/<code>.4</code>、設定有下拉，顯示偏好跨裝置同步；輸入數字只存本機不同步。主畫面各區塊（天氣/台股/美股/匯率）新增 🔄 個別重抓按鈕（保留新聞不動）。「清除全部」按鈕統一搬進設定 modal（紅框紅字 + confirm）避免誤觸。後端新增 <code>POST /api/morning-report/refresh-partial</code> 端點 + <code>UserPrefs</code> 擴充 <code>tw_holdings</code>/<code>us_holdings</code>/<code>fx_decimals</code> 欄位（merge 模式）。<br>
+      New "holdings" feature (TW/US stocks): tap empty area of a stock row to expand qty/cost inputs; market value and P/L calculated live, shown as a sub-row and aggregated at the top of each stock section (red up / green down — Taiwan convention); settings modal has batch-edit table; holdings sync cross-device. FX calculator: per-row amount input with live conversion, ⇄ flips direction, ✕ clears that row; decimal places configurable (0/2/4) via header cycle button <code>.0</code>/<code>.2</code>/<code>.4</code> or settings dropdown — preference synced cross-device, typed amounts local-only. New per-section 🔄 refresh buttons (weather/TW/US/FX) that don't re-fetch news, backed by new <code>POST /api/morning-report/refresh-partial</code> endpoint. "Clear all" buttons moved into settings modal (red-bordered + confirm) to prevent accidental wipes. <code>UserPrefs</code> schema extended with <code>tw_holdings</code>/<code>us_holdings</code>/<code>fx_decimals</code> fields (merge mode).
+    </div>
+    <div class="changelog-v old">V1.3.03</div>
+    <div class="changelog-txt">
       主畫面自選項目可拖移排序（天氣/台股/美股/匯率，每區各自內部排序），每列左邊 ≡ 把手，拖移手感跟 section 排序一致。順序存 server 跨裝置同步、新勾的自動加到最後。天氣卡片改為預設收合，只顯示「地名 / 圖示 / 溫度 / 體感 / 日出 / 日落」第一行 + 「濕度 / 風（含箭頭）/ UV / AQI / PM2.5」第二行，點一下展開 7 天預報。展開狀態本機記住（per location）。新增 Open-Meteo 空氣品質資料（AQI + PM2.5），依美國 EPA 6 級色階上色（只有數值變色，AQI/PM2.5 文字保持灰），點數值彈出色階說明表。<br>
       Main-view item drag-to-reorder (weather/TW/US/FX, each section sorts within itself). ≡ handle on left of each row, same drag UX as section ordering. Order synced to server for cross-device. New picks auto-append to end. Weather cards collapsed by default: row 1 shows location/icon/temp/feels/sunrise/sunset, row 2 shows humidity/wind (with arrow)/UV/AQI/PM2.5; tap to expand 7-day forecast. Expand state remembered per location in localStorage. Added air quality (AQI + PM2.5) from Open-Meteo, color-coded by US EPA 6-tier scale (only the value is colored, the label stays muted); tap value to see legend.
     </div>
@@ -1670,7 +1960,7 @@ a:active { opacity: 0.6; }
     <button class="close" onclick="hideSet()">✕</button>
     <h3 id="set-title">⚙️ 設定 Settings</h3>
     <div style="font-size:.75em;color:var(--muted);margin-bottom:12px">
-      設定會存在這個裝置的瀏覽器裡，換裝置或清快取會重置。
+      設定會綁定你的暱稱存在伺服器，跨裝置自動同步（用同一暱稱在其他裝置開就會拉到你的選擇）。
     </div>
 
     <div class="set-sec" data-section="wx">
@@ -1693,6 +1983,11 @@ a:active { opacity: 0.6; }
         <p style="margin-top:0">手動加代號（用逗號分隔，例如 4968,3515）</p>
         <textarea id="set-tw-custom" placeholder="4968,3515"></textarea>
       </div>
+      <div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--border)">
+        <p style="margin-top:0">💼 持倉（填了才顯示市值/損益，跨裝置同步）</p>
+        <div id="tw-holdings-table" class="holdings-table"></div>
+        <button type="button" class="danger-btn" onclick="clearAllHoldings('tw')">🗑️ 清除全部台股持倉</button>
+      </div>
     </div>
 
     <div class="set-sec" data-section="us">
@@ -1704,6 +1999,11 @@ a:active { opacity: 0.6; }
         <p style="margin-top:0">手動加代號（用逗號分隔，例如 GME,AMC）</p>
         <textarea id="set-us-custom" placeholder="GME,AMC"></textarea>
       </div>
+      <div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--border)">
+        <p style="margin-top:0">💼 持倉（填了才顯示市值/損益，跨裝置同步）</p>
+        <div id="us-holdings-table" class="holdings-table"></div>
+        <button type="button" class="danger-btn" onclick="clearAllHoldings('us')">🗑️ 清除全部美股持倉</button>
+      </div>
     </div>
 
     <div class="set-sec" data-section="fx">
@@ -1714,6 +2014,18 @@ a:active { opacity: 0.6; }
       <div style="margin-top:14px">
         <p style="margin-top:0">手動加貨幣對（用逗號分隔，例如 CHF/TWD,USD/THB）</p>
         <textarea id="set-fx-custom" placeholder="CHF/TWD,USD/THB"></textarea>
+      </div>
+      <div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--border)">
+        <label style="display:flex;align-items:center;gap:8px;font-size:.82em;color:var(--muted);margin-bottom:10px">
+          換算結果小數位數
+          <select id="set-fx-decimals" onchange="onFxDecimalsChange(event)" style="background:var(--bg);border:1px solid var(--border);color:var(--text);padding:4px 8px;border-radius:6px;font-size:.9em">
+            <option value="0">0（整數）</option>
+            <option value="2">2 位</option>
+            <option value="4">4 位</option>
+          </select>
+          <span style="font-size:.72em">（跨裝置同步）</span>
+        </label>
+        <button type="button" class="danger-btn" onclick="clearAllFx()">🗑️ 清除全部匯率換算數字</button>
       </div>
     </div>
 
@@ -1821,6 +2133,12 @@ const LS = {
   secCollapsed: 'morning_sec_collapsed',
   newsCatOrder: 'morning_news_cat_order', // 台灣新聞分類順序
   wxExpanded: 'morning_wx_expanded', // 天氣地點展開狀態（陣列：展開的 location name）
+  twHoldings: 'morning_tw_holdings', // { code: { qty, cost } }
+  usHoldings: 'morning_us_holdings',
+  fxInputs: 'morning_fx_inputs',    // 只存本機：{ pair: amount }
+  fxDirections: 'morning_fx_directions', // 只存本機：{ pair: 'ltr'|'rtl' }
+  fxDecimals: 'morning_fx_decimals', // 跨裝置同步：0 / 2 / 4
+  stockExpanded: 'morning_stock_expanded', // 主畫面哪幾支股票展開（陣列，market:code）
 };
 
 function getUid() {
@@ -2602,6 +2920,255 @@ function toggleWx(name) {
 }
 window.toggleWx = toggleWx;
 
+// ── Stock row expand / holding input ──────────────────────────────
+function toggleStockRow(el) {
+  if (!el) return;
+  el.classList.toggle('expanded');
+  // 存哪些展開
+  const rows = Array.from(document.querySelectorAll('.stock-row.expanded'));
+  const arr = rows.map(r => (r.getAttribute('data-market') || '') + ':' + (r.getAttribute('data-code') || ''));
+  saveSetting('stockExpanded', arr);
+}
+window.toggleStockRow = toggleStockRow;
+let _holdingSaveTimer = null;
+function onHoldingInput(e) {
+  const inp = e.target;
+  const market = inp.getAttribute('data-market');
+  const code = inp.getAttribute('data-code');
+  const field = inp.getAttribute('data-field');
+  const key = market === 'tw' ? 'twHoldings' : 'usHoldings';
+  const map = loadSetting(key, {}) || {};
+  const cur = map[code] || { qty: 0, cost: 0 };
+  const val = Number(inp.value);
+  if (isNaN(val)) return;
+  cur[field] = val;
+  map[code] = cur;
+  saveSetting(key, map);
+  // 更新這列的 row-hold 顯示（不 re-render 整個區塊，避免失焦）
+  updateStockRowHoldingInline(market, code);
+  // Debounce POST server
+  if (_holdingSaveTimer) clearTimeout(_holdingSaveTimer);
+  _holdingSaveTimer = setTimeout(() => {
+    const body = {};
+    body[market === 'tw' ? 'tw_holdings' : 'us_holdings'] = loadSetting(key, {});
+    postPrefsPartial(body);
+  }, 500);
+}
+window.onHoldingInput = onHoldingInput;
+function clearHolding(market, code) {
+  const key = market === 'tw' ? 'twHoldings' : 'usHoldings';
+  const map = loadSetting(key, {}) || {};
+  delete map[code];
+  saveSetting(key, map);
+  // 把該列 input 清空 + 更新 row-hold
+  document.querySelectorAll('.stock-expand input[data-market="' + market + '"][data-code="' + code + '"]').forEach(inp => { inp.value = ''; });
+  updateStockRowHoldingInline(market, code);
+  const body = {};
+  body[market === 'tw' ? 'tw_holdings' : 'us_holdings'] = map;
+  postPrefsPartial(body);
+}
+window.clearHolding = clearHolding;
+function updateStockRowHoldingInline(market, code) {
+  const row = document.querySelector('.stock-row[data-market="' + market + '"][data-code="' + code + '"]');
+  if (!row) return;
+  const holdings = loadSetting(market === 'tw' ? 'twHoldings' : 'usHoldings', {}) || {};
+  const h = holdings[code];
+  const priceEl = row.querySelector('.row-r .p');
+  const price = priceEl ? Number(String(priceEl.textContent).replace(/,/g, '')) : NaN;
+  let existing = row.querySelector('.row-hold-sub');
+  if (!h || !h.qty) {
+    if (existing) existing.remove();
+    updateStockSummaryInline(market);
+    return;
+  }
+  const resetBtn = '<button class="hold-x" onclick="event.stopPropagation();clearHolding(\\'' + market + '\\',\\'' + code + '\\')" title="清除此筆持倉">✕</button>';
+  let html;
+  if (!isFinite(price)) {
+    html = '<span class="lbl">市值</span> — · <span class="lbl">持倉</span> ' + h.qty + ' ' + resetBtn;
+  } else {
+    const mv = price * h.qty;
+    const plAbs = (price - Number(h.cost)) * h.qty;
+    const plPct = h.cost > 0 ? ((price - h.cost) / h.cost) * 100 : 0;
+    const pcls = plAbs > 0 ? 'up' : (plAbs < 0 ? 'down' : 'flat');
+    const psign = plAbs >= 0 ? '+' : '';
+    html = '<span class="lbl">市值</span> <b>' + Math.round(mv).toLocaleString() + '</b>'
+      + ' · <span class="lbl">損益</span> <b class="' + pcls + '">' + psign + Math.round(plAbs).toLocaleString() + ' (' + psign + plPct.toFixed(2) + '%)</b>'
+      + ' ' + resetBtn;
+  }
+  if (!existing) {
+    existing = document.createElement('div');
+    existing.className = 'row-hold-sub';
+    const expand = row.querySelector('.stock-expand');
+    row.insertBefore(existing, expand);
+  }
+  existing.innerHTML = html;
+  updateStockSummaryInline(market);
+}
+// 更新區塊頂端加總
+function updateStockSummaryInline(market) {
+  const secId = market === 'tw' ? 'sec-stw' : 'sec-sus';
+  const sec = document.getElementById(secId);
+  if (!sec) return;
+  const body = sec.querySelector('.sec-b');
+  if (!body) return;
+  const holdings = loadSetting(market === 'tw' ? 'twHoldings' : 'usHoldings', {}) || {};
+  // 掃該區塊每一列：從 data-code 抓、讀現價從 row-r .p
+  const rows = body.querySelectorAll('.stock-row');
+  let totalMv = 0, totalCost = 0, totalPl = 0, hasAny = false;
+  rows.forEach(r => {
+    const code = r.getAttribute('data-code');
+    const h = holdings[code];
+    if (!h || !h.qty) return;
+    const priceEl = r.querySelector('.row-r .p');
+    const price = priceEl ? Number(String(priceEl.textContent).replace(/,/g, '')) : NaN;
+    if (!isFinite(price)) return;
+    hasAny = true;
+    totalMv += price * h.qty;
+    totalCost += Number(h.cost) * h.qty;
+    totalPl += (price - Number(h.cost)) * h.qty;
+  });
+  let summary = body.querySelector('.stock-summary');
+  if (!hasAny) {
+    if (summary) summary.remove();
+    return;
+  }
+  const pct = totalCost > 0 ? (totalPl / totalCost) * 100 : 0;
+  const cls = totalPl > 0 ? 'up' : (totalPl < 0 ? 'down' : 'flat');
+  const sign = totalPl >= 0 ? '+' : '';
+  const html = '💰 <span class="lbl">總市值</span> <b>' + Math.round(totalMv).toLocaleString() + '</b>'
+    + ' · <span class="lbl">總損益</span> <b class="' + cls + '">' + sign + Math.round(totalPl).toLocaleString() + ' (' + sign + pct.toFixed(2) + '%)</b>';
+  if (!summary) {
+    summary = document.createElement('div');
+    summary.className = 'stock-summary';
+    body.insertBefore(summary, body.firstChild);
+  }
+  summary.innerHTML = html;
+}
+// 全區清除該市場所有持倉
+function clearAllHoldings(market) {
+  if (!confirm('確定清除全部' + (market === 'tw' ? '台股' : '美股') + '持倉？')) return;
+  const key = market === 'tw' ? 'twHoldings' : 'usHoldings';
+  saveSetting(key, {});
+  // 清所有 input 值 + 移除 sub-row
+  const secId = market === 'tw' ? 'sec-stw' : 'sec-sus';
+  const sec = document.getElementById(secId);
+  if (sec) {
+    sec.querySelectorAll('.stock-expand input').forEach(inp => {
+      if (inp.getAttribute('data-market') === market) inp.value = '';
+    });
+    sec.querySelectorAll('.row-hold-sub').forEach(el => el.remove());
+    const summary = sec.querySelector('.stock-summary');
+    if (summary) summary.remove();
+  }
+  // 設定 modal 的表格也重繪
+  renderHoldingsTable(market);
+  const body = {};
+  body[market === 'tw' ? 'tw_holdings' : 'us_holdings'] = {};
+  postPrefsPartial(body);
+}
+window.clearAllHoldings = clearAllHoldings;
+
+// ── FX calculator (本機 localStorage 儲存) ────────────────────────
+function onFxInput(e) {
+  const inp = e.target;
+  const pair = inp.getAttribute('data-pair');
+  if (!pair) return;
+  const map = loadSetting('fxInputs', {}) || {};
+  const v = inp.value.trim();
+  if (v === '') delete map[pair]; else map[pair] = Number(v);
+  saveSetting('fxInputs', map);
+  updateFxResultInline(pair);
+}
+window.onFxInput = onFxInput;
+function flipFxDir(pair) {
+  const map = loadSetting('fxDirections', {}) || {};
+  map[pair] = (map[pair] === 'rtl') ? 'ltr' : 'rtl';
+  saveSetting('fxDirections', map);
+  // 重新渲染該列
+  const row = document.querySelector('.fx-row[data-pair="' + pair + '"]');
+  if (row) {
+    const cal = row.querySelector('.fx-calc');
+    if (cal) {
+      const ccys = cal.querySelectorAll('.fx-ccy');
+      if (ccys.length >= 2) {
+        const left = ccys[0].textContent;
+        const right = ccys[1].textContent;
+        ccys[0].textContent = right;
+        ccys[1].textContent = left;
+      }
+    }
+  }
+  updateFxResultInline(pair);
+}
+window.flipFxDir = flipFxDir;
+function clearFxInput(pair) {
+  const map = loadSetting('fxInputs', {}) || {};
+  delete map[pair];
+  saveSetting('fxInputs', map);
+  const row = document.querySelector('.fx-row[data-pair="' + pair + '"]');
+  if (row) {
+    const inp = row.querySelector('.fx-calc input');
+    if (inp) inp.value = '';
+  }
+  updateFxResultInline(pair);
+}
+window.clearFxInput = clearFxInput;
+function applyFxDecimals(val) {
+  if (![0, 2, 4].includes(val)) return;
+  saveSetting('fxDecimals', val);
+  document.querySelectorAll('.fx-row').forEach(row => {
+    const pair = row.getAttribute('data-pair');
+    if (pair) updateFxResultInline(pair);
+  });
+  // 更新 header 按鈕 label
+  const btn = document.querySelector('.sec-fx-dec');
+  if (btn) btn.textContent = '.' + val;
+  // 更新 modal 下拉
+  const sel = document.getElementById('set-fx-decimals');
+  if (sel) sel.value = String(val);
+  postPrefsPartial({ fx_decimals: val });
+}
+function onFxDecimalsChange(e) {
+  applyFxDecimals(Number(e.target.value));
+}
+window.onFxDecimalsChange = onFxDecimalsChange;
+function cycleFxDecimals() {
+  const cur = Number(loadSetting('fxDecimals', 0)) || 0;
+  const next = cur === 0 ? 2 : (cur === 2 ? 4 : 0);
+  applyFxDecimals(next);
+}
+window.cycleFxDecimals = cycleFxDecimals;
+
+function clearAllFx() {
+  if (!confirm('確定清除全部匯率換算的輸入數字？')) return;
+  saveSetting('fxInputs', {});
+  document.querySelectorAll('.fx-row').forEach(row => {
+    const inp = row.querySelector('.fx-calc input');
+    if (inp) inp.value = '';
+    const pair = row.getAttribute('data-pair');
+    updateFxResultInline(pair);
+  });
+}
+window.clearAllFx = clearAllFx;
+function updateFxResultInline(pair) {
+  const row = document.querySelector('.fx-row[data-pair="' + pair + '"]');
+  if (!row) return;
+  const calc = row.querySelector('.fx-calc');
+  if (!calc) return;
+  const inp = calc.querySelector('input');
+  const rateEl = row.querySelector('.row-r .p');
+  const rate = rateEl ? Number(String(rateEl.textContent).replace(/,/g, '')) : NaN;
+  const amt = inp ? Number(inp.value) : NaN;
+  const resEl = calc.querySelector('.fx-result');
+  if (!resEl) return;
+  if (!isFinite(rate) || !isFinite(amt) || inp.value === '') { resEl.textContent = '—'; return; }
+  const dirMap = loadSetting('fxDirections', {}) || {};
+  const dir = dirMap[pair] === 'rtl' ? 'rtl' : 'ltr';
+  const r = dir === 'ltr' ? (amt * rate) : (amt / rate);
+  const fxDec = Number(loadSetting('fxDecimals', 0)) || 0;
+  resEl.textContent = r.toLocaleString('en-US', { minimumFractionDigits: fxDec, maximumFractionDigits: fxDec });
+}
+
 function showAqiLegend() {
   const el = document.getElementById('aqi-legend-wrap');
   if (el) el.classList.add('show');
@@ -2656,8 +3223,10 @@ function renderReport(data) {
         const w = wxByName[loc.name] || { name: loc.name, temp: null, feels: null, humidity: null, wind: null, windDir: null, uv: null, code: null, sunrise: '—', sunset: '—', forecast: [] };
         return renderWx(w);
       }).join('');
-  const twRows = userTw.map(code => renderStock(code, 'tw', (data.stocks_tw || {})[code])).join('') || emptyRow();
-  const usRows = userUs.map(code => renderStock(code, 'us', (data.stocks_us || {})[code])).join('') || emptyRow();
+  const twSummary = renderStockSummary('tw', userTw, data.stocks_tw || {});
+  const usSummary = renderStockSummary('us', userUs, data.stocks_us || {});
+  const twRows = twSummary + (userTw.map(code => renderStock(code, 'tw', (data.stocks_tw || {})[code])).join('') || emptyRow());
+  const usRows = usSummary + (userUs.map(code => renderStock(code, 'us', (data.stocks_us || {})[code])).join('') || emptyRow());
   const fxRows = userFx.map(c => renderFx(c, (data.fx || {})[c])).join('') || emptyRow();
   // 台灣新聞：支援舊格式（陣列）+ 新格式（分類物件）
   let twNews = '';
@@ -2695,12 +3264,17 @@ function renderReport(data) {
   const wwNews = (data.news_world || []).slice(0, 10).map(renderNewsWorld).join('') || emptyNews();
 
   const setBtn = (sec) => \`<button class="sec-set-btn" title="設定" onclick="showSet('\${sec}')">⚙️</button>\`;
+  const refreshBtn = (sec) => \`<button class="sec-set-btn" title="重新抓取此區塊" onclick="refreshPartial('\${sec}')">🔄</button>\`;
+  const fxDecBtn = () => {
+    const d = Number(loadSetting('fxDecimals', 0)) || 0;
+    return \`<button class="sec-set-btn sec-fx-dec" title="切換小數位數（0 / 2 / 4）" onclick="cycleFxDecimals()">.\${d}</button>\`;
+  };
   const secOrder = loadSetting('secOrder', ['sec-wx','sec-stw','sec-sus','sec-fx','sec-ntw','sec-nww']);
   const secDefs = {
-    'sec-wx':  { icon: '🌤️', label: '天氣 Weather', body: wxBlocks || emptyRow(), set: setBtn('wx') },
-    'sec-stw': { icon: '📈', label: '台股 TW Stocks', body: twRows, set: setBtn('tw') },
-    'sec-sus': { icon: '🇺🇸', label: '美股 US Stocks', body: usRows, set: setBtn('us') },
-    'sec-fx':  { icon: '💱', label: '匯率 FX', body: fxRows, set: setBtn('fx') },
+    'sec-wx':  { icon: '🌤️', label: '天氣 Weather', body: wxBlocks || emptyRow(), set: refreshBtn('weather') + setBtn('wx') },
+    'sec-stw': { icon: '📈', label: '台股 TW Stocks', body: twRows, set: refreshBtn('stocks_tw') + setBtn('tw') },
+    'sec-sus': { icon: '🇺🇸', label: '美股 US Stocks', body: usRows, set: refreshBtn('stocks_us') + setBtn('us') },
+    'sec-fx':  { icon: '💱', label: '匯率 FX', body: fxRows, set: fxDecBtn() + refreshBtn('fx') + setBtn('fx') },
     'sec-ntw': { icon: '🇹🇼', label: '台灣新聞 TW News', body: twNews, set: '' },
     'sec-nww': { icon: '🌍', label: '世界新聞 World News', body: wwNews, set: '' },
   };
@@ -3194,38 +3768,134 @@ function renderWx(w) {
 
 function renderStock(code, market, s) {
   const base = market === 'tw' ? 'https://www.cnyes.com/twstock/' : 'https://invest.cnyes.com/usstock/detail/';
+  const holdings = loadSetting(market === 'tw' ? 'twHoldings' : 'usHoldings', {});
+  const h = holdings && holdings[code];
+  const expandSet = new Set(loadSetting('stockExpanded', []));
+  const isExpanded = expandSet.has(market + ':' + code);
+  const expandCls = isExpanded ? ' expanded' : '';
   if (!s) {
-    return \`<div class="row" data-itemkey="\${code}"><span class="item-drag" title="拖移">≡</span><a href="\${base}\${code}" target="_blank"><div class="row-l"><div class="n">\${code}</div><div class="c">—</div></div><div class="row-r flat">—</div></a></div>\`;
+    return \`<div class="row stock-row\${expandCls}" data-itemkey="\${code}" data-market="\${market}" data-code="\${code}" onclick="toggleStockRow(this)">\`
+      + '<span class="item-drag" title="拖移" onclick="event.stopPropagation()">≡</span>'
+      + \`<div class="row-l"><a class="n" href="\${base}\${code}" target="_blank" onclick="event.stopPropagation()">\${code}</a><div class="c">—</div></div>\`
+      + '<div class="row-r flat">—</div>'
+      + renderStockHoldingCell(market, code, null, h)
+      + renderStockExpand(market, code, h)
+      + '</div>';
   }
   const cls = chgClass(s.change);
   return \`
-    <div class="row" data-itemkey="\${code}">
-      <span class="item-drag" title="拖移">≡</span>
-      <a href="\${base}\${code}" target="_blank">
-        <div class="row-l">
-          <div class="n">\${s.name || code}</div>
-          <div class="c">\${code}</div>
-        </div>
-        <div class="row-r">
-          <div class="p">\${fmtNum(s.price, 2)}</div>
-          <div class="ch \${cls}">\${chgSign(s.change)} \${fmtNum(Math.abs(s.change), 2)} (\${pct(s.changePct)})</div>
-        </div>
-      </a>
+    <div class="row stock-row\${expandCls}" data-itemkey="\${code}" data-market="\${market}" data-code="\${code}" onclick="toggleStockRow(this)">
+      <span class="item-drag" title="拖移" onclick="event.stopPropagation()">≡</span>
+      <div class="row-l">
+        <a class="n" href="\${base}\${code}" target="_blank" onclick="event.stopPropagation()">\${s.name || code}</a>
+        <div class="c">\${code}</div>
+      </div>
+      <div class="row-r">
+        <div class="p">\${fmtNum(s.price, 2)}</div>
+        <div class="ch \${cls}">\${chgSign(s.change)} \${fmtNum(Math.abs(s.change), 2)} (\${pct(s.changePct)})</div>
+      </div>
+      \${renderStockHoldingCell(market, code, s, h)}
+      \${renderStockExpand(market, code, h)}
     </div>
   \`;
 }
 
+function renderStockHoldingCell(market, code, s, h) {
+  if (!h || !h.qty) return '';
+  const resetBtn = \`<button class="hold-x" onclick="event.stopPropagation();clearHolding('\${market}','\${code}')" title="清除此筆持倉">✕</button>\`;
+  const price = s ? Number(s.price) : NaN;
+  if (!isFinite(price)) {
+    return \`<div class="row-hold-sub">
+      <span class="lbl">市值</span> — · <span class="lbl">持倉</span> \${h.qty} \${resetBtn}
+    </div>\`;
+  }
+  const mv = price * h.qty;
+  const plAbs = (price - Number(h.cost)) * h.qty;
+  const plPct = h.cost > 0 ? ((price - h.cost) / h.cost) * 100 : 0;
+  const pcls = chgClass(plAbs);
+  const psign = plAbs >= 0 ? '+' : '';
+  return \`<div class="row-hold-sub">
+    <span class="lbl">市值</span> <b>\${fmtNum(mv, 0)}</b>
+    · <span class="lbl">損益</span> <b class="\${pcls}">\${psign}\${fmtNum(plAbs, 0)} (\${psign}\${plPct.toFixed(2)}%)</b>
+    \${resetBtn}
+  </div>\`;
+}
+
+// 股票區塊頂端加總（只有任何持倉時才顯示）
+function renderStockSummary(market, codes, stocksMap) {
+  const holdings = loadSetting(market === 'tw' ? 'twHoldings' : 'usHoldings', {}) || {};
+  let totalMv = 0, totalCost = 0, totalPl = 0;
+  let hasAny = false;
+  for (const code of codes) {
+    const h = holdings[code];
+    if (!h || !h.qty) continue;
+    const s = stocksMap[code];
+    const price = s ? Number(s.price) : NaN;
+    if (!isFinite(price)) continue;
+    hasAny = true;
+    totalMv += price * h.qty;
+    totalCost += Number(h.cost) * h.qty;
+    totalPl += (price - Number(h.cost)) * h.qty;
+  }
+  if (!hasAny) return '';
+  const pct = totalCost > 0 ? (totalPl / totalCost) * 100 : 0;
+  const cls = chgClass(totalPl);
+  const sign = totalPl >= 0 ? '+' : '';
+  return \`<div class="stock-summary">
+    💰 <span class="lbl">總市值</span> <b>\${fmtNum(totalMv, 0)}</b>
+    · <span class="lbl">總損益</span> <b class="\${cls}">\${sign}\${fmtNum(totalPl, 0)} (\${sign}\${pct.toFixed(2)}%)</b>
+  </div>\`;
+}
+
+function renderStockExpand(market, code, h) {
+  const qty = h && h.qty != null ? h.qty : '';
+  const cost = h && h.cost != null ? h.cost : '';
+  return \`<div class="stock-expand" onclick="event.stopPropagation()">
+    <div class="se-grid">
+      <label>股數<input type="number" step="1" min="0" value="\${qty}" data-field="qty" data-market="\${market}" data-code="\${code}" oninput="onHoldingInput(event)"></label>
+      <label>成本<input type="number" step="0.0001" min="0" value="\${cost}" data-field="cost" data-market="\${market}" data-code="\${code}" oninput="onHoldingInput(event)"></label>
+    </div>
+    <button class="se-clear" onclick="clearHolding('\${market}','\${code}')">清除此筆持倉</button>
+  </div>\`;
+}
+
 function renderFx(pair, v) {
+  const parts = pair.split('/');
+  const left = parts[0] || '';
+  const right = parts[1] || '';
+  const fxInputs = loadSetting('fxInputs', {}) || {};
+  const fxDirs = loadSetting('fxDirections', {}) || {};
+  const amount = fxInputs[pair] != null ? fxInputs[pair] : '';
+  const dir = fxDirs[pair] === 'rtl' ? 'rtl' : 'ltr';  // 預設 left→right
+  const rateNum = v && isFinite(Number(v.rate)) ? Number(v.rate) : null;
+  // 結果計算，小數位數可在設定裡調（0/2/4，跨裝置同步）
+  const fxDec = Number(loadSetting('fxDecimals', 0)) || 0;
+  let resultStr = '';
+  if (amount !== '' && !isNaN(Number(amount)) && rateNum != null) {
+    const a = Number(amount);
+    const r = dir === 'ltr' ? (a * rateNum) : (a / rateNum);
+    resultStr = r.toLocaleString('en-US', { minimumFractionDigits: fxDec, maximumFractionDigits: fxDec });
+  }
+  const srcCcy = dir === 'ltr' ? left : right;
+  const dstCcy = dir === 'ltr' ? right : left;
+  const calcHtml = \`<div class="fx-calc" onclick="event.stopPropagation()">
+    <input type="number" step="any" placeholder="金額" value="\${amount}" data-pair="\${pair}" oninput="onFxInput(event)">
+    <span class="fx-ccy">\${srcCcy}</span>
+    <button class="fx-dir" onclick="flipFxDir('\${pair}')" title="切換方向">⇄</button>
+    <span class="fx-ccy">\${dstCcy}</span>
+    <span class="fx-result">\${resultStr || '—'}</span>
+    <button class="fx-x" onclick="clearFxInput('\${pair}')" title="清除此列">✕</button>
+  </div>\`;
   if (!v) {
-    return \`<div class="row" data-itemkey="\${pair}"><span class="item-drag" title="拖移">≡</span><div class="row-l"><div class="n">\${pair}</div><div class="c">—</div></div><div class="row-r flat">—</div></div>\`;
+    return \`<div class="row fx-row" data-itemkey="\${pair}" data-pair="\${pair}"><span class="item-drag" title="拖移" onclick="event.stopPropagation()">≡</span><div class="row-l"><div class="n">\${pair}</div><div class="c">—</div></div><div class="row-r flat">—</div>\${calcHtml}</div>\`;
   }
   const isTwd = pair.endsWith('/TWD');
   const sub = isTwd && v.cashSell != null
     ? ('現金賣出 ' + fmtNum(v.cashSell, 4))
     : (v.change != null ? (pct(v.changePct) + ' (' + (v.change > 0 ? '+' : '') + fmtNum(v.change, 4) + ')') : '即期');
   return \`
-    <div class="row" data-itemkey="\${pair}">
-      <span class="item-drag" title="拖移">≡</span>
+    <div class="row fx-row" data-itemkey="\${pair}" data-pair="\${pair}">
+      <span class="item-drag" title="拖移" onclick="event.stopPropagation()">≡</span>
       <div class="row-l">
         <div class="n">\${pair}</div>
         <div class="c">\${sub}</div>
@@ -3233,6 +3903,7 @@ function renderFx(pair, v) {
       <div class="row-r">
         <div class="p">\${fmtNum(v.rate, 4)}</div>
       </div>
+      \${calcHtml}
     </div>
   \`;
 }
@@ -3326,6 +3997,8 @@ function showSet(section) {
   _fxSelected = fxList.filter(c => FX_PRESET_SET.has(c));
   const fxCustom = fxList.filter(c => !FX_PRESET_SET.has(c));
   document.getElementById('set-fx-custom').value = fxCustom.join(',');
+  const fxDecSel = document.getElementById('set-fx-decimals');
+  if (fxDecSel) fxDecSel.value = String(Number(loadSetting('fxDecimals', 0)) || 0);
 
   // Render preset grids
   renderWxPresets();
@@ -3561,6 +4234,7 @@ function updateTwCounter() {
   const el = document.getElementById('tw-counter');
   el.textContent = '已選 ' + total + ' / ' + TW_MAX;
   el.classList.toggle('full', total >= TW_MAX);
+  renderHoldingsTable('tw');
 }
 
 function renderUsPresets() {
@@ -3619,6 +4293,7 @@ function updateUsCounter() {
   const el = document.getElementById('us-counter');
   el.textContent = '已選 ' + total + ' / ' + US_MAX;
   el.classList.toggle('full', total >= US_MAX);
+  renderHoldingsTable('us');
 }
 
 function renderFxPresets() {
@@ -3677,6 +4352,81 @@ function updateFxCounter() {
   el.textContent = '已選 ' + total + ' / ' + FX_MAX;
   el.classList.toggle('full', total >= FX_MAX);
 }
+
+// ── 設定 modal：持倉表格 ────────────────────────────────────────
+function getHoldingSelectedCodes(section) {
+  // 用當前 modal 裡的選擇 + 自訂 csv（尚未 save，但 UI 同步）
+  const selected = section === 'tw' ? _twSelected : _usSelected;
+  const customEl = document.getElementById('set-' + section + '-custom');
+  const customCodes = customEl ? parseCsvList(customEl.value) : [];
+  // 去重（preset 與 custom 可能 overlap）
+  const seen = new Set();
+  const out = [];
+  for (const c of [...selected, ...customCodes]) {
+    if (!seen.has(c)) { seen.add(c); out.push(c); }
+  }
+  return out;
+}
+function renderHoldingsTable(section) {
+  const wrap = document.getElementById(section + '-holdings-table');
+  if (!wrap) return;
+  const codes = getHoldingSelectedCodes(section);
+  const key = section === 'tw' ? 'twHoldings' : 'usHoldings';
+  const map = loadSetting(key, {}) || {};
+  if (codes.length === 0) {
+    wrap.innerHTML = '<div class="ht-empty">（尚未選擇任何股票）</div>';
+    return;
+  }
+  // 用 preset 查名稱
+  const presetMap = section === 'tw' ? TW_PRESETS : US_PRESETS;
+  const nameByCode = {};
+  Object.values(presetMap).forEach(arr => arr.forEach(p => { nameByCode[p[0]] = p[1]; }));
+  let html = '<div class="ht-row ht-head"><div>代號 / 名稱</div><div style="text-align:right">股數</div><div style="text-align:right">成本</div><div></div></div>';
+  for (const code of codes) {
+    const h = map[code] || { qty: '', cost: '' };
+    const label = (nameByCode[code] ? (code + ' ' + nameByCode[code]) : code).replace(/"/g, '&quot;');
+    html += '<div class="ht-row" data-code="' + code + '">'
+      + '<div class="ht-code" title="' + label + '">' + label + '</div>'
+      + '<input type="number" step="1" min="0" value="' + (h.qty === 0 ? 0 : (h.qty || '')) + '" data-field="qty" data-market="' + section + '" data-code="' + code + '" oninput="onHoldingTableInput(event)">'
+      + '<input type="number" step="0.0001" min="0" value="' + (h.cost === 0 ? 0 : (h.cost || '')) + '" data-field="cost" data-market="' + section + '" data-code="' + code + '" oninput="onHoldingTableInput(event)">'
+      + '<button class="ht-x" onclick="clearHoldingTableRow(\\'' + section + '\\',\\'' + code + '\\')" title="清除此筆">✕</button>'
+      + '</div>';
+  }
+  wrap.innerHTML = html;
+}
+let _holdingTableTimer = null;
+function onHoldingTableInput(e) {
+  const inp = e.target;
+  const market = inp.getAttribute('data-market');
+  const code = inp.getAttribute('data-code');
+  const field = inp.getAttribute('data-field');
+  const key = market === 'tw' ? 'twHoldings' : 'usHoldings';
+  const map = loadSetting(key, {}) || {};
+  const cur = map[code] || { qty: 0, cost: 0 };
+  const val = Number(inp.value);
+  if (isNaN(val)) return;
+  cur[field] = val;
+  map[code] = cur;
+  saveSetting(key, map);
+  if (_holdingTableTimer) clearTimeout(_holdingTableTimer);
+  _holdingTableTimer = setTimeout(() => {
+    const body = {};
+    body[market === 'tw' ? 'tw_holdings' : 'us_holdings'] = loadSetting(key, {});
+    postPrefsPartial(body);
+  }, 500);
+}
+window.onHoldingTableInput = onHoldingTableInput;
+function clearHoldingTableRow(market, code) {
+  const key = market === 'tw' ? 'twHoldings' : 'usHoldings';
+  const map = loadSetting(key, {}) || {};
+  delete map[code];
+  saveSetting(key, map);
+  renderHoldingsTable(market);
+  const body = {};
+  body[market === 'tw' ? 'tw_holdings' : 'us_holdings'] = map;
+  postPrefsPartial(body);
+}
+window.clearHoldingTableRow = clearHoldingTableRow;
 
 async function saveSettings() {
   // Weather
@@ -3909,6 +4659,34 @@ function bumpFont(dir) {
   setTimeout(updateHdrH, 50);
 }
 applyFontScale();
+
+// 🔄 個別區塊重抓（只抓該區塊，保留其他區塊資料）
+async function refreshPartial(section) {
+  // 找對應 section header button 改圖示
+  const secIdMap = { weather: 'sec-wx', stocks_tw: 'sec-stw', stocks_us: 'sec-sus', fx: 'sec-fx' };
+  const secEl = document.getElementById(secIdMap[section]);
+  const btn = secEl ? secEl.querySelector('.sec-set-btn[title="重新抓取此區塊"]') : null;
+  const origText = btn ? btn.textContent : '';
+  if (btn) { btn.textContent = '…'; btn.disabled = true; }
+  try {
+    const r = await apiFetch('/api/morning-report/refresh-partial', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ section }),
+    });
+    const j = await r.json();
+    if (r.ok) {
+      await loadAndRender();
+    } else {
+      alert('重抓失敗：' + (j.error || '未知錯誤'));
+    }
+  } catch (e) {
+    alert('連線失敗：' + e.message);
+  } finally {
+    if (btn) { btn.textContent = origText; btn.disabled = false; }
+  }
+}
+window.refreshPartial = refreshPartial;
 
 // ↻ Refresh button → 真的重新抓所有資料，無節流
 async function smartRefresh() {
@@ -4147,6 +4925,10 @@ async function syncPrefsFromServer() {
     // 排序欄位：只要是陣列就同步（不像 wx/tw/us/fx 有誤洗疑慮）
     if (Array.isArray(serverPrefs.secOrder)) saveSetting('secOrder', serverPrefs.secOrder);
     if (Array.isArray(serverPrefs.newsCatOrder)) saveSetting('newsCatOrder', serverPrefs.newsCatOrder);
+    // Holdings：物件，只要是 object 就同步
+    if (serverPrefs.tw_holdings && typeof serverPrefs.tw_holdings === 'object') saveSetting('twHoldings', serverPrefs.tw_holdings);
+    if (serverPrefs.us_holdings && typeof serverPrefs.us_holdings === 'object') saveSetting('usHoldings', serverPrefs.us_holdings);
+    if (typeof serverPrefs.fx_decimals === 'number' && [0, 2, 4].includes(serverPrefs.fx_decimals)) saveSetting('fxDecimals', serverPrefs.fx_decimals);
 
     // 自動還原：如果 server 四大自選全空，但該使用者有歷史報告，從最近一份非空快照反推清單寫回
     const wiped = (!serverPrefs.wx || serverPrefs.wx.length === 0)
