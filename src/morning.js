@@ -11,8 +11,8 @@ import { Readability } from '@mozilla/readability';
 import { ROOT } from './config.js';
 import { buildMorningReport, fetchSection } from './morning-builder.js';
 
-export const MORNING_VERSION = 'V1.3.07';
-const MORNING_CACHE = 'morning-v1-3-07';
+export const MORNING_VERSION = 'V1.3.08';
+const MORNING_CACHE = 'morning-v1-3-08';
 
 // ─── Postgres ────────────────────────────────────────────────────────
 let _pgPool: pg.Pool | null = null;
@@ -242,9 +242,13 @@ function extractUserSubset(unionReport: any, prefs: UserPrefs) {
     date: unionReport.date,
     generated_at: unionReport.generated_at,
     weather: [],
+    weather_fetched_at: unionReport.weather_fetched_at,
     stocks_tw: {},
+    stocks_tw_fetched_at: unionReport.stocks_tw_fetched_at,
     stocks_us: {},
+    stocks_us_fetched_at: unionReport.stocks_us_fetched_at,
     fx: {},
+    fx_fetched_at: unionReport.fx_fetched_at,
     news_tw: unionReport.news_tw || [],
     news_world: unionReport.news_world || [],
     build_errors: unionReport.build_errors,
@@ -1909,6 +1913,11 @@ a:active { opacity: 0.6; }
     </div>
     <hr style="border:none;border-top:1px solid var(--border);margin:12px 0">
     <div class="changelog-v">${MORNING_VERSION}</div>
+    <div class="changelog-txt">
+      修 bug：<code>runBuildAll</code>（cron 06:30 + 啟動恢復）會漏掉 <code>_fetched_at</code> 欄位導致使用者時間戳被重置。<code>extractUserSubset</code> 補上四個欄位的複製。<br>
+      Bugfix: <code>runBuildAll</code> (06:30 cron + startup recovery) was dropping <code>*_fetched_at</code> fields when extracting per-user subsets, resetting section timestamps. <code>extractUserSubset</code> now propagates all four fields.
+    </div>
+    <div class="changelog-v old">V1.3.07</div>
     <div class="changelog-txt">
       新增使用者存取紀錄：<code>morning_prefs</code> 加 <code>last_seen_at</code> 欄位。<br>
       Added user access tracking: <code>morning_prefs</code> now has a <code>last_seen_at</code> column.
