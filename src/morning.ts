@@ -11,8 +11,8 @@ import { Readability } from '@mozilla/readability';
 import { ROOT } from './config.js';
 import { buildMorningReport, fetchSection } from './morning-builder.js';
 
-export const MORNING_VERSION = 'V1.3.04';
-const MORNING_CACHE = 'morning-v1-3-04';
+export const MORNING_VERSION = 'V1.3.05';
+const MORNING_CACHE = 'morning-v1-3-05';
 
 // ─── Postgres ────────────────────────────────────────────────────────
 let _pgPool: pg.Pool | null = null;
@@ -1883,6 +1883,11 @@ a:active { opacity: 0.6; }
     <hr style="border:none;border-top:1px solid var(--border);margin:12px 0">
     <div class="changelog-v">${MORNING_VERSION}</div>
     <div class="changelog-txt">
+      股票持倉輸入 panel UX 優化：點空白展開時自動 focus 股數欄位（少按一下）、輸入完離開輸入框自動收合（焦點還在同 panel 內不會誤收）、展開狀態不再持久化（開 app/重整頁面預設全部收起，避免輸入 panel 長期佔版面）。<br>
+      Stock holdings input panel UX polish: tapping empty area now auto-focuses the qty input (one fewer tap), panel auto-collapses when focus leaves (stays open while tabbing between qty/cost inputs within the same panel), expand state no longer persisted (page reload always starts collapsed so panels don't permanently clutter the view).
+    </div>
+    <div class="changelog-v old">V1.3.04</div>
+    <div class="changelog-txt">
       新增「持倉」功能（台股/美股）：點主畫面空白處展開輸入股數/成本，即時計算市值與損益，每列下方 sub-row 顯示、區塊頂端加總市值與總損益（紅漲綠跌）；設定 modal 有批次編輯表格；持倉資料跨裝置同步。匯率加「計算機」：每列輸入金額即時算換算結果，⇄ 切換方向、✕ 清該列；小數位數可切（0/2/4），header 有循環按鈕 <code>.0</code>/<code>.2</code>/<code>.4</code>、設定有下拉，顯示偏好跨裝置同步；輸入數字只存本機不同步。主畫面各區塊（天氣/台股/美股/匯率）新增 🔄 個別重抓按鈕（保留新聞不動）。「清除全部」按鈕統一搬進設定 modal（紅框紅字 + confirm）避免誤觸。後端新增 <code>POST /api/morning-report/refresh-partial</code> 端點 + <code>UserPrefs</code> 擴充 <code>tw_holdings</code>/<code>us_holdings</code>/<code>fx_decimals</code> 欄位（merge 模式）。<br>
       New "holdings" feature (TW/US stocks): tap empty area of a stock row to expand qty/cost inputs; market value and P/L calculated live, shown as a sub-row and aggregated at the top of each stock section (red up / green down — Taiwan convention); settings modal has batch-edit table; holdings sync cross-device. FX calculator: per-row amount input with live conversion, ⇄ flips direction, ✕ clears that row; decimal places configurable (0/2/4) via header cycle button <code>.0</code>/<code>.2</code>/<code>.4</code> or settings dropdown — preference synced cross-device, typed amounts local-only. New per-section 🔄 refresh buttons (weather/TW/US/FX) that don't re-fetch news, backed by new <code>POST /api/morning-report/refresh-partial</code> endpoint. "Clear all" buttons moved into settings modal (red-bordered + confirm) to prevent accidental wipes. <code>UserPrefs</code> schema extended with <code>tw_holdings</code>/<code>us_holdings</code>/<code>fx_decimals</code> fields (merge mode).
     </div>
@@ -2924,12 +2929,26 @@ window.toggleWx = toggleWx;
 function toggleStockRow(el) {
   if (!el) return;
   el.classList.toggle('expanded');
-  // 存哪些展開
-  const rows = Array.from(document.querySelectorAll('.stock-row.expanded'));
-  const arr = rows.map(r => (r.getAttribute('data-market') || '') + ':' + (r.getAttribute('data-code') || ''));
-  saveSetting('stockExpanded', arr);
+  // 展開時自動 focus 第一個 input，方便直接打字
+  if (el.classList.contains('expanded')) {
+    const firstInput = el.querySelector('.stock-expand input');
+    if (firstInput) setTimeout(() => firstInput.focus(), 100);
+  }
 }
 window.toggleStockRow = toggleStockRow;
+function onHoldingInputBlur(e) {
+  const inp = e.target;
+  const row = inp.closest('.stock-row');
+  if (!row) return;
+  // 延遲一點判斷，避免 tab/click 去下一個 input 時誤收合
+  setTimeout(() => {
+    const active = document.activeElement;
+    const panel = row.querySelector('.stock-expand');
+    if (panel && panel.contains(active)) return;  // focus 還在同 panel 內
+    row.classList.remove('expanded');
+  }, 150);
+}
+window.onHoldingInputBlur = onHoldingInputBlur;
 let _holdingSaveTimer = null;
 function onHoldingInput(e) {
   const inp = e.target;
@@ -3770,9 +3789,8 @@ function renderStock(code, market, s) {
   const base = market === 'tw' ? 'https://www.cnyes.com/twstock/' : 'https://invest.cnyes.com/usstock/detail/';
   const holdings = loadSetting(market === 'tw' ? 'twHoldings' : 'usHoldings', {});
   const h = holdings && holdings[code];
-  const expandSet = new Set(loadSetting('stockExpanded', []));
-  const isExpanded = expandSet.has(market + ':' + code);
-  const expandCls = isExpanded ? ' expanded' : '';
+  // 展開狀態不再持久化，每次 render 都從收合開始（輸入完會自動收合）
+  const expandCls = '';
   if (!s) {
     return \`<div class="row stock-row\${expandCls}" data-itemkey="\${code}" data-market="\${market}" data-code="\${code}" onclick="toggleStockRow(this)">\`
       + '<span class="item-drag" title="拖移" onclick="event.stopPropagation()">≡</span>'
@@ -3852,8 +3870,8 @@ function renderStockExpand(market, code, h) {
   const cost = h && h.cost != null ? h.cost : '';
   return \`<div class="stock-expand" onclick="event.stopPropagation()">
     <div class="se-grid">
-      <label>股數<input type="number" step="1" min="0" value="\${qty}" data-field="qty" data-market="\${market}" data-code="\${code}" oninput="onHoldingInput(event)"></label>
-      <label>成本<input type="number" step="0.0001" min="0" value="\${cost}" data-field="cost" data-market="\${market}" data-code="\${code}" oninput="onHoldingInput(event)"></label>
+      <label>股數<input type="number" step="1" min="0" value="\${qty}" data-field="qty" data-market="\${market}" data-code="\${code}" oninput="onHoldingInput(event)" onblur="onHoldingInputBlur(event)"></label>
+      <label>成本<input type="number" step="0.0001" min="0" value="\${cost}" data-field="cost" data-market="\${market}" data-code="\${code}" oninput="onHoldingInput(event)" onblur="onHoldingInputBlur(event)"></label>
     </div>
     <button class="se-clear" onclick="clearHolding('\${market}','\${code}')">清除此筆持倉</button>
   </div>\`;
