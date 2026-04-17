@@ -11,8 +11,8 @@ import { Readability } from '@mozilla/readability';
 import { ROOT } from './config.js';
 import { buildMorningReport, fetchSection } from './morning-builder.js';
 
-export const MORNING_VERSION = 'V1.3.05';
-const MORNING_CACHE = 'morning-v1-3-05';
+export const MORNING_VERSION = 'V1.3.06';
+const MORNING_CACHE = 'morning-v1-3-06';
 
 // ─── Postgres ────────────────────────────────────────────────────────
 let _pgPool: pg.Pool | null = null;
@@ -766,8 +766,10 @@ morningRouter.post('/api/morning-report/refresh-partial', async (req, res) => {
     if (section === 'stocks_us') opts.usCodes = prefs.us || [];
     if (section === 'fx') opts.fxPairs = prefs.fx || [];
     const value = await fetchSection(section, opts);
-    const merged: any = { ...existing, date: today, generated_at: new Date().toISOString() };
+    const nowIso = new Date().toISOString();
+    const merged: any = { ...existing, date: today, generated_at: nowIso };
     merged[section] = value;
+    merged[section + '_fetched_at'] = nowIso;
     await saveReport(userId, today, merged);
     res.json({ ok: true, section, date: today });
   } catch (e) {
@@ -1088,6 +1090,16 @@ a:active { opacity: 0.6; }
   padding: 0;
 }
 .sec-set-btn:active { opacity: 0.6; }
+
+/* 每區塊右側顯示資料更新時間 */
+.sec-time {
+  font-size: .68em;
+  color: var(--muted);
+  margin-right: 6px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  align-self: center;
+}
 .sec-b { padding: 6px 0; }
 
 /* Weather（收合版：r1 + r2 永遠顯示，r3 展開後才顯示） */
@@ -1882,6 +1894,11 @@ a:active { opacity: 0.6; }
     </div>
     <hr style="border:none;border-top:1px solid var(--border);margin:12px 0">
     <div class="changelog-v">${MORNING_VERSION}</div>
+    <div class="changelog-txt">
+      各區塊 🔄 重抓改為只替換該區塊 DOM，不再整頁重 render，捲動位置保留。新增每區塊 header 資料更新時間戳（<code>M/D HH:MM</code>，台北時區），按 🔄 該區塊時間會即時更新。後端 report schema 擴充 <code>weather_fetched_at</code>/<code>stocks_tw_fetched_at</code>/<code>stocks_us_fetched_at</code>/<code>fx_fetched_at</code> 四個欄位。台銀匯率 CSV URL 加 cache-busting（<code>?t=timestamp</code> + <code>Cache-Control: no-cache</code>），避免 CDN/proxy 回舊的掛牌。<br>
+      Per-section 🔄 refresh now swaps only that section's DOM instead of full re-render, preserving scroll position. Each section header shows a data-fetched timestamp (<code>M/D HH:MM</code> Taipei), updated live when 🔄 is pressed. Report schema extended with <code>weather_fetched_at</code>/<code>stocks_tw_fetched_at</code>/<code>stocks_us_fetched_at</code>/<code>fx_fetched_at</code> fields. BOT FX CSV URL now adds cache-busting (<code>?t=timestamp</code> + <code>Cache-Control: no-cache</code>) so hitting 🔄 mid-day actually fetches the latest BOT posting.
+    </div>
+    <div class="changelog-v old">V1.3.05</div>
     <div class="changelog-txt">
       股票持倉輸入 panel UX 優化：點空白展開時自動 focus 股數欄位（少按一下）、輸入完離開輸入框自動收合（焦點還在同 panel 內不會誤收）、展開狀態不再持久化（開 app/重整頁面預設全部收起，避免輸入 panel 長期佔版面）。<br>
       Stock holdings input panel UX polish: tapping empty area now auto-focuses the qty input (one fewer tap), panel auto-collapses when focus leaves (stays open while tabbing between qty/cost inputs within the same panel), expand state no longer persisted (page reload always starts collapsed so panels don't permanently clutter the view).
@@ -3288,12 +3305,31 @@ function renderReport(data) {
     const d = Number(loadSetting('fxDecimals', 0)) || 0;
     return \`<button class="sec-set-btn sec-fx-dec" title="切換小數位數（0 / 2 / 4）" onclick="cycleFxDecimals()">.\${d}</button>\`;
   };
+  // M/D HH:MM（台北時區）
+  const fmtFetchedAt = (iso) => {
+    if (!iso) return '';
+    try {
+      const d = new Date(iso);
+      // 台北 = UTC+8，用 UTC 時間 + 8 小時抓台北時間欄位
+      const tpe = new Date(d.getTime() + (8 * 60 + d.getTimezoneOffset()) * 60000);
+      const m = tpe.getMonth() + 1;
+      const day = tpe.getDate();
+      const hh = String(tpe.getHours()).padStart(2, '0');
+      const mm = String(tpe.getMinutes()).padStart(2, '0');
+      return m + '/' + day + ' ' + hh + ':' + mm;
+    } catch (e) { return ''; }
+  };
+  const timeSpan = (iso) => {
+    const s = fmtFetchedAt(iso);
+    // 永遠 render span（即使空的），方便 refreshPartial 後 JS 能 updated
+    return \`<span class="sec-time" title="資料更新時間">\${s}</span>\`;
+  };
   const secOrder = loadSetting('secOrder', ['sec-wx','sec-stw','sec-sus','sec-fx','sec-ntw','sec-nww']);
   const secDefs = {
-    'sec-wx':  { icon: '🌤️', label: '天氣 Weather', body: wxBlocks || emptyRow(), set: refreshBtn('weather') + setBtn('wx') },
-    'sec-stw': { icon: '📈', label: '台股 TW Stocks', body: twRows, set: refreshBtn('stocks_tw') + setBtn('tw') },
-    'sec-sus': { icon: '🇺🇸', label: '美股 US Stocks', body: usRows, set: refreshBtn('stocks_us') + setBtn('us') },
-    'sec-fx':  { icon: '💱', label: '匯率 FX', body: fxRows, set: fxDecBtn() + refreshBtn('fx') + setBtn('fx') },
+    'sec-wx':  { icon: '🌤️', label: '天氣 Weather', body: wxBlocks || emptyRow(), set: timeSpan(data.weather_fetched_at) + refreshBtn('weather') + setBtn('wx') },
+    'sec-stw': { icon: '📈', label: '台股 TW Stocks', body: twRows, set: timeSpan(data.stocks_tw_fetched_at) + refreshBtn('stocks_tw') + setBtn('tw') },
+    'sec-sus': { icon: '🇺🇸', label: '美股 US Stocks', body: usRows, set: timeSpan(data.stocks_us_fetched_at) + refreshBtn('stocks_us') + setBtn('us') },
+    'sec-fx':  { icon: '💱', label: '匯率 FX', body: fxRows, set: timeSpan(data.fx_fetched_at) + fxDecBtn() + refreshBtn('fx') + setBtn('fx') },
     'sec-ntw': { icon: '🇹🇼', label: '台灣新聞 TW News', body: twNews, set: '' },
     'sec-nww': { icon: '🌍', label: '世界新聞 World News', body: wwNews, set: '' },
   };
@@ -4678,11 +4714,11 @@ function bumpFont(dir) {
 }
 applyFontScale();
 
-// 🔄 個別區塊重抓（只抓該區塊，保留其他區塊資料）
+// 🔄 個別區塊重抓（只換該區塊 DOM，保留捲動位置跟其他區塊）
 async function refreshPartial(section) {
-  // 找對應 section header button 改圖示
   const secIdMap = { weather: 'sec-wx', stocks_tw: 'sec-stw', stocks_us: 'sec-sus', fx: 'sec-fx' };
-  const secEl = document.getElementById(secIdMap[section]);
+  const secId = secIdMap[section];
+  const secEl = document.getElementById(secId);
   const btn = secEl ? secEl.querySelector('.sec-set-btn[title="重新抓取此區塊"]') : null;
   const origText = btn ? btn.textContent : '';
   if (btn) { btn.textContent = '…'; btn.disabled = true; }
@@ -4693,10 +4729,53 @@ async function refreshPartial(section) {
       body: JSON.stringify({ section }),
     });
     const j = await r.json();
-    if (r.ok) {
-      await loadAndRender();
-    } else {
+    if (!r.ok) {
       alert('重抓失敗：' + (j.error || '未知錯誤'));
+      return;
+    }
+    // 只抓回整份 report，只換該區塊 body，不動其他區塊 → 捲動位置不變
+    const data = await fetchReport();
+    const secBody = secEl ? secEl.querySelector('.sec-b') : null;
+    if (!secBody) return;
+    // 順便更新該 section 的時間戳
+    const timeEl = secEl.querySelector('.sec-time');
+    const tsField = section + '_fetched_at';
+    if (timeEl && data[tsField]) {
+      try {
+        const d = new Date(data[tsField]);
+        const tpe = new Date(d.getTime() + (8 * 60 + d.getTimezoneOffset()) * 60000);
+        const m = tpe.getMonth() + 1, day = tpe.getDate();
+        const hh = String(tpe.getHours()).padStart(2, '0');
+        const mm = String(tpe.getMinutes()).padStart(2, '0');
+        timeEl.textContent = m + '/' + day + ' ' + hh + ':' + mm;
+      } catch (e) {}
+    }
+    if (section === 'weather') {
+      const activeWx = getActiveWxLocs();
+      const wxByName = {};
+      (data.weather || []).forEach(w => { if (w && w.name) wxByName[w.name] = w; });
+      const html = activeWx.length === 0
+        ? '<div class="wx-empty">尚未選擇天氣地點，請點標題右邊的 ⚙️<br>No weather locations selected. Tap ⚙️ next to the title.</div>'
+        : activeWx.map(loc => renderWx(wxByName[loc.name] || { name: loc.name, temp: null, feels: null, humidity: null, wind: null, windDir: null, uv: null, code: null, sunrise: '—', sunset: '—', forecast: [] })).join('');
+      secBody.innerHTML = html;
+      setupItemDrag('#sec-wx .sec-b', '.wx-loc', 'wx');
+    } else if (section === 'stocks_tw') {
+      const userTw = loadSetting('tw', DEFAULTS.tw);
+      const summary = renderStockSummary('tw', userTw, data.stocks_tw || {});
+      const rows = userTw.map(code => renderStock(code, 'tw', (data.stocks_tw || {})[code])).join('') || emptyRow();
+      secBody.innerHTML = summary + rows;
+      setupItemDrag('#sec-stw .sec-b', '.row', 'tw');
+    } else if (section === 'stocks_us') {
+      const userUs = loadSetting('us', DEFAULTS.us);
+      const summary = renderStockSummary('us', userUs, data.stocks_us || {});
+      const rows = userUs.map(code => renderStock(code, 'us', (data.stocks_us || {})[code])).join('') || emptyRow();
+      secBody.innerHTML = summary + rows;
+      setupItemDrag('#sec-sus .sec-b', '.row', 'us');
+    } else if (section === 'fx') {
+      const userFx = loadSetting('fx', DEFAULTS.fx);
+      const rows = userFx.map(c => renderFx(c, (data.fx || {})[c])).join('') || emptyRow();
+      secBody.innerHTML = rows;
+      setupItemDrag('#sec-fx .sec-b', '.row', 'fx');
     }
   } catch (e) {
     alert('連線失敗：' + e.message);

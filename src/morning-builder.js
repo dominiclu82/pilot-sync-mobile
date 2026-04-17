@@ -350,8 +350,9 @@ async function fetchFx(pairs: string[] = []) {
     ...FX_PAIRS.vsTwd.map(c => `${c}/TWD`),
     ...FX_PAIRS.cross.map(([a, b]) => `${a}/${b}`),
   ];
-  const url = 'https://rate.bot.com.tw/xrt/flcsv/0/day';
-  const r = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0' } });
+  // Cache-busting：避免 CDN/proxy 回快取，確保 🔄 按下去能拿到台銀當下最新掛牌
+  const url = 'https://rate.bot.com.tw/xrt/flcsv/0/day?t=' + Date.now();
+  const r = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0', 'Cache-Control': 'no-cache' }, cache: 'no-store' });
   if (!r.ok) throw new Error('BOT HTTP ' + r.status);
   const buf = await r.arrayBuffer();
   const text = new TextDecoder('utf-8').decode(buf).replace(/^\ufeff/, '');
@@ -625,13 +626,18 @@ export async function buildMorningReport(opts: BuildOpts = {}) {
     safeRun('news_world', fetchNewsWorld),
   ]);
   const errors = [];
+  const nowIso = new Date().toISOString();
   const report = {
     date: todayTaipeiStr(),
-    generated_at: new Date().toISOString(),
+    generated_at: nowIso,
     weather: weather.ok ? weather.value : (errors.push({ weather: weather.error }), null),
+    weather_fetched_at: weather.ok ? nowIso : null,
     stocks_tw: stocksTw.ok ? stocksTw.value : (errors.push({ stocks_tw: stocksTw.error }), null),
+    stocks_tw_fetched_at: stocksTw.ok ? nowIso : null,
     stocks_us: stocksUs.ok ? stocksUs.value : (errors.push({ stocks_us: stocksUs.error }), null),
+    stocks_us_fetched_at: stocksUs.ok ? nowIso : null,
     fx: fx.ok ? fx.value : (errors.push({ fx: fx.error }), null),
+    fx_fetched_at: fx.ok ? nowIso : null,
     news_tw: newsTw.ok ? newsTw.value : (errors.push({ news_tw: newsTw.error }), []),
     news_world: newsWorld.ok ? newsWorld.value : (errors.push({ news_world: newsWorld.error }), []),
     build_errors: errors.length > 0 ? errors : undefined,
