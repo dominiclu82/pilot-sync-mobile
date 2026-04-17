@@ -346,6 +346,18 @@ div.brief-auto-val[contenteditable]{outline:none;white-space:pre-wrap;cursor:tex
 .brief-wx-val{color:var(--text);min-height:2.5em;display:flex;align-items:center;justify-content:center}
 .brief-note{width:100%;background:rgba(255,255,255,.06);border:none;border-radius:8px;padding:10px;color:var(--text);font-size:.85em;resize:none;overflow:hidden;margin-bottom:8px;outline:none;font-family:inherit;min-height:3.5em}
 .brief-note::placeholder{color:var(--muted)}
+.brief-note-row{display:flex;align-items:flex-start;gap:6px;margin-bottom:8px}
+.brief-note-row .brief-note{margin-bottom:0}
+.brief-note-icon{flex-shrink:0;font-size:1.1em;padding-top:8px;line-height:1}
+.brief-note-stack{display:flex;flex-direction:column;gap:4px}
+.brief-note-stack .brief-note-label{font-size:.78em;color:var(--muted);font-weight:500;padding:0 2px}
+.brief-pob-row{align-items:center}
+.brief-pob{display:flex;align-items:center;gap:3px;background:rgba(255,255,255,.06);border-radius:8px;padding:6px 8px;flex:1;font-size:.82em;white-space:nowrap}
+.brief-pob-label{font-size:.88em;color:var(--muted)}
+.brief-pob-sep{color:var(--muted)}
+.brief-pob-input{width:36px;background:rgba(0,0,0,.2);border:1px solid var(--border);color:var(--text);border-radius:4px;padding:3px 4px;font-size:.92em;font-variant-numeric:tabular-nums;-moz-appearance:textfield;text-align:center}
+.brief-pob-input::-webkit-outer-spin-button,.brief-pob-input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+.brief-pob-value{min-width:28px;font-weight:700;color:var(--accent);font-variant-numeric:tabular-nums;text-align:center}
 
 /* ── ⏳ 輪休計算 ── */
 .cr-wrap{max-width:800px;margin:0 auto;padding-bottom:60px}

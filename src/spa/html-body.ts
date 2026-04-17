@@ -391,8 +391,46 @@ export function getSpaHtmlBody(): string {
       <button class="brief-search-btn" onclick="_briefForceQuery()">查詢 Query</button>
       <span id="brief-flt-status" class="pa-flt-status"></span>
       <button style="background:#2d3748;color:#e2e8f0;border:1px solid #4a5568;border-radius:8px;padding:4px 10px;font-size:.8em;cursor:pointer" onclick="openTurbli(true)">🌪️ Turbli</button>
+      <button style="background:#2d3748;color:#e2e8f0;border:1px solid #4a5568;border-radius:8px;padding:4px 10px;font-size:.8em;cursor:pointer" onclick="_briefOpenHistory()">📅 History</button>
       <button class="pa-reset-btn" onclick="briefClearAll()">重設 Reset</button>
     </div>
+    <div id="brief-sync-hint" style="font-size:.68em;color:var(--muted);padding:4px 2px;opacity:.75"></div>
+
+    <!-- Briefing 歷史 modal（月曆式） -->
+    <div id="brief-hist-wrap" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:200;align-items:flex-start;justify-content:center;padding:40px 10px;overflow-y:auto" onclick="if(event.target===this)_briefCloseHistory()">
+      <div style="background:var(--card);border:1px solid var(--border);border-radius:12px;max-width:480px;width:100%;padding:16px;color:var(--text)">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+          <h3 style="margin:0;font-size:1em">📅 Briefing History</h3>
+          <button onclick="_briefCloseHistory()" style="background:none;border:none;color:var(--muted);font-size:1.2em;cursor:pointer">✕</button>
+        </div>
+        <div id="brief-hist-hint" style="font-size:.72em;color:var(--muted);margin-bottom:10px"></div>
+        <!-- 月份 header -->
+        <div style="display:flex;justify-content:space-between;align-items:center;margin:8px 0">
+          <button id="brief-hist-prev" style="background:none;border:1px solid var(--border);color:var(--text);padding:4px 10px;border-radius:6px;cursor:pointer">◀</button>
+          <div id="brief-hist-title" style="font-weight:700"></div>
+          <button id="brief-hist-next" style="background:none;border:1px solid var(--border);color:var(--text);padding:4px 10px;border-radius:6px;cursor:pointer">▶</button>
+        </div>
+        <!-- 月曆 grid（日期格子內直接顯示航班號+起訖地） -->
+        <div id="brief-hist-cal" style="display:grid;grid-template-columns:repeat(7,1fr);gap:3px"></div>
+      </div>
+    </div>
+    <style>
+      .bhc-dow { text-align:center;font-size:.72em;color:var(--muted);padding:4px 0 }
+      /* 固定 4 行高：date / flight_no / route / more。所有格子一樣大 */
+      .bhc-day {
+        padding:3px 2px;border-radius:6px;background:rgba(255,255,255,.03);color:var(--muted);
+        display:grid;grid-template-rows:12px 14px 14px 12px;gap:0;text-align:center;overflow:hidden;
+      }
+      .bhc-day.empty { background:transparent }
+      .bhc-day.has-data { background:rgba(244,196,48,.18);color:var(--text);cursor:pointer }
+      .bhc-day.has-data:active { opacity:.7 }
+      .bhc-day.today { outline:2px solid var(--accent) }
+      .bhc-date { font-size:.75em;font-weight:600;line-height:1;text-align:right;padding-right:3px;color:var(--muted) }
+      .bhc-day.has-data .bhc-date { color:var(--accent) }
+      .bhc-fno { font-size:.68em;font-weight:700;color:var(--accent);line-height:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap }
+      .bhc-route { font-size:.66em;color:var(--text);line-height:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap }
+      .bhc-more { font-size:.6em;color:var(--muted);line-height:1 }
+    </style>
 
     <div class="brief-section">
       <div class="brief-section-header"><span>FLIGHT INFO / DATA <span style="font-size:.75em;color:var(--muted);font-weight:400;opacity:.8">auto-filled · editable</span></span><button class="brief-clear-btn" onclick="briefClearInfo()">清除 Clear</button></div>
@@ -410,9 +448,23 @@ export function getSpaHtmlBody(): string {
 
     <div class="brief-section">
       <div class="brief-section-header"><span>NOTES / BRIEFING</span><button class="brief-clear-btn" onclick="briefClearNotes()">清除 Clear</button></div>
-      <textarea class="brief-note" id="brief-note1" rows="2" placeholder="亂流時間/其他提醒 (Turbulence/Notes)" oninput="this.style.height='auto';this.style.height=this.scrollHeight+'px'"></textarea>
-      <textarea class="brief-note" id="brief-note2" rows="2" placeholder="Tail No./MEL" oninput="this.style.height='auto';this.style.height=this.scrollHeight+'px'"></textarea>
-      <textarea class="brief-note" id="brief-note3" rows="2" placeholder="Fuel Required/min. water" oninput="this.style.height='auto';this.style.height=this.scrollHeight+'px'"></textarea>
+      <div class="brief-note-row brief-note-stack"><div class="brief-note-label">🌪️ Turbulence</div><textarea class="brief-note" id="brief-note1" rows="2" placeholder="亂流時間/其他提醒" oninput="this.style.height='auto';this.style.height=this.scrollHeight+'px'"></textarea></div>
+      <div class="brief-note-row brief-note-stack"><div class="brief-note-label">🛩️ Tail No. / MEL</div><textarea class="brief-note" id="brief-note2" rows="2" placeholder="Tail / MEL" oninput="this.style.height='auto';this.style.height=this.scrollHeight+'px'"></textarea></div>
+      <div class="brief-note-row brief-note-stack"><div class="brief-note-label">💧 Min Water</div><textarea class="brief-note" id="brief-water" rows="2" oninput="this.style.height='auto';this.style.height=this.scrollHeight+'px'"></textarea></div>
+      <div class="brief-note-row brief-note-stack"><div class="brief-note-label">⛽ Fuel Required</div><textarea class="brief-note" id="brief-fuel" rows="2" oninput="this.style.height='auto';this.style.height=this.scrollHeight+'px'"></textarea></div>
+      <div class="brief-note-row brief-pob-row">
+        <span class="brief-note-icon">👥</span>
+        <div class="brief-pob">
+          <span class="brief-pob-label">Crew</span>
+          <input type="number" id="brief-crew" min="0" class="brief-pob-input" oninput="_briefUpdatePob()">
+          <span class="brief-pob-sep">+</span>
+          <span class="brief-pob-label">Pax</span>
+          <input type="number" id="brief-pax" min="0" class="brief-pob-input" oninput="_briefUpdatePob()">
+          <span class="brief-pob-sep">=</span>
+          <span class="brief-pob-label">POB</span>
+          <span id="brief-pob" class="brief-pob-value">—</span>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -1449,7 +1501,7 @@ export function getSpaHtmlBody(): string {
       <button class="tab-util-btn tab-install-btn" id="tab-install-btn" onclick="showInstallGuide()" style="display:none">
         <span>📲</span>安裝
       </button>
-      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer;text-decoration:underline" onclick="showAbout()">V8.0.18</span>
+      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer;text-decoration:underline" onclick="showAbout()">V8.0.19</span>
     </div>
   </div>
 </div>
@@ -1480,7 +1532,12 @@ export function getSpaHtmlBody(): string {
       <div style="color:var(--muted)">Best experience on iPad in landscape mode. Android devices may not display correctly.</div>
     </div>
     <div style="max-height:50vh;overflow-y:auto;-webkit-overflow-scrolling:touch;margin-bottom:10px">
-    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V8.0.18</div>
+    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V8.0.19</div>
+    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
+      <div>Briefing panel 新增歷史功能：📅 History 按鈕打開月曆式歷史檢視，黃色日期表示有 briefing，格子內顯示航班號 + 非 TPE 那端城市（例如 <code>JX820 KIX</code>），多班時顯示 <code>⋯ +N</code>。點日期格子 → 下方 panel 列出當日全部航班（可點擊載入或 ✕ 刪除）。查詢成功自動存 snapshot、notes blur 自動 save，資料永久保留。有 eid（上傳過班表）→ Postgres 跨裝置同步；無 eid → 本機 localStorage。NOTES 區塊重構：Turbulence / Tail No./MEL / Min Water / Fuel Required 四欄都加永久 label（標題獨立一行在 textarea 上方，不會被輸入遮蔽）；新增 👥 Crew + Pax = POB 自動加總欄位（同一行顯示）。後端新增 <code>crewsync_briefings</code> 表 + <code>POST/GET/LIST/DELETE /api/briefing</code> 端點；每筆以 (eid, flight_no, flight_date) 唯一。</div>
+      <div>Briefing panel gains history feature: 📅 History button opens a calendar-style modal where golden days indicate saved briefings; each cell shows flight_no + non-TPE city (e.g., <code>JX820 KIX</code>) with <code>⋯ +N</code> for additional flights. Tap a golden date → detail panel below lists all flights for that day (click to load, ✕ to delete). Auto-save on successful Query + debounced on notes blur; permanent retention. Cross-device sync via eid (Postgres) when roster uploaded; else local (localStorage). NOTES restructured: Turbulence / Tail No./MEL / Min Water / Fuel Required all now have a permanent label above each textarea (no longer hidden when typing); new 👥 Crew + Pax = POB row with auto-sum on a single line. Backend: new <code>crewsync_briefings</code> Postgres table + <code>POST/GET/LIST/DELETE /api/briefing</code> endpoints; unique per (eid, flight_no, flight_date).</div>
+    </div>
+    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V8.0.18</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
       <div>修正退出群組時未清理 sharing 和班表資料的 bug：退出最後一個群組後自動設 sharing=false 並刪除雲端班表</div>
       <div>Fix: leaving last group now auto-disables sharing and deletes roster data from cloud</div>

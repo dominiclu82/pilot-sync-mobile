@@ -26,7 +26,22 @@ function _syncFltNo(source, val) {
 }
 
 var _briefFields = ['brief-gate','brief-origin','brief-dest','brief-ofp','brief-ft'];
-var _briefNotes = ['brief-note1','brief-note2','brief-note3'];
+var _briefNotes = ['brief-note1','brief-note2','brief-water','brief-fuel','brief-crew','brief-pax'];
+
+function _briefUpdatePob() {
+  var crewEl = document.getElementById('brief-crew');
+  var paxEl = document.getElementById('brief-pax');
+  var pobEl = document.getElementById('brief-pob');
+  if (!pobEl) return;
+  var c = crewEl ? Number(crewEl.value) : NaN;
+  var p = paxEl ? Number(paxEl.value) : NaN;
+  var hasC = crewEl && crewEl.value !== '' && !isNaN(c);
+  var hasP = paxEl && paxEl.value !== '' && !isNaN(p);
+  if (!hasC && !hasP) { pobEl.textContent = '—'; return; }
+  var total = (hasC ? c : 0) + (hasP ? p : 0);
+  pobEl.textContent = total;
+}
+window._briefUpdatePob = _briefUpdatePob;
 
 /* ── IATA → UTC offset (hours) ── */
 var _briefTzOffset = {
@@ -166,6 +181,9 @@ function _briefForceQuery() {
   if (!raw) return;
   var num = raw.replace(/^SJX|^JX/, '').replace(/\s/g, '').replace(/^0+/, '') || '0';
   if (!/^\d+$/.test(num)) return;
+  // 按 Query 就離開歷史檢視模式
+  if (typeof _briefLoadedSnapshot !== 'undefined') _briefLoadedSnapshot = null;
+  if (typeof _briefLoadedFlightDate !== 'undefined') _briefLoadedFlightDate = null;
   _briefFidsCache = null;
   _briefFltStatus('查詢中...', 'loading');
   _briefLookup(num, true);  // force=true 跳過快取
@@ -299,6 +317,9 @@ function _briefFillFromFids(fno, data) {
   }
 
   _briefSave();
+  if (typeof _briefUpdatePob === 'function') _briefUpdatePob();
+  // 查詢成功 → 存歷史 snapshot（eid→server / 無eid→localStorage）
+  if (typeof _briefSaveHistory === 'function') _briefSaveHistory(true);
 
   // Fetch weather
   var originEl = document.getElementById('brief-origin');
@@ -490,6 +511,8 @@ function _briefFetchWx(target, iata) {
         (skyText ? ' &middot; ' + skyText : '') +
         (ageText ? ' <span style="font-size:.85em;' + ageClass + '">' + ageText + '</span>' : '') +
         '</div></div>';
+      // WX 抓完順便更新 history snapshot（debounced，避免 o+d 兩次 call）
+      if (typeof _briefSaveHistory === 'function') _briefSaveHistory(false);
     })
     .catch(function() {
       el.innerHTML = '<span style="color:var(--muted)">查詢失敗</span>';
@@ -525,6 +548,7 @@ function briefClearNotes() {
     var el = document.getElementById(id);
     if (el) el.value = '';
   });
+  if (typeof _briefUpdatePob === 'function') _briefUpdatePob();
   _briefSave();
 }
 
@@ -556,6 +580,7 @@ function _briefRestore() {
       else { el.value = obj[id] || ''; }
       if (el.tagName === 'TEXTAREA') { el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; }
     });
+    if (typeof _briefUpdatePob === 'function') _briefUpdatePob();
   } catch(e) {}
 }
 
@@ -565,6 +590,9 @@ function _briefDateNav(dir) {
   var next = _briefDateOffset + dir;
   if (next < -1 || next > 1) return;
   _briefDateOffset = next;
+  // 點 ◀ ▶ 也離開歷史檢視
+  if (typeof _briefLoadedSnapshot !== 'undefined') _briefLoadedSnapshot = null;
+  if (typeof _briefLoadedFlightDate !== 'undefined') _briefLoadedFlightDate = null;
   _briefUpdateDateLabel();
   // 切換日期後自動重新查詢
   var inp = document.getElementById('brief-fno');
@@ -573,6 +601,7 @@ function _briefDateNav(dir) {
     _briefFidsCache = null;
     _briefForceQuery();
   }
+  if (typeof _briefUpdatePob === 'function') _briefUpdatePob();
 }
 function _briefUpdateDateLabel() {
   var el = document.getElementById('brief-date-label');
@@ -613,3 +642,310 @@ function openTurbli(autoFill) {
     }
   }
 }
+
+/* ═════════════════════════════════════════════════════════════
+   Briefing 歷史（有員編 eid → server 跨裝置；沒員編 → 本機 localStorage）
+   ═════════════════════════════════════════════════════════════ */
+function _briefGetEid() {
+  try { return localStorage.getItem('crewsync_eid') || ''; } catch(e) { return ''; }
+}
+function _briefUpdateSyncHint() {
+  var el = document.getElementById('brief-sync-hint');
+  if (!el) return;
+  var eid = _briefGetEid();
+  el.textContent = eid
+    ? '🔗 已登入員編 ' + eid + '，briefing 歷史跨裝置同步'
+    : '💾 未登入員編（上傳班表後才會跨裝置），目前僅本機儲存';
+}
+var _briefLoadedFlightDate = null;  // 歷史檢視時的日期（存檔要對到它而非今天）
+function _briefFlightKey() {
+  var fnoEl = document.getElementById('brief-fno');
+  var fno = fnoEl ? String(fnoEl.value || '').trim().toUpperCase() : '';
+  var date = _briefLoadedFlightDate || _briefGetDate();
+  return { flight_no: fno, flight_date: date };
+}
+function _briefSnapshot() {
+  var obj = {};
+  _briefFields.concat(_briefNotes).forEach(function(id) {
+    var el = document.getElementById(id);
+    if (el) obj[id] = el.value;
+  });
+  var fno = document.getElementById('brief-fno');
+  if (fno) obj['brief-fno'] = fno.value;
+  var depDt = document.getElementById('brief-dep-dt');
+  if (depDt) obj['brief-dep-dt'] = depDt.textContent;
+  // WX 顯示（METAR/TAF 的 textContent，方便歷史直接看）
+  var owx = document.getElementById('brief-owx');
+  if (owx) obj['brief-owx'] = owx.innerHTML;
+  var dwx = document.getElementById('brief-dwx');
+  if (dwx) obj['brief-dwx'] = dwx.innerHTML;
+  return obj;
+}
+function _briefApplySnapshot(obj) {
+  if (!obj) return;
+  Object.keys(obj).forEach(function(id) {
+    var el = document.getElementById(id);
+    if (!el) return;
+    if (id === 'brief-dep-dt') { el.textContent = obj[id] || '—'; }
+    else if (id === 'brief-owx' || id === 'brief-dwx') { el.innerHTML = obj[id] || '—'; }
+    else if ('value' in el) { el.value = obj[id] || ''; }
+    if (el.tagName === 'TEXTAREA') { el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; }
+  });
+  if (typeof _briefUpdatePob === 'function') _briefUpdatePob();
+}
+function _briefLocalHistKey() { return 'crewsync_brief_hist'; }
+function _briefLocalHistGet() {
+  try { return JSON.parse(localStorage.getItem(_briefLocalHistKey()) || '{}') || {}; } catch(e) { return {}; }
+}
+function _briefLocalHistSet(map) {
+  try { localStorage.setItem(_briefLocalHistKey(), JSON.stringify(map)); } catch(e) {}
+}
+function _briefLocalKey(fno, date) { return (fno || '') + '|' + (date || ''); }
+
+/* ── 存 / 取 / 列 / 刪（eid → server；無 eid → localStorage） ── */
+var _briefSaveTimer = null;
+function _briefSaveHistory(forceImmediate) {
+  var k = _briefFlightKey();
+  if (!k.flight_no || !k.flight_date) return;
+  var doSave = function() {
+    var snap = _briefSnapshot();
+    var eid = _briefGetEid();
+    if (eid) {
+      fetch('/api/briefing', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ eid: eid, flight_no: k.flight_no, flight_date: k.flight_date, data: snap }),
+      }).catch(function() {});
+    } else {
+      var map = _briefLocalHistGet();
+      map[_briefLocalKey(k.flight_no, k.flight_date)] = { data: snap, updated_at: new Date().toISOString() };
+      _briefLocalHistSet(map);
+    }
+  };
+  if (forceImmediate) {
+    if (_briefSaveTimer) { clearTimeout(_briefSaveTimer); _briefSaveTimer = null; }
+    doSave();
+  } else {
+    if (_briefSaveTimer) clearTimeout(_briefSaveTimer);
+    _briefSaveTimer = setTimeout(doSave, 500);
+  }
+}
+async function _briefLoadHistoryEntry(fno, date) {
+  var eid = _briefGetEid();
+  if (eid) {
+    try {
+      var r = await fetch('/api/briefing?eid=' + encodeURIComponent(eid) + '&flight_no=' + encodeURIComponent(fno) + '&flight_date=' + encodeURIComponent(date));
+      if (r.ok) { var j = await r.json(); return j.data || null; }
+    } catch(e) {}
+    return null;
+  }
+  var map = _briefLocalHistGet();
+  var e = map[_briefLocalKey(fno, date)];
+  return e ? e.data : null;
+}
+async function _briefListHistory() {
+  var eid = _briefGetEid();
+  if (eid) {
+    try {
+      var r = await fetch('/api/briefing/list?eid=' + encodeURIComponent(eid) + '&limit=100');
+      if (r.ok) { var j = await r.json(); return j.items || []; }
+    } catch(e) {}
+    return [];
+  }
+  var map = _briefLocalHistGet();
+  var items = [];
+  Object.keys(map).forEach(function(k) {
+    var parts = k.split('|');
+    items.push({ flight_no: parts[0], flight_date: parts[1], updated_at: map[k].updated_at });
+  });
+  items.sort(function(a, b) { return (b.flight_date || '').localeCompare(a.flight_date || ''); });
+  return items;
+}
+async function _briefDeleteHistoryEntry(fno, date) {
+  var eid = _briefGetEid();
+  if (eid) {
+    try {
+      await fetch('/api/briefing', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ eid: eid, flight_no: fno, flight_date: date }),
+      });
+    } catch(e) {}
+  } else {
+    var map = _briefLocalHistGet();
+    delete map[_briefLocalKey(fno, date)];
+    _briefLocalHistSet(map);
+  }
+}
+
+/* ── 歷史 modal UI（月曆式，點日期下方顯示該日航班列表）── */
+var _briefHistItems = [];
+var _briefHistMonth = null; // {year, month}
+var _briefHistSelected = null; // 'YYYY-MM-DD'
+
+async function _briefOpenHistory() {
+  var wrap = document.getElementById('brief-hist-wrap');
+  var hint = document.getElementById('brief-hist-hint');
+  if (!wrap) return;
+  wrap.style.display = 'flex';
+  var eid = _briefGetEid();
+  var cal = document.getElementById('brief-hist-cal');
+  var day = document.getElementById('brief-hist-day');
+  if (cal) cal.innerHTML = '<div style="grid-column:span 7;padding:20px;text-align:center;color:var(--muted)">載入中…</div>';
+  if (day) day.innerHTML = '';
+  _briefHistItems = await _briefListHistory();
+  var storage = eid ? ('員編 ' + eid + ' · 跨裝置同步') : '未登入員編 · 僅本機裝置';
+  hint.textContent = storage + ' · 共 ' + _briefHistItems.length + ' 筆紀錄';
+  _briefHistSelected = null;
+  // 預設月份：最新一筆的月份，否則今天
+  var base = new Date();
+  if (_briefHistItems.length > 0 && _briefHistItems[0].flight_date) {
+    var p = (_briefHistItems[0].flight_date || '').split('-');
+    if (p.length === 3) base = new Date(parseInt(p[0], 10), parseInt(p[1], 10) - 1, parseInt(p[2], 10));
+  }
+  _briefHistMonth = { year: base.getFullYear(), month: base.getMonth() };
+  _briefRenderCal();
+  // 綁 ◀ ▶
+  var prev = document.getElementById('brief-hist-prev');
+  var next = document.getElementById('brief-hist-next');
+  if (prev) prev.onclick = function() { _briefHistMonth.month--; if (_briefHistMonth.month < 0) { _briefHistMonth.month = 11; _briefHistMonth.year--; } _briefRenderCal(); };
+  if (next) next.onclick = function() { _briefHistMonth.month++; if (_briefHistMonth.month > 11) { _briefHistMonth.month = 0; _briefHistMonth.year++; } _briefRenderCal(); };
+}
+
+// 把航線簡化為「非 TPE 那一側」（絕大多數航班都過 TPE）
+function _briefRouteShort(orig, dest) {
+  var o = (orig || '').toUpperCase();
+  var d = (dest || '').toUpperCase();
+  if (o === 'TPE' && d) return d;
+  if (d === 'TPE' && o) return o;
+  if (!o && !d) return '—';
+  return (o || '—') + '-' + (d || '—');
+}
+
+function _briefRenderCal() {
+  if (!_briefHistMonth) return;
+  var y = _briefHistMonth.year, m = _briefHistMonth.month;
+  var title = document.getElementById('brief-hist-title');
+  if (title) title.textContent = y + ' / ' + String(m + 1).padStart(2, '0');
+  var cal = document.getElementById('brief-hist-cal');
+  if (!cal) return;
+  // 按日期分組
+  var byDate = {};
+  _briefHistItems.forEach(function(it) {
+    if (!it.flight_date) return;
+    var p = it.flight_date.split('-');
+    if (p.length === 3 && parseInt(p[0], 10) === y && parseInt(p[1], 10) - 1 === m) {
+      if (!byDate[it.flight_date]) byDate[it.flight_date] = [];
+      byDate[it.flight_date].push(it);
+    }
+  });
+  var td = new Date();
+  var todayStr = td.getFullYear() + '-' + String(td.getMonth() + 1).padStart(2, '0') + '-' + String(td.getDate()).padStart(2, '0');
+  var dowNames = ['日','一','二','三','四','五','六'];
+  var html = dowNames.map(function(n) { return '<div class="bhc-dow">' + n + '</div>'; }).join('');
+  var firstDay = new Date(y, m, 1).getDay();
+  var lastDate = new Date(y, m + 1, 0).getDate();
+  for (var i = 0; i < firstDay; i++) html += '<div class="bhc-day empty"></div>';
+  for (var d = 1; d <= lastDate; d++) {
+    var ds = y + '-' + String(m + 1).padStart(2, '0') + '-' + String(d).padStart(2, '0');
+    var cls = ['bhc-day'];
+    var items = byDate[ds] || [];
+    var has = items.length > 0;
+    if (has) cls.push('has-data');
+    if (ds === todayStr) cls.push('today');
+    // 第一班 + 多餘班數提示
+    var first = has ? items[0] : null;
+    var extra = items.length > 1 ? items.length - 1 : 0;
+    var onc = has ? (' onclick="_briefHistDayTap(\'' + ds + '\')"') : '';
+    html += '<div class="' + cls.join(' ') + '"' + onc + '>';
+    html += '<div class="bhc-date">' + d + '</div>';
+    html += '<div class="bhc-fno">' + (first ? (first.flight_no || '—') : '&nbsp;') + '</div>';
+    html += '<div class="bhc-route">' + (first ? _briefRouteShort(first.orig, first.dest) : '&nbsp;') + '</div>';
+    html += '<div class="bhc-more">' + (extra > 0 ? ('⋯ +' + extra) : '&nbsp;') + '</div>';
+    html += '</div>';
+  }
+  cal.innerHTML = html;
+}
+
+// 點日期格子 → 下方彈出該日完整清單（不管幾班，都讓使用者選載入或刪除）
+function _briefHistDayTap(ds) {
+  var items = _briefHistItems.filter(function(it) { return it.flight_date === ds; });
+  if (items.length === 0) return;
+  _briefShowDayPanel(ds, items);
+}
+
+var _briefDayPanelShow = false;
+function _briefShowDayPanel(ds, items) {
+  // 在 calendar 下方 insert/update 一個 overlay panel
+  var wrap = document.getElementById('brief-hist-wrap');
+  if (!wrap) return;
+  var existing = document.getElementById('brief-hist-day-panel');
+  if (existing) existing.remove();
+  var panel = document.createElement('div');
+  panel.id = 'brief-hist-day-panel';
+  panel.style.cssText = 'margin-top:10px;border-top:1px solid var(--border);padding-top:10px;max-height:35vh;overflow-y:auto';
+  var html = '<div style="font-size:.76em;color:var(--muted);margin-bottom:6px">' + ds + ' 共 ' + items.length + ' 班</div>';
+  items.forEach(function(it) {
+    var safeFno = (it.flight_no || '').replace(/'/g, "\\'");
+    var safeDate = (it.flight_date || '').replace(/'/g, "\\'");
+    var route = _briefRouteShort(it.orig, it.dest);
+    html += '<div style="display:flex;align-items:center;gap:8px;padding:8px;border-bottom:1px solid var(--border)">'
+      + '<div style="flex:1;cursor:pointer" onclick="_briefLoadHistoryItem(\'' + safeFno + '\',\'' + safeDate + '\')">'
+      +   '<div style="font-weight:600;color:var(--text)">' + (it.flight_no || '—') + '</div>'
+      +   '<div style="font-size:.76em;color:var(--muted)">' + route + '</div>'
+      + '</div>'
+      + '<button onclick="_briefDeleteHistoryItem(\'' + safeFno + '\',\'' + safeDate + '\')" style="background:none;border:1px solid var(--border);color:var(--muted);width:28px;height:28px;border-radius:50%;font-size:.8em;cursor:pointer">✕</button>'
+      + '</div>';
+  });
+  panel.innerHTML = html;
+  wrap.querySelector('.bhc-dow') ? wrap.querySelector('div').parentNode.appendChild(panel) : wrap.appendChild(panel);
+  // 更簡單：append 到 calendar 後面
+  var cal = document.getElementById('brief-hist-cal');
+  if (cal && cal.parentNode) cal.parentNode.appendChild(panel);
+}
+
+function _briefCloseHistory() {
+  var w = document.getElementById('brief-hist-wrap');
+  if (w) w.style.display = 'none';
+}
+var _briefLoadedSnapshot = null;
+async function _briefLoadHistoryItem(fno, date) {
+  var data = await _briefLoadHistoryEntry(fno, date);
+  if (!data) { alert('找不到此歷史紀錄'); return; }
+  // 先 reset 再填入
+  briefClearInfo();
+  briefClearNotes();
+  // 航班號跟日期
+  var fnoEl = document.getElementById('brief-fno');
+  if (fnoEl) fnoEl.value = fno;
+  _briefApplySnapshot(data);
+  // 更新日期 label 顯示歷史日期（M/D 格式）
+  var dateLabel = document.getElementById('brief-date-label');
+  if (dateLabel && date) {
+    var parts = date.split('-');
+    if (parts.length === 3) dateLabel.textContent = parseInt(parts[1], 10) + '/' + parseInt(parts[2], 10);
+  }
+  // 同步到當前編輯 buffer，下次重整頁面看到的是這份歷史
+  if (typeof _briefSave === 'function') _briefSave();
+  // 記下載入的 snapshot 跟歷史日期，blur/Query 存檔要對到歷史這筆
+  _briefLoadedSnapshot = data;
+  _briefLoadedFlightDate = date;
+  _briefCloseHistory();
+  _briefFltStatus && _briefFltStatus('🕘 歷史 ' + (date || ''), '#94a3b8');
+}
+async function _briefDeleteHistoryItem(fno, date) {
+  if (!confirm('確定刪除 ' + fno + ' @ ' + date + ' 的 briefing？')) return;
+  await _briefDeleteHistoryEntry(fno, date);
+  _briefOpenHistory();  // 重新載入
+}
+
+/* 啟動時更新同步提示；每個 briefing 欄位 blur 觸發 debounced save */
+document.addEventListener('DOMContentLoaded', function() {
+  _briefUpdateSyncHint();
+  var ids = _briefFields.concat(_briefNotes).concat(['brief-dep-dt']);
+  ids.forEach(function(id) {
+    var el = document.getElementById(id);
+    if (!el) return;
+    el.addEventListener('blur', function() { _briefSaveHistory(false); });
+  });
+});
