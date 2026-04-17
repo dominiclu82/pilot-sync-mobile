@@ -11,8 +11,8 @@ import { Readability } from '@mozilla/readability';
 import { ROOT } from './config.js';
 import { buildMorningReport, fetchSection } from './morning-builder.js';
 
-export const MORNING_VERSION = 'V1.3.06';
-const MORNING_CACHE = 'morning-v1-3-06';
+export const MORNING_VERSION = 'V1.3.07';
+const MORNING_CACHE = 'morning-v1-3-07';
 
 // ─── Postgres ────────────────────────────────────────────────────────
 let _pgPool: pg.Pool | null = null;
@@ -58,6 +58,8 @@ async function ensurePgTables() {
         updated_at TIMESTAMPTZ DEFAULT NOW()
       );
     `);
+    // Migration: 加上 last_seen_at 追蹤使用者實際開 app 的時間
+    await pool.query(`ALTER TABLE morning_prefs ADD COLUMN IF NOT EXISTS last_seen_at TIMESTAMPTZ`).catch(() => {});
 
     _pgReady = true;
     return true;
@@ -183,6 +185,17 @@ async function savePrefs(userId: string, prefs: UserPrefs): Promise<boolean> {
     }
   }
   return false;
+}
+
+// 觸發 last_seen_at 更新（使用者開 app 時呼叫）
+async function touchLastSeen(userId: string) {
+  const pool = getPool();
+  if (!pool || !(await ensurePgTables())) return;
+  try {
+    await pool.query('UPDATE morning_prefs SET last_seen_at = NOW() WHERE user_id = $1', [userId]);
+  } catch (e) {
+    // 沒建 row 就略過，等使用者第一次存 prefs 後才會有 row
+  }
 }
 
 async function getAllUserPrefs(): Promise<Array<{ userId: string; prefs: UserPrefs }>> {
@@ -514,6 +527,8 @@ morningRouter.get('/api/morning-report', async (req, res) => {
   try {
     const userId = reqUserId(req);
     if (!userId) return res.status(400).json({ error: 'missing_or_invalid_user_id' });
+    // 記錄 last_seen_at（fire-and-forget，不影響主流程）
+    touchLastSeen(userId).catch(() => {});
     let date = String(req.query.date || '');
     if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
       date = (await getLatestDate(userId)) || todayTaipei();
@@ -1894,6 +1909,11 @@ a:active { opacity: 0.6; }
     </div>
     <hr style="border:none;border-top:1px solid var(--border);margin:12px 0">
     <div class="changelog-v">${MORNING_VERSION}</div>
+    <div class="changelog-txt">
+      新增使用者存取紀錄：<code>morning_prefs</code> 加 <code>last_seen_at</code> 欄位。<br>
+      Added user access tracking: <code>morning_prefs</code> now has a <code>last_seen_at</code> column.
+    </div>
+    <div class="changelog-v old">V1.3.06</div>
     <div class="changelog-txt">
       各區塊 🔄 重抓改為只替換該區塊 DOM，不再整頁重 render，捲動位置保留。新增每區塊 header 資料更新時間戳（<code>M/D HH:MM</code>，台北時區），按 🔄 該區塊時間會即時更新。後端 report schema 擴充 <code>weather_fetched_at</code>/<code>stocks_tw_fetched_at</code>/<code>stocks_us_fetched_at</code>/<code>fx_fetched_at</code> 四個欄位。台銀匯率 CSV URL 加 cache-busting（<code>?t=timestamp</code> + <code>Cache-Control: no-cache</code>），避免 CDN/proxy 回舊的掛牌。<br>
       Per-section 🔄 refresh now swaps only that section's DOM instead of full re-render, preserving scroll position. Each section header shows a data-fetched timestamp (<code>M/D HH:MM</code> Taipei), updated live when 🔄 is pressed. Report schema extended with <code>weather_fetched_at</code>/<code>stocks_tw_fetched_at</code>/<code>stocks_us_fetched_at</code>/<code>fx_fetched_at</code> fields. BOT FX CSV URL now adds cache-busting (<code>?t=timestamp</code> + <code>Cache-Control: no-cache</code>) so hitting 🔄 mid-day actually fetches the latest BOT posting.
