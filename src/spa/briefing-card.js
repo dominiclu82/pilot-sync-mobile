@@ -704,22 +704,34 @@ function _briefLocalKey(fno, date) { return (fno || '') + '|' + (date || ''); }
 
 /* ── 存 / 取 / 列 / 刪（eid → server；無 eid → localStorage） ── */
 var _briefSaveTimer = null;
+// 儲存狀態 dot: 'saved' (綠) | 'saving' (黃) | 'idle' (隱藏)
+function _briefSetSaveDot(state) {
+  var dot = document.getElementById('brief-save-dot');
+  if (!dot) return;
+  dot.className = 'brief-save-dot';
+  if (state === 'saved') dot.classList.add('saved');
+  else if (state === 'saving') dot.classList.add('saving');
+  dot.title = state === 'saved' ? '已儲存' : (state === 'saving' ? '儲存中…' : '');
+}
 function _briefSaveHistory(forceImmediate) {
   var k = _briefFlightKey();
   if (!k.flight_no || !k.flight_date) return;
   var doSave = function() {
+    _briefSetSaveDot('saving');
     var snap = _briefSnapshot();
     var eid = _briefGetEid();
+    var done = function() { _briefSetSaveDot('saved'); };
     if (eid) {
       fetch('/api/briefing', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ eid: eid, flight_no: k.flight_no, flight_date: k.flight_date, data: snap }),
-      }).catch(function() {});
+      }).then(done).catch(done);
     } else {
       var map = _briefLocalHistGet();
       map[_briefLocalKey(k.flight_no, k.flight_date)] = { data: snap, updated_at: new Date().toISOString() };
       _briefLocalHistSet(map);
+      done();
     }
   };
   if (forceImmediate) {
@@ -727,6 +739,7 @@ function _briefSaveHistory(forceImmediate) {
     doSave();
   } else {
     if (_briefSaveTimer) clearTimeout(_briefSaveTimer);
+    _briefSetSaveDot('saving');  // 使用者還在打字時，dot 先變黃
     _briefSaveTimer = setTimeout(doSave, 500);
   }
 }
@@ -939,13 +952,23 @@ async function _briefDeleteHistoryItem(fno, date) {
   _briefOpenHistory();  // 重新載入
 }
 
-/* 啟動時更新同步提示；每個 briefing 欄位 blur 觸發 debounced save */
-document.addEventListener('DOMContentLoaded', function() {
-  _briefUpdateSyncHint();
+/* 啟動時更新同步提示 + 每個 briefing 欄位 oninput 觸發 debounced save（不用等 blur） */
+function _briefAttachAutoSave() {
   var ids = _briefFields.concat(_briefNotes).concat(['brief-dep-dt']);
   ids.forEach(function(id) {
     var el = document.getElementById(id);
     if (!el) return;
+    if (el._briefSaveBound) return;
+    el._briefSaveBound = true;
+    // input 事件：textarea/input 打字時觸發；contenteditable 也會觸發 input
+    el.addEventListener('input', function() { _briefSaveHistory(false); });
+    // 加 blur 當備胎（avoid race on closing tab）
     el.addEventListener('blur', function() { _briefSaveHistory(false); });
   });
+}
+document.addEventListener('DOMContentLoaded', function() {
+  _briefUpdateSyncHint();
+  _briefAttachAutoSave();
+  // 有些元素可能是後來才出現的，briefInit 後再補綁一次
+  setTimeout(_briefAttachAutoSave, 200);
 });

@@ -351,6 +351,9 @@ div.brief-auto-val[contenteditable]{outline:none;white-space:pre-wrap;cursor:tex
 .brief-note-icon{flex-shrink:0;font-size:1.1em;padding-top:8px;line-height:1}
 .brief-note-stack{display:flex;flex-direction:column;gap:4px}
 .brief-note-stack .brief-note-label{font-size:.78em;color:var(--muted);font-weight:500;padding:0 2px}
+.brief-save-dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:transparent;align-self:center;margin-left:4px;transition:background .2s}
+.brief-save-dot.saved{background:#34d399}
+.brief-save-dot.saving{background:#fbbf24}
 .brief-pob-row{align-items:center}
 .brief-pob{display:flex;align-items:center;gap:3px;background:rgba(255,255,255,.06);border-radius:8px;padding:6px 8px;flex:1;font-size:.82em;white-space:nowrap}
 .brief-pob-label{font-size:.88em;color:var(--muted)}

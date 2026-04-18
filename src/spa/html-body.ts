@@ -392,6 +392,7 @@ export function getSpaHtmlBody(): string {
       <span id="brief-flt-status" class="pa-flt-status"></span>
       <button style="background:#2d3748;color:#e2e8f0;border:1px solid #4a5568;border-radius:8px;padding:4px 10px;font-size:.8em;cursor:pointer" onclick="openTurbli(true)">🌪️ Turbli</button>
       <button style="background:#2d3748;color:#e2e8f0;border:1px solid #4a5568;border-radius:8px;padding:4px 10px;font-size:.8em;cursor:pointer" onclick="_briefOpenHistory()">📅 History</button>
+      <span id="brief-save-dot" class="brief-save-dot" title=""></span>
       <button class="pa-reset-btn" onclick="briefClearAll()">重設 Reset</button>
     </div>
     <div id="brief-sync-hint" style="font-size:.68em;color:var(--muted);padding:4px 2px;opacity:.75"></div>
@@ -1501,7 +1502,7 @@ export function getSpaHtmlBody(): string {
       <button class="tab-util-btn tab-install-btn" id="tab-install-btn" onclick="showInstallGuide()" style="display:none">
         <span>📲</span>安裝
       </button>
-      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer;text-decoration:underline" onclick="showAbout()">V8.0.19</span>
+      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer;text-decoration:underline" onclick="showAbout()">V8.0.20</span>
     </div>
   </div>
 </div>
@@ -1532,7 +1533,12 @@ export function getSpaHtmlBody(): string {
       <div style="color:var(--muted)">Best experience on iPad in landscape mode. Android devices may not display correctly.</div>
     </div>
     <div style="max-height:50vh;overflow-y:auto;-webkit-overflow-scrolling:touch;margin-bottom:10px">
-    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V8.0.19</div>
+    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V8.0.20</div>
+    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
+      <div>Briefing 資料儲存改為每字 <code>oninput</code> debounced 500ms 自動存（不用等 blur），整份 briefing（Block 1 + Block 2 notes/POB 全部）都即時同步。搜尋列右邊新增儲存狀態小圓點：🟡 存檔中 / 🟢 已儲存。blur 保留當備胎避免關 tab race。</div>
+      <div>Briefing auto-save switched from blur to <code>input</code> event (debounced 500ms) — no more waiting for field blur; full briefing (Block 1 + Block 2 notes/POB) syncs in real time. Tiny status dot next to the search row: 🟡 saving / 🟢 saved. Blur kept as fallback to guard against tab-close races.</div>
+    </div>
+    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V8.0.19</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
       <div>Briefing panel 新增歷史功能：📅 History 按鈕打開月曆式歷史檢視，黃色日期表示有 briefing，格子內顯示航班號 + 非 TPE 那端城市（例如 <code>JX820 KIX</code>），多班時顯示 <code>⋯ +N</code>。點日期格子 → 下方 panel 列出當日全部航班（可點擊載入或 ✕ 刪除）。查詢成功自動存 snapshot、notes blur 自動 save，資料永久保留。有 eid（上傳過班表）→ Postgres 跨裝置同步；無 eid → 本機 localStorage。NOTES 區塊重構：Turbulence / Tail No./MEL / Min Water / Fuel Required 四欄都加永久 label（標題獨立一行在 textarea 上方，不會被輸入遮蔽）；新增 👥 Crew + Pax = POB 自動加總欄位（同一行顯示）。後端新增 <code>crewsync_briefings</code> 表 + <code>POST/GET/LIST/DELETE /api/briefing</code> 端點；每筆以 (eid, flight_no, flight_date) 唯一。</div>
       <div>Briefing panel gains history feature: 📅 History button opens a calendar-style modal where golden days indicate saved briefings; each cell shows flight_no + non-TPE city (e.g., <code>JX820 KIX</code>) with <code>⋯ +N</code> for additional flights. Tap a golden date → detail panel below lists all flights for that day (click to load, ✕ to delete). Auto-save on successful Query + debounced on notes blur; permanent retention. Cross-device sync via eid (Postgres) when roster uploaded; else local (localStorage). NOTES restructured: Turbulence / Tail No./MEL / Min Water / Fuel Required all now have a permanent label above each textarea (no longer hidden when typing); new 👥 Crew + Pax = POB row with auto-sum on a single line. Backend: new <code>crewsync_briefings</code> Postgres table + <code>POST/GET/LIST/DELETE /api/briefing</code> endpoints; unique per (eid, flight_no, flight_date).</div>
