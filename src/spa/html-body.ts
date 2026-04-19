@@ -440,7 +440,7 @@ export function getSpaHtmlBody(): string {
     </style>
 
     <div class="brief-section">
-      <div class="brief-section-header"><span>FLIGHT INFO / DATA <span style="font-size:.75em;color:var(--muted);font-weight:400;opacity:.8">auto-filled · editable</span> <a href="/briefing-room" onclick="event.preventDefault();_openBriefRoom()" style="font-size:.78em;color:#60a5fa;text-decoration:underline;font-weight:400;margin-left:8px">🗺️ Briefing Room</a></span><button class="brief-clear-btn" onclick="briefClearInfo()">清除 Clear</button></div>
+      <div class="brief-section-header"><span>FLIGHT INFO / DATA <span style="font-size:.75em;color:var(--muted);font-weight:400;opacity:.8">auto-filled · editable</span> <a href="/briefing-room" onclick="event.preventDefault();_openBriefRoom()" style="font-size:.78em;color:#60a5fa;text-decoration:underline;font-weight:400;margin-left:8px">🗺️ Briefing Room</a> <input type="text" id="brief-room" maxlength="4" placeholder="eg. ONT" style="width:98px;padding:3px 8px;font-size:.82em;background:rgba(255,255,255,.08);border:1px solid var(--border);border-radius:4px;color:var(--text);margin-left:4px;text-transform:uppercase;font-weight:400"></span><button class="brief-clear-btn" onclick="briefClearInfo()">清除 Clear</button></div>
       <div class="brief-grid">
         <div class="brief-field"><label>Dep Date/Time</label><div id="brief-dep-dt" class="brief-auto-val" contenteditable="true">—</div></div>
         <div class="brief-field"><label>TPE Gate</label><input type="text" id="brief-gate" placeholder="—"></div>
@@ -1509,7 +1509,7 @@ export function getSpaHtmlBody(): string {
       <button class="tab-util-btn tab-install-btn" id="tab-install-btn" onclick="showInstallGuide()" style="display:none">
         <span>📲</span>安裝
       </button>
-      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer;text-decoration:underline" onclick="showAbout()">V8.0.22</span>
+      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer;text-decoration:underline" onclick="showAbout()">V8.0.23</span>
     </div>
   </div>
 </div>
@@ -1540,7 +1540,12 @@ export function getSpaHtmlBody(): string {
       <div style="color:var(--muted)">Best experience on iPad in landscape mode. Android devices may not display correctly.</div>
     </div>
     <div style="max-height:50vh;overflow-y:auto;-webkit-overflow-scrolling:touch;margin-bottom:10px">
-    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V8.0.22</div>
+    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V8.0.23</div>
+    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
+      <div>FLIGHT INFO/DATA 標題的 🗺️ Briefing Room 連結旁，新增小輸入格（約 98px 寬，maxlength 4），placeholder <code>eg. ONT</code>、輸入自動轉大寫，讓使用者自己填 briefing room 代碼。欄位 <code>brief-room</code> 納入 <code>_briefFields</code> 一起 debounced auto-save、歷史同步、載入歷史會還原。</div>
+      <div>Added a small input next to the 🗺️ Briefing Room link in the FLIGHT INFO/DATA header (~98px wide, maxlength 4, placeholder <code>eg. ONT</code>, auto-uppercase) so users can note their assigned briefing room code. Field <code>brief-room</code> is part of <code>_briefFields</code> — debounced auto-save, history sync, restored on history load.</div>
+    </div>
+    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V8.0.22</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
       <div>修正 V8.0.21 的 🗺️ Briefing Room 連結在 PWA（iPad/手機安裝版）沒地方關閉的問題。改為 in-app modal viewer：點連結不再開新 tab，而是在 app 內彈全螢幕黑底 modal，右上角 ✕ 按鈕（避開 notch safe-area），點空白處也能關，圖片支援雙指縮放（<code>touch-action: pinch-zoom</code>）。修正初始 <code>src=""</code> 被瀏覽器解讀為當前頁 URL 導致 bug。</div>
       <div>Fixed V8.0.21 issue where the 🗺️ Briefing Room link had no close button in PWA mode (installed iPad/phone app). Replaced new-tab with in-app modal viewer: tap the link now opens a full-screen black-backdrop modal inside the app, with a ✕ button top-right (respects notch safe-area), tap outside to close, pinch-zoom supported. Fixed a bug where initial <code>src=""</code> was resolved to current page URL by browsers.</div>

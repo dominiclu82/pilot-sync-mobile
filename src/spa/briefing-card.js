@@ -25,7 +25,7 @@ function _syncFltNo(source, val) {
   _syncFltLock = false;
 }
 
-var _briefFields = ['brief-gate','brief-origin','brief-dest','brief-ofp','brief-ft'];
+var _briefFields = ['brief-gate','brief-origin','brief-dest','brief-ofp','brief-ft','brief-room'];
 var _briefNotes = ['brief-note1','brief-note2','brief-water','brief-fuel','brief-crew','brief-pax'];
 
 function _briefUpdatePob() {
