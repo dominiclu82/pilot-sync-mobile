@@ -434,7 +434,7 @@ export function getSpaHtmlBody(): string {
     </style>
 
     <div class="brief-section">
-      <div class="brief-section-header"><span>FLIGHT INFO / DATA <span style="font-size:.75em;color:var(--muted);font-weight:400;opacity:.8">auto-filled · editable</span></span><button class="brief-clear-btn" onclick="briefClearInfo()">清除 Clear</button></div>
+      <div class="brief-section-header"><span>FLIGHT INFO / DATA <span style="font-size:.75em;color:var(--muted);font-weight:400;opacity:.8">auto-filled · editable</span> <a href="/briefing-room" target="_blank" style="font-size:.78em;color:#60a5fa;text-decoration:underline;font-weight:400;margin-left:8px">🗺️ Briefing Room</a></span><button class="brief-clear-btn" onclick="briefClearInfo()">清除 Clear</button></div>
       <div class="brief-grid">
         <div class="brief-field"><label>Dep Date/Time</label><div id="brief-dep-dt" class="brief-auto-val" contenteditable="true">—</div></div>
         <div class="brief-field"><label>TPE Gate</label><input type="text" id="brief-gate" placeholder="—"></div>
@@ -445,6 +445,7 @@ export function getSpaHtmlBody(): string {
         <div class="brief-field"><label>Cruise Altitude</label><input type="text" id="brief-ofp" placeholder="manual input"></div>
         <div class="brief-field"><label>Flight Time</label><input type="text" id="brief-ft" placeholder="manual input"></div>
       </div>
+      <div id="brief-ot-warn" style="display:none;align-items:center;gap:8px;margin-top:8px;padding:8px 10px;background:rgba(251,191,36,.12);border:1px solid #fbbf24;border-radius:8px;font-size:.82em;color:var(--text)"></div>
     </div>
 
     <div class="brief-section">
@@ -1502,7 +1503,7 @@ export function getSpaHtmlBody(): string {
       <button class="tab-util-btn tab-install-btn" id="tab-install-btn" onclick="showInstallGuide()" style="display:none">
         <span>📲</span>安裝
       </button>
-      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer;text-decoration:underline" onclick="showAbout()">V8.0.20</span>
+      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer;text-decoration:underline" onclick="showAbout()">V8.0.21</span>
     </div>
   </div>
 </div>
@@ -1533,7 +1534,12 @@ export function getSpaHtmlBody(): string {
       <div style="color:var(--muted)">Best experience on iPad in landscape mode. Android devices may not display correctly.</div>
     </div>
     <div style="max-height:50vh;overflow-y:auto;-webkit-overflow-scrolling:touch;margin-bottom:10px">
-    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V8.0.20</div>
+    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V8.0.21</div>
+    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
+      <div>Briefing 新增兩個功能：(1) FLIGHT INFO/DATA 標題旁加「🗺️ Briefing Room」藍色超連結，點擊開新 tab 顯示 briefing room 平面圖，由 server <code>/briefing-room</code> route 提供（7 天 cache）。(2) 輸入 Flight Time 時自動比對 roster 當日表定 FT；邏輯：實際 ≥ 表定 − 10 分鐘就顯示黃色警告框（實際越長 OT 機率越高），含「→ Overtime」按鈕可直接跳去 Overtime subtab。匹配 duty 日期範圍 <code>[reportTime ~ endTime]</code> ± 1 天容錯（處理外站時區差 + 同日來回），冬夏班表不跨月估算。沒同步當天 roster 就靜默不顯示。警告在清除/改航班號/FT 大幅縮短時自動消失。</div>
+      <div>Briefing gains two features: (1) 🗺️ Briefing Room blue underlined link in the FLIGHT INFO/DATA header — opens floor plan in a new tab, served via <code>/briefing-room</code> route (7-day cache). (2) Entering Flight Time auto-compares against that day's scheduled FT from roster; logic: if actual FT ≥ scheduled − 10 min, shows a yellow warning banner (longer actual = higher OT chance) with a "→ Overtime" button. Matches duty's <code>[reportTime ~ endTime]</code> range with ±1 day tolerance (handles outstation timezone + same-day turns), no cross-month estimation. Silently hides if roster not synced for that day. Warning auto-clears on field clear / flight no. change / FT drop below threshold.</div>
+    </div>
+    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V8.0.20</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
       <div>Briefing 資料儲存改為每字 <code>oninput</code> debounced 500ms 自動存（不用等 blur），整份 briefing（Block 1 + Block 2 notes/POB 全部）都即時同步。搜尋列右邊新增儲存狀態小圓點：🟡 存檔中 / 🟢 已儲存。blur 保留當備胎避免關 tab race。</div>
       <div>Briefing auto-save switched from blur to <code>input</code> event (debounced 500ms) — no more waiting for field blur; full briefing (Block 1 + Block 2 notes/POB) syncs in real time. Tiny status dot next to the search row: 🟡 saving / 🟢 saved. Blur kept as fallback to guard against tab-close races.</div>

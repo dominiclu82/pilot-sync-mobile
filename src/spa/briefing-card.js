@@ -318,6 +318,7 @@ function _briefFillFromFids(fno, data) {
 
   _briefSave();
   if (typeof _briefUpdatePob === 'function') _briefUpdatePob();
+  if (typeof _briefCheckOvertime === 'function') _briefCheckOvertime();
   // 查詢成功 → 存歷史 snapshot（eid→server / 無eid→localStorage）
   if (typeof _briefSaveHistory === 'function') _briefSaveHistory(true);
 
@@ -532,6 +533,7 @@ function briefClearInfo() {
   var dwx = document.getElementById('brief-dwx');
   if (dwx) dwx.innerHTML = '—';
   _briefSave();
+  if (typeof _briefCheckOvertime === 'function') _briefCheckOvertime();
 }
 
 function briefClearAll() {
@@ -541,6 +543,7 @@ function briefClearAll() {
   _briefFidsCache = null;
   briefClearInfo();
   briefClearNotes();
+  if (typeof _briefCheckOvertime === 'function') _briefCheckOvertime();
 }
 
 function briefClearNotes() {
@@ -692,6 +695,7 @@ function _briefApplySnapshot(obj) {
     if (el.tagName === 'TEXTAREA') { el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; }
   });
   if (typeof _briefUpdatePob === 'function') _briefUpdatePob();
+  if (typeof _briefCheckOvertime === 'function') _briefCheckOvertime();
 }
 function _briefLocalHistKey() { return 'crewsync_brief_hist'; }
 function _briefLocalHistGet() {
@@ -971,4 +975,159 @@ document.addEventListener('DOMContentLoaded', function() {
   _briefAttachAutoSave();
   // 有些元素可能是後來才出現的，briefInit 後再補綁一次
   setTimeout(_briefAttachAutoSave, 200);
+});
+
+/* ═════════════════════════════════════════════════════════════
+   Overtime 提醒：輸入 FT 跟 roster 表定 FT 比對，差 ≤ 10 分鐘就提示
+   ═════════════════════════════════════════════════════════════ */
+// 把 "0320" / "03:20" / "3:20" → 分鐘。無效回 null
+function _briefParseFT(s) {
+  if (!s) return null;
+  s = String(s).trim();
+  var m = s.match(/^(\d{1,2}):(\d{2})$/);
+  if (m) { return parseInt(m[1], 10) * 60 + parseInt(m[2], 10); }
+  m = s.match(/^(\d{3,4})$/);
+  if (m) { var p = m[1].padStart(4, '0'); return parseInt(p.substring(0, 2), 10) * 60 + parseInt(p.substring(2, 4), 10); }
+  return null;
+}
+// 日期 'YYYY-MM-DD' +- N 天 → 'YYYY-MM-DD'
+function _briefDateShift(dateStr, deltaDays) {
+  var p = String(dateStr).split('-');
+  if (p.length !== 3) return dateStr;
+  var d = new Date(parseInt(p[0],10), parseInt(p[1],10) - 1, parseInt(p[2],10));
+  d.setDate(d.getDate() + deltaDays);
+  return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+}
+// 解析 "2025.Dec.28 2215L" → "2025-12-28"
+function _briefParseDutyDate(str) {
+  if (!str) return null;
+  var m = String(str).match(/(\d{4})\.(\w{3})\.(\d{1,2})/);
+  if (!m) return null;
+  var months = { Jan:1, Feb:2, Mar:3, Apr:4, May:5, Jun:6, Jul:7, Aug:8, Sep:9, Oct:10, Nov:11, Dec:12 };
+  var mon = months[m[2].charAt(0).toUpperCase() + m[2].slice(1).toLowerCase()];
+  if (!mon) return null;
+  return m[1] + '-' + String(mon).padStart(2, '0') + '-' + String(parseInt(m[3], 10)).padStart(2, '0');
+}
+// 嚴格匹配：找 duty 的日期範圍 [reportTime_date, endTime_date] 包含目標日期，且航班號相符
+// 夏冬班表時間不同，必須用當天 roster，不可用其他月份估算
+function _briefFindRosterFlight(flightNo, dateStr) {
+  var eid = _briefGetEid();
+  if (!eid || !flightNo || !dateStr) return null;
+  var mm = dateStr.slice(0, 7);
+  var ym = mm.split('-');
+  var y = parseInt(ym[0], 10), m = parseInt(ym[1], 10);
+  if (isNaN(y) || isNaN(m)) return null;
+  var months = [];
+  var pm = m - 1, py = y; if (pm < 1) { pm = 12; py--; }
+  var nm = m + 1, ny = y; if (nm > 12) { nm = 1; ny++; }
+  months.push(py + '-' + String(pm).padStart(2, '0'));
+  months.push(y + '-' + String(m).padStart(2, '0'));
+  months.push(ny + '-' + String(nm).padStart(2, '0'));
+  for (var mi = 0; mi < months.length; mi++) {
+    var raw;
+    try { raw = localStorage.getItem('crewsync_roster_' + eid + '_' + months[mi]); } catch(e) { continue; }
+    if (!raw) continue;
+    var data;
+    try { data = JSON.parse(raw); } catch(e) { continue; }
+    var duties = Array.isArray(data) ? data : (data.duties || []);
+    for (var di = 0; di < duties.length; di++) {
+      var d = duties[di];
+      var startDate = _briefParseDutyDate(d.reportTime);
+      var endDate = _briefParseDutyDate(d.endTime);
+      if (!startDate) continue;
+      // 容錯：target ± 1 天的範圍跟 duty 範圍有交集就算（處理外站時區差）
+      var targetMin = _briefDateShift(dateStr, -1);
+      var targetMax = _briefDateShift(dateStr, +1);
+      var dutyEnd = endDate || startDate;
+      if (targetMax < startDate || targetMin > dutyEnd) continue;
+      for (var fi = 0; fi < (d.flights || []).length; fi++) {
+        if ((d.flights[fi].flightNo || '').toUpperCase() === flightNo.toUpperCase()) {
+          return d.flights[fi];
+        }
+      }
+    }
+  }
+  return null;
+}
+// 算 flight 的表定 FT 分鐘（優先用 flightTime 欄，fallback 用 dep/arr + tz）
+function _briefCalcSchedFTmin(fl) {
+  if (!fl) return null;
+  if (fl.flightTime) {
+    var p = _briefParseFT(fl.flightTime);
+    if (p != null) return p;
+  }
+  // fallback: UTC 版本優先，否則 local 轉 UTC
+  var parseTime = function(str) {
+    if (!str) return null;
+    var s = String(str).trim();
+    var mm = s.match(/^(\d{4})[ZLzl]?/);
+    if (mm) return { hh: parseInt(mm[1].substring(0, 2), 10), mm: parseInt(mm[1].substring(2, 4), 10) };
+    var m2 = s.match(/(\d{1,2}):(\d{2})/);
+    if (m2) return { hh: parseInt(m2[1], 10), mm: parseInt(m2[2], 10) };
+    return null;
+  };
+  var depU = parseTime(fl.depTimeUtc);
+  var arrU = parseTime(fl.arrTimeUtc);
+  if (depU && arrU) {
+    var d = depU.hh * 60 + depU.mm, a = arrU.hh * 60 + arrU.mm;
+    return (a - d + 1440) % 1440;
+  }
+  // local + tz offset
+  var depL = parseTime(fl.depTime);
+  var arrL = parseTime(fl.arrTime);
+  if (depL && arrL) {
+    var oOff = _briefTzOffset[(fl.origin || '').toUpperCase()];
+    var dOff = _briefTzOffset[(fl.dest || '').toUpperCase()];
+    if (oOff === undefined || dOff === undefined) return null;
+    var dUtc = ((depL.hh * 60 + depL.mm) - oOff * 60 + 1440) % 1440;
+    var aUtc = ((arrL.hh * 60 + arrL.mm) - dOff * 60 + 1440) % 1440;
+    return (aUtc - dUtc + 1440) % 1440;
+  }
+  return null;
+}
+function _briefFmtMin(mins) {
+  if (mins == null) return '—';
+  var h = Math.floor(mins / 60), m = mins % 60;
+  return String(h).padStart(2, '0') + ':' + String(m).padStart(2, '0');
+}
+function _briefCheckOvertime() {
+  var warnEl = document.getElementById('brief-ot-warn');
+  if (!warnEl) return;
+  var ftEl = document.getElementById('brief-ft');
+  var fnoEl = document.getElementById('brief-fno');
+  if (!ftEl || !fnoEl) { warnEl.style.display = 'none'; return; }
+  var actualMin = _briefParseFT(ftEl.value);
+  var fno = (fnoEl.value || '').trim().toUpperCase();
+  if (actualMin == null || !fno) { warnEl.style.display = 'none'; return; }
+  var date = _briefLoadedFlightDate || _briefGetDate();
+  var fl = _briefFindRosterFlight(fno, date);
+  if (!fl) { warnEl.style.display = 'none'; return; }
+  var schedMin = _briefCalcSchedFTmin(fl);
+  if (schedMin == null) { warnEl.style.display = 'none'; return; }
+  // 邏輯：實際 >= 表定-10 就警告（實際更久 = OT 機率高；短於表定 10min 以內 = 邊界）
+  if (actualMin >= schedMin - 10) {
+    var delta = actualMin - schedMin;  // 正 = 長，負 = 短
+    var deltaTxt = delta >= 0 ? ('長 <b>' + delta + '</b> 分鐘') : ('短 <b>' + (-delta) + '</b> 分鐘');
+    warnEl.style.display = 'flex';
+    warnEl.innerHTML = '<span style="flex:1">⚠️ 表定 FT <b>' + _briefFmtMin(schedMin) + '</b>，實際' + deltaTxt + '，可能有 OT</span>'
+      + '<button onclick="switchBriefingTab(\'overtime\', document.getElementById(\'subtabBtn-overtime\'))" style="background:#fbbf24;color:#1a202c;border:none;border-radius:6px;padding:4px 10px;font-size:.85em;font-weight:700;cursor:pointer;white-space:nowrap">→ Overtime</button>';
+  } else {
+    warnEl.style.display = 'none';
+  }
+}
+window._briefCheckOvertime = _briefCheckOvertime;
+// 任何可能影響判斷的欄位變動都要重算 OT 警告
+document.addEventListener('DOMContentLoaded', function() {
+  var attach = function() {
+    ['brief-ft', 'brief-fno'].forEach(function(id) {
+      var el = document.getElementById(id);
+      if (el && !el._briefOtBound) {
+        el._briefOtBound = true;
+        el.addEventListener('input', _briefCheckOvertime);
+        el.addEventListener('blur', _briefCheckOvertime);
+      }
+    });
+  };
+  attach();
+  setTimeout(attach, 300);
 });

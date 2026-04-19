@@ -432,6 +432,15 @@ app.get(REDIRECT_PATH, oauthCallback);
 app.get('/api/oauth2callback', oauthCallback); // 雲端路徑
 app.get('/oauth/callback', oauthCallback);     // 本機 fallback
 
+// ── Briefing Room 平面圖 ──────────────────────────────────────────────────────
+app.get('/briefing-room', (_req, res) => {
+  const p = path.resolve(process.cwd(), 'src', 'spa', 'briefing-room.jpg');
+  res.setHeader('Cache-Control', 'public, max-age=604800'); // 7 天快取
+  res.sendFile(p, (err) => {
+    if (err) res.status(404).send('briefing room image not found');
+  });
+});
+
 // ── METAR proxy ────────────────────────────────────────────────────────────────
 app.get('/api/metar', async (req, res) => {
   try {
@@ -465,7 +474,7 @@ app.get('/sw.js', (_req, res) => {
   res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
   res.setHeader('Service-Worker-Allowed', '/');
   res.send(`
-const CACHE = 'crewsync-v8020';
+const CACHE = 'crewsync-v8021';
 const SHELL = ['/', '/main', '/share'];
 self.addEventListener('install', e => {
   e.waitUntil(
