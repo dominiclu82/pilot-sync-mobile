@@ -293,14 +293,15 @@ async function fetchWeather(locs: Array<{ name: string; lat: number; lon: number
 // ────────────────────────────────────────────────────────────────────
 // 2) cnyes 台股（批次）
 // ────────────────────────────────────────────────────────────────────
-async function cnyesBatch(codes, marketPrefix) {
+// 單一 chunk 的 cnyes 呼叫
+async function cnyesBatchOne(codes, marketPrefix) {
   if (!codes || codes.length === 0) return {};
   const symbols = codes.map(c => `${marketPrefix}:${c}:STOCK`).join(',');
   const url = `https://ws.api.cnyes.com/ws/api/v1/quote/quotes/${symbols}`;
   const r = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0' } });
   if (!r.ok) return {};
   const json = await r.json();
-  const out = {};
+  const out: any = {};
   for (const row of (json.data || [])) {
     const code = row['200010'];
     if (!code) continue;
@@ -316,6 +317,20 @@ async function cnyesBatch(codes, marketPrefix) {
       w52low: row['76'] != null ? Number(row['76']) : null,
     };
   }
+  return out;
+}
+// Chunking：每 50 支拆一批，避免 URL 過長 / cnyes 拒絕大請求
+async function cnyesBatch(codes, marketPrefix) {
+  if (!codes || codes.length === 0) return {};
+  const CHUNK = 50;
+  const out: any = {};
+  const chunks = [];
+  for (let i = 0; i < codes.length; i += CHUNK) chunks.push(codes.slice(i, i + CHUNK));
+  // 並行打每個 chunk，單 chunk 失敗不影響其他
+  const results = await Promise.all(chunks.map(async (ch) => {
+    try { return await cnyesBatchOne(ch, marketPrefix); } catch (e) { return {}; }
+  }));
+  for (const r of results) Object.assign(out, r);
   return out;
 }
 

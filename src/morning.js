@@ -11,8 +11,8 @@ import { Readability } from '@mozilla/readability';
 import { ROOT } from './config.js';
 import { buildMorningReport, fetchSection } from './morning-builder.js';
 
-export const MORNING_VERSION = 'V1.3.08';
-const MORNING_CACHE = 'morning-v1-3-08';
+export const MORNING_VERSION = 'V1.3.09';
+const MORNING_CACHE = 'morning-v1-3-09';
 
 // ─── Postgres ────────────────────────────────────────────────────────
 let _pgPool: pg.Pool | null = null;
@@ -1914,6 +1914,11 @@ a:active { opacity: 0.6; }
     <hr style="border:none;border-top:1px solid var(--border);margin:12px 0">
     <div class="changelog-v">${MORNING_VERSION}</div>
     <div class="changelog-txt">
+      設定放寬：取消天氣/台股/美股/匯率的 hard cap（原本 10/20/20/15 上限），改為 soft warning —超過閾值（天氣 30、台股 30、美股 30、匯率 20）顯示黃色提示但不阻擋，使用者自己決定要選多少。後端 cnyesBatch 加 chunking（每 50 支拆一批並行請求），避免 URL 過長被 API 拒絕；單 chunk 失敗不影響其他，UI 顯示「—」，網站不會因為使用者瘋狂勾選而崩潰。<br>
+      Settings loosened: removed hard caps on weather/TW stocks/US stocks/FX (previously 10/20/20/15), replaced with soft warnings (30/30/30/20) that show a yellow hint without blocking — users choose their own limits. Backend cnyesBatch now chunks (50 codes per request, parallel), avoiding URL-too-long API rejections; single-chunk failures fall back to "—" display so the site never crashes no matter how aggressively a user picks.
+    </div>
+    <div class="changelog-v old">V1.3.08</div>
+    <div class="changelog-txt">
       修 bug：<code>runBuildAll</code>（cron 06:30 + 啟動恢復）會漏掉 <code>_fetched_at</code> 欄位導致使用者時間戳被重置。<code>extractUserSubset</code> 補上四個欄位的複製。<br>
       Bugfix: <code>runBuildAll</code> (06:30 cron + startup recovery) was dropping <code>*_fetched_at</code> fields when extracting per-user subsets, resetting section timestamps. <code>extractUserSubset</code> now propagates all four fields.
     </div>
@@ -2016,7 +2021,7 @@ a:active { opacity: 0.6; }
 
     <div class="set-sec" data-section="wx">
       <h4>🌤️ 天氣地點</h4>
-      <p>勾選預設或手動輸入，最多 10 個</p>
+      <p>勾選預設或手動輸入，建議 &lt; 30 個（絕對上限 500）</p>
       <div class="wx-counter" id="wx-counter">已選 0 / 10</div>
       <div id="wx-presets"></div>
       <div style="margin-top:14px">
@@ -2027,8 +2032,8 @@ a:active { opacity: 0.6; }
 
     <div class="set-sec" data-section="tw">
       <h4>📈 台股</h4>
-      <p>勾選預設或手動輸入代號，最多 20 支</p>
-      <div class="wx-counter" id="tw-counter">已選 0 / 20</div>
+      <p>勾選預設或手動輸入代號（建議 &lt; 30 支）</p>
+      <div class="wx-counter" id="tw-counter">已選 0</div>
       <div id="tw-presets"></div>
       <div style="margin-top:14px">
         <p style="margin-top:0">手動加代號（用逗號分隔，例如 4968,3515）</p>
@@ -2043,8 +2048,8 @@ a:active { opacity: 0.6; }
 
     <div class="set-sec" data-section="us">
       <h4>🇺🇸 美股</h4>
-      <p>勾選預設或手動輸入代號，最多 20 支</p>
-      <div class="wx-counter" id="us-counter">已選 0 / 20</div>
+      <p>勾選預設或手動輸入代號（建議 &lt; 30 支）</p>
+      <div class="wx-counter" id="us-counter">已選 0</div>
       <div id="us-presets"></div>
       <div style="margin-top:14px">
         <p style="margin-top:0">手動加代號（用逗號分隔，例如 GME,AMC）</p>
@@ -2059,8 +2064,8 @@ a:active { opacity: 0.6; }
 
     <div class="set-sec" data-section="fx">
       <h4>💱 匯率</h4>
-      <p>勾選常用貨幣對（不限對台幣），最多 15 個</p>
-      <div class="wx-counter" id="fx-counter">已選 0 / 15</div>
+      <p>勾選常用貨幣對（不限對台幣，建議 &lt; 20 個）</p>
+      <div class="wx-counter" id="fx-counter">已選 0</div>
       <div id="fx-presets"></div>
       <div style="margin-top:14px">
         <p style="margin-top:0">手動加貨幣對（用逗號分隔，例如 CHF/TWD,USD/THB）</p>
@@ -2773,7 +2778,8 @@ const WX_PRESETS = {
 };
 const WX_PRESET_MAP = {};
 Object.values(WX_PRESETS).forEach(arr => arr.forEach(p => { WX_PRESET_MAP[p[0]] = { id: p[0], name: p[1], lat: p[2], lon: p[3] }; }));
-const WX_MAX = 10;
+// 沒有絕對上限（使用者自己的選擇），只有 soft warning 超過 N 提示
+const WX_SOFT_WARN = 30;
 
 // 三層架構：區域 → 縣市(WX_PRESETS key) → 行政區(checkbox)
 // 台灣的 region 先包在「台灣」super-region 底下
@@ -2873,9 +2879,10 @@ const FX_PRESETS = {
 const FX_PRESET_SET = new Set();
 Object.values(FX_PRESETS).forEach(arr => arr.forEach(p => FX_PRESET_SET.add(p)));
 
-const TW_MAX = 20;
-const US_MAX = 20;
-const FX_MAX = 15;
+// 沒絕對上限，soft warning 閾值
+const TW_SOFT_WARN = 30;
+const US_SOFT_WARN = 30;
+const FX_SOFT_WARN = 20;
 
 const DEFAULTS = {
   wxPresets: ['tw-taipei', 'tw-guishan'],
@@ -2919,11 +2926,9 @@ function getActiveWxLocs() {
   const out = [];
   for (const id of presetIds) {
     if (WX_PRESET_MAP[id]) out.push(WX_PRESET_MAP[id]);
-    if (out.length >= WX_MAX) return out;
   }
   for (const c of custom) {
     if (c && c.name && typeof c.lat === 'number' && typeof c.lon === 'number') out.push(c);
-    if (out.length >= WX_MAX) return out;
   }
   return out;
 }
@@ -4234,10 +4239,6 @@ function renderWxPresets() {
       if (idx >= 0) {
         _wxSelectedIds.splice(idx, 1);
       } else {
-        if (_wxSelectedIds.length + countWxCustomValid() >= WX_MAX) {
-          alert('最多只能選 ' + WX_MAX + ' 個地點');
-          return;
-        }
         _wxSelectedIds.push(id);
       }
       renderWxPresets();
@@ -4249,8 +4250,22 @@ function renderWxPresets() {
 function updateWxCounter() {
   const total = _wxSelectedIds.length + countWxCustomValid();
   const el = document.getElementById('wx-counter');
-  el.textContent = '已選 ' + total + ' / ' + WX_MAX;
-  el.classList.toggle('full', total >= WX_MAX);
+  el.textContent = '已選 ' + total;
+  el.classList.toggle('full', total >= WX_SOFT_WARN);
+  // 動態 soft warning（在 counter 下方）
+  let warn = document.getElementById('wx-soft-warn');
+  if (!warn) {
+    warn = document.createElement('div');
+    warn.id = 'wx-soft-warn';
+    warn.style.cssText = 'font-size:.72em;color:#f59e0b;margin:4px 0 8px;line-height:1.4;display:none';
+    el.parentNode.insertBefore(warn, el.nextSibling);
+  }
+  if (total >= WX_SOFT_WARN) {
+    warn.style.display = 'block';
+    warn.textContent = '⚠️ 已選 ' + total + ' 個地點，載入時間會變長（建議 < ' + WX_SOFT_WARN + '）';
+  } else {
+    warn.style.display = 'none';
+  }
 }
 
 // ── Stocks / FX shared helpers ──
@@ -4300,10 +4315,6 @@ function renderTwPresets() {
       if (idx >= 0) {
         _twSelected.splice(idx, 1);
       } else {
-        if (_twSelected.length + countCsv('set-tw-custom') >= TW_MAX) {
-          alert('最多只能選 ' + TW_MAX + ' 支台股');
-          return;
-        }
         _twSelected.push(code);
       }
       renderTwPresets();
@@ -4315,8 +4326,21 @@ function renderTwPresets() {
 function updateTwCounter() {
   const total = _twSelected.length + countCsv('set-tw-custom');
   const el = document.getElementById('tw-counter');
-  el.textContent = '已選 ' + total + ' / ' + TW_MAX;
-  el.classList.toggle('full', total >= TW_MAX);
+  el.textContent = '已選 ' + total;
+  el.classList.toggle('full', total >= TW_SOFT_WARN);
+  let warn = document.getElementById('tw-soft-warn');
+  if (!warn) {
+    warn = document.createElement('div');
+    warn.id = 'tw-soft-warn';
+    warn.style.cssText = 'font-size:.72em;color:#f59e0b;margin:4px 0 8px;line-height:1.4;display:none';
+    el.parentNode.insertBefore(warn, el.nextSibling);
+  }
+  if (total >= TW_SOFT_WARN) {
+    warn.style.display = 'block';
+    warn.textContent = '⚠️ 已選 ' + total + ' 支台股，載入時間會變長（建議 < ' + TW_SOFT_WARN + '）';
+  } else {
+    warn.style.display = 'none';
+  }
   renderHoldingsTable('tw');
 }
 
@@ -4359,10 +4383,6 @@ function renderUsPresets() {
       if (idx >= 0) {
         _usSelected.splice(idx, 1);
       } else {
-        if (_usSelected.length + countCsv('set-us-custom') >= US_MAX) {
-          alert('最多只能選 ' + US_MAX + ' 支美股');
-          return;
-        }
         _usSelected.push(code);
       }
       renderUsPresets();
@@ -4374,8 +4394,21 @@ function renderUsPresets() {
 function updateUsCounter() {
   const total = _usSelected.length + countCsv('set-us-custom');
   const el = document.getElementById('us-counter');
-  el.textContent = '已選 ' + total + ' / ' + US_MAX;
-  el.classList.toggle('full', total >= US_MAX);
+  el.textContent = '已選 ' + total;
+  el.classList.toggle('full', total >= US_SOFT_WARN);
+  let warn = document.getElementById('us-soft-warn');
+  if (!warn) {
+    warn = document.createElement('div');
+    warn.id = 'us-soft-warn';
+    warn.style.cssText = 'font-size:.72em;color:#f59e0b;margin:4px 0 8px;line-height:1.4;display:none';
+    el.parentNode.insertBefore(warn, el.nextSibling);
+  }
+  if (total >= US_SOFT_WARN) {
+    warn.style.display = 'block';
+    warn.textContent = '⚠️ 已選 ' + total + ' 支美股，載入時間會變長（建議 < ' + US_SOFT_WARN + '）';
+  } else {
+    warn.style.display = 'none';
+  }
   renderHoldingsTable('us');
 }
 
@@ -4417,10 +4450,6 @@ function renderFxPresets() {
       if (idx >= 0) {
         _fxSelected.splice(idx, 1);
       } else {
-        if (_fxSelected.length + countCsv('set-fx-custom') >= FX_MAX) {
-          alert('最多只能選 ' + FX_MAX + ' 個匯率');
-          return;
-        }
         _fxSelected.push(pair);
       }
       renderFxPresets();
@@ -4432,8 +4461,21 @@ function renderFxPresets() {
 function updateFxCounter() {
   const total = _fxSelected.length + countCsv('set-fx-custom');
   const el = document.getElementById('fx-counter');
-  el.textContent = '已選 ' + total + ' / ' + FX_MAX;
-  el.classList.toggle('full', total >= FX_MAX);
+  el.textContent = '已選 ' + total;
+  el.classList.toggle('full', total >= FX_SOFT_WARN);
+  let warn = document.getElementById('fx-soft-warn');
+  if (!warn) {
+    warn = document.createElement('div');
+    warn.id = 'fx-soft-warn';
+    warn.style.cssText = 'font-size:.72em;color:#f59e0b;margin:4px 0 8px;line-height:1.4;display:none';
+    el.parentNode.insertBefore(warn, el.nextSibling);
+  }
+  if (total >= FX_SOFT_WARN) {
+    warn.style.display = 'block';
+    warn.textContent = '⚠️ 已選 ' + total + ' 個匯率，載入時間會變長（建議 < ' + FX_SOFT_WARN + '）';
+  } else {
+    warn.style.display = 'none';
+  }
 }
 
 // ── 設定 modal：持倉表格 ────────────────────────────────────────
