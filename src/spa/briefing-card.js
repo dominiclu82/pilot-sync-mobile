@@ -977,6 +977,23 @@ document.addEventListener('DOMContentLoaded', function() {
   setTimeout(_briefAttachAutoSave, 200);
 });
 
+/* ── Briefing Room 平面圖 modal ── */
+function _openBriefRoom() {
+  var wrap = document.getElementById('brief-room-wrap');
+  var img = document.getElementById('brief-room-img');
+  // 確保 src 是 /briefing-room（初始 src="" 讀出來會是 current URL，需明確設）
+  if (img && !(img.getAttribute('src') || '').endsWith('/briefing-room')) {
+    img.src = '/briefing-room';
+  }
+  if (wrap) wrap.style.display = 'flex';
+}
+function _closeBriefRoom() {
+  var wrap = document.getElementById('brief-room-wrap');
+  if (wrap) wrap.style.display = 'none';
+}
+window._openBriefRoom = _openBriefRoom;
+window._closeBriefRoom = _closeBriefRoom;
+
 /* ═════════════════════════════════════════════════════════════
    Overtime 提醒：輸入 FT 跟 roster 表定 FT 比對，差 ≤ 10 分鐘就提示
    ═════════════════════════════════════════════════════════════ */

@@ -398,6 +398,12 @@ export function getSpaHtmlBody(): string {
     <div id="brief-sync-hint" style="font-size:.68em;color:var(--muted);padding:4px 2px;opacity:.75"></div>
 
     <!-- Briefing 歷史 modal（月曆式） -->
+    <!-- Briefing Room 平面圖 modal (PWA 也能關) -->
+    <div id="brief-room-wrap" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.92);z-index:300;align-items:center;justify-content:center;overflow:auto;padding:env(safe-area-inset-top) 10px env(safe-area-inset-bottom)" onclick="if(event.target===this)_closeBriefRoom()">
+      <button onclick="_closeBriefRoom()" style="position:fixed;top:calc(env(safe-area-inset-top) + 10px);right:14px;width:44px;height:44px;border-radius:50%;border:none;background:rgba(255,255,255,.18);color:#fff;font-size:1.3em;cursor:pointer;z-index:301;line-height:1;display:flex;align-items:center;justify-content:center">✕</button>
+      <img id="brief-room-img" alt="Briefing Room 平面圖" style="max-width:100%;max-height:100%;object-fit:contain;touch-action:pinch-zoom;user-select:none">
+    </div>
+
     <div id="brief-hist-wrap" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:200;align-items:flex-start;justify-content:center;padding:40px 10px;overflow-y:auto" onclick="if(event.target===this)_briefCloseHistory()">
       <div style="background:var(--card);border:1px solid var(--border);border-radius:12px;max-width:480px;width:100%;padding:16px;color:var(--text)">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
@@ -434,7 +440,7 @@ export function getSpaHtmlBody(): string {
     </style>
 
     <div class="brief-section">
-      <div class="brief-section-header"><span>FLIGHT INFO / DATA <span style="font-size:.75em;color:var(--muted);font-weight:400;opacity:.8">auto-filled · editable</span> <a href="/briefing-room" target="_blank" style="font-size:.78em;color:#60a5fa;text-decoration:underline;font-weight:400;margin-left:8px">🗺️ Briefing Room</a></span><button class="brief-clear-btn" onclick="briefClearInfo()">清除 Clear</button></div>
+      <div class="brief-section-header"><span>FLIGHT INFO / DATA <span style="font-size:.75em;color:var(--muted);font-weight:400;opacity:.8">auto-filled · editable</span> <a href="/briefing-room" onclick="event.preventDefault();_openBriefRoom()" style="font-size:.78em;color:#60a5fa;text-decoration:underline;font-weight:400;margin-left:8px">🗺️ Briefing Room</a></span><button class="brief-clear-btn" onclick="briefClearInfo()">清除 Clear</button></div>
       <div class="brief-grid">
         <div class="brief-field"><label>Dep Date/Time</label><div id="brief-dep-dt" class="brief-auto-val" contenteditable="true">—</div></div>
         <div class="brief-field"><label>TPE Gate</label><input type="text" id="brief-gate" placeholder="—"></div>
@@ -1503,7 +1509,7 @@ export function getSpaHtmlBody(): string {
       <button class="tab-util-btn tab-install-btn" id="tab-install-btn" onclick="showInstallGuide()" style="display:none">
         <span>📲</span>安裝
       </button>
-      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer;text-decoration:underline" onclick="showAbout()">V8.0.21</span>
+      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer;text-decoration:underline" onclick="showAbout()">V8.0.22</span>
     </div>
   </div>
 </div>
@@ -1534,7 +1540,12 @@ export function getSpaHtmlBody(): string {
       <div style="color:var(--muted)">Best experience on iPad in landscape mode. Android devices may not display correctly.</div>
     </div>
     <div style="max-height:50vh;overflow-y:auto;-webkit-overflow-scrolling:touch;margin-bottom:10px">
-    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V8.0.21</div>
+    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V8.0.22</div>
+    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
+      <div>修正 V8.0.21 的 🗺️ Briefing Room 連結在 PWA（iPad/手機安裝版）沒地方關閉的問題。改為 in-app modal viewer：點連結不再開新 tab，而是在 app 內彈全螢幕黑底 modal，右上角 ✕ 按鈕（避開 notch safe-area），點空白處也能關，圖片支援雙指縮放（<code>touch-action: pinch-zoom</code>）。修正初始 <code>src=""</code> 被瀏覽器解讀為當前頁 URL 導致 bug。</div>
+      <div>Fixed V8.0.21 issue where the 🗺️ Briefing Room link had no close button in PWA mode (installed iPad/phone app). Replaced new-tab with in-app modal viewer: tap the link now opens a full-screen black-backdrop modal inside the app, with a ✕ button top-right (respects notch safe-area), tap outside to close, pinch-zoom supported. Fixed a bug where initial <code>src=""</code> was resolved to current page URL by browsers.</div>
+    </div>
+    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V8.0.21</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
       <div>Briefing 新增兩個功能：(1) FLIGHT INFO/DATA 標題旁加「🗺️ Briefing Room」藍色超連結，點擊開新 tab 顯示 briefing room 平面圖，由 server <code>/briefing-room</code> route 提供（7 天 cache）。(2) 輸入 Flight Time 時自動比對 roster 當日表定 FT；邏輯：實際 ≥ 表定 − 10 分鐘就顯示黃色警告框（實際越長 OT 機率越高），含「→ Overtime」按鈕可直接跳去 Overtime subtab。匹配 duty 日期範圍 <code>[reportTime ~ endTime]</code> ± 1 天容錯（處理外站時區差 + 同日來回），冬夏班表不跨月估算。沒同步當天 roster 就靜默不顯示。警告在清除/改航班號/FT 大幅縮短時自動消失。</div>
       <div>Briefing gains two features: (1) 🗺️ Briefing Room blue underlined link in the FLIGHT INFO/DATA header — opens floor plan in a new tab, served via <code>/briefing-room</code> route (7-day cache). (2) Entering Flight Time auto-compares against that day's scheduled FT from roster; logic: if actual FT ≥ scheduled − 10 min, shows a yellow warning banner (longer actual = higher OT chance) with a "→ Overtime" button. Matches duty's <code>[reportTime ~ endTime]</code> range with ±1 day tolerance (handles outstation timezone + same-day turns), no cross-month estimation. Silently hides if roster not synced for that day. Warning auto-clears on field clear / flight no. change / FT drop below threshold.</div>
