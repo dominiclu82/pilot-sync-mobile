@@ -1509,7 +1509,7 @@ export function getSpaHtmlBody(): string {
       <button class="tab-util-btn tab-install-btn" id="tab-install-btn" onclick="showInstallGuide()" style="display:none">
         <span>📲</span>安裝
       </button>
-      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer;text-decoration:underline" onclick="showAbout()">V8.0.23</span>
+      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer;text-decoration:underline" onclick="showAbout()">V8.0.24</span>
     </div>
   </div>
 </div>
@@ -1540,7 +1540,12 @@ export function getSpaHtmlBody(): string {
       <div style="color:var(--muted)">Best experience on iPad in landscape mode. Android devices may not display correctly.</div>
     </div>
     <div style="max-height:50vh;overflow-y:auto;-webkit-overflow-scrolling:touch;margin-bottom:10px">
-    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V8.0.23</div>
+    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V8.0.24</div>
+    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
+      <div>Roster sync（Playwright）穩定性大改造：(1) 所有 <code>.rbc-event-content</code> 的等待 timeout 從 2s 拉到 10s，慢網下不再因為 calendar 重繪稍慢就噴掉。(2) 外層 while 入口加 <code>try/catch</code>，超時就優雅 break 並保留已抓到的 duties，不再整份 sync 中止。(3) Click 失敗後檢查是否還在 calendar，有部分導航就 <code>goBack</code> 恢復再繼續。(4) 三個失敗點（outer_timeout / click_fail / goback_wait_fail）加詳細 log（<code>url / i / dutyText / .rbc 數量 / readyState</code>）+ 截圖到 <code>/tmp/sync-debug/{jobId}/{i}_{type}_{ts}.png</code>。(5) 最外層 try/catch 接 unhandled Playwright error，若已抓到 ≥1 筆 duty → 回傳 partial + 輸出部分 ICS；完全沒抓到則維持 fail 不包裝。(6) 新增 <code>GET /api/sync-debug/:syncId/:file?eid=xxx</code>（job.employeeId 比對）讓使用者下載除錯截圖；啟動時清除 24h 前的檔案。(7) 前端同步完成頁三態顯示：✅ 完整 / ⚠️ 部分成功（列出原因 + 截圖連結）/ ❌ 失敗。</div>
+      <div>Roster sync (Playwright) reliability overhaul: (1) all <code>.rbc-event-content</code> wait timeouts raised from 2s to 10s — slow networks no longer trip over calendar re-renders. (2) Outer while-loop entry wrapped in <code>try/catch</code> — timeouts break gracefully, preserving already-captured duties. (3) Click failure now checks if still on calendar, recovers via <code>goBack</code> if partial navigation occurred. (4) Three failure points (outer_timeout / click_fail / goback_wait_fail) now log detailed context (<code>url / i / dutyText / .rbc count / readyState</code>) and snapshot to <code>/tmp/sync-debug/{jobId}/{i}_{type}_{ts}.png</code>. (5) Outermost <code>try/catch</code> catches unhandled Playwright errors — returns partial with partial ICS if ≥1 duty captured, otherwise still fails cleanly (no dishonest wrapping). (6) New <code>GET /api/sync-debug/:syncId/:file?eid=xxx</code> (job.employeeId check) for downloading debug screenshots; 24h-old session dirs auto-cleaned on startup. (7) Sync-complete screen now has three states: ✅ full / ⚠️ partial (with reason + clickable screenshot links) / ❌ failed.</div>
+    </div>
+    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V8.0.23</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
       <div>FLIGHT INFO/DATA 標題的 🗺️ Briefing Room 連結旁，新增小輸入格（約 98px 寬，maxlength 4），placeholder <code>eg. ONT</code>、輸入自動轉大寫，讓使用者自己填 briefing room 代碼。欄位 <code>brief-room</code> 納入 <code>_briefFields</code> 一起 debounced auto-save、歷史同步、載入歷史會還原。</div>
       <div>Added a small input next to the 🗺️ Briefing Room link in the FLIGHT INFO/DATA header (~98px wide, maxlength 4, placeholder <code>eg. ONT</code>, auto-uppercase) so users can note their assigned briefing room code. Field <code>brief-room</code> is part of <code>_briefFields</code> — debounced auto-save, history sync, restored on history load.</div>

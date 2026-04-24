@@ -239,7 +239,7 @@ async function startSyncJob(params) {
     }
     pollStatus();
   } catch (err) {
-    showDone(false, [], null, err.message);
+    showDone('error', [], null, err.message);
   }
 }
 
@@ -265,7 +265,7 @@ function pollStatus() {
         logEl.textContent = logs.join('\\n') || '等待中...';
         logEl.scrollTop = logEl.scrollHeight;
       }
-      if (data.status === 'done' || data.status === 'error') {
+      if (data.status === 'done' || data.status === 'partial' || data.status === 'error') {
         clearInterval(pollTimer); pollTimer = null;
         if (data.newRefreshToken) {
           refreshToken = data.newRefreshToken;
@@ -286,24 +286,43 @@ function pollStatus() {
             }
           }
         }
-        showDone(data.status === 'done', data.logs, data.result, data.error);
+        showDone(data.status, data.logs, data.result, data.error, data.partialReason, data.debugFiles, data.employeeId, currentJobId);
       }
     } catch (err) {
       clearInterval(pollTimer); pollTimer = null;
-      showDone(false, [], null, '網路錯誤：' + err.message);
+      showDone('error', [], null, '網路錯誤：' + err.message);
     }
   }, 2000);
 }
 
-function showDone(success, logs, result, error) {
+function showDone(status, logs, result, error, partialReason, debugFiles, employeeId, jobId) {
   const titleEl = document.getElementById('done-title');
   const statsEl = document.getElementById('done-stats');
-  titleEl.textContent = success ? '✅ 同步完成！' : '❌ 同步失敗';
-  titleEl.style.color = success ? 'var(--success)' : 'var(--error)';
-  if (success && result) {
+  // 三態：done = 完整成功 / partial = 部分成功 / 其他 = 失敗
+  if (status === 'done') {
+    titleEl.textContent = '✅ 同步完成！';
+    titleEl.style.color = 'var(--success)';
+  } else if (status === 'partial') {
+    titleEl.textContent = '⚠️ 部分成功（未抓完整月）';
+    titleEl.style.color = '#f59e0b';
+  } else {
+    titleEl.textContent = '❌ 同步失敗';
+    titleEl.style.color = 'var(--error)';
+  }
+  if ((status === 'done' || status === 'partial') && result) {
     statsEl.innerHTML =
       mkStat(result.addedCount,'新增') + mkStat(result.updatedCount,'更新') +
       mkStat(result.deletedCount,'刪除') + mkStat(result.totalCount,'總計');
+    if (status === 'partial') {
+      const reason = partialReason || 'unknown';
+      let dbgHtml = '';
+      if (debugFiles && debugFiles.length && employeeId && jobId) {
+        dbgHtml = '<div style="font-size:.78em;margin-top:8px">除錯截圖：'
+          + debugFiles.map(function(f) { return '<a href="/api/sync-debug/' + encodeURIComponent(jobId) + '/' + encodeURIComponent(f) + '?eid=' + encodeURIComponent(employeeId) + '" target="_blank" style="color:#60a5fa;text-decoration:underline;margin-right:8px">' + f + '</a>'; }).join('')
+          + '</div>';
+      }
+      statsEl.innerHTML += '<div class="alert" style="width:100%;background:rgba(251,191,36,.12);border:1px solid #fbbf24;color:var(--text);padding:8px;border-radius:6px;margin-top:8px;font-size:.85em">原因：' + reason + dbgHtml + '</div>';
+    }
   } else {
     statsEl.innerHTML = error ? '<div class="alert alert-error" style="width:100%">' + error + '</div>' : '';
   }

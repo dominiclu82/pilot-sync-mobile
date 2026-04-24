@@ -1,5 +1,5 @@
-export function getSpaCoreJs() {
-    return `
+export function getSpaCoreJs(): string {
+  return `
 // ── Auto-reload on idle ──────────────────────────────────────────────────────
 var _hiddenAt = 0;
 document.addEventListener('visibilitychange', function() {
@@ -239,7 +239,7 @@ async function startSyncJob(params) {
     }
     pollStatus();
   } catch (err) {
-    showDone(false, [], null, err.message);
+    showDone('error', [], null, err.message);
   }
 }
 
@@ -265,7 +265,7 @@ function pollStatus() {
         logEl.textContent = logs.join('\\n') || '等待中...';
         logEl.scrollTop = logEl.scrollHeight;
       }
-      if (data.status === 'done' || data.status === 'error') {
+      if (data.status === 'done' || data.status === 'partial' || data.status === 'error') {
         clearInterval(pollTimer); pollTimer = null;
         if (data.newRefreshToken) {
           refreshToken = data.newRefreshToken;
@@ -273,6 +273,7 @@ function pollStatus() {
         }
         if (data.employeeId) {
           localStorage.setItem('crewsync_eid', data.employeeId);
+          if (data.crewName) localStorage.setItem('crewsync_crew_name', data.crewName);
           // 同步完成後直接把 rosterData 存 localStorage（離線用，不經 DB）
           if (data.rosterData && data.rosterData.length > 0) {
             var selYear = document.getElementById('sync-year');
@@ -285,24 +286,43 @@ function pollStatus() {
             }
           }
         }
-        showDone(data.status === 'done', data.logs, data.result, data.error);
+        showDone(data.status, data.logs, data.result, data.error, data.partialReason, data.debugFiles, data.employeeId, currentJobId);
       }
     } catch (err) {
       clearInterval(pollTimer); pollTimer = null;
-      showDone(false, [], null, '網路錯誤：' + err.message);
+      showDone('error', [], null, '網路錯誤：' + err.message);
     }
   }, 2000);
 }
 
-function showDone(success, logs, result, error) {
+function showDone(status, logs, result, error, partialReason, debugFiles, employeeId, jobId) {
   const titleEl = document.getElementById('done-title');
   const statsEl = document.getElementById('done-stats');
-  titleEl.textContent = success ? '✅ 同步完成！' : '❌ 同步失敗';
-  titleEl.style.color = success ? 'var(--success)' : 'var(--error)';
-  if (success && result) {
+  // 三態：done = 完整成功 / partial = 部分成功 / 其他 = 失敗
+  if (status === 'done') {
+    titleEl.textContent = '✅ 同步完成！';
+    titleEl.style.color = 'var(--success)';
+  } else if (status === 'partial') {
+    titleEl.textContent = '⚠️ 部分成功（未抓完整月）';
+    titleEl.style.color = '#f59e0b';
+  } else {
+    titleEl.textContent = '❌ 同步失敗';
+    titleEl.style.color = 'var(--error)';
+  }
+  if ((status === 'done' || status === 'partial') && result) {
     statsEl.innerHTML =
       mkStat(result.addedCount,'新增') + mkStat(result.updatedCount,'更新') +
       mkStat(result.deletedCount,'刪除') + mkStat(result.totalCount,'總計');
+    if (status === 'partial') {
+      const reason = partialReason || 'unknown';
+      let dbgHtml = '';
+      if (debugFiles && debugFiles.length && employeeId && jobId) {
+        dbgHtml = '<div style="font-size:.78em;margin-top:8px">除錯截圖：'
+          + debugFiles.map(function(f) { return '<a href="/api/sync-debug/' + encodeURIComponent(jobId) + '/' + encodeURIComponent(f) + '?eid=' + encodeURIComponent(employeeId) + '" target="_blank" style="color:#60a5fa;text-decoration:underline;margin-right:8px">' + f + '</a>'; }).join('')
+          + '</div>';
+      }
+      statsEl.innerHTML += '<div class="alert" style="width:100%;background:rgba(251,191,36,.12);border:1px solid #fbbf24;color:var(--text);padding:8px;border-radius:6px;margin-top:8px;font-size:.85em">原因：' + reason + dbgHtml + '</div>';
+    }
   } else {
     statsEl.innerHTML = error ? '<div class="alert alert-error" style="width:100%">' + error + '</div>' : '';
   }
@@ -317,6 +337,7 @@ function mkStat(n, label) {
 
 // ── Roster sub-tab ───────────────────────────────────────────────────────────
 var gcalInited = false;
+var _grpPanelInited = false;
 function _rosterDevUnlock(tab) {
   var pw = document.getElementById(tab === 'friends' ? 'friends-dev-pw' : 'roster-dev-pw').value;
   if (pw === 'qwertyui') {
@@ -346,6 +367,7 @@ function switchRosterTab(panel, btn) {
   document.getElementById('roster-' + panel).classList.add('active');
   if (panel === 'cal' && !gcalInited) { gcalInited = true; gcalInit(); }
   if (panel === 'roster' && !_rgInited) { _rgInited = true; _rgInit(); }
+  if (panel === 'groups' && !_grpPanelInited) { _grpPanelInited = true; _grpInitPanel(); }
   if (panel === 'friends' && !_frInited) { _frInited = true; _frInit(); }
 }
 // Auto-switch to Calendar if user already authorized (setTimeout to wait for calendar JS)
@@ -396,7 +418,7 @@ setTimeout(function() {
 
 // ── Tab switching ─────────────────────────────────────────────────────────────
 function switchTab(tab, btn) {
-  ['tab-sync','tab-briefing','tab-fr24','tab-gate'].forEach(function(id) {
+  ['tab-sync','tab-briefing','tab-cabin','tab-fr24','tab-gate'].forEach(function(id) {
     var el = document.getElementById(id);
     if (el) { el.classList.remove('tab-active'); el.style.display = 'none'; }
   });
@@ -691,6 +713,14 @@ function ctReset() {
 }
 
 // ── Briefing sub-tab ──────────────────────────────────────────────────────────
+function switchCabinTab(panel, btn) {
+  document.querySelectorAll('#tab-cabin .briefing-subtab').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('#tab-cabin .briefing-panel').forEach(p => p.classList.remove('active'));
+  btn.classList.add('active');
+  var target = document.getElementById('cabin-' + panel);
+  if (target) target.classList.add('active');
+}
+
 function switchBriefingTab(panel, btn) {
   document.querySelectorAll('.briefing-subtab').forEach(b => b.classList.remove('active'));
   document.querySelectorAll('.briefing-panel').forEach(p => p.classList.remove('active'));

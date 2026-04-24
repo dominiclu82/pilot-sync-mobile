@@ -56,6 +56,42 @@ export interface FlightDetail {
 export interface RosterResult {
   employeeId: string;
   duties: { duty: string; reportTime: string; endTime: string; flights: FlightDetail[] }[];
+  partial?: boolean;         // true = 抓到一些但沒完整跑完
+  errorSummary?: string;     // 失敗原因的簡短描述（partial 時才有意義）
+  crewName?: string;         // 有些地方會用到
+  debugFiles?: string[];     // 失敗時存的 screenshot 檔名（相對路徑）
+}
+
+// ── sync-debug screenshot + log helpers ─────────────────────────────────────
+const SYNC_DEBUG_DIR = path.join('/tmp', 'sync-debug');
+async function captureFailure(
+  page: any,
+  syncId: string | undefined,
+  idx: number,
+  failureType: 'outer_timeout' | 'click_fail' | 'goback_wait_fail',
+  dutyText?: string,
+): Promise<string | null> {
+  if (!syncId) return null;
+  try {
+    const dir = path.join(SYNC_DEBUG_DIR, syncId);
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    const ts = Date.now();
+    const duty = (dutyText || '').replace(/[^\w-]/g, '').slice(0, 20);
+    const fn = `${idx}_${failureType}${duty ? '_' + duty : ''}_${ts}.png`;
+    const full = path.join(dir, fn);
+    await page.screenshot({ path: full, fullPage: false });
+    return fn;
+  } catch { return null; }
+}
+async function gatherFailureContext(page: any, idx: number, type: string, dutyText?: string) {
+  try {
+    const url = page.url();
+    const [eventCount, readyState] = await page.evaluate(() => [
+      document.querySelectorAll('.rbc-event-content').length,
+      document.readyState,
+    ]);
+    return `url=${url} i=${idx} duty=${dutyText || '-'} .rbc-event-content=${eventCount} readyState=${readyState}`;
+  } catch (e: any) { return `[context unavailable: ${e.message}]`; }
 }
 
 export async function generateICSHeadless(
@@ -63,10 +99,16 @@ export async function generateICSHeadless(
   targetMonth: number,
   jxCredentials: { username: string; password: string },
   icsPath: string,
-  onLog?: (msg: string) => void
+  onLog?: (msg: string) => void,
+  syncId?: string,
 ): Promise<RosterResult> {
+  const debugFiles: string[] = [];
   const log = (msg: string) => { console.log(msg); onLog?.(msg); };
   const { username, password } = jxCredentials;
+  // 提到最外層 scope，方便 catch 區塊也能引用目前進度
+  const dutyDetails: { duty: string; reportTime: string; endTime: string; flights: FlightDetail[] }[] = [];
+  let employeeId = '';
+  let crewName = '';
 
   const browser = await chromium.launch({ headless: true });
   const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
@@ -193,12 +235,10 @@ export async function generateICSHeadless(
     } catch { /* 非致命 */ }
 
     // ── 抓取班表 ───────────────────────────────────────────
-    interface DutyDetail { duty: string; reportTime: string; endTime: string; flights: FlightDetail[] }
-    const dutyDetails: DutyDetail[] = [];
+    // dutyDetails 已提到函式頂端 scope；這裡只宣告 processedDuties
     const processedDuties = new Set<string>();
 
-    // ── 抓取員工編號 ─────────────────────────────────────────
-    let employeeId = '';
+    // ── 抓取員工編號（employeeId 已在函式頂端宣告）─────────────
     try {
       employeeId = await page.evaluate(() => {
         const body = document.body.innerText;
@@ -215,7 +255,7 @@ export async function generateICSHeadless(
       if (employeeId) log(`🪪 員工編號: ${employeeId}`);
     } catch { /* non-fatal */ }
 
-    let crewName = '';
+    // crewName 已在函式頂端宣告
     let i = 0;
     const SKIP = new Set([
       'DO',  'HDO', 'BDO', 'MDO',
@@ -225,8 +265,19 @@ export async function generateICSHeadless(
       'TFL', 'UBL', 'UKL', 'UQL', 'PPSL',
     ]);
 
+    let outerBreakReason = '';
     while (true) {
-      await page.waitForSelector('.rbc-event-content', { timeout: 2000 });
+      // 外層等 calendar — 10s timeout + 清楚 log + 保留已抓的 duties
+      try {
+        await page.waitForSelector('.rbc-event-content', { timeout: 10000 });
+      } catch {
+        const ctx = await gatherFailureContext(page, i, 'outer_timeout');
+        log(`⚠️ calendar 等待超時，中止迴圈（已抓 ${dutyDetails.length} 筆）; ${ctx}`);
+        const fn = await captureFailure(page, syncId, i, 'outer_timeout');
+        if (fn) debugFiles.push(fn);
+        outerBreakReason = 'outer_timeout';
+        break;
+      }
       const elements = await page.$$('.rbc-event-content');
       if (i >= elements.length) break;
 
@@ -241,7 +292,18 @@ export async function generateICSHeadless(
         await el.scrollIntoViewIfNeeded();
         await el.click({ timeout: 3000 });
       } catch {
-        log(`⚠️ [${i}] 無法點擊，跳過`);
+        const ctx = await gatherFailureContext(page, i, 'click_fail', dutyText);
+        log(`⚠️ [${i}] 無法點擊，跳過; ${ctx}`);
+        const fn = await captureFailure(page, syncId, i, 'click_fail', dutyText);
+        if (fn) debugFiles.push(fn);
+        // 恢復：若 click 失敗導致部分導航，確認還在 calendar 否則 goBack
+        const stillOn = await page.$('.rbc-event-content');
+        if (!stillOn) {
+          try {
+            await page.goBack({ waitUntil: 'domcontentloaded' });
+            await page.waitForSelector('.rbc-event-content', { timeout: 10000 });
+          } catch {}
+        }
         i++; continue;
       }
 
@@ -252,7 +314,16 @@ export async function generateICSHeadless(
       } catch {
         log(`⚠️ [${i}] 頁面未跳轉，跳過`);
         await page.goBack({ waitUntil: 'domcontentloaded' });
-        try { await page.waitForSelector('.rbc-event-content', { timeout: 2000 }); } catch { break; }
+        try {
+          await page.waitForSelector('.rbc-event-content', { timeout: 10000 });
+        } catch {
+          const ctx = await gatherFailureContext(page, i, 'goback_wait_fail', dutyText);
+          log(`⚠️ goBack 後等 calendar 超時，中止; ${ctx}`);
+          const fn = await captureFailure(page, syncId, i, 'goback_wait_fail', dutyText);
+          if (fn) debugFiles.push(fn);
+          outerBreakReason = 'goback_wait_fail';
+          break;
+        }
         i++; continue;
       }
 
@@ -309,7 +380,16 @@ export async function generateICSHeadless(
         const dutyKey = `${combined}-${reportTime.split(' ')[0]}`;
         if (processedDuties.has(dutyKey)) {
           await page.goBack({ waitUntil: 'domcontentloaded' });
-          try { await page.waitForSelector('.rbc-event-content', { timeout: 2000 }); } catch { break; }
+          try {
+            await page.waitForSelector('.rbc-event-content', { timeout: 10000 });
+          } catch {
+            const ctx = await gatherFailureContext(page, i, 'goback_wait_fail', dutyText);
+            log(`⚠️ goBack 後等 calendar 超時，中止; ${ctx}`);
+            const fn = await captureFailure(page, syncId, i, 'goback_wait_fail', dutyText);
+            if (fn) debugFiles.push(fn);
+            outerBreakReason = 'goback_wait_fail';
+            break;
+          }
           i++; continue;
         }
         processedDuties.add(dutyKey);
@@ -438,7 +518,16 @@ export async function generateICSHeadless(
       log(`✅ [${i}] ${finalDutyName}`);
 
       await page.goBack({ waitUntil: 'domcontentloaded' });
-      try { await page.waitForSelector('.rbc-event-content', { timeout: 2000 }); } catch { break; }
+      try {
+        await page.waitForSelector('.rbc-event-content', { timeout: 10000 });
+      } catch {
+        const ctx = await gatherFailureContext(page, i, 'goback_wait_fail', finalDutyName);
+        log(`⚠️ goBack 後等 calendar 超時，中止; ${ctx}`);
+        const fn = await captureFailure(page, syncId, i, 'goback_wait_fail', finalDutyName);
+        if (fn) debugFiles.push(fn);
+        outerBreakReason = 'goback_wait_fail';
+        break;
+      }
       i++;
     }
 
@@ -494,7 +583,27 @@ export async function generateICSHeadless(
       }
     }
 
-    return { employeeId, crewName, duties: dutyDetails };
+    // partial = 有中止原因 + 至少抓到 1 筆；完全沒抓到則不算 partial，讓外層照舊當失敗
+    const partial = outerBreakReason !== '' && dutyDetails.length > 0;
+    const errorSummary = outerBreakReason || undefined;
+    if (partial) {
+      log(`⚠️ 部分成功：已抓 ${dutyDetails.length} 筆 duty，因 ${errorSummary} 提早結束`);
+    }
+    return { employeeId, crewName, duties: dutyDetails, partial, errorSummary, debugFiles };
+  } catch (err: any) {
+    // 最外層全域 try/catch — 接未預期的 Playwright / navigation 錯誤
+    const msg = err?.message || String(err);
+    let url = '';
+    try { url = page.url(); } catch {}
+    log(`❌ 同步過程發生未預期錯誤: ${msg}`);
+    if (url) log(`   url=${url}`);
+    if (err?.stack) log(`   stack: ${String(err.stack).split('\n').slice(0, 3).join(' | ')}`);
+    // 若已抓到一些 duty，標記 partial 並回傳；否則讓錯誤往上丟（完全失敗）
+    if (dutyDetails.length > 0) {
+      log(`⚠️ 部分成功：已抓 ${dutyDetails.length} 筆 duty（錯誤前）`);
+      return { employeeId, crewName, duties: dutyDetails, partial: true, errorSummary: 'unhandled:' + msg.slice(0, 120), debugFiles };
+    }
+    throw err;
   } finally {
     await browser.close();
   }

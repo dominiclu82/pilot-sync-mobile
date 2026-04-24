@@ -474,7 +474,7 @@ app.get('/sw.js', (_req, res) => {
   res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
   res.setHeader('Service-Worker-Allowed', '/');
   res.send(`
-const CACHE = 'crewsync-v8023';
+const CACHE = 'crewsync-v8024';
 const SHELL = ['/', '/main', '/share'];
 self.addEventListener('install', e => {
   e.waitUntil(
@@ -1540,11 +1540,19 @@ function _syncNext() {
 
   (async () => {
     try {
-      const rosterResult = await generateICSHeadless(Number(year), Number(month), { username: jxUsername, password: jxPassword }, icsPath, onLog);
+      const rosterResult = await generateICSHeadless(Number(year), Number(month), { username: jxUsername, password: jxPassword }, icsPath, onLog, jobId);
       const { result, newRefreshToken } = await syncICS({ refreshToken, calendarId, icsPath, onLog });
       job.result = result;
       if (newRefreshToken) job.newRefreshToken = newRefreshToken;
-      job.status = 'done';
+      // Partial vs full：有 duty 又標 partial 的話，狀態改為 'partial'
+      if (rosterResult.partial) {
+        job.status = 'partial';
+        (job as any).partialReason = rosterResult.errorSummary;
+        (job as any).debugFiles = rosterResult.debugFiles || [];
+        onLog(`⚠️ 部分成功（${rosterResult.duties.length} 筆）：${rosterResult.errorSummary || 'unknown'}`);
+      } else {
+        job.status = 'done';
+      }
 
       // Save employee ID + roster data to job for frontend
       const eid = rosterResult.employeeId || jxUsername;
@@ -1633,8 +1641,47 @@ app.get('/status/:jobId', (req, res) => {
   // 計算排隊位置
   const queuePos = _syncQueue.findIndex(e => e.jobId === req.params.jobId);
   const ahead = queuePos >= 0 ? queuePos + (_syncRunning ? 1 : 0) : 0;
-  res.json({ status: job.status, logs: job.logs, result: job.result, newRefreshToken: job.newRefreshToken, employeeId: job.employeeId, crewName: job.crewName, rosterData: job.rosterData, error: job.error, queue: ahead });
+  res.json({
+    status: job.status, logs: job.logs, result: job.result, newRefreshToken: job.newRefreshToken,
+    employeeId: job.employeeId, crewName: job.crewName, rosterData: job.rosterData,
+    error: job.error, queue: ahead,
+    partialReason: (job as any).partialReason,
+    debugFiles: (job as any).debugFiles,
+  });
 });
+
+// ── Sync debug screenshots download (eid 比對) ─────────────────────────
+app.get('/api/sync-debug/:syncId/:file', (req, res) => {
+  const { syncId, file } = req.params;
+  const qEid = String(req.query.eid || '');
+  const job = jobs.get(syncId);
+  if (!job) return res.status(404).send('job not found');
+  if (!qEid || job.employeeId !== qEid) return res.status(403).send('forbidden');
+  // 防 path traversal
+  if (!/^[\w.\-]+\.png$/.test(file)) return res.status(400).send('invalid file');
+  const full = path.join('/tmp', 'sync-debug', syncId, file);
+  res.sendFile(full, (err) => { if (err) res.status(404).send('not found'); });
+});
+
+// 啟動時清理 /tmp/sync-debug 超過 24h 的 session 目錄
+(function cleanupSyncDebug() {
+  try {
+    const root = path.join('/tmp', 'sync-debug');
+    if (!require('fs').existsSync(root)) return;
+    const dirs = require('fs').readdirSync(root);
+    const now = Date.now();
+    const CUTOFF = 24 * 3600 * 1000;
+    for (const d of dirs) {
+      const p = path.join(root, d);
+      try {
+        const st = require('fs').statSync(p);
+        if (now - st.mtimeMs > CUTOFF) {
+          require('fs').rmSync(p, { recursive: true, force: true });
+        }
+      } catch {}
+    }
+  } catch {}
+})();
 
 // ── Briefings CRUD ────────────────────────────────────────────────────────
 // POST /api/briefing — upsert（eid + flight_no + flight_date）
