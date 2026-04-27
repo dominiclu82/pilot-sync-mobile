@@ -9,27 +9,11 @@
 
 import { randomUUID } from 'crypto';
 import { getPool, ensureTables } from './schema.js';
-
-// ── Tab parser ────────────────────────────────────────────────────────────────
-function parseTab(text: string): { headers: string[]; rows: Record<string, string>[] } {
-  // 處理 BOM
-  if (text.charCodeAt(0) === 0xFEFF) text = text.slice(1);
-  const lines = text.split(/\r\n|\n|\r/).filter(l => l.length > 0);
-  if (lines.length < 2) return { headers: [], rows: [] };
-  const headers = lines[0].split('\t').map(h => h.trim());
-  const rows: Record<string, string>[] = [];
-  for (let i = 1; i < lines.length; i++) {
-    const cells = lines[i].split('\t');
-    // 跳過全空白行
-    if (cells.every(c => !c.trim())) continue;
-    const row: Record<string, string> = {};
-    for (let j = 0; j < headers.length; j++) {
-      row[headers[j]] = (cells[j] ?? '').trim();
-    }
-    rows.push(row);
-  }
-  return { headers, rows };
-}
+import { parseTab } from './tsv-parser.js';
+// V1.0.06：parseTab 抽到 tsv-parser.ts 改成 proper state machine，
+// 處理 quoted 多行欄位（LogTen Remarks 多行用 quote 包）+ escaped quote。
+// 原本 inline split-by-line 版本會把 LogTen 多行 Remarks 拆成假 row，
+// 觸發 invalid_date_format 整批 reject。
 
 function assertHeaders(headers: string[], required: string[]): string[] {
   const missing: string[] = [];
