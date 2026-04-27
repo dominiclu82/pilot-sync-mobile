@@ -35,8 +35,8 @@ import { loadCredentials } from '../config.js';
 import { getSpaPilotLogJs } from '../spa/js-pilot-log.js';
 
 // ── 版本（比照 CrewSync / Morning：每次推版必更新；SW cache 名稱跟著走） ────
-export const PILOT_LOG_VERSION = 'V1.0.02';
-const PILOT_LOG_CACHE = 'pilotlog-v1-0-02';
+export const PILOT_LOG_VERSION = 'V1.0.03';
+const PILOT_LOG_CACHE = 'pilotlog-v1-0-03';
 
 export const pilotLogRouter = express.Router();
 
@@ -178,6 +178,11 @@ if (document.readyState !== 'loading') pilotLogInit();
 function _renderPilotLogChangelog(): string {
   return `
     <div class="pl-cl-v">${PILOT_LOG_VERSION}</div>
+    <div class="pl-cl-txt">
+      新增 LogTen entries bulk-delete 救援機制（escape hatch），讓匯入失敗 / 想完全重來時可以一鍵清掉。<code>DELETE /api/pilot-log/entries?source=logten&confirm=true</code> 砍掉當前 user 所有 LogTen 來源的 entries（auth 必須登入、<code>source</code> 必須是 <code>'logten'</code>、<code>confirm</code> 必須是 <code>'true'</code>，缺一就 reject），回傳實際刪除筆數。第一版意圖性收斂：<b>不開 <code>source=all</code> / <code>manual</code> / <code>roster</code></b>；<b>不影響機尾庫</b>（<code>pilot_aircraft</code>）；不影響非 LogTen 來源的 entries。Import 介面底部新增 ⚠️ Danger Zone：紅色 <b>🗑️ Wipe all my LogTen entries</b> 按鈕，兩段 confirm 才執行，避免誤觸。<br>
+      Added LogTen entries bulk-delete escape hatch for botched imports / clean restart. <code>DELETE /api/pilot-log/entries?source=logten&confirm=true</code> wipes all LogTen-sourced entries belonging to the current user (auth required; <code>source</code> must be <code>'logten'</code>; <code>confirm</code> must be <code>'true'</code>; missing any rejects). Returns actual delete count. v1 intentionally narrow: <b>no <code>source=all</code> / <code>manual</code> / <code>roster</code></b>; <b>tail registry untouched</b> (<code>pilot_aircraft</code>); non-LogTen entries untouched. Import page now has an ⚠️ Danger Zone at the bottom with a red <b>🗑️ Wipe all my LogTen entries</b> button gated behind two confirms.
+    </div>
+    <div class="pl-cl-v old">V1.0.02</div>
     <div class="pl-cl-txt">
       LogTen import 改成 smart 模式，語意對齊飛行實況：(1) <b>Smart status</b>：每筆 entry 依據 actual <code>Out</code> 是否填寫決定 status —有填→<code>confirmed</code>（已飛）；空白→<code>draft</code>（計畫中、還沒飛）。原本 V1.0.0x 一律 confirmed 是錯的語意，未飛的航班放 confirmed 不合理。(2) <b>Smart re-import</b>：同 source_ref 重 import 時，現有 <code>draft</code> / <code>roster_removed</code> 整筆覆蓋（LogTen 是 source of truth）；現有 <code>confirmed</code> 一律 skip 不動，保護使用者的手動編輯。所以「飛之前先 import 計畫，飛完 LogTen 補完 actual 再 import 一次」會正確把 draft 升級成 confirmed。(3) Preview / 結果頁顯示每筆 action badge：<b>NEW draft / NEW confirmed / UPDATE→confirmed / SKIP</b>，加總顯示新增、更新、保留三類數字，使用者一眼看到會發生什麼。<br>
       LogTen import upgraded to smart mode that respects flight reality: (1) <b>Smart status</b>: each entry's status now derives from whether actual <code>Out</code> is filled — filled → <code>confirmed</code> (flown); empty → <code>draft</code> (planned but not yet flown). Previous V1.0.0x always-confirmed semantic was wrong for unflown flights. (2) <b>Smart re-import</b>: when re-importing the same source_ref, existing <code>draft</code> / <code>roster_removed</code> entries are fully overwritten (LogTen is source of truth); existing <code>confirmed</code> entries are always skipped, preserving manual edits. So "import schedule before flight, then re-import after LogTen has actuals" correctly upgrades draft → confirmed. (3) Preview / result UI now shows per-row action badge: <b>NEW draft / NEW confirmed / UPDATE→confirmed / SKIP</b>, with summary counts for inserts / updates / preserved.
@@ -491,6 +496,33 @@ pilotLogRouter.delete('/api/pilot-log/entries/:id', requireAuth, async (req: Aut
     [req.params.id, req.pilotUserId]
   );
   res.json({ deleted: r.rowCount });
+});
+
+// ── Entries: bulk delete by source (escape hatch；目前只開 source=logten） ────
+// DELETE /api/pilot-log/entries?source=logten&confirm=true
+//   - auth 必須登入（自動 scope 到當前 user）
+//   - source 第一版只接受 'logten'（不開 'all' / 'manual' / 'roster'）
+//   - confirm 必須是 'true'，少傳就 reject
+//   - 不影響 pilot_aircraft 機尾庫
+pilotLogRouter.delete('/api/pilot-log/entries', requireAuth, async (req: AuthedRequest, res) => {
+  const pool = getPool();
+  if (!pool) return res.status(503).json({ error: 'database_unavailable' });
+
+  const source = String(req.query.source || '');
+  const confirm = String(req.query.confirm || '');
+
+  if (source !== 'logten') {
+    return res.status(400).json({ error: 'invalid_source', allowed: ['logten'] });
+  }
+  if (confirm !== 'true') {
+    return res.status(400).json({ error: 'missing_confirm_true' });
+  }
+
+  const r = await pool.query(
+    `DELETE FROM pilot_log_entries WHERE user_id = $1 AND source = $2`,
+    [req.pilotUserId, source]
+  );
+  res.json({ deleted: r.rowCount, source });
 });
 
 // ── Imports ──────────────────────────────────────────────────────────────────

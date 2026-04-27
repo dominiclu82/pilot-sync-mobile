@@ -671,7 +671,34 @@ function _plOpenImport() {
       '<button onclick="_plUploadAircraft()" style="margin-left:8px;background:#6366f1;color:#fff;border:0;border-radius:6px;padding:6px 12px;font-size:.78em;font-weight:700;cursor:pointer">Upload</button>' +
     '</div>' +
     '<div id="pl-import-result" style="margin-top:14px"></div>' +
+    '<div style="background:rgba(127,29,29,.2);border:1px solid #7f1d1d;border-radius:10px;padding:14px;margin-top:24px">' +
+      '<div style="font-size:.85em;font-weight:700;margin-bottom:6px;color:#fca5a5">⚠️ Danger Zone</div>' +
+      '<div style="font-size:.7em;color:var(--muted);margin-bottom:8px;line-height:1.5">' +
+        '一鍵砍掉你**所有 LogTen 來源**的 entries（manual / roster 來源不會動、機尾庫不會動）。<br>' +
+        '匯入失敗或想完全重來的時候用。<strong style="color:#fca5a5">不可復原。</strong>' +
+      '</div>' +
+      '<button onclick="_plWipeLogten()" style="background:#dc2626;color:#fff;border:0;border-radius:6px;padding:6px 12px;font-size:.78em;font-weight:700;cursor:pointer">🗑️ Wipe all my LogTen entries</button>' +
+    '</div>' +
     '</div>';
+}
+
+async function _plWipeLogten() {
+  // 兩段 confirm
+  if (!window.confirm('真的要砍掉所有 LogTen 來源的 entries 嗎？\n（manual / roster 來源不會動）')) return;
+  if (!window.confirm('再確認一次。這個動作不可復原。\n按 OK 才會真的執行。')) return;
+
+  var r = await _plApi('/api/pilot-log/entries?source=logten&confirm=true', { method: 'DELETE' });
+  if (!r.ok) {
+    var err = await r.json().catch(function() { return {}; });
+    _plToast('砍除失敗：' + (err.error || r.status), 'error');
+    return;
+  }
+  var j = await r.json();
+  _plToast('已砍除 ' + (j.deleted || 0) + ' 筆 LogTen entries');
+  // 清掉 import 介面殘留的結果，並回 main view 讓 list 重新 fetch
+  var resBox = document.getElementById('pl-import-result');
+  if (resBox) resBox.innerHTML = '';
+  await _plRefreshMain();
 }
 
 async function _plUploadFile(inputId, endpoint) {

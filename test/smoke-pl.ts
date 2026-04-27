@@ -107,6 +107,10 @@ async function run() {
   await check('Import UI 含 Import 按鈕', async () => {
     assert(plHtml.includes('_plUploadFlights(false)'), '找不到 Import 按鈕');
   });
+  await check('Import UI 含 Danger Zone Wipe 按鈕', async () => {
+    assert(plHtml.includes('_plWipeLogten()') && plHtml.includes('Danger Zone'),
+           '找不到 Wipe LogTen 按鈕 / Danger Zone 區塊');
+  });
   await check('Editor flight_date 用 date type（防 +0YYYYY 顯示 bug）', async () => {
     assert(plHtml.includes("_plEditorField('Date', 'flight_date', 'date')"),
            "flight_date 欄位沒用 'date' type，會顯示 ISO 字串");
@@ -206,6 +210,10 @@ async function run() {
       headers: { 'Content-Type': 'text/plain' },
       body: 'fake',
     });
+    assert(r.status === 401, `status ${r.status}`);
+  });
+  await check('DELETE /api/pilot-log/entries?source=logten&confirm=true（無 auth）→ 401', async () => {
+    const r = await fetch(`${BASE}/api/pilot-log/entries?source=logten&confirm=true`, { method: 'DELETE' });
     assert(r.status === 401, `status ${r.status}`);
   });
 
