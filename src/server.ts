@@ -26,6 +26,7 @@ import { getSpaRosterGridJs } from './spa/js-roster-grid.js';
 import { getSpaFriendsJs } from './spa/js-friends.js';
 import { getSpaGroupsJs } from './spa/js-groups.js';
 import { morningRouter, startMorningCron } from './morning.js';
+import { pilotLogRouter } from './pilot-log/routes.js';
 import FR24Pkg from 'flightradarapi';
 import pg from 'pg';
 
@@ -184,6 +185,9 @@ app.use(express.json());
 
 // Morning Report PWA (獨立模組，掛在 /morning 底下)
 app.use(morningRouter);
+
+// Pilot Log（獨立子系統，掛在 /api/pilot-log 底下；前端 inline 在 SPA HTML）
+app.use(pilotLogRouter);
 
 app.get('/', (_req, res) => { res.redirect('/main'); });
 
@@ -474,7 +478,7 @@ app.get('/sw.js', (_req, res) => {
   res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
   res.setHeader('Service-Worker-Allowed', '/');
   res.send(`
-const CACHE = 'crewsync-v8024';
+const CACHE = 'crewsync-v8025';
 const SHELL = ['/', '/main', '/share'];
 self.addEventListener('install', e => {
   e.waitUntil(

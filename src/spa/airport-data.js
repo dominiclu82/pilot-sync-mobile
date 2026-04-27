@@ -1,5 +1,16 @@
 // ── 機隊機場分類資料 ─────────────────────────────────────────────────
-// 依據 Operations Specifications C-6 Authorized Airport List (Effective: JAN 30 2026)
+// 依據 Operations Specifications C-6 Authorized Airport List
+// Base: JAN 30 2026 + Amendment 069 (Effective APR 01 2026)
+// Amendment 069 changes:
+//   1. A350-1041: 新增 RJBB 為定期機場、新增 RJFF 為備用機場
+//   2. A330-941:  RJCH / RJOT / RPVM 改為備用機場
+//   3. A350-941:  新增 RJCH 為備用機場、RJSS / RPLC / RPVM 改為備用機場
+//   4. A321-252NX / A330-941 / A350-941: 移除 VDPP（金邊）為備用機場
+//   5. A321-252NX: WADD（峇里島）改為備用機場
+//   6. A330-941:  WIII（雅加達）改為備用機場
+//   7. A350-941:  VVPQ（富國）及 WIII（雅加達）改為備用機場
+//   8. A330-941:  移除 WADD 為定期機場；A350-941: 移除 WADD 為備用機場
+//
 // cls: 'r'=Regular, 'a'=Alternate, 'rs'=Regular+Special, 'as'=Alternate+Special
 // P → 視為 A；P,S → 視為 A,S（RCKH/RCFN 等）
 
@@ -15,8 +26,8 @@ var _wxFleetData = {
   korea:       [{icao:'RKPC',name:'濟州',cls:'a'},{icao:'RKPK',name:'釜山',cls:'rs'},{icao:'RKSI',name:'仁川',cls:'a'},{icao:'RKSS',name:'金浦',cls:'a'},{icao:'RKTN',name:'大邱',cls:'a'}],
   philippines: [{icao:'RPLC',name:'克拉克',cls:'r'},{icao:'RPLL',name:'馬尼拉',cls:'r'},{icao:'RPMD',name:'達沃',cls:'a'},{icao:'RPVM',name:'宿霧',cls:'r'}],
   thailand:    [{icao:'VTBS',name:'素萬那普',cls:'r'},{icao:'VTBD',name:'廊曼',cls:'a'},{icao:'VTBU',name:'芭達雅',cls:'a'},{icao:'VTCC',name:'清邁',cls:'r'},{icao:'VTSP',name:'普吉',cls:'a'}],
-  vietnam:     [{icao:'VVNB',name:'河內',cls:'r'},{icao:'VVPQ',name:'富國',cls:'r'},{icao:'VVTS',name:'胡志明',cls:'r'},{icao:'VDPP',name:'金邊',cls:'a'},{icao:'VVCR',name:'芽莊',cls:'a'},{icao:'VVDN',name:'峴港',cls:'r'}],
-  seasia:      [{icao:'WIII',name:'雅加達',cls:'r'},{icao:'WSSS',name:'新加坡',cls:'r'},{icao:'WADD',name:'峇里島',cls:'r'},{icao:'WARR',name:'泗水',cls:'a'},{icao:'WBGG',name:'古晉',cls:'a'},{icao:'WICA',name:'戈達查帝',cls:'a'},{icao:'WMKP',name:'檳城',cls:'r'},{icao:'WMKK',name:'吉隆坡',cls:'r'}],
+  vietnam:     [{icao:'VVNB',name:'河內',cls:'r'},{icao:'VVPQ',name:'富國',cls:'r'},{icao:'VVTS',name:'胡志明',cls:'r'},{icao:'VVCR',name:'芽莊',cls:'a'},{icao:'VVDN',name:'峴港',cls:'r'}],
+  seasia:      [{icao:'WIII',name:'雅加達',cls:'r'},{icao:'WSSS',name:'新加坡',cls:'r'},{icao:'WADD',name:'峇里島',cls:'a'},{icao:'WARR',name:'泗水',cls:'a'},{icao:'WBGG',name:'古晉',cls:'a'},{icao:'WICA',name:'戈達查帝',cls:'a'},{icao:'WMKP',name:'檳城',cls:'r'},{icao:'WMKK',name:'吉隆坡',cls:'r'}],
   usa:         [],
   pacific:     [{icao:'PGSN',name:'塞班',cls:'a'},{icao:'PGUM',name:'關島',cls:'r'},{icao:'PTRO',name:'帛琉',cls:'a'}],
   canada:      [],
@@ -29,12 +40,12 @@ var _wxFleetData = {
 'A330': {
   taiwan:      [{icao:'RCTP',name:'桃園',cls:'r'},{icao:'RCKH',name:'高雄',cls:'as'},{icao:'RCSS',name:'松山',cls:'as'}],
   hkmacao:     [{icao:'VHHH',name:'香港',cls:'rs'},{icao:'VMMC',name:'澳門',cls:'r'}],
-  japan:       [{icao:'RJAA',name:'成田',cls:'r'},{icao:'RJBB',name:'關西',cls:'r'},{icao:'RJCC',name:'新千歲',cls:'r'},{icao:'RJCH',name:'函館',cls:'r'},{icao:'RJFF',name:'福岡',cls:'rs'},{icao:'RJFK',name:'鹿兒島',cls:'a'},{icao:'RJFT',name:'熊本',cls:'r'},{icao:'RJGG',name:'名古屋',cls:'r'},{icao:'RJOT',name:'高松',cls:'r'},{icao:'RJSS',name:'仙台',cls:'r'},{icao:'RJTT',name:'羽田',cls:'a'},{icao:'ROAH',name:'那霸',cls:'r'}],
+  japan:       [{icao:'RJAA',name:'成田',cls:'r'},{icao:'RJBB',name:'關西',cls:'r'},{icao:'RJCC',name:'新千歲',cls:'r'},{icao:'RJCH',name:'函館',cls:'a'},{icao:'RJFF',name:'福岡',cls:'rs'},{icao:'RJFK',name:'鹿兒島',cls:'a'},{icao:'RJFT',name:'熊本',cls:'r'},{icao:'RJGG',name:'名古屋',cls:'r'},{icao:'RJOT',name:'高松',cls:'a'},{icao:'RJSS',name:'仙台',cls:'r'},{icao:'RJTT',name:'羽田',cls:'a'},{icao:'ROAH',name:'那霸',cls:'r'}],
   korea:       [],
-  philippines: [{icao:'RPLC',name:'克拉克',cls:'r'},{icao:'RPLL',name:'馬尼拉',cls:'r'},{icao:'RPVM',name:'宿霧',cls:'r'}],
+  philippines: [{icao:'RPLC',name:'克拉克',cls:'r'},{icao:'RPLL',name:'馬尼拉',cls:'r'},{icao:'RPVM',name:'宿霧',cls:'a'}],
   thailand:    [{icao:'VTBS',name:'素萬那普',cls:'r'},{icao:'VTBD',name:'廊曼',cls:'a'},{icao:'VTBU',name:'芭達雅',cls:'a'},{icao:'VTCC',name:'清邁',cls:'r'}],
-  vietnam:     [{icao:'VVNB',name:'河內',cls:'r'},{icao:'VVPQ',name:'富國',cls:'r'},{icao:'VVTS',name:'胡志明',cls:'r'},{icao:'VDPP',name:'金邊',cls:'a'},{icao:'VVCR',name:'芽莊',cls:'a'},{icao:'VVDN',name:'峴港',cls:'r'}],
-  seasia:      [{icao:'WIII',name:'雅加達',cls:'r'},{icao:'WSSS',name:'新加坡',cls:'r'},{icao:'WADD',name:'峇里島',cls:'r'},{icao:'WARR',name:'泗水',cls:'a'},{icao:'WBGG',name:'古晉',cls:'a'},{icao:'WMKP',name:'檳城',cls:'r'},{icao:'WMKK',name:'吉隆坡',cls:'r'}],
+  vietnam:     [{icao:'VVNB',name:'河內',cls:'r'},{icao:'VVPQ',name:'富國',cls:'r'},{icao:'VVTS',name:'胡志明',cls:'r'},{icao:'VVCR',name:'芽莊',cls:'a'},{icao:'VVDN',name:'峴港',cls:'r'}],
+  seasia:      [{icao:'WIII',name:'雅加達',cls:'a'},{icao:'WSSS',name:'新加坡',cls:'r'},{icao:'WARR',name:'泗水',cls:'a'},{icao:'WBGG',name:'古晉',cls:'a'},{icao:'WMKP',name:'檳城',cls:'r'},{icao:'WMKK',name:'吉隆坡',cls:'r'}],
   usa:         [],
   pacific:     [],
   canada:      [],
@@ -47,12 +58,12 @@ var _wxFleetData = {
 'A350-900': {
   taiwan:      [{icao:'RCTP',name:'桃園',cls:'r'},{icao:'RCKH',name:'高雄',cls:'as'},{icao:'RCSS',name:'松山',cls:'as'}],
   hkmacao:     [{icao:'VHHH',name:'香港',cls:'rs'},{icao:'VMMC',name:'澳門',cls:'r'}],
-  japan:       [{icao:'RJAA',name:'成田',cls:'r'},{icao:'RJBB',name:'關西',cls:'r'},{icao:'RJCC',name:'新千歲',cls:'r'},{icao:'RJFF',name:'福岡',cls:'rs'},{icao:'RJGG',name:'名古屋',cls:'r'},{icao:'RJSS',name:'仙台',cls:'r'},{icao:'ROAH',name:'那霸',cls:'r'},{icao:'RJTT',name:'羽田',cls:'a'}],
+  japan:       [{icao:'RJAA',name:'成田',cls:'r'},{icao:'RJBB',name:'關西',cls:'r'},{icao:'RJCC',name:'新千歲',cls:'r'},{icao:'RJCH',name:'函館',cls:'a'},{icao:'RJFF',name:'福岡',cls:'rs'},{icao:'RJGG',name:'名古屋',cls:'r'},{icao:'RJSS',name:'仙台',cls:'a'},{icao:'ROAH',name:'那霸',cls:'r'},{icao:'RJTT',name:'羽田',cls:'a'}],
   korea:       [{icao:'RKPC',name:'濟州',cls:'a'},{icao:'RKPK',name:'釜山',cls:'as'},{icao:'RKSI',name:'仁川',cls:'a'}],
-  philippines: [{icao:'RPLC',name:'克拉克',cls:'r'},{icao:'RPLL',name:'馬尼拉',cls:'r'},{icao:'RPVM',name:'宿霧',cls:'r'}],
+  philippines: [{icao:'RPLC',name:'克拉克',cls:'a'},{icao:'RPLL',name:'馬尼拉',cls:'r'},{icao:'RPVM',name:'宿霧',cls:'a'}],
   thailand:    [{icao:'VTBS',name:'素萬那普',cls:'r'},{icao:'VTBD',name:'廊曼',cls:'a'},{icao:'VTBU',name:'芭達雅',cls:'a'},{icao:'VTCC',name:'清邁',cls:'a'}],
-  vietnam:     [{icao:'VVNB',name:'河內',cls:'r'},{icao:'VVPQ',name:'富國',cls:'r'},{icao:'VVTS',name:'胡志明',cls:'r'},{icao:'VDPP',name:'金邊',cls:'a'},{icao:'VVCR',name:'芽莊',cls:'a'},{icao:'VVDN',name:'峴港',cls:'a'}],
-  seasia:      [{icao:'WIII',name:'雅加達',cls:'r'},{icao:'WSSS',name:'新加坡',cls:'r'},{icao:'WADD',name:'峇里島',cls:'a'},{icao:'WARR',name:'泗水',cls:'a'},{icao:'WMKK',name:'吉隆坡',cls:'a'},{icao:'WMKP',name:'檳城',cls:'a'}],
+  vietnam:     [{icao:'VVNB',name:'河內',cls:'r'},{icao:'VVPQ',name:'富國',cls:'a'},{icao:'VVTS',name:'胡志明',cls:'r'},{icao:'VVCR',name:'芽莊',cls:'a'},{icao:'VVDN',name:'峴港',cls:'a'}],
+  seasia:      [{icao:'WIII',name:'雅加達',cls:'a'},{icao:'WSSS',name:'新加坡',cls:'r'},{icao:'WARR',name:'泗水',cls:'a'},{icao:'WMKK',name:'吉隆坡',cls:'a'},{icao:'WMKP',name:'檳城',cls:'a'}],
   usa:         [{icao:'KLAX',name:'洛杉磯',cls:'r'},{icao:'KONT',name:'安大略',cls:'rs'},{icao:'KPHX',name:'鳳凰城',cls:'r'},{icao:'KSEA',name:'西雅圖',cls:'r'},{icao:'KSFO',name:'舊金山',cls:'rs'},{icao:'KLAS',name:'拉斯維加斯',cls:'a'},{icao:'KOAK',name:'奧克蘭',cls:'a'},{icao:'KPDX',name:'波特蘭',cls:'a'},{icao:'KSMF',name:'沙加緬度',cls:'a'},{icao:'KTUS',name:'土森',cls:'a'}],
   pacific:     [{icao:'PACD',name:'Cold Bay',cls:'a'},{icao:'PAFA',name:'費爾班克斯',cls:'a'},{icao:'PAKN',name:'King Salmon',cls:'a'},{icao:'PANC',name:'安克拉治',cls:'a'},{icao:'PASY',name:'Shemya',cls:'a'},{icao:'PGSN',name:'塞班',cls:'a'},{icao:'PGUM',name:'關島',cls:'a'},{icao:'PHNL',name:'檀香山',cls:'a'},{icao:'PMDY',name:'中途島',cls:'a'},{icao:'PWAK',name:'威克島',cls:'a'}],
   canada:      [{icao:'CYVR',name:'溫哥華',cls:'a'}],
@@ -65,7 +76,7 @@ var _wxFleetData = {
 'A350-1000': {
   taiwan:      [{icao:'RCTP',name:'桃園',cls:'r'},{icao:'RCKH',name:'高雄',cls:'as'}],
   hkmacao:     [{icao:'VHHH',name:'香港',cls:'as'},{icao:'VMMC',name:'澳門',cls:'as'}],
-  japan:       [{icao:'RJAA',name:'成田',cls:'r'},{icao:'RJBB',name:'關西',cls:'a'},{icao:'RJCC',name:'新千歲',cls:'a'},{icao:'RJGG',name:'名古屋',cls:'a'},{icao:'RJSS',name:'仙台',cls:'a'},{icao:'ROAH',name:'那霸',cls:'a'},{icao:'RJTT',name:'羽田',cls:'a'}],
+  japan:       [{icao:'RJAA',name:'成田',cls:'r'},{icao:'RJBB',name:'關西',cls:'r'},{icao:'RJCC',name:'新千歲',cls:'a'},{icao:'RJFF',name:'福岡',cls:'a'},{icao:'RJGG',name:'名古屋',cls:'a'},{icao:'RJSS',name:'仙台',cls:'a'},{icao:'ROAH',name:'那霸',cls:'a'},{icao:'RJTT',name:'羽田',cls:'a'}],
   korea:       [],
   philippines: [{icao:'RPLC',name:'克拉克',cls:'a'},{icao:'RPLL',name:'馬尼拉',cls:'a'}],
   thailand:    [{icao:'VTBS',name:'素萬那普',cls:'r'},{icao:'VTBD',name:'廊曼',cls:'a'},{icao:'VTBU',name:'芭達雅',cls:'a'},{icao:'VTCC',name:'清邁',cls:'a'}],

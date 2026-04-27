@@ -10,7 +10,8 @@
     "dev": "tsx watch src/server.ts",
     "test": "tsx test/smoke.ts",
     "test:m": "tsx test/smoke-m.ts",
-    "test:all": "tsx test/smoke.ts && tsx test/smoke-m.ts"
+    "test:pl": "tsx test/smoke-pl.ts",
+    "test:all": "tsx test/smoke.ts && tsx test/smoke-m.ts && tsx test/smoke-pl.ts"
   },
   "dependencies": {
     "@mozilla/readability": "^0.6.0",
