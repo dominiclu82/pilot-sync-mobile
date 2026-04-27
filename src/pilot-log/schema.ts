@@ -31,6 +31,10 @@ export async function ensureTables(): Promise<boolean> {
         last_login_at TIMESTAMPTZ
       );
     `);
+    // V1.0.05 monitoring：active user / 重 import 偵測欄位
+    await pool.query(`ALTER TABLE pilot_users ADD COLUMN IF NOT EXISTS last_seen_at TIMESTAMPTZ`).catch(() => {});
+    await pool.query(`ALTER TABLE pilot_users ADD COLUMN IF NOT EXISTS last_import_at TIMESTAMPTZ`).catch(() => {});
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_pilot_users_last_seen ON pilot_users(last_seen_at DESC NULLS LAST)`).catch(() => {});
 
     await pool.query(`
       CREATE TABLE IF NOT EXISTS pilot_user_emails (

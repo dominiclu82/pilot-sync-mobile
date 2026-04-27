@@ -35,8 +35,8 @@ import { loadCredentials } from '../config.js';
 import { getSpaPilotLogJs } from '../spa/js-pilot-log.js';
 
 // ── 版本（比照 CrewSync / Morning：每次推版必更新；SW cache 名稱跟著走） ────
-export const PILOT_LOG_VERSION = 'V1.0.04';
-const PILOT_LOG_CACHE = 'pilotlog-v1-0-04';
+export const PILOT_LOG_VERSION = 'V1.0.05';
+const PILOT_LOG_CACHE = 'pilotlog-v1-0-05';
 
 export const pilotLogRouter = express.Router();
 
@@ -178,6 +178,17 @@ if (document.readyState !== 'loading') pilotLogInit();
 function _renderPilotLogChangelog(): string {
   return `
     <div class="pl-cl-v">${PILOT_LOG_VERSION}</div>
+    <div class="pl-cl-txt">
+      新增 admin stats endpoint，讓使用量 / 容量管理可見（因應 Pilot Log 跟餐廳 POS 共用 1 GB Postgres，必須能監控成長速度與重度使用者）。
+      (1) Schema 補欄位：<code>pilot_users.last_seen_at</code>（active user 偵測）+ <code>pilot_users.last_import_at</code>（重 import 偵測）。<code>last_seen_at</code> 在 <code>requireAuth</code> middleware 用 server-side 條件式 UPDATE 寫入（<code>WHERE last_seen_at IS NULL OR last_seen_at &lt; NOW() - INTERVAL '1 minute'</code>），每分鐘最多寫 1 次、fire-and-forget 不擋 user。
+      (2) <code>GET /api/pilot-log/admin/stats?pw=&lt;PILOT_LOG_ADMIN_PW&gt;</code>：server-side admin secret（環境變數，timing-safe compare），不沿用前端可見模式。回傳結構分兩層：<b>summary</b>（total / active_7d / active_30d / with_entries / with_imports / entries 統計 / 總 size）+ <b>breakdown</b>（per-table 三組 size：<code>pg_total_relation_size</code> + <code>pg_relation_size</code> + <code>pg_indexes_size</code> + 推算 toast；top users by entry count，default 10、可選 <code>?limit=N</code> 最大 50）。
+      (3) 60 秒 in-memory cache（admin 用、低頻；不做事件型主動失效）。<br>
+      Added admin stats endpoint for usage / capacity management (Pilot Log shares a 1 GB Postgres with the user's restaurant POS — growth tracking and heavy-user identification are required).
+      (1) Schema additions: <code>pilot_users.last_seen_at</code> (active user detection) + <code>pilot_users.last_import_at</code> (heavy import detection). <code>last_seen_at</code> updates via server-side conditional UPDATE in the <code>requireAuth</code> middleware (<code>WHERE last_seen_at IS NULL OR last_seen_at &lt; NOW() - INTERVAL '1 minute'</code>) — at most one write per user per minute, fire-and-forget so it never blocks the user.
+      (2) <code>GET /api/pilot-log/admin/stats?pw=&lt;PILOT_LOG_ADMIN_PW&gt;</code>: server-side admin secret (env var, timing-safe compare), distinct from any user-visible password pattern. Two-tier response: <b>summary</b> (total / active_7d / active_30d / with_entries / with_imports / entries stats / total size) + <b>breakdown</b> (per-table three sizes: <code>pg_total_relation_size</code> + <code>pg_relation_size</code> + <code>pg_indexes_size</code> + computed toast; top users by entry count, default 10, optional <code>?limit=N</code> max 50).
+      (3) 60-second in-memory cache (admin use, low frequency; no event-driven invalidation in v1).
+    </div>
+    <div class="pl-cl-v old">V1.0.04</div>
     <div class="pl-cl-txt">
       LogTen import 效能優化 + in-file dedup + 全部寫入包 transaction（<b>業務語意維持 V1.0.02 行為</b>）。原本逐筆 SELECT + INSERT，2000 筆會打 4000 次 query 撞 Render 30s timeout。改成：(1) <b>Batch lookup</b>：一次 <code>SELECT</code> 撈出所有現有 <code>source_ref</code> 進 Map，省 N 次 SELECT。(2) <b>Bulk INSERT</b>：每 50 筆 row 合併成一個 <code>INSERT ... VALUES (...), (...), ...</code> statement（35 col × 50 row = 1750 params/batch，遠低於 PG 65535 限制），省 95%+ round trip。預估 2000 筆從 ~40s 降到 ~3-5s。UPDATE 維持逐筆（draft → confirmed 是少數情境、不是瓶頸）。(3) <b>In-file dedup</b>：existingMap 在 loop 中即時回寫，讓「同一檔內 sourceRef 重複」走跟 cross-run 一樣的語意（confirmed → 後者 skip；draft → 後者覆蓋前者），避免 bulk INSERT 撞 UNIQUE constraint 整批 fail。(4) <b>Atomic transaction</b>：所有 INSERT + UPDATE 包在單一 BEGIN/COMMIT 區塊（<code>pool.connect()</code> 取得 client），任一失敗就 ROLLBACK 全部，不會留 partial 寫入；前端會看到 500 而不是假的成功訊息，counter 也只在 COMMIT 後才寫進 result。<br>
       LogTen import perf optimization + in-file dedup + transactional writes (<b>business semantics preserve V1.0.02 behavior</b>). Old code did per-row SELECT + INSERT — 2000 rows = 4000 queries, hitting Render's 30s timeout. New: (1) <b>Batch lookup</b>: single <code>SELECT</code> pulls all existing <code>source_ref</code>s into a Map. (2) <b>Bulk INSERT</b>: every 50 rows merge into one <code>INSERT ... VALUES (...), (...), ...</code> statement (35 × 50 = 1750 params/batch, well under PG's 65535 limit), saving 95%+ round trips. Estimated 2000 rows: ~40s → ~3-5s. UPDATE stays per-row. (3) <b>In-file dedup</b>: existingMap is updated in-loop so duplicate sourceRefs within the same file follow the same semantics as cross-run, avoiding bulk INSERT UNIQUE constraint blowups. (4) <b>Atomic transaction</b>: all INSERTs + UPDATEs wrapped in a single BEGIN/COMMIT block on a dedicated client (<code>pool.connect()</code>); any failure ROLLBACKs everything — no partial state, frontend gets a real 500 instead of a misleading success message, counters are only written to result after COMMIT.
@@ -566,6 +577,154 @@ pilotLogRouter.get('/api/pilot-log/stats', requireAuth, async (req: AuthedReques
     getByAircraftType(userId),
   ]);
   res.json({ totals, rolling, by_type: byType });
+});
+
+// ── Admin stats（V1.0.05；server-side admin secret，60s cache） ──────────────
+// GET /api/pilot-log/admin/stats?pw=<env PILOT_LOG_ADMIN_PW>&limit=10
+// 不掛 requireAuth：這是 ops 監控 endpoint，不走 user JWT。
+// 認證走 timing-safe compare，避免泄漏密碼長度資訊。
+const PL_STATS_TTL_MS = 60 * 1000;
+let _plStatsCache: { at: number; data: any } | null = null;
+
+import { timingSafeEqual as _tse, createHash as _ch } from 'crypto';
+function _plAdminPwMatch(provided: string): boolean {
+  const expected = process.env.PILOT_LOG_ADMIN_PW || '';
+  // server config 檢查（不是 user-controlled，沒 leak issue）
+  if (!expected || expected.length < 8) return false;
+  // codex review fix：先 SHA-256 digest 兩邊到固定 32 bytes 再 timingSafeEqual，
+  // 避免「先比長度」的早期分支洩漏 expected 長度資訊
+  try {
+    const a = _ch('sha256').update(String(provided)).digest();
+    const b = _ch('sha256').update(expected).digest();
+    return _tse(a, b);
+  } catch {
+    return false;
+  }
+}
+
+// Cache 內永遠存 top 50（最大值），response 依 request limit 動態 slice。
+// 這樣 ?limit=10 / ?limit=50 共用同一份 cache，不會有 cross-limit 污染。
+const PL_TOP_USERS_MAX = 50;
+
+function _plBuildResponse(cached: any, limit: number, isCached: boolean, cacheAgeMs: number) {
+  const all = cached.breakdown.top_users_by_entries || [];
+  return {
+    ...cached,
+    breakdown: {
+      ...cached.breakdown,
+      top_users_by_entries: all.slice(0, limit),
+    },
+    cached: isCached,
+    cache_age_ms: isCached ? cacheAgeMs : undefined,
+  };
+}
+
+pilotLogRouter.get('/api/pilot-log/admin/stats', async (req, res) => {
+  const pw = String(req.query.pw || '');
+  if (!_plAdminPwMatch(pw)) return res.status(403).json({ error: 'forbidden' });
+
+  const limit = Math.min(Math.max(parseInt(String(req.query.limit || '10'), 10) || 10, 1), PL_TOP_USERS_MAX);
+
+  // 60s in-memory cache（admin 用、低頻；不做事件型主動失效）
+  const now = Date.now();
+  if (_plStatsCache && (now - _plStatsCache.at) < PL_STATS_TTL_MS) {
+    return res.json(_plBuildResponse(_plStatsCache.data, limit, true, now - _plStatsCache.at));
+  }
+
+  const pool = getPool();
+  if (!pool || !(await ensureTables())) return res.status(503).json({ error: 'database_unavailable' });
+
+  try {
+    // ── Users 區 ────
+    const usersAgg = await pool.query(`
+      SELECT
+        COUNT(*)::int                                                              AS total,
+        COUNT(*) FILTER (WHERE last_seen_at > NOW() - INTERVAL '7 days')::int      AS active_7d,
+        COUNT(*) FILTER (WHERE last_seen_at > NOW() - INTERVAL '30 days')::int     AS active_30d,
+        COUNT(*) FILTER (WHERE last_import_at IS NOT NULL)::int                    AS with_imports,
+        COUNT(*) FILTER (WHERE EXISTS (SELECT 1 FROM pilot_log_entries e WHERE e.user_id = u.id))::int AS with_entries
+      FROM pilot_users u
+    `);
+
+    // ── Entries 區 ────
+    const entriesTotal = await pool.query(`SELECT COUNT(*)::int AS total FROM pilot_log_entries`);
+    const perUser = await pool.query(`
+      SELECT
+        COALESCE(AVG(c)::int, 0)                                              AS avg_per_user,
+        COALESCE(MAX(c)::int, 0)                                              AS max_per_user,
+        COALESCE(percentile_disc(0.5) WITHIN GROUP (ORDER BY c)::int, 0)      AS median_per_user
+      FROM (SELECT user_id, COUNT(*) AS c FROM pilot_log_entries GROUP BY user_id) t
+    `);
+    const byStatus = await pool.query(`
+      SELECT status, COUNT(*)::int AS c FROM pilot_log_entries GROUP BY status
+    `);
+    const statusMap: Record<string, number> = { draft: 0, confirmed: 0, roster_removed: 0 };
+    for (const r of byStatus.rows) statusMap[r.status] = r.c;
+
+    // ── Tables 區（三個 size 都回） ────
+    const tableNames = ['pilot_users', 'pilot_user_emails', 'pilot_user_sessions', 'pilot_log_entries', 'pilot_aircraft'];
+    const tables: Record<string, any> = {};
+    let totalSize = 0;
+    for (const t of tableNames) {
+      const r = await pool.query(`
+        SELECT
+          (SELECT COUNT(*) FROM ${t})::int                       AS rows,
+          pg_total_relation_size($1::regclass)::bigint            AS total_bytes,
+          pg_relation_size($1::regclass)::bigint                  AS heap_bytes,
+          pg_indexes_size($1::regclass)::bigint                   AS index_bytes
+      `, [t]);
+      const row = r.rows[0];
+      tables[t] = {
+        rows: row.rows,
+        total_bytes: Number(row.total_bytes),
+        heap_bytes: Number(row.heap_bytes),
+        index_bytes: Number(row.index_bytes),
+        toast_bytes: Number(row.total_bytes) - Number(row.heap_bytes) - Number(row.index_bytes),
+      };
+      totalSize += Number(row.total_bytes);
+    }
+
+    // ── Top users by entry count（永遠抓 max 50 進 cache，response 再 slice）────
+    const topUsers = await pool.query(`
+      SELECT
+        u.id                                                                          AS user_id,
+        (SELECT email FROM pilot_user_emails WHERE user_id = u.id ORDER BY is_primary DESC, linked_at LIMIT 1) AS primary_email,
+        u.created_at, u.last_seen_at, u.last_import_at, u.last_login_at,
+        (SELECT COUNT(*) FROM pilot_log_entries WHERE user_id = u.id)::int            AS entry_count,
+        (SELECT COUNT(*) FROM pilot_aircraft WHERE user_id = u.id)::int               AS aircraft_count
+      FROM pilot_users u
+      ORDER BY entry_count DESC
+      LIMIT $1
+    `, [PL_TOP_USERS_MAX]);
+
+    // cacheData 存「不分 limit 的完整資料」（top 50）；回應時依本次 request limit slice
+    const cacheData = {
+      generated_at: new Date().toISOString(),
+      summary: {
+        users: usersAgg.rows[0],
+        entries: {
+          total: entriesTotal.rows[0].total,
+          avg_per_user: perUser.rows[0].avg_per_user,
+          median_per_user: perUser.rows[0].median_per_user,
+          max_per_user: perUser.rows[0].max_per_user,
+          by_status: statusMap,
+        },
+        total_pilot_log_size_bytes: totalSize,
+        total_pilot_log_size_mb: Math.round(totalSize / 1024 / 1024 * 10) / 10,
+      },
+      breakdown: {
+        tables,
+        top_users_by_entries: topUsers.rows,    // ← 永遠 top 50
+      },
+      warnings: [],
+    };
+
+    _plStatsCache = { at: now, data: cacheData };
+    res.json(_plBuildResponse(cacheData, limit, false, 0));
+  } catch (e: any) {
+    console.error('[pilot-log] admin stats error:', e.message);
+    res.status(500).json({ error: 'internal', detail: e.message });
+  }
 });
 
 // ── Quick suggest ────────────────────────────────────────────────────────────

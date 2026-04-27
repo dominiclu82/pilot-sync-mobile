@@ -434,6 +434,14 @@ export async function importLogtenFlights(
     // 只有 COMMIT 成功才寫進 result；不然 ROLLBACK 後 DB 是空的，計數也該是 0
     result.inserted = insertedCount;
     result.updated = updatedCount;
+
+    // V1.0.05 monitoring：成功匯入後寫 last_import_at（fire-and-forget，跟主 TX 解耦）
+    if (insertedCount > 0 || updatedCount > 0) {
+      pool.query(
+        `UPDATE pilot_users SET last_import_at = NOW() WHERE id = $1`,
+        [userId]
+      ).catch(() => { /* swallow */ });
+    }
   } catch (e: any) {
     try { await client.query('ROLLBACK'); } catch { /* swallow */ }
     console.error('[pilot-log] import transaction rolled back:', e.message);

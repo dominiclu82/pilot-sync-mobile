@@ -217,6 +217,21 @@ async function run() {
     assert(r.status === 401, `status ${r.status}`);
   });
 
+  // ── Admin stats endpoint（V1.0.05）─────────────────────────────────────
+  console.log('\n📊 Admin stats endpoint:');
+  await check('GET /api/pilot-log/admin/stats（無 pw）→ 403', async () => {
+    const r = await fetch(`${BASE}/api/pilot-log/admin/stats`);
+    assert(r.status === 403, `status ${r.status}`);
+  });
+  await check('GET /api/pilot-log/admin/stats?pw=wrong → 403', async () => {
+    const r = await fetch(`${BASE}/api/pilot-log/admin/stats?pw=wrong-secret-xx`);
+    assert(r.status === 403, `status ${r.status}`);
+  });
+  await check('GET /api/pilot-log/admin/stats?pw=（空字串）→ 403', async () => {
+    const r = await fetch(`${BASE}/api/pilot-log/admin/stats?pw=`);
+    assert(r.status === 403, `status ${r.status}`);
+  });
+
   // ── Bearer with bogus token → 401 ─────────────────────────────────────
   await check('Bearer 假 token → 401', async () => {
     const r = await fetch(`${BASE}/api/pilot-log/me`, {

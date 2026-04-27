@@ -249,5 +249,19 @@ export function requireAuth(req: AuthedRequest, res: Response, next: NextFunctio
   const payload = verifyAccessToken(m[1]);
   if (!payload) { res.status(401).json({ error: 'invalid_or_expired_token' }); return; }
   req.pilotUserId = payload.sub;
+
+  // V1.0.05 monitoring：last_seen_at server-side 條件式 update（每分鐘最多 1 次寫入）
+  // - 不在 app memory 節流（race condition 多）→ 走 SQL WHERE 條件
+  // - fire-and-forget：不 await，不擋 request；錯了也不影響業務
+  const pool = getPool();
+  if (pool) {
+    pool.query(
+      `UPDATE pilot_users SET last_seen_at = NOW()
+       WHERE id = $1
+         AND (last_seen_at IS NULL OR last_seen_at < NOW() - INTERVAL '1 minute')`,
+      [payload.sub]
+    ).catch(() => { /* swallow: monitoring 寫入失敗不該擋 user */ });
+  }
+
   next();
 }
