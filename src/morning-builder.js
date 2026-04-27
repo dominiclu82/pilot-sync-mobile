@@ -357,54 +357,131 @@ async function fetchUsStocks(codes: string[] = US_STOCK_CODES) {
 }
 
 // ────────────────────────────────────────────────────────────────────
-// 3) 台銀匯率 CSV
+// 3) 台銀匯率：CSV 主源 + HTML fallback
+//   - 優先打 flcsv/0/day（簡潔最快），加 cache-busting
+//   - 若 302/HTML/空 → fallback 解析 xrt?Lang=zh-TW 牌告
+//   - 兩者都失敗才回 {}（前端顯示 —）
+//   保留現金/即期買賣價，CSV 恢復後不用再改
 // ────────────────────────────────────────────────────────────────────
+type TwdRate = {
+  rate: number | null;
+  cashBuy: number | null;
+  cashSell: number | null;
+  spotBuy: number | null;
+  spotSell: number | null;
+};
+
+function _fxNz(n: number): number | null { return isNaN(n) ? null : n; }
+function _fxMid(cb: number | null, cs: number | null, sb: number | null, ss: number | null): number | null {
+  if (sb != null && ss != null) return (sb + ss) / 2;
+  if (cb != null && cs != null) return (cb + cs) / 2;
+  return null;
+}
+
+// CSV：原本格式
+//   0: 幣別 | 1: "本行買入" | 2: 現金買入 | 3: 即期買入 | 4-10: 遠期買入
+//   11: "本行賣出" | 12: 現金賣出 | 13: 即期賣出 | 14-20: 遠期賣出
+function _parseBotCsv(text: string): Record<string, TwdRate> | null {
+  const cleaned = text.replace(/^﻿/, '').trim();
+  if (!cleaned || cleaned.startsWith('<') || !cleaned.includes(',')) return null;
+  const lines = cleaned.split(/\r?\n/);
+  if (lines.length < 2) return null;
+  const out: Record<string, TwdRate> = {};
+  for (let i = 1; i < lines.length; i++) {
+    const cols = lines[i].split(',');
+    if (cols.length < 14) continue;
+    const code = cols[0].trim();
+    if (!/^[A-Z]{3}$/.test(code)) continue;
+    const cashBuy = _fxNz(parseFloat(cols[2]));
+    const spotBuy = _fxNz(parseFloat(cols[3]));
+    const cashSell = _fxNz(parseFloat(cols[12]));
+    const spotSell = _fxNz(parseFloat(cols[13]));
+    out[code] = { rate: _fxMid(cashBuy, cashSell, spotBuy, spotSell), cashBuy, cashSell, spotBuy, spotSell };
+  }
+  return Object.keys(out).length > 0 ? out : null;
+}
+
+async function _fetchBotCsvRates(): Promise<Record<string, TwdRate> | null> {
+  try {
+    const url = 'https://rate.bot.com.tw/xrt/flcsv/0/day?t=' + Date.now();
+    const r = await fetch(url, {
+      headers: { 'User-Agent': 'Mozilla/5.0', 'Cache-Control': 'no-cache' },
+      cache: 'no-store',
+      redirect: 'manual',  // 不跟隨 302（被導到公告頁就算 CSV 失敗）
+    });
+    if (r.status < 200 || r.status >= 300) return null;
+    const text = await r.text();
+    return _parseBotCsv(text);
+  } catch {
+    return null;
+  }
+}
+
+// HTML：每個幣別一段，內含「(CCY)」+ data-table="本行XX買入/賣出" 的 td 數值
+// 同值會出現兩次（desktop / phone responsive）— 取第一個就行
+function _pickHtmlRate(block: string, label: string): number | null {
+  const re = new RegExp('data-table="' + label + '"[^>]*>\\s*([0-9.]+)', 'i');
+  const m = block.match(re);
+  if (!m) return null;
+  const n = parseFloat(m[1]);
+  return isNaN(n) ? null : n;
+}
+
+function _parseBotHtml(html: string): Record<string, TwdRate> | null {
+  const blocks = html.split(/<\/tr>/i);
+  const out: Record<string, TwdRate> = {};
+  for (const block of blocks) {
+    const m = block.match(/\(([A-Z]{3})\)/);
+    if (!m) continue;
+    const code = m[1];
+    if (out[code]) continue;
+    const cashBuy = _pickHtmlRate(block, '本行現金買入');
+    const cashSell = _pickHtmlRate(block, '本行現金賣出');
+    const spotBuy = _pickHtmlRate(block, '本行即期買入');
+    const spotSell = _pickHtmlRate(block, '本行即期賣出');
+    if (cashBuy == null && spotBuy == null) continue;
+    out[code] = { rate: _fxMid(cashBuy, cashSell, spotBuy, spotSell), cashBuy, cashSell, spotBuy, spotSell };
+  }
+  return Object.keys(out).length > 0 ? out : null;
+}
+
+async function _fetchBotHtmlRates(): Promise<Record<string, TwdRate> | null> {
+  try {
+    const r = await fetch('https://rate.bot.com.tw/xrt?Lang=zh-TW', {
+      headers: { 'User-Agent': 'Mozilla/5.0', 'Accept': 'text/html' },
+      cache: 'no-store',
+    });
+    if (!r.ok) return null;
+    const html = await r.text();
+    return _parseBotHtml(html);
+  } catch {
+    return null;
+  }
+}
+
 async function fetchFx(pairs: string[] = []) {
   // 若沒傳 pairs 則用預設清單（向後相容）
   const usePairs = (pairs && pairs.length > 0) ? pairs : [
     ...FX_PAIRS.vsTwd.map(c => `${c}/TWD`),
     ...FX_PAIRS.cross.map(([a, b]) => `${a}/${b}`),
   ];
-  // Cache-busting：避免 CDN/proxy 回快取，確保 🔄 按下去能拿到台銀當下最新掛牌
-  const url = 'https://rate.bot.com.tw/xrt/flcsv/0/day?t=' + Date.now();
-  const r = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0', 'Cache-Control': 'no-cache' }, cache: 'no-store' });
-  if (!r.ok) throw new Error('BOT HTTP ' + r.status);
-  const buf = await r.arrayBuffer();
-  const text = new TextDecoder('utf-8').decode(buf).replace(/^\ufeff/, '');
-  const lines = text.trim().split(/\r?\n/);
-  // 第一行是 header，後面每行是一個幣別
-  // 格式：幣別, [匯率], [現金買入], [即期買入], 遠期10/30/60/90/120/150/180, [匯率], [現金賣出], [即期賣出], 遠期...
-  // 第二個 "匯率" 是佔位。實際 index：
-  // 0: 幣別
-  // 1: "本行買入" label
-  // 2: 現金買入
-  // 3: 即期買入
-  // 4~10: 遠期買入 10/30/60/90/120/150/180
-  // 11: "本行賣出" label
-  // 12: 現金賣出
-  // 13: 即期賣出
-  // 14~20: 遠期賣出
-  const twdRates = {};
-  for (let i = 1; i < lines.length; i++) {
-    const cols = lines[i].split(',');
-    if (cols.length < 14) continue;
-    const code = cols[0].trim();
-    const cashBuy = parseFloat(cols[2]);
-    const spotBuy = parseFloat(cols[3]);
-    const cashSell = parseFloat(cols[12]);
-    const spotSell = parseFloat(cols[13]);
-    // 即期中間價（買賣平均）當作主 rate
-    const rate = (isNaN(spotBuy) || isNaN(spotSell))
-      ? (isNaN(cashBuy) || isNaN(cashSell) ? null : (cashBuy + cashSell) / 2)
-      : (spotBuy + spotSell) / 2;
-    twdRates[code] = {
-      rate,
-      cashBuy: isNaN(cashBuy) ? null : cashBuy,
-      cashSell: isNaN(cashSell) ? null : cashSell,
-      spotBuy: isNaN(spotBuy) ? null : spotBuy,
-      spotSell: isNaN(spotSell) ? null : spotSell,
-    };
+
+  // 1) CSV 主源
+  let twdRates = await _fetchBotCsvRates();
+  let source: 'csv' | 'html' | null = twdRates ? 'csv' : null;
+
+  // 2) Fallback：HTML 牌告
+  if (!twdRates) {
+    twdRates = await _fetchBotHtmlRates();
+    if (twdRates) source = 'html';
   }
+
+  if (!twdRates) {
+    console.warn('[morning-builder] BOT FX: CSV + HTML 都失敗，回空');
+    return {};
+  }
+  console.log(`[morning-builder] BOT FX 來源：${source} (${Object.keys(twdRates).length} 幣別)`);
+
   // 組成 pair-keyed 格式：任何 A/B，都用 (A/TWD)/(B/TWD) 去算
   const out: any = {};
   for (const pair of usePairs) {

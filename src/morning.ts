@@ -11,8 +11,8 @@ import { Readability } from '@mozilla/readability';
 import { ROOT } from './config.js';
 import { buildMorningReport, fetchSection } from './morning-builder.js';
 
-export const MORNING_VERSION = 'V1.3.09';
-const MORNING_CACHE = 'morning-v1-3-09';
+export const MORNING_VERSION = 'V1.3.10';
+const MORNING_CACHE = 'morning-v1-3-10';
 
 // ─── Postgres ────────────────────────────────────────────────────────
 let _pgPool: pg.Pool | null = null;
@@ -910,6 +910,7 @@ body {
   line-height: 1.5;
   min-height: 100vh;
   padding-bottom: env(safe-area-inset-bottom);
+  overflow-x: hidden;            /* 比照 CrewSync：擋住橫向捲動，避免 modal/長字串造成空白橫滑 */
   overscroll-behavior: none;
 }
 a { color: var(--accent); text-decoration: none; }
@@ -1601,6 +1602,8 @@ a:active { opacity: 0.6; }
   width: 100%;
   max-height: 80vh;
   overflow-y: auto;
+  overflow-x: hidden;            /* 擋住內部橫滑（純防禦，body 已有 overflow-x:hidden） */
+  overflow-wrap: break-word;     /* 長英文/code/URL 不再撐爆寬度 */
   -webkit-overflow-scrolling: touch;
 }
 .modal h3 { margin: 0 0 10px; font-size: 1.05em; }
@@ -1913,6 +1916,11 @@ a:active { opacity: 0.6; }
     </div>
     <hr style="border:none;border-top:1px solid var(--border);margin:12px 0">
     <div class="changelog-v">${MORNING_VERSION}</div>
+    <div class="changelog-txt">
+      兩件修正。(1) 修匯率全空白：台銀 <code>flcsv/0/day</code> CSV 端點現在 302 導去公告頁不再回 CSV。改為 <b>CSV 主源 + HTML fallback</b>—優先打 CSV（<code>redirect: 'manual'</code> 不跟 302），失敗才解析 <code>xrt?Lang=zh-TW</code> 牌告 HTML，從每個 <code>&lt;tr&gt;</code> 抽 <code>(CCY)</code> + <code>data-table="本行XX買入/賣出"</code> 數值；現金/即期買賣價全部保留，CSV 恢復後不用再改。(2) 修 About card 可橫向滑動：<code>body</code> 補 <code>overflow-x: hidden</code>（CrewSync 早就有，晨報漏掉），modal 加 <code>overflow-wrap: break-word</code> 防長英文/code 撐爆。<br>
+      Two fixes. (1) FX-blank bugfix: BOT <code>flcsv/0/day</code> now 302-redirects to a notice page instead of returning CSV. Switched to <b>CSV-first + HTML-fallback</b>: try CSV with <code>redirect: 'manual'</code>; on failure parse <code>xrt?Lang=zh-TW</code> rate table, extracting <code>(CCY)</code> + <code>data-table="本行XX買入/賣出"</code> cell values per <code>&lt;tr&gt;</code>. Cash/spot buy/sell rates preserved — no rework needed when CSV is restored. (2) About-card horizontal-scroll bugfix: added <code>body { overflow-x: hidden }</code> (already in CrewSync, missing here), plus defensive <code>overflow-wrap: break-word</code> on modal to prevent long English/code strings from blowing up width.
+    </div>
+    <div class="changelog-v old">V1.3.09</div>
     <div class="changelog-txt">
       設定放寬：取消天氣/台股/美股/匯率的 hard cap（原本 10/20/20/15 上限），改為 soft warning —超過閾值（天氣 30、台股 30、美股 30、匯率 20）顯示黃色提示但不阻擋，使用者自己決定要選多少。後端 cnyesBatch 加 chunking（每 50 支拆一批並行請求），避免 URL 過長被 API 拒絕；單 chunk 失敗不影響其他，UI 顯示「—」，網站不會因為使用者瘋狂勾選而崩潰。<br>
       Settings loosened: removed hard caps on weather/TW stocks/US stocks/FX (previously 10/20/20/15), replaced with soft warnings (30/30/30/20) that show a yellow hint without blocking — users choose their own limits. Backend cnyesBatch now chunks (50 codes per request, parallel), avoiding URL-too-long API rejections; single-chunk failures fall back to "—" display so the site never crashes no matter how aggressively a user picks.
