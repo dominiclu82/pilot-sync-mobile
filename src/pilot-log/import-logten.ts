@@ -112,7 +112,8 @@ const FLIGHTS_REQUIRED = [
 
 export interface ImportLogtenFlightsResult {
   inserted: number;
-  duplicate_skipped: number;
+  updated: number;
+  duplicate_skipped: number;            // 命中 confirmed → 不動
   parse_errors: number;
   bad_rows?: Array<{ row: number; flight_no?: string; date?: string; reason: string }>;
   preview?: Array<{
@@ -120,6 +121,8 @@ export interface ImportLogtenFlightsResult {
     aircraft_type: string; tail_no: string;
     out_utc: string | null; off_utc: string | null; on_utc: string | null; in_utc: string | null;
     block: string | null; pic: string | null; sic: string | null;
+    action: 'insert' | 'update' | 'skip_confirmed';
+    new_status: 'draft' | 'confirmed' | null;   // skip_confirmed 時為 null
   }>;
   error?: string;
   dry_run?: boolean;
@@ -143,13 +146,13 @@ export async function importLogtenFlights(
   const missing = assertHeaders(headers, FLIGHTS_REQUIRED);
   if (missing.length > 0) {
     return {
-      inserted: 0, duplicate_skipped: 0, parse_errors: 0,
+      inserted: 0, updated: 0, duplicate_skipped: 0, parse_errors: 0,
       error: `missing_required_columns:${missing.join(',')}`,
     };
   }
 
   const result: ImportLogtenFlightsResult = {
-    inserted: 0, duplicate_skipped: 0, parse_errors: 0,
+    inserted: 0, updated: 0, duplicate_skipped: 0, parse_errors: 0,
     bad_rows: [], preview: [],
     dry_run: !!opts.dryRun,
   };
@@ -175,6 +178,8 @@ export async function importLogtenFlights(
       error: `bad_date_in_${result.bad_rows!.length}_row(s)`,
     };
   }
+
+  // 早期 dryRun 回傳：但是還是要逐筆跑出 preview + action（不寫 DB），所以繼續往下走
 
   for (let i = 0; i < rows.length; i++) {
     const row = rows[i];
@@ -224,14 +229,26 @@ export async function importLogtenFlights(
       if (row['Observer']) crew.observer1 = row['Observer'];
       if (row['Observer 2']) crew.observer2 = row['Observer 2'];
 
-      // 重複檢查（dry-run 也檢查，這樣 preview 才會看到「會被略過」）
-      const exists = await pool.query(
-        `SELECT 1 FROM pilot_log_entries WHERE user_id = $1 AND source = 'logten' AND source_ref = $2`,
+      // Smart status：有 actual Out 才算飛過，否則仍是計畫
+      const newStatus: 'draft' | 'confirmed' = outUtc ? 'confirmed' : 'draft';
+
+      // Smart re-import：找現有同 source_ref → 已 confirmed 不動，draft / roster_removed 可更新
+      const existing = await pool.query(
+        `SELECT id, status FROM pilot_log_entries WHERE user_id = $1 AND source = 'logten' AND source_ref = $2`,
         [userId, sourceRef]
       );
-      const isDup = exists.rows.length > 0;
+      let action: 'insert' | 'update' | 'skip_confirmed';
+      let existingId: string | null = null;
+      if (existing.rows.length === 0) {
+        action = 'insert';
+      } else if (existing.rows[0].status === 'confirmed') {
+        action = 'skip_confirmed';
+      } else {
+        action = 'update';
+        existingId = existing.rows[0].id;
+      }
 
-      // Preview 用簡短 summary（不論 dry-run 或實際匯入都填，讓使用者看到會發生什麼）
+      // Preview / 結果用簡短 summary
       result.preview!.push({
         flight_date: date,
         flight_no: flightNo,
@@ -246,48 +263,88 @@ export async function importLogtenFlights(
         block: blockMin != null ? `${Math.floor(blockMin / 60)}:${String(blockMin % 60).padStart(2, '0')}` : null,
         pic: pic || null,
         sic: sic || null,
+        action,
+        new_status: action === 'skip_confirmed' ? null : newStatus,
       });
 
-      if (isDup) {
+      if (action === 'skip_confirmed') {
         result.duplicate_skipped++;
         continue;
       }
 
-      // dry-run：到此為止，不真的 insert
+      // dry-run：到此為止，不真的寫 DB
       if (opts.dryRun) continue;
 
-      await pool.query(
-        `INSERT INTO pilot_log_entries
-         (id, user_id, source, source_ref, status, flight_date, flight_no, origin, dest,
-          aircraft_type, tail_no, std_utc, sta_utc, out_utc, off_utc, on_utc, in_utc,
-          block_minutes, air_minutes, night_minutes, distance_nm,
-          on_duty_utc, off_duty_utc, total_duty_minutes,
-          crew, approaches,
-          day_takeoffs, night_takeoffs, day_landings, night_landings, autolands,
-          pax_count, sid, star, remarks)
-         VALUES ($1, $2, 'logten', $3, 'confirmed', $4, $5, $6, $7,
-                 $8, $9, $10, $11, $12, $13, $14, $15,
-                 $16, $17, $18, $19,
-                 $20, $21, $22,
-                 $23::jsonb, $24::jsonb,
-                 $25, $26, $27, $28, $29,
-                 $30, $31, $32, $33)`,
-        [
-          randomUUID(), userId, sourceRef, date, flightNo, from, to,
-          row['Aircraft Type'] || null, row['Aircraft ID'] || null,
-          stdUtc, staUtc, outUtc, offUtc, onUtc, inUtc,
-          blockMin, airMin, nightMin, parseDecimalOrNull(row['Distance']),
-          onDutyUtc, offDutyUtc, dutyMin,
-          Object.keys(crew).length ? JSON.stringify(crew) : null,
-          approaches.length ? JSON.stringify(approaches) : null,
-          parseInt0(row['Day T/O']), parseInt0(row['Night T/O']),
-          parseInt0(row['Day Ldg']), parseInt0(row['Night Ldg']),
-          parseInt0(row['Autolands']),
-          parseIntOrNull(row['Total Pax']), row['SID'] || null, row['STAR'] || null,
-          row['Remarks'] || null,
-        ]
-      );
-      result.inserted++;
+      const crewJson = Object.keys(crew).length ? JSON.stringify(crew) : null;
+      const approachesJson = approaches.length ? JSON.stringify(approaches) : null;
+      const distanceVal = parseDecimalOrNull(row['Distance']);
+      const paxVal = parseIntOrNull(row['Total Pax']);
+
+      if (action === 'update') {
+        // 對 draft / roster_removed 整筆覆蓋（LogTen 是 source of truth；
+        // 使用者要保留 confirmed 之前的編輯，自己改成 confirmed 就會被保護）
+        await pool.query(
+          `UPDATE pilot_log_entries SET
+             status = $2,
+             flight_date = $3, flight_no = $4, origin = $5, dest = $6,
+             aircraft_type = $7, tail_no = $8,
+             std_utc = $9, sta_utc = $10, out_utc = $11, off_utc = $12, on_utc = $13, in_utc = $14,
+             block_minutes = $15, air_minutes = $16, night_minutes = $17, distance_nm = $18,
+             on_duty_utc = $19, off_duty_utc = $20, total_duty_minutes = $21,
+             crew = $22::jsonb, approaches = $23::jsonb,
+             day_takeoffs = $24, night_takeoffs = $25, day_landings = $26, night_landings = $27, autolands = $28,
+             pax_count = $29, sid = $30, star = $31, remarks = $32,
+             updated_at = NOW()
+           WHERE id = $1`,
+          [
+            existingId, newStatus,
+            date, flightNo, from, to,
+            row['Aircraft Type'] || null, row['Aircraft ID'] || null,
+            stdUtc, staUtc, outUtc, offUtc, onUtc, inUtc,
+            blockMin, airMin, nightMin, distanceVal,
+            onDutyUtc, offDutyUtc, dutyMin,
+            crewJson, approachesJson,
+            parseInt0(row['Day T/O']), parseInt0(row['Night T/O']),
+            parseInt0(row['Day Ldg']), parseInt0(row['Night Ldg']),
+            parseInt0(row['Autolands']),
+            paxVal, row['SID'] || null, row['STAR'] || null,
+            row['Remarks'] || null,
+          ]
+        );
+        result.updated++;
+      } else {
+        await pool.query(
+          `INSERT INTO pilot_log_entries
+           (id, user_id, source, source_ref, status, flight_date, flight_no, origin, dest,
+            aircraft_type, tail_no, std_utc, sta_utc, out_utc, off_utc, on_utc, in_utc,
+            block_minutes, air_minutes, night_minutes, distance_nm,
+            on_duty_utc, off_duty_utc, total_duty_minutes,
+            crew, approaches,
+            day_takeoffs, night_takeoffs, day_landings, night_landings, autolands,
+            pax_count, sid, star, remarks)
+           VALUES ($1, $2, 'logten', $3, $4, $5, $6, $7, $8,
+                   $9, $10, $11, $12, $13, $14, $15, $16,
+                   $17, $18, $19, $20,
+                   $21, $22, $23,
+                   $24::jsonb, $25::jsonb,
+                   $26, $27, $28, $29, $30,
+                   $31, $32, $33, $34)`,
+          [
+            randomUUID(), userId, sourceRef, newStatus, date, flightNo, from, to,
+            row['Aircraft Type'] || null, row['Aircraft ID'] || null,
+            stdUtc, staUtc, outUtc, offUtc, onUtc, inUtc,
+            blockMin, airMin, nightMin, distanceVal,
+            onDutyUtc, offDutyUtc, dutyMin,
+            crewJson, approachesJson,
+            parseInt0(row['Day T/O']), parseInt0(row['Night T/O']),
+            parseInt0(row['Day Ldg']), parseInt0(row['Night Ldg']),
+            parseInt0(row['Autolands']),
+            paxVal, row['SID'] || null, row['STAR'] || null,
+            row['Remarks'] || null,
+          ]
+        );
+        result.inserted++;
+      }
     } catch (e: any) {
       console.warn('[pilot-log] flight import row error:', e.message);
       result.parse_errors++;

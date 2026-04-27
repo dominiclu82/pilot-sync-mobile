@@ -694,15 +694,25 @@ async function _plUploadFile(inputId, endpoint) {
 
 function _plRenderPreviewRows(rows) {
   if (!rows || !rows.length) return '';
-  var html = '<div style="margin-top:8px;font-size:.7em;color:var(--muted)">前 ' + Math.min(rows.length, 10) + ' / 共 ' + rows.length + ' 筆預覽：</div>' +
-    '<div style="max-height:200px;overflow-y:auto;margin-top:4px">';
+  var actionBadge = function(action, newStatus) {
+    if (action === 'skip_confirmed') return '<span style="background:#475569;color:#fff;padding:1px 6px;border-radius:4px;font-size:.85em">SKIP</span>';
+    if (action === 'update') {
+      var col = newStatus === 'confirmed' ? '#10b981' : '#f59e0b';
+      return '<span style="background:' + col + ';color:#fff;padding:1px 6px;border-radius:4px;font-size:.85em">UPDATE→' + (newStatus || '?') + '</span>';
+    }
+    var col = newStatus === 'confirmed' ? '#10b981' : '#f59e0b';
+    return '<span style="background:' + col + ';color:#fff;padding:1px 6px;border-radius:4px;font-size:.85em">NEW ' + (newStatus || '?') + '</span>';
+  };
+  var html = '<div style="margin-top:8px;font-size:.7em;color:var(--muted)">前 ' + Math.min(rows.length, 10) + ' / 共 ' + rows.length + ' 筆預覽（NEW=新增、UPDATE=覆蓋舊 draft、SKIP=已是 confirmed 不動）：</div>' +
+    '<div style="max-height:240px;overflow-y:auto;margin-top:4px">';
   for (var i = 0; i < Math.min(rows.length, 10); i++) {
     var p = rows[i];
-    html += '<div style="font-size:.66em;padding:4px 6px;border-bottom:1px solid var(--border);font-family:monospace">' +
-      _plEsc(p.flight_date) + ' ' + _plEsc(p.flight_no) + ' ' + _plEsc(p.origin) + '→' + _plEsc(p.dest) +
-      ' [' + _plEsc(p.aircraft_type) + '/' + _plEsc(p.tail_no) + '] ' +
-      'block=' + _plEsc(p.block || '—') + ' out=' + _plEsc(p.out_utc ? p.out_utc.slice(11,16) + 'z' : '—') +
-      ' pic=' + _plEsc(p.pic || '—') +
+    html += '<div style="font-size:.66em;padding:4px 6px;border-bottom:1px solid var(--border);font-family:monospace;display:flex;gap:6px;align-items:center;flex-wrap:wrap">' +
+      actionBadge(p.action, p.new_status) +
+      '<span>' + _plEsc(p.flight_date) + ' ' + _plEsc(p.flight_no) + ' ' + _plEsc(p.origin) + '→' + _plEsc(p.dest) + '</span>' +
+      '<span style="color:var(--muted)">[' + _plEsc(p.aircraft_type) + '/' + _plEsc(p.tail_no) + ']</span>' +
+      '<span style="color:var(--muted)">blk=' + _plEsc(p.block || '—') + ' out=' + _plEsc(p.out_utc ? p.out_utc.slice(11,16) + 'z' : '—') + '</span>' +
+      '<span style="color:var(--muted)">pic=' + _plEsc(p.pic || '—') + '</span>' +
     '</div>';
   }
   html += '</div>';
@@ -737,17 +747,27 @@ async function _plUploadFlights(dryRun) {
     return;
   }
 
+  // 從 preview 算出各 action 數量（dry-run 跟實際都用同一個來源）
+  var nNew = 0, nUpdate = 0;
+  if (j.preview) {
+    for (var i = 0; i < j.preview.length; i++) {
+      if (j.preview[i].action === 'insert') nNew++;
+      else if (j.preview[i].action === 'update') nUpdate++;
+    }
+  }
+
   if (dryRun) {
     var preview = _plRenderPreviewRows(j.preview);
     resBox.innerHTML = '<div style="background:#1e3a5f;color:#fff;padding:10px;border-radius:8px;font-size:.78em">' +
-      '🔍 Dry-run（沒寫入 DB）：可匯入 <b>' + (j.preview ? j.preview.length : 0) + '</b> 筆、' +
-      '重複略過 <b>' + j.duplicate_skipped + '</b>、解析失敗 <b>' + j.parse_errors + '</b><br>' +
+      '🔍 Dry-run（沒寫入 DB）：新增 <b>' + nNew + '</b>、更新舊 draft <b>' + nUpdate + '</b>、' +
+      '保留 confirmed <b>' + j.duplicate_skipped + '</b>、解析失敗 <b>' + j.parse_errors + '</b><br>' +
       '<span style="font-size:.85em;color:#bfdbfe">確認 OK 後按 Import 真的寫入。</span>' +
       preview +
       '</div>';
   } else {
     resBox.innerHTML = '<div style="background:#064e3b;color:#fff;padding:10px;border-radius:8px;font-size:.78em">' +
-      '✅ 匯入完成：新增 <b>' + j.inserted + '</b>、重複略過 <b>' + j.duplicate_skipped + '</b>、解析失敗 <b>' + j.parse_errors + '</b>' +
+      '✅ 匯入完成：新增 <b>' + (j.inserted || 0) + '</b>、更新 <b>' + (j.updated || 0) + '</b>、' +
+      '保留 confirmed <b>' + j.duplicate_skipped + '</b>、解析失敗 <b>' + j.parse_errors + '</b>' +
       '</div>';
     _plToast('匯入完成');
   }
