@@ -100,6 +100,17 @@ async function run() {
     assert(plHtml.includes('SECTION: state') && plHtml.includes('SECTION: auth') &&
            plHtml.includes('SECTION: editor'), 'pilot-log.js 內容沒注入或缺 section');
   });
+  await check('Import UI 含 Preview (dry-run) 按鈕', async () => {
+    assert(plHtml.includes('_plUploadFlights(true)') && plHtml.includes('Preview'),
+           '找不到 Preview / dry-run 按鈕');
+  });
+  await check('Import UI 含 Import 按鈕', async () => {
+    assert(plHtml.includes('_plUploadFlights(false)'), '找不到 Import 按鈕');
+  });
+  await check('Editor flight_date 用 date type（防 +0YYYYY 顯示 bug）', async () => {
+    assert(plHtml.includes("_plEditorField('Date', 'flight_date', 'date')"),
+           "flight_date 欄位沒用 'date' type，會顯示 ISO 字串");
+  });
   await check('inline JS 能 parse（用 new Function 過編譯，不執行）', async () => {
     // 抽出整段 <script>...</script>（用最後一個 </script> 為止）
     const start = plHtml.indexOf('<script>');

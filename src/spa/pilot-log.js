@@ -431,6 +431,25 @@ function _plEditorField(label, name, type, opts) {
     input = '<textarea ' + attrs + ' rows="2">' + _plEsc(val) + '</textarea>';
   } else if (type === 'number') {
     input = '<input type="number" ' + attrs + ' value="' + _plEsc(val) + '" step="' + (opts.step || '1') + '">';
+  } else if (type === 'date') {
+    // 從 server 來的可能是 'YYYY-MM-DD' 純字串、'YYYY-MM-DDTHH:mm:ss.sssZ' ISO，
+    // 甚至 PG TIMESTAMPTZ 序列化的 6 位年份 '+0YYYYY-MM-DDT...'。
+    // 一律抽前 10 字、必要時清掉非 YYYY-MM-DD 的雜訊。
+    var dateStr = String(val || '').slice(0, 10);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+      // 嘗試從任何 ISO 變體用 Date.parse 還原
+      var d = new Date(val);
+      if (!isNaN(d.getTime())) {
+        var y = d.getUTCFullYear(), mo = d.getUTCMonth() + 1, da = d.getUTCDate();
+        // 年份若 > 9999 表示資料壞了，留空讓使用者察覺
+        dateStr = (y >= 1000 && y <= 9999)
+          ? y + '-' + (mo < 10 ? '0' : '') + mo + '-' + (da < 10 ? '0' : '') + da
+          : '';
+      } else {
+        dateStr = '';
+      }
+    }
+    input = '<input ' + attrs + ' value="' + _plEsc(dateStr) + '" placeholder="YYYY-MM-DD" maxlength="10">';
   } else {
     input = '<input ' + attrs + ' value="' + _plEsc(val) + '"' + (opts.placeholder ? ' placeholder="' + _plEsc(opts.placeholder) + '"' : '') + '>';
   }
@@ -465,7 +484,7 @@ function _plRenderEditor() {
     '</div>' +
 
     '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;background:var(--card);border-radius:10px;padding:12px">' +
-      '<div style="grid-column:span 2">' + _plEditorField('Date', 'flight_date', 'text') + '</div>' +
+      '<div style="grid-column:span 2">' + _plEditorField('Date', 'flight_date', 'date') + '</div>' +
       _plEditorField('Flight #', 'flight_no', 'text') +
       _plEditorField('From (ICAO)', 'origin', 'text') +
       _plEditorField('To (ICAO)', 'dest', 'text') +
@@ -636,7 +655,11 @@ function _plOpenImport() {
         '必填欄位：Date / Flight # / From / To / Aircraft Type / Aircraft ID / Out / In / On Duty / Off Duty / PIC/P1 / SIC/P2。' +
       '</div>' +
       '<input type="file" id="pl-flights-file" accept=".txt,.tab,.tsv,text/plain" style="font-size:.78em">' +
-      '<button onclick="_plUploadFlights()" style="margin-left:8px;background:#10b981;color:#fff;border:0;border-radius:6px;padding:6px 12px;font-size:.78em;font-weight:700;cursor:pointer">Upload</button>' +
+      '<div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap">' +
+        '<button onclick="_plUploadFlights(true)" style="background:#475569;color:#fff;border:0;border-radius:6px;padding:6px 12px;font-size:.78em;font-weight:700;cursor:pointer">🔍 Preview (dry-run)</button>' +
+        '<button onclick="_plUploadFlights(false)" style="background:#10b981;color:#fff;border:0;border-radius:6px;padding:6px 12px;font-size:.78em;font-weight:700;cursor:pointer">Import</button>' +
+      '</div>' +
+      '<div style="font-size:.65em;color:var(--muted);margin-top:6px">建議先 Preview 確認所有 row 都解析正常，再按 Import。</div>' +
     '</div>' +
     '<div style="background:var(--card);border-radius:10px;padding:14px">' +
       '<div style="font-size:.85em;font-weight:700;margin-bottom:6px">🛩️ Aircraft (Tab 匯出，選用)</div>' +
@@ -669,12 +692,59 @@ async function _plUploadFile(inputId, endpoint) {
   return await r.json();
 }
 
-async function _plUploadFlights() {
-  var j = await _plUploadFile('pl-flights-file', '/api/pilot-log/import/logten-flights');
+function _plRenderPreviewRows(rows) {
+  if (!rows || !rows.length) return '';
+  var html = '<div style="margin-top:8px;font-size:.7em;color:var(--muted)">前 ' + Math.min(rows.length, 10) + ' / 共 ' + rows.length + ' 筆預覽：</div>' +
+    '<div style="max-height:200px;overflow-y:auto;margin-top:4px">';
+  for (var i = 0; i < Math.min(rows.length, 10); i++) {
+    var p = rows[i];
+    html += '<div style="font-size:.66em;padding:4px 6px;border-bottom:1px solid var(--border);font-family:monospace">' +
+      _plEsc(p.flight_date) + ' ' + _plEsc(p.flight_no) + ' ' + _plEsc(p.origin) + '→' + _plEsc(p.dest) +
+      ' [' + _plEsc(p.aircraft_type) + '/' + _plEsc(p.tail_no) + '] ' +
+      'block=' + _plEsc(p.block || '—') + ' out=' + _plEsc(p.out_utc ? p.out_utc.slice(11,16) + 'z' : '—') +
+      ' pic=' + _plEsc(p.pic || '—') +
+    '</div>';
+  }
+  html += '</div>';
+  return html;
+}
+
+function _plRenderBadRows(badRows) {
+  if (!badRows || !badRows.length) return '';
+  var html = '<div style="margin-top:8px;font-size:.78em;font-weight:700;color:#fca5a5">❌ 以下 row 格式錯誤，整批不會 import：</div>' +
+    '<div style="max-height:200px;overflow-y:auto;margin-top:4px">';
+  for (var i = 0; i < badRows.length; i++) {
+    var b = badRows[i];
+    html += '<div style="font-size:.7em;padding:4px 6px;border-bottom:1px solid #7f1d1d;font-family:monospace;color:#fca5a5">' +
+      'Row ' + b.row + ' (' + _plEsc(b.flight_no || '?') + '): date=<b>' + _plEsc(b.date || '空') + '</b> — ' + _plEsc(b.reason) +
+    '</div>';
+  }
+  html += '</div>';
+  return html;
+}
+
+async function _plUploadFlights(dryRun) {
+  var endpoint = '/api/pilot-log/import/logten-flights' + (dryRun ? '?dryRun=1' : '');
+  var j = await _plUploadFile('pl-flights-file', endpoint);
   if (!j) return;
   var resBox = document.getElementById('pl-import-result');
+
   if (j.error) {
-    resBox.innerHTML = '<div style="background:#7f1d1d;color:#fff;padding:10px;border-radius:8px;font-size:.78em">❌ ' + _plEsc(j.error) + '</div>';
+    var badHtml = _plRenderBadRows(j.bad_rows);
+    resBox.innerHTML = '<div style="background:#7f1d1d;color:#fff;padding:10px;border-radius:8px;font-size:.78em">' +
+      '❌ ' + _plEsc(j.error) + (badHtml ? '' : '') +
+      '</div>' + badHtml;
+    return;
+  }
+
+  if (dryRun) {
+    var preview = _plRenderPreviewRows(j.preview);
+    resBox.innerHTML = '<div style="background:#1e3a5f;color:#fff;padding:10px;border-radius:8px;font-size:.78em">' +
+      '🔍 Dry-run（沒寫入 DB）：可匯入 <b>' + (j.preview ? j.preview.length : 0) + '</b> 筆、' +
+      '重複略過 <b>' + j.duplicate_skipped + '</b>、解析失敗 <b>' + j.parse_errors + '</b><br>' +
+      '<span style="font-size:.85em;color:#bfdbfe">確認 OK 後按 Import 真的寫入。</span>' +
+      preview +
+      '</div>';
   } else {
     resBox.innerHTML = '<div style="background:#064e3b;color:#fff;padding:10px;border-radius:8px;font-size:.78em">' +
       '✅ 匯入完成：新增 <b>' + j.inserted + '</b>、重複略過 <b>' + j.duplicate_skipped + '</b>、解析失敗 <b>' + j.parse_errors + '</b>' +

@@ -114,12 +114,21 @@ export interface ImportLogtenFlightsResult {
   inserted: number;
   duplicate_skipped: number;
   parse_errors: number;
+  bad_rows?: Array<{ row: number; flight_no?: string; date?: string; reason: string }>;
+  preview?: Array<{
+    flight_date: string; flight_no: string; origin: string; dest: string;
+    aircraft_type: string; tail_no: string;
+    out_utc: string | null; off_utc: string | null; on_utc: string | null; in_utc: string | null;
+    block: string | null; pic: string | null; sic: string | null;
+  }>;
   error?: string;
+  dry_run?: boolean;
 }
 
 export async function importLogtenFlights(
   userId: string,
-  text: string
+  text: string,
+  opts: { dryRun?: boolean } = {}
 ): Promise<ImportLogtenFlightsResult> {
   const pool = getPool();
   if (!pool || !(await ensureTables())) {
@@ -139,9 +148,36 @@ export async function importLogtenFlights(
     };
   }
 
-  const result: ImportLogtenFlightsResult = { inserted: 0, duplicate_skipped: 0, parse_errors: 0 };
+  const result: ImportLogtenFlightsResult = {
+    inserted: 0, duplicate_skipped: 0, parse_errors: 0,
+    bad_rows: [], preview: [],
+    dry_run: !!opts.dryRun,
+  };
 
-  for (const row of rows) {
+  // 嚴格 Date 格式驗證 — 任何一筆爛掉就標記、整批不寫
+  // 先掃一遍找壞 row。即使 dry-run 也要回 bad_rows 給前端看。
+  for (let i = 0; i < rows.length; i++) {
+    const row = rows[i];
+    const date = (row['Date'] || '').trim();
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      result.bad_rows!.push({
+        row: i + 2,                       // header 是第 1 行，資料從第 2 行起
+        flight_no: row['Flight #'] || '',
+        date,
+        reason: 'invalid_date_format (expected YYYY-MM-DD)',
+      });
+    }
+  }
+
+  if (result.bad_rows!.length > 0) {
+    return {
+      ...result,
+      error: `bad_date_in_${result.bad_rows!.length}_row(s)`,
+    };
+  }
+
+  for (let i = 0; i < rows.length; i++) {
+    const row = rows[i];
     try {
       const date = row['Date'];
       const flightNo = row['Flight #'];
@@ -171,8 +207,8 @@ export async function importLogtenFlights(
 
       // Approach 1..N
       const approaches: any[] = [];
-      for (let i = 1; i <= 5; i++) {
-        const a = parseApproach(row[`Approach ${i}`] || '');
+      for (let ai = 1; ai <= 5; ai++) {
+        const a = parseApproach(row[`Approach ${ai}`] || '');
         if (a) approaches.push(a);
       }
 
@@ -188,15 +224,37 @@ export async function importLogtenFlights(
       if (row['Observer']) crew.observer1 = row['Observer'];
       if (row['Observer 2']) crew.observer2 = row['Observer 2'];
 
-      // 重複檢查
+      // 重複檢查（dry-run 也檢查，這樣 preview 才會看到「會被略過」）
       const exists = await pool.query(
         `SELECT 1 FROM pilot_log_entries WHERE user_id = $1 AND source = 'logten' AND source_ref = $2`,
         [userId, sourceRef]
       );
-      if (exists.rows.length > 0) {
+      const isDup = exists.rows.length > 0;
+
+      // Preview 用簡短 summary（不論 dry-run 或實際匯入都填，讓使用者看到會發生什麼）
+      result.preview!.push({
+        flight_date: date,
+        flight_no: flightNo,
+        origin: from,
+        dest: to,
+        aircraft_type: row['Aircraft Type'] || '',
+        tail_no: row['Aircraft ID'] || '',
+        out_utc: outUtc ? outUtc.toISOString() : null,
+        off_utc: offUtc ? offUtc.toISOString() : null,
+        on_utc: onUtc ? onUtc.toISOString() : null,
+        in_utc: inUtc ? inUtc.toISOString() : null,
+        block: blockMin != null ? `${Math.floor(blockMin / 60)}:${String(blockMin % 60).padStart(2, '0')}` : null,
+        pic: pic || null,
+        sic: sic || null,
+      });
+
+      if (isDup) {
         result.duplicate_skipped++;
         continue;
       }
+
+      // dry-run：到此為止，不真的 insert
+      if (opts.dryRun) continue;
 
       await pool.query(
         `INSERT INTO pilot_log_entries
