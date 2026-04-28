@@ -1509,7 +1509,7 @@ export function getSpaHtmlBody(): string {
       <button class="tab-util-btn tab-install-btn" id="tab-install-btn" onclick="showInstallGuide()" style="display:none">
         <span>📲</span>安裝
       </button>
-      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer;text-decoration:underline" onclick="showAbout()">V8.0.25</span>
+      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer;text-decoration:underline" onclick="showAbout()">V8.0.26</span>
     </div>
   </div>
 </div>
@@ -1540,7 +1540,12 @@ export function getSpaHtmlBody(): string {
       <div style="color:var(--muted)">Best experience on iPad in landscape mode. Android devices may not display correctly.</div>
     </div>
     <div style="max-height:50vh;overflow-y:auto;-webkit-overflow-scrolling:touch;margin-bottom:10px">
-    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V8.0.25</div>
+    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V8.0.26</div>
+    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
+      <div>修正 Briefing 中 Overtime warning：統一航班號比對規則（去前導 0／去空白）、改用 flight-level 日期推算（學 overtime 子頁的方式，更穩）、找不到航班或算不出表定 FT 時改顯示診斷提示，不再靜默失敗。Groups 群組面板：清除 SFO/FO 合併前留下的舊群組（denylist 模式，只刪明確列出的 legacy id，未來新增機隊／preset 不會被誤刪）。Duty Time 持久化補強：每次輸入即存（不再需要按 Calculate 才存）、保存／還原 crew 人數選擇、重開頁面時若 FDP Start 已填妥則自動重算讓結果區塊回來。</div>
+      <div>Briefing Overtime warning fix: unified flight number matching (strip leading zeros/spaces), use flight-level date parsing (matches Overtime subtab logic), replaced silent failures with diagnostic hints when roster flight not found or scheduled FT unavailable. Groups panel: removed legacy SFO/FO orphan groups left from the merge (denylist approach — only deletes explicitly listed legacy IDs, so future fleets/presets won't be accidentally removed). Duty Time persistence: instant save on every input (no longer requires clicking Calculate), save/restore crew size selection, auto-recalculates on page reopen when FDP Start is filled so the result section comes back too.</div>
+    </div>
+    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V8.0.25</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
       <div>機場分類資料表更新到 Operations Specifications C-6 Authorized Airport List APR 01 2026 修正版（Amendment 069），共 8 項：(1) A350-1041 新增 RJBB（關西）為定期機場、新增 RJFF（福岡）為備用機場。(2) A330-941：RJCH（函館）、RJOT（高松）、RPVM（宿霧）由定期改備用。(3) A350-941：新增 RJCH（函館）為備用；RJSS（仙台）、RPLC（克拉克）、RPVM（宿霧）由定期改備用。(4) A321-252NX / A330-941 / A350-941：移除 VDPP（金邊）為備用機場。(5) A321-252NX：WADD（峇里島）由定期改備用。(6) A330-941：WIII（雅加達）由定期改備用。(7) A350-941：VVPQ（富國）、WIII（雅加達）由定期改備用。(8) A330-941：移除 WADD（峇里島）為定期機場；A350-941：移除 WADD 為備用機場。</div>
       <div>Airport classification table updated to Operations Specifications C-6 Authorized Airport List APR 01 2026 amendment (Amendment 069), 8 changes: (1) A350-1041 — added RJBB (Kansai) as regular, RJFF (Fukuoka) as alternate. (2) A330-941 — RJCH / RJOT / RPVM regular → alternate. (3) A350-941 — added RJCH as alternate; RJSS / RPLC / RPVM regular → alternate. (4) A321-252NX / A330-941 / A350-941 — removed VDPP (Phnom Penh) as alternate. (5) A321-252NX — WADD (Bali) regular → alternate. (6) A330-941 — WIII (Jakarta) regular → alternate. (7) A350-941 — VVPQ / WIII regular → alternate. (8) A330-941 — removed WADD as regular; A350-941 — removed WADD as alternate.</div>

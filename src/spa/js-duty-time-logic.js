@@ -617,7 +617,13 @@ var _dtCheckIds = ['dt-c1','dt-disc','dt-td6','dt-accom','dt-dhd'];
 
 function _dtSave() {
   try {
-    var obj = { mode: dtMode, inputs: {}, checks: {} };
+    var crewBtn = document.querySelector('.dt-crew-btn.active');
+    var obj = {
+      mode: dtMode,
+      crew: crewBtn ? crewBtn.dataset.crew : '',
+      inputs: {},
+      checks: {}
+    };
     _dtInputIds.forEach(function(id) {
       var el = document.getElementById(id);
       if (el) obj.inputs[id] = el.value || '';
@@ -636,6 +642,12 @@ function _dtRestore() {
     if (!s) return;
     var obj = JSON.parse(s);
     if (obj.mode) dtSetMode(obj.mode);
+    // 還原 crew 選擇（active button class）
+    if (obj.crew) {
+      document.querySelectorAll('.dt-crew-btn').forEach(function(b) {
+        b.classList.toggle('active', b.dataset.crew === String(obj.crew));
+      });
+    }
     if (obj.inputs) {
       Object.keys(obj.inputs).forEach(function(id) {
         var el = document.getElementById(id);
@@ -655,7 +667,38 @@ function _dtRestore() {
       if (obj.checks['dt-dhd']) dtToggleDhd();
       if (obj.checks['dt-accom']) dtToggleAccom();
     }
+    // 重建結果區塊：FDP Start 時 / 分齊全時才自動重算（不齊全會觸發 alert，所以要守門）
+    var shEl = document.getElementById('dt-s-h');
+    var smEl = document.getElementById('dt-s-m');
+    var shVal = shEl ? shEl.value : '';
+    var smVal = smEl ? smEl.value : '';
+    if (shVal !== '' && smVal !== '' && !isNaN(parseInt(shVal, 10)) && !isNaN(parseInt(smVal, 10))) {
+      try { dtCalculate(); } catch(e){}
+    }
   } catch(e){}
+}
+
+// 每個輸入/checkbox/crew 按鈕都掛 listener → 輸入即存（解決「沒按 Calculate 就沒存」的問題）
+function _dtAttachAutoSave() {
+  _dtInputIds.forEach(function(id) {
+    var el = document.getElementById(id);
+    if (!el || el._dtSaveBound) return;
+    el._dtSaveBound = true;
+    el.addEventListener('input', _dtSave);
+    el.addEventListener('change', _dtSave);
+  });
+  _dtCheckIds.forEach(function(id) {
+    var el = document.getElementById(id);
+    if (!el || el._dtSaveBound) return;
+    el._dtSaveBound = true;
+    el.addEventListener('change', _dtSave);
+  });
+  document.querySelectorAll('.dt-crew-btn').forEach(function(b) {
+    if (b._dtSaveBound) return;
+    b._dtSaveBound = true;
+    // 用 setTimeout(0) 等 onclick 處理完 active class 切換後再存
+    b.addEventListener('click', function() { setTimeout(_dtSave, 0); });
+  });
 }
 
 function dtReset() {
@@ -682,6 +725,7 @@ function dtReset() {
 
 // ── Boot ─────────────────────────────────────────────────────────────────────
 dtInitDates();
+_dtAttachAutoSave();
 showMain();
 // 預設顯示簡報箱 datis 分頁 → 立即載入初始天氣資料
 wxLoaded = true; (function(){ var fsel = document.getElementById('wx-fleet-select'); if (fsel) fsel.value = wxCurrentFleet; })(); loadWxRegion(wxCurrentRegion);

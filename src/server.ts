@@ -112,6 +112,26 @@ async function _dbInit() {
         [g.id, g.name]
       );
     }
+    // Denylist cleanup：只刪明確列出的 legacy preset id，未來新增 preset 不會被誤殺。
+    // CASCADE 會連帶清掉這些舊群組的會員與邀請紀錄。冪等：沒有孤兒就 no-op。
+    // 之後若有 preset 要 retire，把 id 加進這個陣列即可。
+    const legacyPresetIds = [
+      // SFO/FO 合併前的孤兒（合併成 preset_{fleet}_SFOFO）
+      'preset_A321_SFO', 'preset_A321_FO',
+      'preset_A330_SFO', 'preset_A330_FO',
+      'preset_A350_SFO', 'preset_A350_FO',
+    ];
+    try {
+      const cleanup = await _pool.query(
+        `DELETE FROM cs_groups WHERE type = 'preset' AND id = ANY($1::text[])`,
+        [legacyPresetIds]
+      );
+      if (cleanup.rowCount && cleanup.rowCount > 0) {
+        console.log(`🧹 Removed ${cleanup.rowCount} legacy preset group(s)`);
+      }
+    } catch (e: any) {
+      console.warn('Preset cleanup skipped:', e.message);
+    }
     // ── Briefings（使用者的航班 briefing snapshot，可查歷史）──
     await _pool.query(`
       CREATE TABLE IF NOT EXISTS crewsync_briefings (
@@ -478,7 +498,7 @@ app.get('/sw.js', (_req, res) => {
   res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
   res.setHeader('Service-Worker-Allowed', '/');
   res.send(`
-const CACHE = 'crewsync-v8025';
+const CACHE = 'crewsync-v8026';
 const SHELL = ['/', '/main', '/share'];
 self.addEventListener('install', e => {
   e.waitUntil(

@@ -1007,6 +1007,14 @@ function _briefParseFT(s) {
   if (m) { var p = m[1].padStart(4, '0'); return parseInt(p.substring(0, 2), 10) * 60 + parseInt(p.substring(2, 4), 10); }
   return null;
 }
+// 統一航班號比對形式：去空白、去前導 0，統一成 "JX{純數字}"
+// 與 _briefForceQuery / _briefOnInput / _briefHasFlight 等其他 lookup 規則一致
+function _briefNormFno(s) {
+  s = String(s || '').toUpperCase().replace(/\s+/g, '');
+  s = s.replace(/^SJX|^JX/, '');
+  s = s.replace(/^0+/, '') || '0';
+  return 'JX' + s;
+}
 // 日期 'YYYY-MM-DD' +- N 天 → 'YYYY-MM-DD'
 function _briefDateShift(dateStr, deltaDays) {
   var p = String(dateStr).split('-');
@@ -1025,11 +1033,37 @@ function _briefParseDutyDate(str) {
   if (!mon) return null;
   return m[1] + '-' + String(mon).padStart(2, '0') + '-' + String(parseInt(m[3], 10)).padStart(2, '0');
 }
-// 嚴格匹配：找 duty 的日期範圍 [reportTime_date, endTime_date] 包含目標日期，且航班號相符
+// 從 flight 自己的欄位推日期 → 'YYYY-MM-DD'。學 overtime.js _otParseDateFromFlight 的做法。
+// 優先序：fl.date (YYYY-MM-DD) → fl.depTime / depTimeUtc 內的 "/DDMMM" pattern → fallback duty.reportTime
+function _briefParseFlightDate(fl, duty, monthStr) {
+  if (fl && fl.date && /^\d{4}-\d{2}-\d{2}$/.test(fl.date)) return fl.date;
+  var monNames = { JAN:1, FEB:2, MAR:3, APR:4, MAY:5, JUN:6, JUL:7, AUG:8, SEP:9, OCT:10, NOV:11, DEC:12 };
+  var sources = [fl && fl.depTime, fl && fl.depTimeUtc];
+  for (var i = 0; i < sources.length; i++) {
+    var match = (sources[i] || '').match(/\/(\d{1,2})([A-Za-z]{3})/);
+    if (!match) continue;
+    var day = parseInt(match[1], 10);
+    var mon = monNames[match[2].toUpperCase()];
+    if (!day || !mon) continue;
+    var ym = String(monthStr || '').split('-');
+    var year = parseInt(ym[0], 10);
+    var monInRoster = parseInt(ym[1], 10);
+    if (isNaN(year) || isNaN(monInRoster)) continue;
+    // 跨年容錯：12 月 roster 看到 1 月日期 → 隔年；1 月 roster 看到 12 月 → 前年
+    if (mon === 1 && monInRoster === 12) year++;
+    else if (mon === 12 && monInRoster === 1) year--;
+    return year + '-' + String(mon).padStart(2, '0') + '-' + String(day).padStart(2, '0');
+  }
+  return _briefParseDutyDate(duty && duty.reportTime);
+}
+// 找 roster 內航班號相符的 flight。兩階段比對：
+//   (1) 先用 flight-level 日期 (穩，跟 overtime.js 一致)
+//   (2) fallback duty-level 日期範圍 (兼容沒 flight-level 日期欄位的舊 roster)
 // 夏冬班表時間不同，必須用當天 roster，不可用其他月份估算
 function _briefFindRosterFlight(flightNo, dateStr) {
   var eid = _briefGetEid();
   if (!eid || !flightNo || !dateStr) return null;
+  var target = _briefNormFno(flightNo);
   var mm = dateStr.slice(0, 7);
   var ym = mm.split('-');
   var y = parseInt(ym[0], 10), m = parseInt(ym[1], 10);
@@ -1040,6 +1074,10 @@ function _briefFindRosterFlight(flightNo, dateStr) {
   months.push(py + '-' + String(pm).padStart(2, '0'));
   months.push(y + '-' + String(m).padStart(2, '0'));
   months.push(ny + '-' + String(nm).padStart(2, '0'));
+  var targetMin = _briefDateShift(dateStr, -1);
+  var targetMax = _briefDateShift(dateStr, +1);
+  // 先收集所有航班號相符的 candidates（保留來源 month / duty 供日期推算）
+  var candidates = [];
   for (var mi = 0; mi < months.length; mi++) {
     var raw;
     try { raw = localStorage.getItem('crewsync_roster_' + eid + '_' + months[mi]); } catch(e) { continue; }
@@ -1049,20 +1087,29 @@ function _briefFindRosterFlight(flightNo, dateStr) {
     var duties = Array.isArray(data) ? data : (data.duties || []);
     for (var di = 0; di < duties.length; di++) {
       var d = duties[di];
-      var startDate = _briefParseDutyDate(d.reportTime);
-      var endDate = _briefParseDutyDate(d.endTime);
-      if (!startDate) continue;
-      // 容錯：target ± 1 天的範圍跟 duty 範圍有交集就算（處理外站時區差）
-      var targetMin = _briefDateShift(dateStr, -1);
-      var targetMax = _briefDateShift(dateStr, +1);
-      var dutyEnd = endDate || startDate;
-      if (targetMax < startDate || targetMin > dutyEnd) continue;
       for (var fi = 0; fi < (d.flights || []).length; fi++) {
-        if ((d.flights[fi].flightNo || '').toUpperCase() === flightNo.toUpperCase()) {
-          return d.flights[fi];
-        }
+        var f = d.flights[fi];
+        if (_briefNormFno(f.flightNo) !== target) continue;
+        candidates.push({ fl: f, duty: d, monthStr: months[mi] });
       }
     }
+  }
+  if (candidates.length === 0) return null;
+  // 第一輪：flight-level 日期比對
+  for (var c1 = 0; c1 < candidates.length; c1++) {
+    var cand1 = candidates[c1];
+    var fDate = _briefParseFlightDate(cand1.fl, cand1.duty, cand1.monthStr);
+    if (fDate && fDate >= targetMin && fDate <= targetMax) return cand1.fl;
+  }
+  // 第二輪 fallback：duty-level 日期範圍
+  for (var c2 = 0; c2 < candidates.length; c2++) {
+    var cand2 = candidates[c2];
+    var startDate = _briefParseDutyDate(cand2.duty.reportTime);
+    var endDate = _briefParseDutyDate(cand2.duty.endTime);
+    if (!startDate) continue;
+    var dutyEnd = endDate || startDate;
+    if (targetMax < startDate || targetMin > dutyEnd) continue;
+    return cand2.fl;
   }
   return null;
 }
@@ -1107,6 +1154,18 @@ function _briefFmtMin(mins) {
   var h = Math.floor(mins / 60), m = mins % 60;
   return String(h).padStart(2, '0') + ':' + String(m).padStart(2, '0');
 }
+// 設定 brief-ot-warn 的視覺樣式：'warn' = 黃色（OT 警告）；'hint' = 灰色（診斷提示）
+function _briefSetOtBox(el, kind, html) {
+  el.style.display = 'flex';
+  if (kind === 'warn') {
+    el.style.background = 'rgba(251,191,36,.12)';
+    el.style.borderColor = '#fbbf24';
+  } else {
+    el.style.background = 'rgba(148,163,184,.12)';
+    el.style.borderColor = 'rgba(148,163,184,.5)';
+  }
+  el.innerHTML = html;
+}
 function _briefCheckOvertime() {
   var warnEl = document.getElementById('brief-ot-warn');
   if (!warnEl) return;
@@ -1115,20 +1174,34 @@ function _briefCheckOvertime() {
   if (!ftEl || !fnoEl) { warnEl.style.display = 'none'; return; }
   var actualMin = _briefParseFT(ftEl.value);
   var fno = (fnoEl.value || '').trim().toUpperCase();
+  // 必要條件不齊：靜默隱藏（使用者還沒輸入完）
   if (actualMin == null || !fno) { warnEl.style.display = 'none'; return; }
+  // 沒登入員編就沒 roster 可比對，靜默退出（不是 bug，是預期狀態）
+  if (!_briefGetEid()) { warnEl.style.display = 'none'; return; }
   var date = _briefLoadedFlightDate || _briefGetDate();
   var fl = _briefFindRosterFlight(fno, date);
-  if (!fl) { warnEl.style.display = 'none'; return; }
+  if (!fl) {
+    // 診斷：班表內找不到此航班（消除 silent fail）
+    _briefSetOtBox(warnEl, 'hint',
+      '<span style="flex:1;color:var(--muted)">📋 班表中找不到 <b>' + _briefNormFno(fno) + '</b>，請確認航班號或當月 roster 是否已載入</span>');
+    return;
+  }
   var schedMin = _briefCalcSchedFTmin(fl);
-  if (schedMin == null) { warnEl.style.display = 'none'; return; }
+  if (schedMin == null) {
+    // 診斷：找到 flight 但沒有表定 FT 資料
+    _briefSetOtBox(warnEl, 'hint',
+      '<span style="flex:1;color:var(--muted)">⏱️ 班表中此航班沒有表定飛行時間，無法比對 OT</span>');
+    return;
+  }
   // 邏輯：實際 >= 表定-10 就警告（實際更久 = OT 機率高；短於表定 10min 以內 = 邊界）
   if (actualMin >= schedMin - 10) {
     var delta = actualMin - schedMin;  // 正 = 長，負 = 短
     var deltaTxt = delta >= 0 ? ('長 <b>' + delta + '</b> 分鐘') : ('短 <b>' + (-delta) + '</b> 分鐘');
-    warnEl.style.display = 'flex';
-    warnEl.innerHTML = '<span style="flex:1">⚠️ 表定 FT <b>' + _briefFmtMin(schedMin) + '</b>，實際' + deltaTxt + '，可能有 OT</span>'
-      + '<button onclick="switchBriefingTab(\'overtime\', document.getElementById(\'subtabBtn-overtime\'))" style="background:#fbbf24;color:#1a202c;border:none;border-radius:6px;padding:4px 10px;font-size:.85em;font-weight:700;cursor:pointer;white-space:nowrap">→ Overtime</button>';
+    _briefSetOtBox(warnEl, 'warn',
+      '<span style="flex:1">⚠️ 表定 FT <b>' + _briefFmtMin(schedMin) + '</b>，實際' + deltaTxt + '，可能有 OT</span>'
+      + '<button onclick="switchBriefingTab(\'overtime\', document.getElementById(\'subtabBtn-overtime\'))" style="background:#fbbf24;color:#1a202c;border:none;border-radius:6px;padding:4px 10px;font-size:.85em;font-weight:700;cursor:pointer;white-space:nowrap">→ Overtime</button>');
   } else {
+    // 實際短於表定夠多 → 沒 OT 風險，不顯示（per spec：無 OT 時不打擾）
     warnEl.style.display = 'none';
   }
 }
