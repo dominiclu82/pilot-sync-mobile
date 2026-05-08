@@ -127,6 +127,40 @@ export async function ensureTables(): Promise<boolean> {
       CREATE INDEX IF NOT EXISTS idx_pilot_aircraft_user ON pilot_aircraft(user_id);
     `);
 
+    // ── Crew 名單（V1.0.09；含 pilot + cabin crew，不掛 pilot_ prefix）──────────
+    // 設計重點：employee_id 為主識別、display_name 只當顯示與弱比對 fallback。
+    // 換公司會有多個 ID（例如 "2214780/B79363"），所以 ID 拆出去獨立成 alias 表，
+    // 同一人可掛多 ID，每 ID 在 user 範圍內唯一。
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS crew (
+        id UUID PRIMARY KEY,
+        user_id UUID NOT NULL REFERENCES pilot_users(id) ON DELETE CASCADE,
+        display_name TEXT NOT NULL,
+        organization TEXT,
+        comment TEXT,
+        is_self BOOLEAN DEFAULT FALSE,
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+      );
+      CREATE INDEX IF NOT EXISTS idx_crew_user ON crew(user_id);
+      CREATE INDEX IF NOT EXISTS idx_crew_user_name ON crew(user_id, display_name);
+    `);
+
+    // crew_employee_ids: 一個 crew 可掛多個 employee_id（換公司情境）
+    // user_id 故意 denormalize → 跨 row UNIQUE 限制：同一個 user 的 address book 內，
+    // 任何 employee_id 都只能掛在一個 crew 上，避免 import 後跨人混淆
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS crew_employee_ids (
+        id SERIAL PRIMARY KEY,
+        crew_id UUID NOT NULL REFERENCES crew(id) ON DELETE CASCADE,
+        user_id UUID NOT NULL REFERENCES pilot_users(id) ON DELETE CASCADE,
+        employee_id TEXT NOT NULL,
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        UNIQUE(user_id, employee_id)
+      );
+      CREATE INDEX IF NOT EXISTS idx_crew_eid_crew ON crew_employee_ids(crew_id);
+    `);
+
     _ready = true;
     console.log('✅ Pilot Log tables ready');
     return true;

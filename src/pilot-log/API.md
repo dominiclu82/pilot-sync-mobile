@@ -219,6 +219,44 @@ Smart re-import 行為：`confirmed` 不覆蓋（保護使用者編輯），`dra
 
 ---
 
+### `POST /api/pilot-log/import/logten-addressbook` (V1.0.09)
+
+匯入 LogTen Address Book（crew name 名單）。
+
+**Content-Type:** `text/plain`（TSV，UTF-8）
+
+**Required headers:** `Name`, `ID`, `This is Me`（其他欄位 optional）
+
+**識別邏輯：**
+- 主鍵為 `employee_id`（從 `ID` 欄解析、`/` split、trim、去空白、去重複）
+- `display_name` 只當 fallback：當 row **完全沒 ID** 時，才用名字弱比對「也都沒 ID 的 crew」
+- **Conflict 規則**（不自動合併、列在 `conflicts`、row 不寫入）：
+  - 同一 row 的多個 ID 命中**多個既有 crew**
+  - 沒 ID 的 row 用名字弱比對命中**多筆「也沒 ID 的 crew」**
+- `is_self`：只有當檔案有明確的 `This is Me=1` 才更新；流程是 clear-then-set，包單一 TX
+- **寫入保證**：每 row 自己 BEGIN/COMMIT，失敗整 row ROLLBACK，不留半套 crew + 部分 alias
+
+**200 Response:**
+```json
+{
+  "inserted": 50,
+  "updated": 10,
+  "conflicts": [
+    { "row": 12, "name": "Allan Arguelles", "ids": ["A123", "B456"], "matched_crew_ids": ["uuid-1", "uuid-2"] }
+  ],
+  "parse_errors": 0,
+  "bad_rows": [],
+  "self_set": "Dominic Lu",
+  "self_update_error": null
+}
+```
+
+`self_update_error`（V1.0.09 補）：data import 全部成功了、但 `is_self` clear-then-set 那段獨立 TX 失敗時，把錯誤訊息帶到 caller，方便前端決定要不要提示「self 標記沒換掉、要不要重 import」。整批 import 不會因此整體 fail。
+
+**錯誤回應：** `empty_or_invalid_file` / `missing_required_columns:Name,ID,This is Me`
+
+---
+
 ## Aircraft
 
 ### `GET /api/pilot-log/aircraft`
