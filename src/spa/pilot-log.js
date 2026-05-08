@@ -11,10 +11,13 @@ var _pl = {
   accessToken: null,
   refreshToken: null,
   user: null,                    // { id, primaryEmail }
-  entries: [],
+  entries: [],                   // 主頁列表用，受 _pl.filter 跟 200 limit 影響（不是完整資料）
   filter: 'all',                 // all | draft | confirmed | roster_removed
   stats: null,
   aircraft: [],                  // pilot_aircraft
+  // Aircraft 頁用的完整 entries 快照：不過 _pl.filter、不分頁，撈到所有 user 的 flights
+  // 用 null 區別「還沒拉過」和「拉過但是空陣列」，進 Aircraft 頁第一次才 fetch
+  aircraftEntries: null,
   suggest: { tail_nos: [], aircraft_types: [], airports: [] },
   editing: null,                 // entry being edited
   initialized: false,
@@ -341,6 +344,7 @@ function _plRenderToolbar() {
   return '<div style="display:flex;align-items:center;flex-wrap:wrap;gap:6px;margin-bottom:10px">' +
     '<button onclick="_plOpenEditor(null)" style="background:#10b981;color:#fff;border:0;border-radius:6px;padding:6px 12px;font-size:.8em;font-weight:700;cursor:pointer">+ New Entry</button>' +
     '<button onclick="_plOpenImport()" style="background:#6366f1;color:#fff;border:0;border-radius:6px;padding:6px 12px;font-size:.8em;font-weight:700;cursor:pointer">📥 Import</button>' +
+    '<button onclick="_plOpenAircraft()" style="background:#0ea5e9;color:#fff;border:0;border-radius:6px;padding:6px 12px;font-size:.8em;font-weight:700;cursor:pointer">✈️ Aircraft</button>' +
     '<div style="flex:1"></div>' +
     filterBtn('all', 'All') + filterBtn('draft', 'Draft') +
     filterBtn('confirmed', 'Confirmed') + filterBtn('roster_removed', 'Removed') +
@@ -439,7 +443,13 @@ function _plBlankEntry() {
 
 function _plOpenEditor(id) {
   if (id) {
+    // 先從主頁 list 找；找不到再退回 Aircraft 頁的完整快照
+    // （Aircraft detail 顯示的 row 可能不在 _pl.entries 主頁清單裡 — 主頁 filter 篩掉、
+    //  或在 200 limit 之外。沒有這個 fallback，使用者點下去會無聲無息打不開）
     var e = _pl.entries.filter(function(x) { return x.id === id; })[0];
+    if (!e && _pl.aircraftEntries) {
+      e = _pl.aircraftEntries.filter(function(x) { return x.id === id; })[0];
+    }
     if (!e) return;
     _pl.editing = JSON.parse(JSON.stringify(e));
     if (!_pl.editing.crew) _pl.editing.crew = {};
@@ -711,7 +721,7 @@ function _plOpenImport() {
       '</div>' +
       '<div style="font-size:.65em;color:var(--muted);margin-top:6px">建議先 Preview 確認所有 row 都解析正常，再按 Import。</div>' +
     '</div>' +
-    '<div style="background:var(--card);border-radius:10px;padding:14px">' +
+    '<div style="background:var(--card);border-radius:10px;padding:14px;margin-bottom:12px">' +
       '<div style="font-size:.85em;font-weight:700;margin-bottom:6px">🛩️ Aircraft (Tab 匯出，選用)</div>' +
       '<div style="font-size:.7em;color:var(--muted);margin-bottom:8px;line-height:1.5">' +
         '建你的機尾庫，之後新增 entry 時 tail # 可自動帶 operator/type/notes。<br>' +
@@ -719,6 +729,15 @@ function _plOpenImport() {
       '</div>' +
       '<input type="file" id="pl-aircraft-file" accept=".txt,.tab,.tsv,text/plain" style="font-size:.78em">' +
       '<button onclick="_plUploadAircraft()" style="margin-left:8px;background:#6366f1;color:#fff;border:0;border-radius:6px;padding:6px 12px;font-size:.78em;font-weight:700;cursor:pointer">Upload</button>' +
+    '</div>' +
+    '<div style="background:var(--card);border-radius:10px;padding:14px">' +
+      '<div style="font-size:.85em;font-weight:700;margin-bottom:6px">👥 Address Book (Tab 匯出，選用)</div>' +
+      '<div style="font-size:.7em;color:var(--muted);margin-bottom:8px;line-height:1.5">' +
+        'LogTen Pro → File → Export → Address Book Tab。匯入 crew 名單（含 pilots 與 cabin crew）給之後篩選 / 查同事飛過的航班用。<br>' +
+        '必填欄位：Name / ID / This is Me。「This is Me=1」會自動標記成你本人，同 user 一次只能有一筆 self。' +
+      '</div>' +
+      '<input type="file" id="pl-addressbook-file" accept=".txt,.tab,.tsv,text/plain" style="font-size:.78em">' +
+      '<button onclick="_plUploadAddressBook()" style="margin-left:8px;background:#6366f1;color:#fff;border:0;border-radius:6px;padding:6px 12px;font-size:.78em;font-weight:700;cursor:pointer">Upload</button>' +
     '</div>' +
     '<div id="pl-import-result" style="margin-top:14px"></div>' +
     '<div style="background:rgba(127,29,29,.2);border:1px solid #7f1d1d;border-radius:10px;padding:14px;margin-top:24px">' +
@@ -861,6 +880,220 @@ async function _plUploadAircraft() {
       '✅ 機尾庫：新增 <b>' + j.inserted + '</b>、更新 <b>' + j.updated + '</b>、解析失敗 <b>' + j.parse_errors + '</b>' +
       '</div>';
     _plToast('機尾庫已更新');
+  }
+}
+
+// V1.0.10：Address Book 匯入（接 V1.0.09 backend）
+async function _plUploadAddressBook() {
+  var j = await _plUploadFile('pl-addressbook-file', '/api/pilot-log/import/logten-addressbook');
+  if (!j) return;
+  var resBox = document.getElementById('pl-import-result');
+  if (j.error) {
+    resBox.innerHTML = '<div style="background:#7f1d1d;color:#fff;padding:10px;border-radius:8px;font-size:.78em">❌ ' + _plEsc(j.error) + '</div>';
+    return;
+  }
+  var html = '<div style="background:#064e3b;color:#fff;padding:10px;border-radius:8px;font-size:.78em;line-height:1.6">' +
+    '✅ Address Book：新增 <b>' + j.inserted + '</b>、更新 <b>' + j.updated + '</b>、解析失敗 <b>' + j.parse_errors + '</b>';
+  if (j.self_set) html += '、本人標記為 <b>' + _plEsc(j.self_set) + '</b>';
+  if (j.conflicts && j.conflicts.length > 0) {
+    html += '<div style="margin-top:6px;background:rgba(251,191,36,.15);border:1px solid #fbbf24;border-radius:6px;padding:6px 8px;color:#fde68a;font-size:.92em">' +
+      '⚠️ ' + j.conflicts.length + ' 筆 conflict（多 ID 命中不同 crew、或同名多筆都沒 ID） — 不自動合併、請人工檢查';
+    for (var ci = 0; ci < Math.min(j.conflicts.length, 5); ci++) {
+      var c = j.conflicts[ci];
+      html += '<div style="margin-top:4px;font-size:.88em">row ' + c.row + '：' + _plEsc(c.name) + '（IDs: ' + (c.ids.join(', ') || '無') + '）</div>';
+    }
+    if (j.conflicts.length > 5) html += '<div style="margin-top:4px;font-size:.88em">…還有 ' + (j.conflicts.length - 5) + ' 筆</div>';
+    html += '</div>';
+  }
+  if (j.self_update_error) {
+    html += '<div style="margin-top:6px;color:#fca5a5">⚠️ self 標記更新失敗：' + _plEsc(j.self_update_error) + '（其他資料正常匯入）</div>';
+  }
+  html += '</div>';
+  resBox.innerHTML = html;
+  _plToast('Address Book 已更新');
+}
+
+// === SECTION: aircraft（V1.0.10） ═══════════════════════════════════════════════
+// 列表頁：所有 pilot_aircraft → 點某架 → 顯示用過這架 tail 的所有 flights
+// + Add Aircraft：手動加新機（公司新交機等）
+
+// 獨立 fetch：撈完整 entries（不過主頁 filter、不分頁），給 Aircraft 列表 / drill-down 用
+// 主頁 _pl.entries 受 filter + 200 limit 影響，counts 跟 drill-down 不能用它
+async function _plFetchAircraftEntries() {
+  // 用 limit=50000（server 端剛調的上限），覆蓋任何真實飛行員職涯範圍
+  var res = await _plApi('/api/pilot-log/entries?limit=50000');
+  if (!res.ok) {
+    _pl.aircraftEntries = [];
+    return;
+  }
+  var j = await res.json();
+  _pl.aircraftEntries = j.entries || [];
+}
+
+async function _plOpenAircraft() {
+  var c = document.getElementById('pilotlog-content');
+  if (!c) return;
+  // Loading state（避免空白）
+  c.innerHTML = '<div style="text-align:center;color:var(--muted);padding:40px;font-size:.85em">載入機尾庫…</div>';
+  // 同時拉 aircraft 清單跟完整 entries（兩者各自獨立、可並行）
+  await Promise.all([_plFetchAll(), _plFetchAircraftEntries()]);
+  _plRenderAircraftList();
+}
+
+function _plRenderAircraftList() {
+  var c = document.getElementById('pilotlog-content');
+  if (!c) return;
+  // 用完整快照算 count（不受主頁 filter 跟 200 limit 影響）
+  var sourceEntries = _pl.aircraftEntries || [];
+  var tailCount = {};
+  for (var i = 0; i < sourceEntries.length; i++) {
+    var t = sourceEntries[i].tail_no;
+    if (t) tailCount[t] = (tailCount[t] || 0) + 1;
+  }
+  var rows = '';
+  if (_pl.aircraft.length === 0) {
+    rows = '<div style="text-align:center;color:var(--muted);padding:30px;font-size:.85em">機尾庫是空的。點 <b>+ Add Aircraft</b> 手動加，或從 <b>📥 Import</b> 上傳 LogTen Aircraft 檔。</div>';
+  } else {
+    for (var ai = 0; ai < _pl.aircraft.length; ai++) {
+      var a = _pl.aircraft[ai];
+      var count = tailCount[a.tail_no] || 0;
+      var typeStr = _plEsc(a.type_code || '');
+      var modelStr = '';
+      if (a.make || a.model) {
+        modelStr = _plEsc([a.make, a.model].filter(Boolean).join(' '));
+      }
+      rows += '<div onclick="_plOpenAircraftDetail(\'' + _plEsc(a.tail_no) + '\')" ' +
+        'style="background:var(--card);border-radius:8px;padding:10px 12px;margin-bottom:6px;cursor:pointer;display:flex;gap:10px;align-items:center">' +
+        '<div style="min-width:110px"><div style="font-size:.85em;font-weight:700">' + _plEsc(a.tail_no) + '</div>' +
+        (a.operator ? '<div style="font-size:.62em;color:var(--muted)">' + _plEsc(a.operator) + '</div>' : '') + '</div>' +
+        '<div style="min-width:90px;font-size:.74em;color:var(--muted)">' + typeStr + '</div>' +
+        '<div style="flex:1;font-size:.7em;color:var(--muted)">' + modelStr + '</div>' +
+        '<div style="font-size:.72em;color:var(--text);text-align:right">' + count + ' flights</div>' +
+        '</div>';
+    }
+  }
+  c.innerHTML =
+    '<div style="padding:10px;max-width:760px;margin:0 auto">' +
+      '<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">' +
+        '<button onclick="_plRenderMain()" style="background:transparent;border:0;color:var(--text);font-size:1.2em;cursor:pointer">←</button>' +
+        '<div style="font-size:1em;font-weight:700">✈️ Aircraft</div>' +
+        '<div style="flex:1"></div>' +
+        '<button onclick="_plOpenAddAircraft()" style="background:#10b981;color:#fff;border:0;border-radius:6px;padding:6px 12px;font-size:.78em;font-weight:700;cursor:pointer">+ Add Aircraft</button>' +
+      '</div>' +
+      '<div style="font-size:.7em;color:var(--muted);margin-bottom:10px">共 ' + _pl.aircraft.length + ' 架；點任一筆可查看用過這架的所有航班。</div>' +
+      rows +
+    '</div>';
+}
+
+function _plOpenAircraftDetail(tail) {
+  var c = document.getElementById('pilotlog-content');
+  if (!c) return;
+  // 找出這架的詳細資料 + 用過這架的 entries
+  var aircraft = null;
+  for (var ai = 0; ai < _pl.aircraft.length; ai++) {
+    if (_pl.aircraft[ai].tail_no === tail) { aircraft = _pl.aircraft[ai]; break; }
+  }
+  // 從完整快照篩這架的所有航班（不受主頁 filter / 分頁影響）
+  var sourceEntries = _pl.aircraftEntries || [];
+  var flights = sourceEntries.filter(function(e) { return e.tail_no === tail; });
+  // 依日期排序（最新先）
+  flights.sort(function(a, b) { return (b.flight_date || '').localeCompare(a.flight_date || ''); });
+
+  var head = aircraft
+    ? '<div style="background:var(--card);border-radius:8px;padding:12px;margin-bottom:10px;font-size:.78em">' +
+        '<div style="font-weight:700;font-size:1.1em">' + _plEsc(aircraft.tail_no) + '</div>' +
+        '<div style="color:var(--muted);margin-top:4px">' +
+          (aircraft.type_code ? _plEsc(aircraft.type_code) : '') +
+          (aircraft.make || aircraft.model ? '　' + _plEsc([aircraft.make, aircraft.model].filter(Boolean).join(' ')) : '') +
+          (aircraft.operator ? '　' + _plEsc(aircraft.operator) : '') +
+        '</div>' +
+        (aircraft.notes ? '<div style="color:var(--muted);margin-top:4px">' + _plEsc(aircraft.notes) + '</div>' : '') +
+      '</div>'
+    : '<div style="background:var(--card);border-radius:8px;padding:12px;margin-bottom:10px;font-size:.85em;font-weight:700">' + _plEsc(tail) + '</div>';
+
+  var rows = '';
+  if (flights.length === 0) {
+    rows = '<div style="text-align:center;color:var(--muted);padding:30px;font-size:.85em">沒有用過這架的航班紀錄。</div>';
+  } else {
+    rows = flights.map(_plRenderEntryRow).join('');
+  }
+
+  c.innerHTML =
+    '<div style="padding:10px;max-width:760px;margin:0 auto">' +
+      '<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">' +
+        '<button onclick="_plOpenAircraft()" style="background:transparent;border:0;color:var(--text);font-size:1.2em;cursor:pointer">←</button>' +
+        '<div style="font-size:1em;font-weight:700">' + _plEsc(tail) + ' / Flights</div>' +
+        '<div style="flex:1"></div>' +
+        '<div style="font-size:.72em;color:var(--muted)">' + flights.length + ' flights</div>' +
+      '</div>' +
+      head +
+      rows +
+    '</div>';
+}
+
+function _plOpenAddAircraft() {
+  var c = document.getElementById('pilotlog-content');
+  if (!c) return;
+  function field(label, id, placeholder) {
+    return '<div style="margin-bottom:10px">' +
+      '<div style="font-size:.7em;color:var(--muted);margin-bottom:3px">' + label + '</div>' +
+      '<input id="' + id + '" placeholder="' + (placeholder || '') + '" ' +
+        'style="width:100%;background:var(--bg,#0a0e1a);color:var(--text);border:1px solid var(--border,#334155);border-radius:6px;padding:8px 10px;font-size:.85em">' +
+      '</div>';
+  }
+  c.innerHTML =
+    '<div style="padding:10px;max-width:520px;margin:0 auto">' +
+      '<div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">' +
+        '<button onclick="_plOpenAircraft()" style="background:transparent;border:0;color:var(--text);font-size:1.2em;cursor:pointer">←</button>' +
+        '<div style="font-size:1em;font-weight:700">+ Add Aircraft</div>' +
+      '</div>' +
+      '<div style="background:var(--card);border-radius:10px;padding:14px">' +
+        field('Tail # *（機號，例：B-58502）', 'pl-add-tail', 'B-58502') +
+        field('Type Code（機型代碼，例：A359）', 'pl-add-type', 'A359') +
+        field('Manufacturer（廠商，例：Airbus）', 'pl-add-make', 'AIRBUS INDUSTRIES') +
+        field('Model（完整機型，例：A-350-900）', 'pl-add-model', 'A-350-900') +
+        field('Operator（公司）', 'pl-add-operator', 'Starlux') +
+        field('Notes（備註）', 'pl-add-notes', '') +
+        '<div style="display:flex;gap:8px;margin-top:6px">' +
+          '<button onclick="_plSubmitAddAircraft()" style="background:#10b981;color:#fff;border:0;border-radius:6px;padding:8px 14px;font-size:.85em;font-weight:700;cursor:pointer">Save</button>' +
+          '<button onclick="_plOpenAircraft()" style="background:transparent;border:1px solid var(--border,#334155);color:var(--text);border-radius:6px;padding:8px 14px;font-size:.85em;cursor:pointer">Cancel</button>' +
+        '</div>' +
+        '<div style="font-size:.65em;color:var(--muted);margin-top:8px">* 必填。已存在同 tail 會 merge（空欄位不會洗掉舊資料）。</div>' +
+      '</div>' +
+      '<div id="pl-add-result" style="margin-top:14px"></div>' +
+    '</div>';
+}
+
+async function _plSubmitAddAircraft() {
+  function val(id) { var el = document.getElementById(id); return el ? el.value.trim() : ''; }
+  var tail = val('pl-add-tail');
+  var resBox = document.getElementById('pl-add-result');
+  if (!tail) {
+    if (resBox) resBox.innerHTML = '<div style="background:#7f1d1d;color:#fff;padding:8px 10px;border-radius:6px;font-size:.78em">❌ Tail # 必填</div>';
+    return;
+  }
+  var body = {
+    tail_no: tail,
+    type_code: val('pl-add-type'),
+    make: val('pl-add-make'),
+    model: val('pl-add-model'),
+    operator: val('pl-add-operator'),
+    notes: val('pl-add-notes'),
+  };
+  try {
+    var res = await _plApi('/api/pilot-log/aircraft', { method: 'POST', body: body });
+    if (res.status === 201 || res.status === 200) {
+      var j = await res.json();
+      _plToast(j.inserted ? '已新增 ' + tail : '已更新 ' + tail);
+      // 重新拉資料 + 回列表
+      await _plFetchAll();
+      _plRenderAircraftList();
+      return;
+    }
+    var ej = await res.json().catch(function() { return {}; });
+    if (resBox) resBox.innerHTML = '<div style="background:#7f1d1d;color:#fff;padding:8px 10px;border-radius:6px;font-size:.78em">❌ ' + _plEsc(ej.error || ('HTTP ' + res.status)) + '</div>';
+  } catch (e) {
+    if (resBox) resBox.innerHTML = '<div style="background:#7f1d1d;color:#fff;padding:8px 10px;border-radius:6px;font-size:.78em">❌ ' + _plEsc((e && e.message) || 'unknown') + '</div>';
   }
 }
 

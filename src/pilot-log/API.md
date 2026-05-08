@@ -267,6 +267,32 @@ Smart re-import 行為：`confirmed` 不覆蓋（保護使用者編輯），`dra
 
 ---
 
+### `POST /api/pilot-log/aircraft` (V1.0.10)
+
+手動新增 / upsert 一筆機尾。Body 可空欄位，唯一必填 `tail_no`。
+
+**Body:**
+```json
+{
+  "tail_no": "B-58510",
+  "type_code": "A359",
+  "make": "AIRBUS INDUSTRIES",
+  "model": "A-350-900",
+  "operator": "Starlux",
+  "notes": "新交機"
+}
+```
+
+**Behavior:** `ON CONFLICT (user_id, tail_no) DO UPDATE` + COALESCE — 已存在的 tail 會用新值 merge，**空字串不會洗掉舊資料**。
+
+**Response:**
+- `201 Created`：新增成功 → `{ "aircraft": {...}, "inserted": true }`
+- `200 OK`：原本就存在、被 upsert 更新 → `{ "aircraft": {...}, "inserted": false }`
+
+**錯誤：** 400 `missing_tail_no` / 503 `database_unavailable` / 500 `create_failed`
+
+---
+
 ## Stats
 
 ### `GET /api/pilot-log/stats`
