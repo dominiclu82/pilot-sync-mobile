@@ -198,21 +198,41 @@ async function _plOnGoogleCredential(response) {
   _plRenderMain();
 }
 
+// 並發保護：同一時間只允許一個 refresh 在跑，其他 caller 共用同一個 promise。
+// 過去的問題：_plFetchAll() 用 Promise.all 同時打 4 個 API，access token 過期時 4 個並發
+// 各自呼叫 _plTryRefresh()，server rotation 後第一個成功、後 3 個拿著已作廢的 refresh token
+// 全部失敗。任何一個失敗的 race-loser 都會觸發 _plClearSession() → 把已成功更新的 session
+// 清掉、誤把使用者登出。改成 singleton 後只發一次 refresh，沒有 race，沒有誤清。
+var _plRefreshPromise = null;
+
 async function _plTryRefresh() {
   if (!_pl.refreshToken) return false;
-  try {
-    var r = await fetch('/api/pilot-log/auth/refresh', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ refreshToken: _pl.refreshToken }),
-    });
-    if (!r.ok) { _plClearSession(); return false; }
-    var j = await r.json();
-    _plSaveSession(j);
-    return true;
-  } catch (e) {
-    return false;
-  }
+  // 已經有 refresh 進行中 → 共用同一個 promise，其他 caller await 同個結果即可
+  if (_plRefreshPromise) return _plRefreshPromise;
+  _plRefreshPromise = (async () => {
+    try {
+      var r = await fetch('/api/pilot-log/auth/refresh', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ refreshToken: _pl.refreshToken }),
+      });
+      if (r.ok) {
+        var j = await r.json();
+        _plSaveSession(j);
+        return true;
+      }
+      // 只有 401 = server 確認 refresh token 失效 → 清 session 強制重登
+      // 其他（5xx 服務暫時不可用 / 網路錯誤）= 暫時性失敗，不清 session，下次再試
+      if (r.status === 401) _plClearSession();
+      return false;
+    } catch (e) {
+      // 網路錯誤等暫時性失敗 → 保留 session，下次再試
+      return false;
+    } finally {
+      _plRefreshPromise = null;
+    }
+  })();
+  return _plRefreshPromise;
 }
 
 async function _plLogout() {
