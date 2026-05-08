@@ -187,6 +187,8 @@ async function run() {
     '/api/pilot-log/entries',
     '/api/pilot-log/entries/00000000-0000-0000-0000-000000000000',
     '/api/pilot-log/aircraft',
+    '/api/pilot-log/aircraft-types',
+    '/api/pilot-log/crew',
     '/api/pilot-log/stats',
     '/api/pilot-log/quick-suggest',
   ];
@@ -209,6 +211,30 @@ async function run() {
       method: 'POST',
       headers: { 'Content-Type': 'text/plain' },
       body: 'fake',
+    });
+    assert(r.status === 401, `status ${r.status}`);
+  });
+  await check('POST /api/pilot-log/import/logten-aircraft-types → 401', async () => {
+    const r = await fetch(`${BASE}/api/pilot-log/import/logten-aircraft-types`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain' },
+      body: 'fake',
+    });
+    assert(r.status === 401, `status ${r.status}`);
+  });
+  await check('POST /api/pilot-log/import/logten-addressbook → 401', async () => {
+    const r = await fetch(`${BASE}/api/pilot-log/import/logten-addressbook`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain' },
+      body: 'fake',
+    });
+    assert(r.status === 401, `status ${r.status}`);
+  });
+  await check('POST /api/pilot-log/aircraft → 401', async () => {
+    const r = await fetch(`${BASE}/api/pilot-log/aircraft`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: '{}',
     });
     assert(r.status === 401, `status ${r.status}`);
   });

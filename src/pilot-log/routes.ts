@@ -15,8 +15,11 @@
 //   PUT    /api/pilot-log/entries/:id         (edit / confirm draft)
 //   DELETE /api/pilot-log/entries/:id
 //   POST   /api/pilot-log/import/logten-flights      (text/plain body)
-//   POST   /api/pilot-log/import/logten-aircraft     (text/plain body)
-//   POST   /api/pilot-log/import/logten-addressbook  (text/plain body) — V1.0.09
+//   POST   /api/pilot-log/import/logten-aircraft         (text/plain body) — tail registry
+//   POST   /api/pilot-log/import/logten-addressbook      (text/plain body) — V1.0.09 crew
+//   POST   /api/pilot-log/import/logten-aircraft-types   (text/plain body) — V1.0.11 type catalog
+//   GET    /api/pilot-log/aircraft-types                                    — V1.0.11
+//   GET    /api/pilot-log/crew                                              — V1.0.11 crew list
 //   GET    /api/pilot-log/aircraft
 //   POST   /api/pilot-log/aircraft            (manual add，V1.0.10)
 //   GET    /api/pilot-log/stats
@@ -34,13 +37,14 @@ import {
 import { getPool, ensureTables } from './schema.js';
 import { importLogtenFlights, importLogtenAircraft } from './import-logten.js';
 import { importLogtenAddressBook } from './import-addressbook.js';
+import { importLogtenAircraftTypes } from './import-aircraft-types.js';
 import { getTotals, getRollingTotals, getByAircraftType } from './stats.js';
 import { loadCredentials } from '../config.js';
 import { getSpaPilotLogJs } from '../spa/js-pilot-log.js';
 
 // ── 版本（比照 CrewSync / Morning：每次推版必更新；SW cache 名稱跟著走） ────
-export const PILOT_LOG_VERSION = 'V1.0.10';
-const PILOT_LOG_CACHE = 'pilotlog-v1-0-10';
+export const PILOT_LOG_VERSION = 'V1.0.11';
+const PILOT_LOG_CACHE = 'pilotlog-v1-0-11';
 
 export const pilotLogRouter = express.Router();
 
@@ -192,6 +196,11 @@ if (document.readyState !== 'loading') pilotLogInit();
 function _renderPilotLogChangelog(): string {
   return `
     <div class="pl-cl-v">${PILOT_LOG_VERSION}</div>
+    <div class="pl-cl-txt">
+      新增 LogTen <b>Aircraft Types</b> 匯入跟 👥 <b>Crew</b> 列表頁，補齊兩個 V1.0.10 之後使用者馬上就會碰到的工作流。<b>(1) Aircraft Types：</b>LogTen 其實有兩種 export — 一種是 Aircraft（tail 為主，必填 <code>Aircraft ID / Operator</code>），另一種是 Aircraft Types（type 為主、無 tail，必填只有 <code>Type</code>）；之前 UI 只認得前者，使用者把 Aircraft Types 檔丟進 Aircraft 區塊就會撞 <code>missing_required_columns</code>。新表 <code>pilot_aircraft_types</code>（<code>type_code/make/model/engine_type/category/class/notes</code>，<code>UNIQUE(user_id, type_code)</code>）+ 兩個 endpoint <code>POST /api/pilot-log/import/logten-aircraft-types</code>、<code>GET /api/pilot-log/aircraft-types</code>，都走 COALESCE upsert 保留舊資料。📥 Import 區明確分成 📋 <b>Aircraft</b> 跟 🧭 <b>Aircraft Types</b> 兩塊（含「不是 Aircraft Types」的明確提示），Aircraft 列表 / drill-down 顯示時會把 <code>A359</code> enrich 成 <code>Airbus A-350-900</code>，方便辨識。<b>(2) Crew 列表頁：</b>V1.0.09 backend 已把 Address Book 寫進 <code>crew</code> + <code>crew_employee_ids</code>，但沒 UI，這版補上。新 endpoint <code>GET /api/pilot-log/crew</code>（<code>JOIN ... array_agg</code> 把 employee IDs 帶出），主頁工具列加紫色 👥 Crew 按鈕；列表頁可搜尋 name 或 employee ID、顯示一起飛過的航班次數、<code>is_self</code> 的人 mark 「YOU」、點進 drill-down 顯示一起飛過的所有航班。<b>(3) 同名保護（SAME-NAME）：</b>因為 <code>entry.crew</code> JSONB 只記名字、沒帶 <code>employee_id</code>，如果 Address Book 內有兩位 crew 同名，從某筆航班是無法判斷該名出自哪一位的。為避免錯誤歸屬，列表頁會給同名 crew 掛橘色 <code>SAME-NAME</code> badge、flight count 改顯示 <code>—</code>、drill-down 完全不列航班，改顯示警告框 + 建議在 LogTen 端用 organization / comment 區分後重匯。順手把 5 個新 endpoint 的 auth 401 檢查補進 smoke test。<br>
+      Added LogTen <b>Aircraft Types</b> import and a 👥 <b>Crew</b> list page, closing two workflows users immediately ran into post-V1.0.10. <b>(1) Aircraft Types:</b> LogTen actually has two exports — Aircraft (tail-centric, requires <code>Aircraft ID / Operator</code>) vs Aircraft Types (type-centric, no tail, only <code>Type</code> required); the old UI only recognized the former, so dropping an Aircraft Types file into the Aircraft section returned <code>missing_required_columns</code>. New table <code>pilot_aircraft_types</code> (<code>type_code/make/model/engine_type/category/class/notes</code>, <code>UNIQUE(user_id, type_code)</code>) plus two endpoints <code>POST /api/pilot-log/import/logten-aircraft-types</code> and <code>GET /api/pilot-log/aircraft-types</code>, both COALESCE upsert to preserve existing data. The 📥 Import section now clearly separates 📋 <b>Aircraft</b> from 🧭 <b>Aircraft Types</b> (with explicit "not Aircraft Types" disambiguation), and the Aircraft list / drill-down enriches codes like <code>A359</code> into <code>Airbus A-350-900</code> for recognition. <b>(2) Crew list page:</b> V1.0.09's backend already wrote Address Book to <code>crew</code> + <code>crew_employee_ids</code>, but had no UI — fixed here. New endpoint <code>GET /api/pilot-log/crew</code> (<code>JOIN ... array_agg</code> for employee IDs), purple 👥 Crew button in the main toolbar; list page supports search by name or employee ID, shows shared-flight counts, marks <code>is_self</code> with "YOU", and drill-down lists all flights flown together. <b>(3) Same-name protection:</b> because <code>entry.crew</code> JSONB stores only names, not <code>employee_id</code>, when two Address Book crews share a display name there is no way to tell which one a given flight refers to. To prevent misattribution, the list tags same-name crew with an orange <code>SAME-NAME</code> badge, replaces the flight count with <code>—</code>, and the drill-down refuses to list any flights — instead showing a warning suggesting users differentiate them via organization / comment in LogTen and re-import. Also added auth 401 checks for the 5 new endpoints to the smoke test.
+    </div>
+    <div class="pl-cl-v old">V1.0.10</div>
     <div class="pl-cl-txt">
       新增 ✈️ Aircraft 列表頁，把「依飛機看航班」工作流補齊。主頁工具列加 ✈️ Aircraft 按鈕 → 列表顯示所有 <code>pilot_aircraft</code> 跟每架的 flight 數，點某架 → drill-down 顯示用過這架的所有航班。配套三個基礎修正：(a) 後端新 endpoint <code>POST /api/pilot-log/aircraft</code>，公司新交機等情境可手動加 tail / type / 廠商 / 完整機型 / operator / notes，已存在 tail 走 COALESCE upsert 不洗掉舊資料，<code>tail_no</code> 統一 <code>trim + uppercase</code> 避免 <code>b-58502</code> 跟 <code>B-58502&nbsp;</code> 變兩筆；(b) Aircraft 頁的完整資料來源改從獨立快照 <code>_pl.aircraftEntries</code> 撈（不受主頁 filter 跟 200 limit 影響），不再讓「我看了哪個 status」「在第幾頁」污染 aircraft 的 count 跟 drill-down，後端 entries endpoint <code>limit</code> 上限從 1000 拉到 50000 給這個獨立快照用；(c) <code>_plOpenEditor</code> 加 fallback：找不到 entry 時退到 <code>_pl.aircraftEntries</code> 找，避免 Aircraft drill-down 顯示得到、點下去卻打不開的洞。順手把 V1.0.09 已做好但沒接的 Address Book import UI 接上，📥 Import 多一個 👥 Address Book 區塊，匯入結果顯示 <code>inserted / updated / conflicts / self_set / self_update_error</code>。Entry editor 的 aircraft picker（新增 log 直接選飛機）跟「save 後回 Aircraft drill-down」這兩個非阻擋 UX 留 V1.0.11。<br>
       Added ✈️ Aircraft list page, completing the "view flights by aircraft" workflow. The main toolbar now has an ✈️ Aircraft button → opens a list of all <code>pilot_aircraft</code> with per-aircraft flight counts; tap an aircraft → drill-down showing every flight that used that tail. Three foundational fixes shipped together: (a) new backend endpoint <code>POST /api/pilot-log/aircraft</code> for manual add (new delivery aircraft, etc.) with fields tail / type / make / model / operator / notes — existing tails go through COALESCE upsert so empty fields don't wipe old data, <code>tail_no</code> is normalized via <code>trim + uppercase</code> to prevent <code>b-58502</code> and <code>B-58502&nbsp;</code> becoming two rows; (b) Aircraft page reads from an independent <code>_pl.aircraftEntries</code> snapshot (not affected by main filter or 200-row pagination), so "which status I'm filtering on" / "which page I'm on" no longer corrupts aircraft counts or drill-down — the backend entries endpoint <code>limit</code> cap was raised from 1000 to 50000 to support this single-shot fetch; (c) <code>_plOpenEditor</code> now falls back to <code>_pl.aircraftEntries</code> when an entry isn't in the main list, fixing a hole where flights visible in the Aircraft drill-down would silently fail to open. Also wired up the Address Book import UI for V1.0.09's already-shipped backend — 📥 Import now has a 👥 Address Book section, showing <code>inserted / updated / conflicts / self_set / self_update_error</code> from the response. Two non-blocking UX items deferred to V1.0.11: aircraft picker in the entry editor (new logs can select from saved aircraft instead of typing) and "return to Aircraft drill-down after save" instead of bouncing to the main list.
@@ -628,6 +637,14 @@ pilotLogRouter.post('/api/pilot-log/import/logten-addressbook', requireAuth, asy
   res.json(r);
 });
 
+// V1.0.11：LogTen Aircraft Types → pilot_aircraft_types（type 為主、無 tail）
+pilotLogRouter.post('/api/pilot-log/import/logten-aircraft-types', requireAuth, async (req: AuthedRequest, res) => {
+  const text = typeof req.body === 'string' ? req.body : '';
+  if (!text) return res.status(400).json({ error: 'empty_body' });
+  const r = await importLogtenAircraftTypes(req.pilotUserId!, text);
+  res.json(r);
+});
+
 // ── Aircraft ─────────────────────────────────────────────────────────────────
 pilotLogRouter.get('/api/pilot-log/aircraft', requireAuth, async (req: AuthedRequest, res) => {
   const pool = getPool();
@@ -637,6 +654,39 @@ pilotLogRouter.get('/api/pilot-log/aircraft', requireAuth, async (req: AuthedReq
     [req.pilotUserId]
   );
   res.json({ aircraft: r.rows });
+});
+
+// V1.0.11：列出當前 user 的 aircraft types catalog（給前端用 type_code 查 make/model）
+pilotLogRouter.get('/api/pilot-log/aircraft-types', requireAuth, async (req: AuthedRequest, res) => {
+  const pool = getPool();
+  if (!pool) return res.status(503).json({ error: 'database_unavailable' });
+  const r = await pool.query(
+    `SELECT * FROM pilot_aircraft_types WHERE user_id = $1 ORDER BY type_code`,
+    [req.pilotUserId]
+  );
+  res.json({ aircraft_types: r.rows });
+});
+
+// V1.0.11：列出當前 user 的 crew 名單，含每筆的 employee_ids array（換公司多 ID 情境）
+// is_self 排在最前面、其他依 display_name 排序
+pilotLogRouter.get('/api/pilot-log/crew', requireAuth, async (req: AuthedRequest, res) => {
+  const pool = getPool();
+  if (!pool) return res.status(503).json({ error: 'database_unavailable' });
+  const r = await pool.query(
+    `SELECT c.id, c.display_name, c.organization, c.comment, c.is_self,
+            c.created_at, c.updated_at,
+            COALESCE(
+              array_agg(e.employee_id ORDER BY e.created_at) FILTER (WHERE e.employee_id IS NOT NULL),
+              '{}'::text[]
+            ) AS employee_ids
+     FROM crew c
+     LEFT JOIN crew_employee_ids e ON e.crew_id = c.id
+     WHERE c.user_id = $1
+     GROUP BY c.id
+     ORDER BY c.is_self DESC, c.display_name`,
+    [req.pilotUserId]
+  );
+  res.json({ crew: r.rows });
 });
 
 // 手動新增一架機（V1.0.10）— 公司新交機等情境，不用每次都 export LogTen 再 import

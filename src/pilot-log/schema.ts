@@ -127,6 +127,28 @@ export async function ensureTables(): Promise<boolean> {
       CREATE INDEX IF NOT EXISTS idx_pilot_aircraft_user ON pilot_aircraft(user_id);
     `);
 
+    // ── Aircraft Types（V1.0.11；LogTen Aircraft Types export 對應）─────────────
+    // 跟 pilot_aircraft（tail 為主）區分：這張表是 type 為主、無 tail。
+    // 用來把 A359 這種代碼對應到完整廠商機型 (Airbus A-350-900)，
+    // 之後 Aircraft 列表 / drill-down 顯示完整名用。
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS pilot_aircraft_types (
+        id SERIAL PRIMARY KEY,
+        user_id UUID NOT NULL REFERENCES pilot_users(id) ON DELETE CASCADE,
+        type_code TEXT NOT NULL,
+        make TEXT,
+        model TEXT,
+        engine_type TEXT,
+        category TEXT,
+        class TEXT,
+        notes TEXT,
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW(),
+        UNIQUE (user_id, type_code)
+      );
+      CREATE INDEX IF NOT EXISTS idx_pilot_aircraft_types_user ON pilot_aircraft_types(user_id);
+    `);
+
     // ── Crew 名單（V1.0.09；含 pilot + cabin crew，不掛 pilot_ prefix）──────────
     // 設計重點：employee_id 為主識別、display_name 只當顯示與弱比對 fallback。
     // 換公司會有多個 ID（例如 "2214780/B79363"），所以 ID 拆出去獨立成 alias 表，

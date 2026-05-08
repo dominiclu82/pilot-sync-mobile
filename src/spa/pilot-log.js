@@ -14,9 +14,11 @@ var _pl = {
   entries: [],                   // 主頁列表用，受 _pl.filter 跟 200 limit 影響（不是完整資料）
   filter: 'all',                 // all | draft | confirmed | roster_removed
   stats: null,
-  aircraft: [],                  // pilot_aircraft
-  // Aircraft 頁用的完整 entries 快照：不過 _pl.filter、不分頁，撈到所有 user 的 flights
-  // 用 null 區別「還沒拉過」和「拉過但是空陣列」，進 Aircraft 頁第一次才 fetch
+  aircraft: [],                  // pilot_aircraft（tail 為主）
+  aircraftTypes: [],              // pilot_aircraft_types（V1.0.11；type 為主，含 make/model）
+  crew: [],                       // V1.0.11 crew 名單（含 pilots + cabin crew）
+  // Aircraft / Crew 頁共用的完整 entries 快照：不過 _pl.filter、不分頁，撈到所有 user 的 flights
+  // 用 null 區別「還沒拉過」和「拉過但是空陣列」，進 Aircraft 或 Crew 頁第一次才 fetch
   aircraftEntries: null,
   suggest: { tail_nos: [], aircraft_types: [], airports: [] },
   editing: null,                 // entry being edited
@@ -286,16 +288,20 @@ async function _plDeleteAccount() {
 async function _plFetchAll() {
   var q = '';
   if (_pl.filter !== 'all') q = '?status=' + _pl.filter;
-  var [eRes, sRes, aRes, qRes] = await Promise.all([
+  var [eRes, sRes, aRes, qRes, atRes, cRes] = await Promise.all([
     _plApi('/api/pilot-log/entries' + q),
     _plApi('/api/pilot-log/stats'),
     _plApi('/api/pilot-log/aircraft'),
     _plApi('/api/pilot-log/quick-suggest'),
+    _plApi('/api/pilot-log/aircraft-types'),  // V1.0.11
+    _plApi('/api/pilot-log/crew'),            // V1.0.11
   ]);
   if (eRes.ok) { var ej = await eRes.json(); _pl.entries = ej.entries || []; }
   if (sRes.ok) { _pl.stats = await sRes.json(); }
   if (aRes.ok) { var aj = await aRes.json(); _pl.aircraft = aj.aircraft || []; }
   if (qRes.ok) { _pl.suggest = await qRes.json(); }
+  if (atRes.ok) { var atj = await atRes.json(); _pl.aircraftTypes = atj.aircraft_types || []; }
+  if (cRes.ok) { var cj = await cRes.json(); _pl.crew = cj.crew || []; }
 }
 
 function _plRenderStats() {
@@ -345,6 +351,7 @@ function _plRenderToolbar() {
     '<button onclick="_plOpenEditor(null)" style="background:#10b981;color:#fff;border:0;border-radius:6px;padding:6px 12px;font-size:.8em;font-weight:700;cursor:pointer">+ New Entry</button>' +
     '<button onclick="_plOpenImport()" style="background:#6366f1;color:#fff;border:0;border-radius:6px;padding:6px 12px;font-size:.8em;font-weight:700;cursor:pointer">📥 Import</button>' +
     '<button onclick="_plOpenAircraft()" style="background:#0ea5e9;color:#fff;border:0;border-radius:6px;padding:6px 12px;font-size:.8em;font-weight:700;cursor:pointer">✈️ Aircraft</button>' +
+    '<button onclick="_plOpenCrew()" style="background:#a855f7;color:#fff;border:0;border-radius:6px;padding:6px 12px;font-size:.8em;font-weight:700;cursor:pointer">👥 Crew</button>' +
     '<div style="flex:1"></div>' +
     filterBtn('all', 'All') + filterBtn('draft', 'Draft') +
     filterBtn('confirmed', 'Confirmed') + filterBtn('roster_removed', 'Removed') +
@@ -722,13 +729,24 @@ function _plOpenImport() {
       '<div style="font-size:.65em;color:var(--muted);margin-top:6px">建議先 Preview 確認所有 row 都解析正常，再按 Import。</div>' +
     '</div>' +
     '<div style="background:var(--card);border-radius:10px;padding:14px;margin-bottom:12px">' +
-      '<div style="font-size:.85em;font-weight:700;margin-bottom:6px">🛩️ Aircraft (Tab 匯出，選用)</div>' +
+      '<div style="font-size:.85em;font-weight:700;margin-bottom:6px">🛩️ Aircraft / 機尾庫（LogTen Aircraft 匯出）</div>' +
       '<div style="font-size:.7em;color:var(--muted);margin-bottom:8px;line-height:1.5">' +
+        '⚠️ 是 LogTen 的 <b>Aircraft</b> export（每筆有機號），<b>不是 Aircraft Types</b>。<br>' +
         '建你的機尾庫，之後新增 entry 時 tail # 可自動帶 operator/type/notes。<br>' +
         '必填欄位：Aircraft ID / Operator / Type。' +
       '</div>' +
       '<input type="file" id="pl-aircraft-file" accept=".txt,.tab,.tsv,text/plain" style="font-size:.78em">' +
       '<button onclick="_plUploadAircraft()" style="margin-left:8px;background:#6366f1;color:#fff;border:0;border-radius:6px;padding:6px 12px;font-size:.78em;font-weight:700;cursor:pointer">Upload</button>' +
+    '</div>' +
+    '<div style="background:var(--card);border-radius:10px;padding:14px;margin-bottom:12px">' +
+      '<div style="font-size:.85em;font-weight:700;margin-bottom:6px">🧭 Aircraft Types / 機型目錄（LogTen Aircraft Types 匯出）</div>' +
+      '<div style="font-size:.7em;color:var(--muted);margin-bottom:8px;line-height:1.5">' +
+        '⚠️ 是 LogTen 的 <b>Aircraft Types</b> export（type 為主、無機號），<b>跟上面 Aircraft 不同檔</b>。<br>' +
+        '建你的機型目錄，之後 Aircraft 列表 / drill-down 顯示完整廠商機型（例：A359 → Airbus A-350-900）。<br>' +
+        '必填欄位：Type。Make / Model / Engine Type / Category / Class / Notes 都可選。' +
+      '</div>' +
+      '<input type="file" id="pl-aircraft-types-file" accept=".txt,.tab,.tsv,text/plain" style="font-size:.78em">' +
+      '<button onclick="_plUploadAircraftTypes()" style="margin-left:8px;background:#6366f1;color:#fff;border:0;border-radius:6px;padding:6px 12px;font-size:.78em;font-weight:700;cursor:pointer">Upload</button>' +
     '</div>' +
     '<div style="background:var(--card);border-radius:10px;padding:14px">' +
       '<div style="font-size:.85em;font-weight:700;margin-bottom:6px">👥 Address Book (Tab 匯出，選用)</div>' +
@@ -883,6 +901,25 @@ async function _plUploadAircraft() {
   }
 }
 
+// V1.0.11：Aircraft Types 匯入（type catalog，跟 Aircraft tail 區分）
+async function _plUploadAircraftTypes() {
+  var j = await _plUploadFile('pl-aircraft-types-file', '/api/pilot-log/import/logten-aircraft-types');
+  if (!j) return;
+  var resBox = document.getElementById('pl-import-result');
+  if (j.error) {
+    var hint = '';
+    if (j.error.indexOf('missing_required_columns') >= 0) {
+      hint = '<div style="margin-top:6px;color:#fde68a;font-size:.92em">提示：你可能上傳到 Aircraft（機尾）檔了。Aircraft Types 必填欄位是 <code>Type</code>，是 LogTen 的另一個 export。</div>';
+    }
+    resBox.innerHTML = '<div style="background:#7f1d1d;color:#fff;padding:10px;border-radius:8px;font-size:.78em">❌ ' + _plEsc(j.error) + hint + '</div>';
+    return;
+  }
+  resBox.innerHTML = '<div style="background:#064e3b;color:#fff;padding:10px;border-radius:8px;font-size:.78em">' +
+    '✅ 機型目錄：新增 <b>' + j.inserted + '</b>、更新 <b>' + j.updated + '</b>、解析失敗 <b>' + j.parse_errors + '</b>' +
+    '</div>';
+  _plToast('機型目錄已更新');
+}
+
 // V1.0.10：Address Book 匯入（接 V1.0.09 backend）
 async function _plUploadAddressBook() {
   var j = await _plUploadFile('pl-addressbook-file', '/api/pilot-log/import/logten-addressbook');
@@ -940,6 +977,19 @@ async function _plOpenAircraft() {
   _plRenderAircraftList();
 }
 
+// 用 type_code 從 _pl.aircraftTypes 撈完整名（V1.0.11）
+// 例：A359 → "Airbus A-350-900"。沒匹配就回空字串
+function _plLookupTypeFullName(typeCode) {
+  if (!typeCode || !_pl.aircraftTypes || _pl.aircraftTypes.length === 0) return '';
+  for (var i = 0; i < _pl.aircraftTypes.length; i++) {
+    var t = _pl.aircraftTypes[i];
+    if (t.type_code === typeCode) {
+      return [t.make, t.model].filter(Boolean).join(' ');
+    }
+  }
+  return '';
+}
+
 function _plRenderAircraftList() {
   var c = document.getElementById('pilotlog-content');
   if (!c) return;
@@ -958,9 +1008,14 @@ function _plRenderAircraftList() {
       var a = _pl.aircraft[ai];
       var count = tailCount[a.tail_no] || 0;
       var typeStr = _plEsc(a.type_code || '');
+      // 機型顯示優先序：(1) pilot_aircraft 自己的 make/model（手動建的可能有）
+      //                (2) Aircraft Types catalog 查到的完整名（V1.0.11）
       var modelStr = '';
       if (a.make || a.model) {
         modelStr = _plEsc([a.make, a.model].filter(Boolean).join(' '));
+      } else if (a.type_code) {
+        var fromCatalog = _plLookupTypeFullName(a.type_code);
+        if (fromCatalog) modelStr = _plEsc(fromCatalog);
       }
       rows += '<div onclick="_plOpenAircraftDetail(\'' + _plEsc(a.tail_no) + '\')" ' +
         'style="background:var(--card);border-radius:8px;padding:10px 12px;margin-bottom:6px;cursor:pointer;display:flex;gap:10px;align-items:center">' +
@@ -999,12 +1054,21 @@ function _plOpenAircraftDetail(tail) {
   // 依日期排序（最新先）
   flights.sort(function(a, b) { return (b.flight_date || '').localeCompare(a.flight_date || ''); });
 
+  // make/model 優先用 pilot_aircraft 自己的，沒有再從 aircraft_types catalog 查
+  var fullName = '';
+  if (aircraft) {
+    if (aircraft.make || aircraft.model) {
+      fullName = [aircraft.make, aircraft.model].filter(Boolean).join(' ');
+    } else if (aircraft.type_code) {
+      fullName = _plLookupTypeFullName(aircraft.type_code);
+    }
+  }
   var head = aircraft
     ? '<div style="background:var(--card);border-radius:8px;padding:12px;margin-bottom:10px;font-size:.78em">' +
         '<div style="font-weight:700;font-size:1.1em">' + _plEsc(aircraft.tail_no) + '</div>' +
         '<div style="color:var(--muted);margin-top:4px">' +
           (aircraft.type_code ? _plEsc(aircraft.type_code) : '') +
-          (aircraft.make || aircraft.model ? '　' + _plEsc([aircraft.make, aircraft.model].filter(Boolean).join(' ')) : '') +
+          (fullName ? '　' + _plEsc(fullName) : '') +
           (aircraft.operator ? '　' + _plEsc(aircraft.operator) : '') +
         '</div>' +
         (aircraft.notes ? '<div style="color:var(--muted);margin-top:4px">' + _plEsc(aircraft.notes) + '</div>' : '') +
@@ -1095,6 +1159,195 @@ async function _plSubmitAddAircraft() {
   } catch (e) {
     if (resBox) resBox.innerHTML = '<div style="background:#7f1d1d;color:#fff;padding:8px 10px;border-radius:6px;font-size:.78em">❌ ' + _plEsc((e && e.message) || 'unknown') + '</div>';
   }
+}
+
+// === SECTION: crew（V1.0.11） ═══════════════════════════════════════════════════
+// 列表頁：所有 crew + 一起飛過幾班 → 點某人 → 顯示一起飛過的所有 flight
+// drill-down 用名字比對 entry.crew JSONB 內任一欄位（pic / sic / fo1 / fo2 / purser ...）
+// 完整 entries 快照沿用 Aircraft 那套（_pl.aircraftEntries），不再開第二份
+
+var _plCrewSearchTerm = '';
+
+async function _plOpenCrew() {
+  var c = document.getElementById('pilotlog-content');
+  if (!c) return;
+  c.innerHTML = '<div style="text-align:center;color:var(--muted);padding:40px;font-size:.85em">載入 crew…</div>';
+  // 同時拉 crew 跟完整 entries（兩者各自獨立、可並行）
+  await Promise.all([_plFetchAll(), _plFetchAircraftEntries()]);
+  _plRenderCrewList();
+}
+
+// 從 entry.crew JSONB 內所有欄位收集名字（pic/sic/fo1/fo2/purser/observer 都算）
+function _plEntryCrewNames(e) {
+  if (!e || !e.crew || typeof e.crew !== 'object') return [];
+  var names = [];
+  Object.keys(e.crew).forEach(function(k) {
+    var v = e.crew[k];
+    if (typeof v === 'string' && v.trim()) names.push(v.trim());
+  });
+  return names;
+}
+
+// 找出 Address Book 內 display_name 被多筆共用的名字（同名 ambiguous）。
+// entry.crew 只有名字、沒有 employee_id，所以同名的 crew 我們無法確定
+// 哪一筆 flight 屬於哪一個人 → 必須標 ambiguous，不能算 flight count、
+// drill-down 也不該列航班，避免錯誤歸屬。
+function _plCrewAmbiguousNames() {
+  var counts = {};
+  var list = _pl.crew || [];
+  for (var i = 0; i < list.length; i++) {
+    var n = (list[i].display_name || '').trim();
+    if (!n) continue;
+    counts[n] = (counts[n] || 0) + 1;
+  }
+  var amb = {};
+  Object.keys(counts).forEach(function(k) { if (counts[k] > 1) amb[k] = true; });
+  return amb;
+}
+
+function _plRenderCrewList() {
+  var c = document.getElementById('pilotlog-content');
+  if (!c) return;
+  // 用完整快照算「跟某 crew 一起飛過幾班」
+  var sourceEntries = _pl.aircraftEntries || [];
+  var nameCount = {};
+  for (var i = 0; i < sourceEntries.length; i++) {
+    var ns = _plEntryCrewNames(sourceEntries[i]);
+    for (var j = 0; j < ns.length; j++) {
+      nameCount[ns[j]] = (nameCount[ns[j]] || 0) + 1;
+    }
+  }
+  var ambNames = _plCrewAmbiguousNames();
+  var hasAmb = false;
+  for (var ak in ambNames) { if (ambNames.hasOwnProperty(ak)) { hasAmb = true; break; } }
+
+  // 套搜尋條件（display_name / employee_id 都比對）
+  var term = (_plCrewSearchTerm || '').toLowerCase().trim();
+  var filtered = _pl.crew.filter(function(p) {
+    if (!term) return true;
+    if ((p.display_name || '').toLowerCase().indexOf(term) >= 0) return true;
+    if (Array.isArray(p.employee_ids)) {
+      for (var k = 0; k < p.employee_ids.length; k++) {
+        if (String(p.employee_ids[k]).toLowerCase().indexOf(term) >= 0) return true;
+      }
+    }
+    return false;
+  });
+
+  var rows = '';
+  if (_pl.crew.length === 0) {
+    rows = '<div style="text-align:center;color:var(--muted);padding:30px;font-size:.85em">名單是空的。從 <b>📥 Import</b> 上傳 LogTen Address Book 把 crew 匯進來。</div>';
+  } else if (filtered.length === 0) {
+    rows = '<div style="text-align:center;color:var(--muted);padding:30px;font-size:.85em">沒符合「' + _plEsc(term) + '」的 crew。</div>';
+  } else {
+    for (var ri = 0; ri < filtered.length; ri++) {
+      var p = filtered[ri];
+      var ambiguous = !!ambNames[(p.display_name || '').trim()];
+      var idStr = Array.isArray(p.employee_ids) && p.employee_ids.length ? p.employee_ids.join(' / ') : '';
+      var selfMark = p.is_self ? '<span style="background:#0ea5e9;color:#fff;border-radius:4px;padding:1px 6px;font-size:.6em;margin-left:6px">YOU</span>' : '';
+      var ambMark = ambiguous ? '<span style="background:#f59e0b;color:#000;border-radius:4px;padding:1px 6px;font-size:.6em;margin-left:6px" title="Address Book 內有多筆同名 crew，無法判斷哪些航班屬於誰">SAME-NAME</span>' : '';
+      var countCell = ambiguous
+        ? '<div style="font-size:.72em;color:var(--muted);text-align:right" title="同名 crew 無法計數">—</div>'
+        : '<div style="font-size:.72em;color:var(--text);text-align:right">' + (nameCount[p.display_name] || 0) + ' flights</div>';
+      rows += '<div onclick="_plOpenCrewDetail(\'' + _plEsc(p.id) + '\')" ' +
+        'style="background:var(--card);border-radius:8px;padding:10px 12px;margin-bottom:6px;cursor:pointer;display:flex;gap:10px;align-items:center">' +
+        '<div style="flex:1"><div style="font-size:.85em;font-weight:700">' + _plEsc(p.display_name) + selfMark + ambMark + '</div>' +
+          (idStr ? '<div style="font-size:.62em;color:var(--muted)">ID: ' + _plEsc(idStr) + '</div>' : '') +
+          (p.organization ? '<div style="font-size:.62em;color:var(--muted)">' + _plEsc(p.organization) + '</div>' : '') + '</div>' +
+        countCell +
+        '</div>';
+    }
+  }
+
+  var ambNotice = hasAmb
+    ? '<div style="background:#3b2f0a;border:1px solid #f59e0b;color:#fbbf24;border-radius:6px;padding:8px 10px;margin-bottom:8px;font-size:.7em">⚠ 有同名 crew（標記 <b>SAME-NAME</b>）：因為 entry.crew 只記名字、沒帶 employee_id，無法判斷某筆航班屬於哪一位，所以不顯示 flight count、drill-down 也不列航班。建議在 Address Book 內把同名的人加註 organization 或 comment 區分。</div>'
+    : '';
+
+  c.innerHTML =
+    '<div style="padding:10px;max-width:760px;margin:0 auto">' +
+      '<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">' +
+        '<button onclick="_plRenderMain()" style="background:transparent;border:0;color:var(--text);font-size:1.2em;cursor:pointer">←</button>' +
+        '<div style="font-size:1em;font-weight:700">👥 Crew</div>' +
+        '<div style="flex:1"></div>' +
+        '<div style="font-size:.7em;color:var(--muted)">共 ' + _pl.crew.length + ' 人</div>' +
+      '</div>' +
+      '<input id="pl-crew-search" type="search" placeholder="搜尋名字 / ID..." value="' + _plEsc(term) + '" ' +
+        'oninput="_plCrewSearchInput(this.value)" ' +
+        'style="width:100%;background:var(--bg,#0a0e1a);color:var(--text);border:1px solid var(--border,#334155);border-radius:6px;padding:8px 10px;font-size:.85em;margin-bottom:10px;box-sizing:border-box">' +
+      ambNotice +
+      '<div style="font-size:.65em;color:var(--muted);margin-bottom:8px">flight count 用完整資料計算（不受主頁 filter 影響）。點任一筆查看一起飛過的航班。</div>' +
+      rows +
+    '</div>';
+}
+
+function _plCrewSearchInput(v) {
+  _plCrewSearchTerm = v;
+  _plRenderCrewList();
+}
+
+function _plOpenCrewDetail(crewId) {
+  var c = document.getElementById('pilotlog-content');
+  if (!c) return;
+  // 找 crew 本人
+  var person = null;
+  for (var i = 0; i < _pl.crew.length; i++) {
+    if (_pl.crew[i].id === crewId) { person = _pl.crew[i]; break; }
+  }
+  if (!person) {
+    _plRenderCrewList();
+    return;
+  }
+  var name = (person.display_name || '').trim();
+  var ambNames = _plCrewAmbiguousNames();
+  var ambiguous = !!ambNames[name];
+
+  var idStr = Array.isArray(person.employee_ids) && person.employee_ids.length ? person.employee_ids.join(' / ') : '';
+  var head = '<div style="background:var(--card);border-radius:8px;padding:12px;margin-bottom:10px;font-size:.78em">' +
+    '<div style="font-weight:700;font-size:1.1em">' + _plEsc(person.display_name) +
+      (person.is_self ? '<span style="background:#0ea5e9;color:#fff;border-radius:4px;padding:1px 6px;font-size:.6em;margin-left:6px">YOU</span>' : '') +
+      (ambiguous ? '<span style="background:#f59e0b;color:#000;border-radius:4px;padding:1px 6px;font-size:.6em;margin-left:6px">SAME-NAME</span>' : '') +
+    '</div>' +
+    (idStr ? '<div style="color:var(--muted);margin-top:4px">ID: ' + _plEsc(idStr) + '</div>' : '') +
+    (person.organization ? '<div style="color:var(--muted);margin-top:2px">' + _plEsc(person.organization) + '</div>' : '') +
+    (person.comment ? '<div style="color:var(--muted);margin-top:2px;font-size:.92em">' + _plEsc(person.comment) + '</div>' : '') +
+  '</div>';
+
+  var bodyHtml;
+  var countLabel;
+  if (ambiguous) {
+    bodyHtml = '<div style="background:#3b2f0a;border:1px solid #f59e0b;color:#fbbf24;border-radius:6px;padding:12px;font-size:.78em;line-height:1.5">' +
+      '⚠ <b>無法列出航班</b><br>' +
+      'Address Book 內有多位 crew 叫「' + _plEsc(name) + '」，但 entry 只記名字、沒帶 employee_id，' +
+      '所以我們無法判斷某筆航班是跟「這個」' + _plEsc(name) + '飛、還是另一個同名 crew 飛。' +
+      '為了避免錯誤歸屬，先不顯示。<br><br>' +
+      '建議：到 Address Book（LogTen 端）給同名的人加上不同的 organization 或備註，再重新匯入。' +
+    '</div>';
+    countLabel = '—';
+  } else {
+    var sourceEntries = _pl.aircraftEntries || [];
+    var flights = sourceEntries.filter(function(e) {
+      var ns = _plEntryCrewNames(e);
+      for (var k = 0; k < ns.length; k++) if (ns[k] === name) return true;
+      return false;
+    });
+    flights.sort(function(a, b) { return (b.flight_date || '').localeCompare(a.flight_date || ''); });
+    bodyHtml = flights.length === 0
+      ? '<div style="text-align:center;color:var(--muted);padding:30px;font-size:.85em">沒有跟這位 crew 一起飛過的紀錄。注意：比對方式是 entry.crew 內欄位的姓名是否完全一致，不同 export 的拼法可能對不到。</div>'
+      : flights.map(_plRenderEntryRow).join('');
+    countLabel = flights.length + ' flights';
+  }
+
+  c.innerHTML =
+    '<div style="padding:10px;max-width:760px;margin:0 auto">' +
+      '<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">' +
+        '<button onclick="_plOpenCrew()" style="background:transparent;border:0;color:var(--text);font-size:1.2em;cursor:pointer">←</button>' +
+        '<div style="font-size:1em;font-weight:700">' + _plEsc(person.display_name) + ' / Flights</div>' +
+        '<div style="flex:1"></div>' +
+        '<div style="font-size:.72em;color:var(--muted)">' + countLabel + '</div>' +
+      '</div>' +
+      head +
+      bodyHtml +
+    '</div>';
 }
 
 // === SECTION: entry point ════════════════════════════════════════════════════

@@ -267,6 +267,30 @@ Smart re-import 行為：`confirmed` 不覆蓋（保護使用者編輯），`dra
 
 ---
 
+### `GET /api/pilot-log/aircraft-types` (V1.0.11)
+
+當前 user 的 aircraft type catalog（type 為主、無 tail）。
+
+**200 Response:** `{ "aircraft_types": [{ "type_code": "A359", "make": "AIRBUS INDUSTRIES", "model": "A-350-900", "engine_type": "Jet", ... }] }`
+
+---
+
+### `POST /api/pilot-log/import/logten-aircraft-types` (V1.0.11)
+
+匯入 LogTen Aircraft Types export（跟 Aircraft tail registry **不同檔**）。
+
+**Content-Type:** `text/plain`（TSV，UTF-8）
+
+**Required header:** `Type` 一欄。`Make / Model / Engine Type / Category / Class / Notes` 都 optional。
+
+**識別 / merge：** `(user_id, type_code)` UNIQUE。已存在的 type → COALESCE 風格 upsert，空欄位不洗掉舊資料。
+
+**200 Response:** `{ "inserted": N, "updated": M, "parse_errors": K, "bad_rows": [] }`
+
+**錯誤回應：** `empty_or_invalid_file` / `missing_required_columns:Type`
+
+---
+
 ### `POST /api/pilot-log/aircraft` (V1.0.10)
 
 手動新增 / upsert 一筆機尾。Body 可空欄位，唯一必填 `tail_no`。
@@ -290,6 +314,20 @@ Smart re-import 行為：`confirmed` 不覆蓋（保護使用者編輯），`dra
 - `200 OK`：原本就存在、被 upsert 更新 → `{ "aircraft": {...}, "inserted": false }`
 
 **錯誤：** 400 `missing_tail_no` / 503 `database_unavailable` / 500 `create_failed`
+
+---
+
+## Crew（V1.0.11）
+
+### `GET /api/pilot-log/crew`
+
+當前 user 的 Address Book crew 名單（含 cabin crew，不限 pilot）。
+
+**200 Response:** `{ "crew": [{ "id": "uuid", "display_name": "Wei-Hung Lu", "organization": "STARLUX", "comment": null, "is_self": true, "employee_ids": ["2214780", "B79363"] }] }`
+
+`employee_ids` 是 alias 表 `crew_employee_ids` 的 `array_agg`，同一人換公司 / 多 ID 都會帶出。`is_self` 由 LogTen export 的 `This is Me=1` 設定（見 V1.0.09 import）。
+
+**Same-name 注意：** `entry.crew` JSONB 只記名字、沒 `employee_id`，所以同 user 內 `display_name` 出現多次的 crew 屬於 ambiguous，前端 UI 會掛 `SAME-NAME` 標記、不算 flight count、drill-down 也不列航班。
 
 ---
 
