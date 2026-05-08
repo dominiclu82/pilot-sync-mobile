@@ -249,6 +249,36 @@ async function _plLogout() {
   _plRender();
 }
 
+// 永久刪除帳號（Apple App Store 5.1.1(v) 強制要求 in-app 刪帳號功能）
+// CASCADE 會清掉 emails / sessions / log entries / aircraft，無法復原
+async function _plDeleteAccount() {
+  var msg1 = '⚠️ 永久刪除你的帳號？\n\n' +
+             '會一起清掉：\n' +
+             '• 全部飛行記錄 entries\n' +
+             '• 機尾資料 (Aircraft)\n' +
+             '• 全部登入 sessions\n\n' +
+             '此動作無法復原。\n\n' +
+             '— — —\n\n' +
+             'Permanently delete your account? All flight records, aircraft data, and sessions will be erased. This cannot be undone.';
+  if (!confirm(msg1)) return;
+  var msg2 = '最後確認：真的要刪除整個帳號嗎？\n\nFinal confirm: are you sure you want to delete the entire account?';
+  if (!confirm(msg2)) return;
+  try {
+    var res = await _plApi('/api/pilot-log/account', { method: 'DELETE' });
+    if (res.status === 204) {
+      _plClearSession();
+      alert('帳號已刪除\nAccount deleted');
+      _plRender();
+      return;
+    }
+    var j = {};
+    try { j = await res.json(); } catch (e) {}
+    alert('刪除失敗 Delete failed: ' + (j.error || 'HTTP ' + res.status));
+  } catch (e) {
+    alert('刪除失敗 Delete failed: ' + (e && e.message ? e.message : 'unknown'));
+  }
+}
+
 // === SECTION: list ══════════════════════════════════════════════════════════
 async function _plFetchAll() {
   var q = '';

@@ -8,6 +8,7 @@
 //
 // Authed (Authorization: Bearer <accessToken>):
 //   GET    /api/pilot-log/me
+//   DELETE /api/pilot-log/account             (Apple 5.1.1(v) compliance — 永久刪除帳號 + CASCADE 全部資料)
 //   GET    /api/pilot-log/entries?status=&from=&to=&limit=&offset=
 //   GET    /api/pilot-log/entries/:id
 //   POST   /api/pilot-log/entries             (manual entry)
@@ -35,8 +36,8 @@ import { loadCredentials } from '../config.js';
 import { getSpaPilotLogJs } from '../spa/js-pilot-log.js';
 
 // ── 版本（比照 CrewSync / Morning：每次推版必更新；SW cache 名稱跟著走） ────
-export const PILOT_LOG_VERSION = 'V1.0.07';
-const PILOT_LOG_CACHE = 'pilotlog-v1-0-07';
+export const PILOT_LOG_VERSION = 'V1.0.08';
+const PILOT_LOG_CACHE = 'pilotlog-v1-0-08';
 
 export const pilotLogRouter = express.Router();
 
@@ -152,6 +153,16 @@ header .h-ver:active { background: rgba(255,255,255,.1); }
     </div>
     <hr style="border:none;border-top:1px solid var(--border);margin:12px 0">
     ${_renderPilotLogChangelog()}
+    <hr style="border:none;border-top:1px solid var(--border);margin:14px 0 10px">
+    <!-- Danger Zone: Apple App Store 5.1.1(v) compliance — in-app account delete -->
+    <div style="background:rgba(220,38,38,.08);border:1px solid rgba(220,38,38,.3);border-radius:8px;padding:12px">
+      <div style="font-weight:700;color:#ef4444;font-size:.82em;margin-bottom:6px">⚠️ Danger Zone</div>
+      <div style="font-size:.7em;color:var(--muted);line-height:1.5;margin-bottom:8px">
+        永久刪除帳號與全部飛行記錄、機尾資料、會話。此動作無法復原。<br>
+        Permanently delete account, all flight records, aircraft data, and sessions. This cannot be undone.
+      </div>
+      <button onclick="_plDeleteAccount()" style="background:#dc2626;color:#fff;border:0;border-radius:6px;padding:6px 12px;font-size:.76em;font-weight:700;cursor:pointer">🗑️ Delete Account</button>
+    </div>
   </div>
 </div>
 
@@ -178,6 +189,11 @@ if (document.readyState !== 'loading') pilotLogInit();
 function _renderPilotLogChangelog(): string {
   return `
     <div class="pl-cl-v">${PILOT_LOG_VERSION}</div>
+    <div class="pl-cl-txt">
+      新增帳號刪除功能（Apple App Store 5.1.1(v) 要求提供 in-app delete account），為未來上架做準備。新增 endpoint <code>DELETE /api/pilot-log/account</code>，會以 CASCADE 方式刪除使用者的 emails / sessions / log entries / aircraft 全部資料，無法復原。前端在 About modal 底部加入 Danger Zone 紅色區塊（點 header 右上角版號開啟），採雙段 confirm 才會真的呼叫 API，以避免誤觸。另新增 <code>API.md</code> 完整 REST contract 文件，整理全部 endpoint 的 method / path / auth / request / response 範例，以及 native client 注意事項（Keychain 儲存 token、refresh singleton 必做、未來 Apple Sign In endpoint 預留位置等），讓之後 native app 開發可直接參照，降低遷移成本。<br>
+      Added account deletion (Apple App Store 5.1.1(v) requires in-app account deletion), preparing for future store submission. New endpoint <code>DELETE /api/pilot-log/account</code> cascades deletion of the user's emails / sessions / log entries / aircraft and is irreversible. The frontend adds a red Danger Zone section at the bottom of the About modal (opened via the header version badge) with two-step confirmation before calling the API to reduce accidental deletion. Also added <code>API.md</code>, a full REST contract document covering every endpoint's method / path / auth / request / response examples plus native-client notes (Keychain token storage, mandatory refresh singleton, reserved spot for a future Apple Sign In endpoint, etc.), so future native app development has a direct reference and migration cost stays lower.
+    </div>
+    <div class="pl-cl-v old">V1.0.07</div>
     <div class="pl-cl-txt">
       <b>修 access token 過期時的並發 refresh race</b>：原本 <code>_plFetchAll()</code> 用 <code>Promise.all</code> 同時打 4 個 API（entries / stats / aircraft / quick-suggest），token 過期時 4 個並發各自呼叫 <code>_plTryRefresh()</code>，server 的 refresh token rotation 後第一個成功、後 3 個拿著已作廢的 refresh token 全部失敗 — 任何 race-loser 失敗都會觸發 <code>_plClearSession()</code> → 把已成功更新的 session 清掉、誤把使用者登出，同時部分 API 會看似「資料消失」（iPad PWA 隔天打開常見 stats summary 不見）。改成 singleton in-flight lock：同時間只允許一個 refresh 在跑，其他 caller 共用同一個 promise；只有 server 確實回 401（refresh token 真的失效）才清 session，5xx / 網路錯誤等暫時性失敗保留 session 下次再試。預期效果：iPad PWA 隔天打開不再被登出（refresh token 90 天內持續有效），stats summary 不再偶發消失。<br>
       <b>Fixed concurrent refresh race on access token expiry</b>: previously <code>_plFetchAll()</code> fired 4 parallel API calls via <code>Promise.all</code>; on token expiry all 4 hit 401 and each invoked <code>_plTryRefresh()</code> in parallel. After the server's refresh token rotation the first refresh succeeded but the other 3 race-losers failed with the now-invalidated old refresh token, and any failure triggered <code>_plClearSession()</code> — wiping the freshly-rotated session and forcing re-login, while some APIs (stats / aircraft / quick-suggest) appeared as "missing data" (iPad PWA next-day open often lost the stats summary). Now uses a singleton in-flight lock: only one refresh runs at a time, concurrent callers share the same promise; <code>_plClearSession()</code> only fires on a definitive 401 from server (refresh token actually invalid), retaining session for transient 5xx / network errors. Expected: iPad PWA no longer forces re-login on next-day reopen (refresh token stays valid for 90 days), stats summary no longer randomly disappears.
@@ -376,6 +392,27 @@ pilotLogRouter.get('/api/pilot-log/me', requireAuth, async (req: AuthedRequest, 
   );
   if (u.rows.length === 0) return res.status(404).json({ error: 'user_not_found' });
   res.json({ user: u.rows[0], emails: emails.rows });
+});
+
+// ── Account delete（V1.0.08；Apple App Store 5.1.1(v) compliance）─────────────
+// 永久刪除使用者帳號跟所有相關資料。CASCADE 會清掉：
+//   - pilot_user_emails（ON DELETE CASCADE）
+//   - pilot_user_sessions（ON DELETE CASCADE，含 refresh tokens）
+//   - pilot_log_entries（ON DELETE CASCADE）
+//   - pilot_aircraft（ON DELETE CASCADE）
+// 不可復原。前端要做雙段 confirm 才能呼叫這個 endpoint。
+pilotLogRouter.delete('/api/pilot-log/account', requireAuth, async (req: AuthedRequest, res) => {
+  const pool = getPool();
+  if (!pool || !(await ensureTables())) return res.status(503).json({ error: 'database_unavailable' });
+  const userId = req.pilotUserId!;
+  try {
+    const r = await pool.query('DELETE FROM pilot_users WHERE id = $1', [userId]);
+    if (r.rowCount === 0) return res.status(404).json({ error: 'user_not_found' });
+    res.status(204).end();
+  } catch (e: any) {
+    console.error('[pilot-log] account delete failed:', e.message);
+    res.status(500).json({ error: 'delete_failed' });
+  }
 });
 
 // ── Entries: list ────────────────────────────────────────────────────────────
