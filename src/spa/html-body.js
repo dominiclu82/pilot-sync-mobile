@@ -1509,7 +1509,7 @@ export function getSpaHtmlBody(): string {
       <button class="tab-util-btn tab-install-btn" id="tab-install-btn" onclick="showInstallGuide()" style="display:none">
         <span>📲</span>安裝
       </button>
-      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer;text-decoration:underline" onclick="showAbout()">V8.0.28</span>
+      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer;text-decoration:underline" onclick="showAbout()">V8.0.29</span>
     </div>
   </div>
 </div>
@@ -1540,7 +1540,12 @@ export function getSpaHtmlBody(): string {
       <div style="color:var(--muted)">Best experience on iPad in landscape mode. Android devices may not display correctly.</div>
     </div>
     <div style="max-height:50vh;overflow-y:auto;-webkit-overflow-scrolling:touch;margin-bottom:10px">
-    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V8.0.28</div>
+    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V8.0.29</div>
+    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
+      <div>修正 PWA cache 永遠看到舊版本問題：Service Worker 的 cache name 寫死成 <code>'crewsync-v8026'</code>，每次推版都用同一個 cache name → SW activate handler 「刪除別的 cache key」永遠刪不到自己 → 舊 shell 永遠 cached，user kill PWA 重開仍看舊版號（V8.0.26 / V8.0.27 / V8.0.28 改完都沒生效）。改成從 SPA HTML 內動態抓當前 V8.0.X 字串組 cache name → 每次推版 cache name 自動跟著變 → 新 SW 自動 invalidate 舊 cache。</div>
+      <div>Fix PWA cache stuck on old version: Service Worker cache name was hardcoded as <code>'crewsync-v8026'</code>, so every deploy reused the same cache key — SW activate handler's <code>delete keys !== CACHE</code> never cleared its own cache → app shell stuck at the cached old version (V8.0.26/27/28 all failed to take effect even after kill+reopen PWA). Now the cache name is derived dynamically from the current V8.0.X string in the SPA HTML, so it changes with every deploy and the new SW automatically invalidates the old cache.</div>
+    </div>
+    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V8.0.28</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
       <div>修正 Briefing 中 Overtime warning「表定 FT 00:00 → 任何輸入都顯示 OT」bug：root cause 是 DHD（deadhead，配位調機）任務班表系統會把 <code>flightTime</code> 寫成 <code>"00:00"</code>（DHD 計薪方式不算 FT），但 dep/arr time 還在（飛機還是要飛），DHD 也該算 OT。<code>_briefCalcSchedFTmin</code> 原本看到 <code>flightTime</code> 就用，parse 出 0 也回傳 → OT 警告基準變 0 → 永遠觸發。改成 parse 出 0 視為無效繼續走下方 dep/arr fallback 用 schedule dep/arr 算 schedFT（跟 Overtime 子頁 <code>_otCalcMagic</code> 同邏輯）。</div>
       <div>Fix Briefing Overtime warning「sched FT 00:00 → always triggers」bug: root cause is DHD (deadhead) tasks — roster system writes <code>flightTime="00:00"</code> for DHD (its pay logic excludes FT), but dep/arr times are still present (the plane still flies) and DHD should still trigger OT calc. <code>_briefCalcSchedFTmin</code> previously took <code>flightTime</code> as-is, returning 0 → OT baseline became 0 → warning always triggered. Now treats parsed value of 0 as invalid and falls through to dep/arr-based sched FT calculation (same logic as Overtime subtab <code>_otCalcMagic</code>).</div>

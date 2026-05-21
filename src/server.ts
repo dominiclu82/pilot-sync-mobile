@@ -493,12 +493,17 @@ app.get('/api/taf', async (req, res) => {
 });
 
 // ── Service Worker ────────────────────────────────────────────────────────────
+// V8.0.29 fix: cache name 從 html-body.js 動態抓當前 V8.0.X，每次推版自動 invalidate 舊 cache
+// 原本寫死 'crewsync-v8026' → 每次 deploy 同 cache name → SW activate handler
+// `delete keys !== CACHE` 不會清自己 → PWA 永遠看 cached shell V8.0.26 不更新
 app.get('/sw.js', (_req, res) => {
   res.setHeader('Content-Type', 'application/javascript');
   res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
   res.setHeader('Service-Worker-Allowed', '/');
+  const verMatch = getSpaHtmlBody().match(/V\d+\.\d+\.\d+/);
+  const cacheVer = verMatch ? verMatch[0].replace('V', 'v').replace(/\./g, '') : 'vunknown';
   res.send(`
-const CACHE = 'crewsync-v8026';
+const CACHE = 'crewsync-${cacheVer}';
 const SHELL = ['/', '/main', '/share'];
 self.addEventListener('install', e => {
   e.waitUntil(
