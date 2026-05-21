@@ -1116,9 +1116,12 @@ function _briefFindRosterFlight(flightNo, dateStr) {
 // 算 flight 的表定 FT 分鐘（優先用 flightTime 欄，fallback 用 dep/arr + tz）
 function _briefCalcSchedFTmin(fl) {
   if (!fl) return null;
+  // V8.0.28 fix: DHD 任務（deadhead）班表系統會把 flightTime 寫 "00:00"（計薪不算 FT），
+  // 但 dep/arr time 還在（飛機還是要飛），DHD 也該算 OT。parse 出 0 視為無效，
+  // 繼續走下方 dep/arr fallback 算 schedFT。
   if (fl.flightTime) {
     var p = _briefParseFT(fl.flightTime);
-    if (p != null) return p;
+    if (p != null && p > 0) return p;
   }
   // fallback: UTC 版本優先，否則 local 轉 UTC
   var parseTime = function(str) {
