@@ -123,12 +123,18 @@ export async function generateICSHeadless(
 
     try {
       await Promise.all([
-        page.waitForNavigation({ timeout: 8000 }),
+        // 2026-05-21 fix B: timeout 8s → 20s（班表發布日 JX 後端壅塞時 8s 容易 timeout 被誤判成密碼錯）
+        page.waitForNavigation({ timeout: 20000 }),
         page.click('button[type="submit"]'),
       ]);
       log('✅ 登入成功');
-    } catch {
-      throw new Error('登入失敗，請確認 JX 帳號密碼是否正確');
+    } catch (e) {
+      // 2026-05-21 fix A: 原本 `catch {}` 吞掉真實 error，硬塞「密碼錯」當 fallback 訊息，
+      // 員工以為密碼錯但其實是 navigation timeout / network error。
+      // 改成 log 真實 error + 訊息帶 cause，方便排查塞車 vs 真錯帳密
+      const cause = e instanceof Error ? `${e.name}: ${e.message}` : String(e);
+      log(`❌ 登入流程失敗 (cause: ${cause})`);
+      throw new Error(`登入失敗 (${cause}) — 若 JX 班表剛發布可能網站壅塞，請稍後重試；若確認非塞車再檢查帳密`);
     }
 
     // 登入後直接導覽到 roster 頁面（登入不一定自動跳轉）
