@@ -4,3 +4,34 @@ credentials.json
 token.json
 config.json
 output/
+
+# Codex review log（本機 audit 用，不推 prod）
+codex_reviews/
+
+# tsc 編譯產物（source-of-truth 是 .ts，runtime 用 tsx 直接跑 .ts，不需要 .js）
+# V8.0.31 dual-source 收斂後新增，避免本機 tsc 編譯產物再次被誤 track
+src/auth.js
+src/config.js
+src/server.js
+src/morning.js
+src/morning-builder.js
+src/generate-ics-headless.js
+src/upload-ics.js
+src/spa/html-body.js
+src/spa/js-airport-data.js
+src/spa/js-briefing-card.js
+src/spa/js-calendar-wrap.js
+src/spa/js-core.js
+src/spa/js-crew-rest.js
+src/spa/js-duty-time.js
+src/spa/js-fr24-radar.js
+src/spa/js-friends.js
+src/spa/js-gate-info.js
+src/spa/js-live-radar.js
+src/spa/js-pa.js
+src/spa/js-pilot-log.js
+src/spa/js-roster-grid.js
+src/spa/js-subtab-reorder.js
+src/spa/js-weather.js
+src/spa/styles.js
+seed-test.cjs
