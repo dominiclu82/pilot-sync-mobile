@@ -1509,7 +1509,7 @@ export function getSpaHtmlBody(): string {
       <button class="tab-util-btn tab-install-btn" id="tab-install-btn" onclick="showInstallGuide()" style="display:none">
         <span>📲</span>安裝
       </button>
-      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer;text-decoration:underline" onclick="showAbout()">V8.0.29</span>
+      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer;text-decoration:underline" onclick="showAbout()">V8.0.30</span>
     </div>
   </div>
 </div>
@@ -1540,7 +1540,12 @@ export function getSpaHtmlBody(): string {
       <div style="color:var(--muted)">Best experience on iPad in landscape mode. Android devices may not display correctly.</div>
     </div>
     <div style="max-height:50vh;overflow-y:auto;-webkit-overflow-scrolling:touch;margin-bottom:10px">
-    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V8.0.29</div>
+    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V8.0.30</div>
+    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
+      <div>修正 V8.0.27 / V8.0.28 / V8.0.29 三版皆未生效於 prod 的根本問題：<code>src/spa/html-body.ts</code> 跟 <code>html-body.js</code> 是同名雙檔（都被 git tracked），server.ts 雖 import <code>'./spa/html-body.js'</code>，但 tsx ESM resolver 優先解析到同名 <code>.ts</code> → prod runtime 永遠 serve V8.0.26 的 source。前三次推版只改 <code>.js</code> 沒改 <code>.ts</code>，等於白做。本版把 <code>.ts</code> 內容同步到 <code>.js</code> 最新版（含 V8.0.27～29 全部 fix），未來推版兩份要一起改直到 dual-source 收斂。</div>
+      <div>Fix the root cause of V8.0.27/28/29 all failing to take effect in prod: <code>src/spa/html-body.ts</code> and <code>html-body.js</code> are dual-source files (both git-tracked); although server.ts imports <code>'./spa/html-body.js'</code>, tsx's ESM resolver prefers the same-named <code>.ts</code> → prod runtime always serves V8.0.26 source. The previous three releases only updated <code>.js</code> without touching <code>.ts</code>, so they were no-ops on prod. This release syncs <code>.ts</code> to match <code>.js</code> (carrying V8.0.27～29 fixes through), and going forward both files must be edited together until the dual-source situation is resolved.</div>
+    </div>
+    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V8.0.29</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
       <div>修正 PWA cache 永遠看到舊版本問題：Service Worker 的 cache name 寫死成 <code>'crewsync-v8026'</code>，每次推版都用同一個 cache name → SW activate handler 「刪除別的 cache key」永遠刪不到自己 → 舊 shell 永遠 cached，user kill PWA 重開仍看舊版號（V8.0.26 / V8.0.27 / V8.0.28 改完都沒生效）。改成從 SPA HTML 內動態抓當前 V8.0.X 字串組 cache name → 每次推版 cache name 自動跟著變 → 新 SW 自動 invalidate 舊 cache。</div>
       <div>Fix PWA cache stuck on old version: Service Worker cache name was hardcoded as <code>'crewsync-v8026'</code>, so every deploy reused the same cache key — SW activate handler's <code>delete keys !== CACHE</code> never cleared its own cache → app shell stuck at the cached old version (V8.0.26/27/28 all failed to take effect even after kill+reopen PWA). Now the cache name is derived dynamically from the current V8.0.X string in the SPA HTML, so it changes with every deploy and the new SW automatically invalidates the old cache.</div>
