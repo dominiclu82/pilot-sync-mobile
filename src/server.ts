@@ -27,6 +27,7 @@ import { getSpaFriendsJs } from './spa/js-friends.js';
 import { getSpaGroupsJs } from './spa/js-groups.js';
 import { morningRouter, startMorningCron } from './morning.js';
 import { pilotLogRouter } from './pilot-log/routes.js';
+import { portfolioRouter, startPortfolio } from './portfolio/routes.js';
 import FR24Pkg from 'flightradarapi';
 import pg from 'pg';
 
@@ -208,6 +209,9 @@ app.use(morningRouter);
 
 // Pilot Log（獨立子系統，掛在 /api/pilot-log 底下；前端 inline 在 SPA HTML）
 app.use(pilotLogRouter);
+
+// Portfolio module（獨立子系統，掛在 /api/portfolio 底下；前端 PWA 在 phase 1.C 加）
+app.use(portfolioRouter);
 
 app.get('/', (_req, res) => { res.redirect('/main'); });
 
@@ -1791,6 +1795,8 @@ app.listen(Number(PORT), '0.0.0.0', () => {
   console.log(`🚀 CrewSync 伺服器啟動：${BASE_URL}`);
   // 啟動晨報 cron（每分鐘檢查是否到 06:30 台北時間）
   startMorningCron();
+  // Portfolio module：建表 + 一次性 holdings → transactions migration（idempotent）
+  startPortfolio().catch(e => console.error('[portfolio] startPortfolio failed:', e));
 });
 
 // If the registered redirect URI is on a different port, start a second mini-server for it
