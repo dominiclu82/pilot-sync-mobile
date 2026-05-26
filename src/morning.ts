@@ -11,7 +11,7 @@ import { Readability } from '@mozilla/readability';
 import { ROOT } from './config.js';
 import { buildMorningReport, fetchSection } from './morning-builder.js';
 
-export const MORNING_VERSION = 'V1.3.12';
+export const MORNING_VERSION = 'V1.3.13';
 const MORNING_CACHE = 'morning-v1-3-10';
 
 // ─── Postgres ────────────────────────────────────────────────────────
@@ -1974,6 +1974,11 @@ a:active { opacity: 0.6; }
     <hr style="border:none;border-top:1px solid var(--border);margin:12px 0">
     <div class="changelog-v">${MORNING_VERSION}</div>
     <div class="changelog-txt">
+      Hdr 拿掉「的晨報」字尾 (user 反映「navbar 已寫晨報，底下又寫一次 redundant」)，<code>hdr-user-title</code> 只顯示 <code>@uid</code>。Navbar 已是 module 標識，無需在 hdr 重複。<br>
+      Removed "的晨報" suffix from header title (user: "the navbar already says 晨報, redundant below"). <code>hdr-user-title</code> now shows just <code>@uid</code> — navbar already identifies the module.
+    </div>
+    <div class="changelog-v old">V1.3.12</div>
+    <div class="changelog-txt">
       改 cross-PWA 切換為 <b>tab navbar</b>：最上方加 sticky tab「🌅 晨報 │ 📈 投資組合」，active tab 底線 highlight；<b>字型 / 日夜 / 歷史 / refresh 控制按鈕都搬到 tab navbar 同 row 右邊</b>（user 反映「功能按鈕跟 navbar 在一起啦」），原 hdr 內 hdr-btns 拿掉只剩 title + date。Click 對方 tab 直接跳對應 URL（兩個 PWA 各自 implement 同樣 navbar 視覺）。<br>
       Cross-PWA navigation switched to <b>tab navbar</b>: sticky top with "🌅 Morning │ 📈 Portfolio" tabs (active underlined); <b>font/theme/history/refresh controls moved to the same row as the navbar</b> (per user "controls should sit with the navbar"), removed from hdr block. Click other tab → navigate to its URL. Both PWAs implement the same navbar visual independently.
     </div>
@@ -2290,7 +2295,8 @@ function updateHdrTitle() {
   const el = document.getElementById('hdr-user-title');
   if (!el) return;
   const uid = getUid();
-  el.textContent = uid ? (uid + ' 的晨報') : '晨報';
+  // V1.3.13: 拿掉「的晨報」字樣 (navbar 已標 module 名)，只顯示暱稱
+  el.textContent = uid ? ('@' + uid) : '請設暱稱';
 }
 
 // Wrapped fetch that always adds X-User-Id header

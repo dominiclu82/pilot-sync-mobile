@@ -45,10 +45,9 @@ export function getPortfolioHtml(): string {
       <div class="hdr">
         <div style="min-width:0;flex:1">
           <div class="hdr-title">
-            📈 投資組合
-            <span class="ver" id="ver-tag" onclick="openAbout()">V1.0.9</span>
+            <span class="hdr-user" id="hdr-user" onclick="changeUid()">—</span>
+            <span class="ver" id="ver-tag" onclick="openAbout()">V1.0.10</span>
           </div>
-          <div class="hdr-user" id="hdr-user" onclick="changeUid()">—</div>
         </div>
       </div>
       <div class="hdr-actions">
@@ -175,7 +174,13 @@ export function getPortfolioHtml(): string {
         <div class="modal-body" style="max-height:60vh;overflow-y:auto">
           <div class="muted muted-small">獨立投資組合子系統 — 多筆買賣帳本、自動算均價、三視角持倉分析、opt-in PIN 保護</div>
           <div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border)">
-            <div style="font-weight:700;margin-bottom:6px">V1.0.9 — Tab navbar 切換晨報 / 投資組合</div>
+            <div style="font-weight:700;margin-bottom:6px">V1.0.10 — 拿掉重複 module name + 平板 / 桌面全寬</div>
+            <div class="muted" style="font-size:.85em;line-height:1.6;margin-bottom:12px">
+              修兩個 user 反映：(1)「navbar 已寫晨報，底下又寫一次 redundant」— hdr title 拿掉「📈 投資組合」字眼，只剩 @user + 版號（晨報那邊同步拿掉「的晨報」字尾）。(2)「畫面要根據平板 / 手機調整螢幕寬度，不要有空白」— 拿掉 .page max-width:720px 限制，改用 full width + responsive padding (768px↑ 加 padding 24px)。
+            </div>
+          </div>
+          <div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border)">
+            <div style="font-weight:700;margin-bottom:6px;color:var(--muted)">V1.0.9 — Tab navbar 切換晨報 / 投資組合</div>
             <div class="muted" style="font-size:.85em;line-height:1.6;margin-bottom:12px">
               修 V1.0.8 兩個 sun emoji 撞色問題（light theme 時 ☀️ theme toggle
               跟 ☀️ link button 兩個都太陽）。改成最上方 sticky tab navbar：
@@ -401,7 +406,10 @@ function getStyles(): string {
 html { font-size: 15px; }
 html, body { margin: 0; padding: 0; background: var(--bg); color: var(--fg); font-family: -apple-system, "Segoe UI", system-ui, "Microsoft JhengHei", sans-serif; }
 body { font-size: 1rem; }
-.page { max-width: 720px; margin: 0 auto; padding: 12px 14px 80px; }
+.page { width: 100%; padding: 12px 14px 80px; }
+@media (min-width: 768px) {
+  .page { padding: 16px 24px 80px; }
+}
 .hdr { display: flex; align-items: center; gap: 10px; margin: 6px 0 16px; }
 .hdr-title { font-size: 1.2em; font-weight: 700; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .hdr-title .ver {
@@ -1341,7 +1349,7 @@ function renderChart(points, note) {
 
 // ── Theme / Font / About ─────────────────────────────────────────────────────
 
-const PORTFOLIO_VERSION = 'V1.0.9';
+const PORTFOLIO_VERSION = 'V1.0.10';
 const THEME_KEY = 'portfolio_theme';
 const FONT_SCALE_KEY = 'portfolio_font_scale';
 
