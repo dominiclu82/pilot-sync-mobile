@@ -30,7 +30,7 @@ export function getPortfolioHtml(): string {
         <div style="min-width:0;flex:1">
           <div class="hdr-title">
             📈 投資組合
-            <span class="ver" id="ver-tag" onclick="openAbout()">V1.0.7</span>
+            <span class="ver" id="ver-tag" onclick="openAbout()">V1.0.8</span>
           </div>
           <div class="hdr-user" id="hdr-user" onclick="changeUid()">—</div>
         </div>
@@ -40,6 +40,7 @@ export function getPortfolioHtml(): string {
             <button onclick="bumpFont(-1)">A−</button>
           </div>
           <button class="hdr-btn" id="btn-theme" onclick="toggleTheme()" title="日/夜">🌙</button>
+          <button class="hdr-btn" onclick="location.href='/morning'" title="去晨報">☀️</button>
           <button class="hdr-btn" onclick="openSettings()" title="設定">⚙</button>
         </div>
       </div>
@@ -167,7 +168,15 @@ export function getPortfolioHtml(): string {
         <div class="modal-body" style="max-height:60vh;overflow-y:auto">
           <div class="muted muted-small">獨立投資組合子系統 — 多筆買賣帳本、自動算均價、三視角持倉分析、opt-in PIN 保護</div>
           <div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border)">
-            <div style="font-weight:700;margin-bottom:6px">V1.0.7 — 第一次開圖自動補歷史</div>
+            <div style="font-weight:700;margin-bottom:6px">V1.0.8 — 跨 PWA 互聯</div>
+            <div class="muted" style="font-size:.85em;line-height:1.6;margin-bottom:12px">
+              Header 加 ☀️ 按鈕跳晨報；晨報那邊同步加 📈 按鈕跳回投資組合。
+              晨報加「💼 投資總損益」summary banner 顯示未實現損益（從這邊
+              <code>portfolio_transactions</code> 即時算），detail 還是在這邊看。
+            </div>
+          </div>
+          <div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border)">
+            <div style="font-weight:700;margin-bottom:6px;color:var(--muted)">V1.0.7 — 第一次開圖自動補歷史</div>
             <div class="muted" style="font-size:.85em;line-height:1.6;margin-bottom:12px">
               修 V1.0.6 user 抱怨「至少也有四月的資料可以顯示給我吧!!!」：<br>
               • 第一次開 chart 偵測到 ≤ 1 個 snapshot point + user 有持倉 →
@@ -1288,7 +1297,7 @@ function renderChart(points, note) {
 
 // ── Theme / Font / About ─────────────────────────────────────────────────────
 
-const PORTFOLIO_VERSION = 'V1.0.7';
+const PORTFOLIO_VERSION = 'V1.0.8';
 const THEME_KEY = 'portfolio_theme';
 const FONT_SCALE_KEY = 'portfolio_font_scale';
 
