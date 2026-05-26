@@ -1509,7 +1509,7 @@ export function getSpaHtmlBody(): string {
       <button class="tab-util-btn tab-install-btn" id="tab-install-btn" onclick="showInstallGuide()" style="display:none">
         <span>📲</span>安裝
       </button>
-      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer;text-decoration:underline" onclick="showAbout()">V8.0.31</span>
+      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer;text-decoration:underline" onclick="showAbout()">V8.0.32</span>
     </div>
   </div>
 </div>
@@ -1540,7 +1540,17 @@ export function getSpaHtmlBody(): string {
       <div style="color:var(--muted)">Best experience on iPad in landscape mode. Android devices may not display correctly.</div>
     </div>
     <div style="max-height:50vh;overflow-y:auto;-webkit-overflow-scrolling:touch;margin-bottom:10px">
-    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V8.0.31</div>
+    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V8.0.32</div>
+    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
+      <div>🎉 Portfolio module V1.0.0 + 新 domain 上線：</div>
+      <div>1) 新增「投資組合」獨立子系統 <code>/portfolio</code> — 多筆 buy / sell 交易帳本、移動均價自動計算、配股配息（V2 加 auto 入帳）、FIFO Lot 詳細追蹤；三種視角同時呈現（整體實際持倉 / 每筆 buy 的 timing 回顧 / Lot 詳細）；opt-in PIN 保護（sessionStorage 解鎖、tab 關了要重輸）；跨裝置同步沿用晨報 user 暱稱機制。</div>
+      <div>2) Domain rename — 新增 <code>oops.h-peak.com</code> alias（自嘲笨小孩感，跟 brand 主域 h-peak 呼應），老 <code>crewsync.h-peak.com</code> 保留 backward compat，現有 PWA 不受影響；新 user 用新 URL。</div>
+      <div>3) 一次性 migration — 把舊 <code>morning_prefs.tw_holdings / us_holdings</code> 簡單持倉資料搬到新 <code>portfolio_transactions</code> 表（標 <code>source='migration'</code>），影響 3 個 user 共 4 筆 transactions：Dominic / 大全 / 湯湯。</div>
+      <div>4) 新依賴：<code>bcryptjs ^3.0.3</code>（pure JS，~30KB，給 PIN feature 用）。</div>
+      <div>Portfolio module 整體 ~1,800 行新 code 分 4 phase commit 累積（phase 1.A schema → 1.B CRUD + 三視角 → 1.C PWA frontend → 1.D PIN）；intentionally 跳過 phase 1.E（晨報 stocks read-only 改造），晨報短期維持現況 — Portfolio 是 source-of-truth，user 一旦進 Portfolio 加交易就不會回頭編晨報 holdings。V2 視 user 回饋再做 morning frontend cleanup + 配股配息 auto cron。</div>
+      <div>🎉 Portfolio module V1.0.0 + new domain launch: 1) New independent Portfolio subsystem at <code>/portfolio</code> with multi-row buy/sell ledger, moving-average cost basis, stock/cash dividend support (auto-credit in V2), FIFO lot tracking — three views simultaneously (overall reality / per-buy timing retrospective / lot detail); opt-in PIN protection (sessionStorage unlock, re-enter on tab close); cross-device sync reuses morning report's nickname-based identity. 2) Domain rename — added <code>oops.h-peak.com</code> alias (self-deprecating brand fit), kept <code>crewsync.h-peak.com</code> backward compat. 3) One-shot migration of <code>morning_prefs.tw_holdings/us_holdings</code> into <code>portfolio_transactions</code> (3 users, 4 txns). 4) New dep: <code>bcryptjs ^3.0.3</code> (~30KB pure JS for PIN). ~1,800 LOC across phases 1.A-1.D; intentionally skipped phase 1.E (morning stocks read-only refactor) — Portfolio is source-of-truth; users won't go back to editing morning holdings once they use Portfolio.</div>
+    </div>
+    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V8.0.31</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
       <div>Dual-source 收斂 — 永遠根治 V8.0.30 修的問題：砍掉 9 個 tracked <code>.js</code>（<code>server</code> / <code>morning</code> / <code>morning-builder</code> / <code>generate-ics-headless</code> / <code>spa/html-body</code> / <code>spa/js-core</code> / <code>spa/js-pilot-log</code> / <code>spa/js-weather</code> / <code>spa/styles</code>）+ 13 個 untracked stale 編譯產物，<code>.ts</code> 變唯一 source-of-truth。tsx 對 <code>'./xxx.js'</code> 的 import 會自動 fallback 到同名 <code>.ts</code>，所以 server.ts 不用改 import 路徑。<code>.gitignore</code> 加防護避免本機跑 tsc 再被誤 track。從此推版只改 <code>.ts</code>，不再有「改了 <code>.js</code> 但 prod 跑 <code>.ts</code>」這種白做工的可能。</div>
       <div>Dual-source consolidation — permanent fix for the issue V8.0.30 patched: removed 9 tracked <code>.js</code> files (<code>server</code> / <code>morning</code> / <code>morning-builder</code> / <code>generate-ics-headless</code> / <code>spa/html-body</code> / <code>spa/js-core</code> / <code>spa/js-pilot-log</code> / <code>spa/js-weather</code> / <code>spa/styles</code>) plus 13 untracked stale build artifacts, making <code>.ts</code> the sole source of truth. tsx automatically falls back from <code>'./xxx.js'</code> imports to the matching <code>.ts</code>, so server.ts import paths don't need to change. <code>.gitignore</code> now explicitly blocks the <code>.js</code> compilation outputs to prevent re-tracking if someone runs tsc locally. Going forward only the <code>.ts</code> needs to be touched, eliminating the「edited .js but prod runs .ts」class of no-op releases.</div>
