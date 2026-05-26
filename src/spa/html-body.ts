@@ -1509,7 +1509,7 @@ export function getSpaHtmlBody(): string {
       <button class="tab-util-btn tab-install-btn" id="tab-install-btn" onclick="showInstallGuide()" style="display:none">
         <span>📲</span>安裝
       </button>
-      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer;text-decoration:underline" onclick="showAbout()">V8.0.36</span>
+      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer;text-decoration:underline" onclick="showAbout()">V8.0.37</span>
     </div>
   </div>
 </div>
@@ -1540,7 +1540,12 @@ export function getSpaHtmlBody(): string {
       <div style="color:var(--muted)">Best experience on iPad in landscape mode. Android devices may not display correctly.</div>
     </div>
     <div style="max-height:50vh;overflow-y:auto;-webkit-overflow-scrolling:touch;margin-bottom:10px">
-    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V8.0.36</div>
+    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V8.0.37</div>
+    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
+      <div>Portfolio V1.0.4: 台股手續費 + 證交稅自動算 — 買賣自動套用 0.1425% 手續費（最低 NT$20），賣方加 0.3% 證交稅。加交易 modal 即時 preview 估算 fee；同時保留**手動覆寫欄位**（user 從券商 app 抄實際 fee 填進去，留空就 auto-calc）。Cost basis 算法：買 fee 加進成本、賣 fee+稅扣 realized PnL；FIFO Lot 視角的賣出 fee 按各 lot 比例分配。Detail 頁交易紀錄每筆 buy/sell 後面顯示 (費 NT$X)。美股暫不算 fee（多數 broker $0 commission）。</div>
+      <div>Portfolio V1.0.4: Auto Taiwan stock fees + capital gains tax — 0.1425% broker fee (min NT$20) on both sides, 0.3% transaction tax on sell. Add-txn modal shows live fee preview; manual override field also available (paste actual fee from broker app, leave blank for auto). Cost basis: buy fee added to cost, sell fee+tax deducted from realized PnL; FIFO lot view splits sell fee proportionally across lots. Detail txn rows show (fee NT$X) suffix. US side keeps fee=0 ($0 commission at most brokers).</div>
+    </div>
+    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V8.0.36</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
       <div>Portfolio V1.0.3 hotfix：A+/A- 字型按了沒變化 — CSS 寫成 <code>html, body { font-size: 15px }</code> 把 body 也寫死 15px，<code>bumpFont</code> 改 html inline style 但子元素 em 相對 body 算（body 還 15px）→ 視覺零變化。拆成 <code>html { font-size: 15px }</code> + <code>body { font-size: 1rem }</code>，body 跟著 root 動。</div>
       <div>Portfolio V1.0.3 hotfix: A+/A- font-scale buttons had no visible effect — CSS combined <code>html, body { font-size: 15px }</code> hardcoded body too; <code>bumpFont</code> changed html inline style but body kept overriding (children's em relative to body, not html). Split into <code>html { font-size: 15px }</code> + <code>body { font-size: 1rem }</code>.</div>

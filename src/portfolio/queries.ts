@@ -84,7 +84,25 @@ export interface InsertManualTxnInput {
   txn_type: 'buy' | 'sell';  // 限 buy/sell；dividend 自動入帳不走這
   qty: number;
   price: number;
+  fee?: number;              // 留 undefined = 自動算台股 fee；給 number = override
   note?: string;
+}
+
+// ── 台股 fee + tax 自動算 ────────────────────────────────────────────────────
+// 一般券商手續費 0.1425%，電子下單常見打 6 折 → 簡化用 0.1425% (V2 可加 user
+// 設定 broker rate)。最低收 NT$ 20 (台股慣例 floor)。
+// 證券交易稅：賣方 0.3% (一般股票；ETF 0.1%，本版 V1 簡化用 0.3% 統一)
+const TW_FEE_RATE = 0.001425;
+const TW_FEE_MIN = 20;
+const TW_SELL_TAX = 0.003;
+
+export function calcTwFee(qty: number, price: number, txn_type: 'buy' | 'sell'): number {
+  const gross = qty * price;
+  const brokerFee = Math.max(TW_FEE_MIN, Math.round(gross * TW_FEE_RATE));
+  if (txn_type === 'sell') {
+    return brokerFee + Math.round(gross * TW_SELL_TAX);
+  }
+  return brokerFee;
 }
 
 export async function insertManualTransaction(
@@ -94,13 +112,17 @@ export async function insertManualTransaction(
   const pool = getPool();
   if (!pool) throw new Error('no_db');
   const cash_amount = input.qty * input.price;
+  // fee 優先順序：user override > 台股自動算 > 美股預設 0 (broker $0 commission)
+  const fee = input.fee !== undefined
+    ? input.fee
+    : (input.market === 'TW' ? calcTwFee(input.qty, input.price, input.txn_type) : 0);
   const r = await pool.query(
     `INSERT INTO portfolio_transactions
-     (user_id, symbol, market, txn_date, txn_type, qty, price, cash_amount, source, note)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'manual', $9)
+     (user_id, symbol, market, txn_date, txn_type, qty, price, cash_amount, fee, source, note)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'manual', $10)
      RETURNING *`,
     [userId, input.symbol, input.market, input.txn_date, input.txn_type,
-      input.qty, input.price, cash_amount, input.note || null],
+      input.qty, input.price, cash_amount, fee, input.note || null],
   );
   return rowToTxn(r.rows[0]);
 }

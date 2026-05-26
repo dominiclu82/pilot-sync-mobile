@@ -86,7 +86,8 @@ export function calcOverall(txns: PortfolioTxn[]): OverallHolding | null {
   for (const t of sortByDate(txns)) {
     if (t.txn_type === 'buy') {
       const price = t.price ?? 0;
-      costBasis += t.qty * price;
+      // 買入手續費算進 cost basis (台股 0.1425% 預設 auto，美股 = 0)
+      costBasis += t.qty * price + (t.fee || 0);
       qty += t.qty;
     }
     else if (t.txn_type === 'sell') {
@@ -94,7 +95,8 @@ export function calcOverall(txns: PortfolioTxn[]): OverallHolding | null {
       const sellQty = Math.min(t.qty, qty);
       const avg = costBasis / qty;
       const sellPrice = t.price ?? 0;
-      realizedPnl += (sellPrice - avg) * sellQty;
+      // 賣出 fee + 證交稅扣 realized PnL (台股 sell fee = 0.1425% + 0.3% tax)
+      realizedPnl += (sellPrice - avg) * sellQty - (t.fee || 0);
       costBasis = Math.max(0, costBasis - avg * sellQty);
       qty -= sellQty;
     }
@@ -147,25 +149,30 @@ export function calcLots(txns: PortfolioTxn[]): LotItem[] {
   for (const t of sortByDate(txns)) {
     if (t.txn_type === 'buy') {
       const price = t.price ?? 0;
+      const fee = t.fee || 0;
       lots.push({
         txn_id: t.id,
         txn_date: t.txn_date,
         original_qty: t.qty,
         original_price: price,
         remaining_qty: t.qty,
-        remaining_cost: t.qty * price,
+        remaining_cost: t.qty * price + fee,  // 買入 fee 算進該 lot 成本
         realized: 0,
       });
     }
     else if (t.txn_type === 'sell') {
       let toSell = t.qty;
       const sellPrice = t.price ?? 0;
+      const totalFee = t.fee || 0;
+      const totalSellQty = t.qty;
       for (const lot of lots) {
         if (toSell <= 0) break;
         if (lot.remaining_qty <= 0) continue;
         const sellFromLot = Math.min(lot.remaining_qty, toSell);
         const lotAvg = lot.remaining_qty > 0 ? lot.remaining_cost / lot.remaining_qty : 0;
-        lot.realized += (sellPrice - lotAvg) * sellFromLot;
+        // 賣出 fee 按本筆 sell 內各 lot 的 qty 比例分配
+        const feeShare = totalFee * (sellFromLot / totalSellQty);
+        lot.realized += (sellPrice - lotAvg) * sellFromLot - feeShare;
         lot.remaining_qty -= sellFromLot;
         lot.remaining_cost = Math.max(0, lot.remaining_cost - lotAvg * sellFromLot);
         toSell -= sellFromLot;

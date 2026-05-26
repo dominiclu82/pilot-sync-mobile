@@ -254,7 +254,7 @@ portfolioRouter.get('/api/portfolio/transactions', pinGate, async (req, res) => 
 portfolioRouter.post('/api/portfolio/transaction', pinGate, async (req, res) => {
   const userId = reqUserId(req)!;
   const body = req.body || {};
-  const { symbol, market, txn_date, txn_type, qty, price, note } = body;
+  const { symbol, market, txn_date, txn_type, qty, price, fee, note } = body;
 
   if (!symbol || typeof symbol !== 'string') return res.status(400).json({ error: 'invalid_symbol' });
   if (market !== 'TW' && market !== 'US') return res.status(400).json({ error: 'invalid_market' });
@@ -264,6 +264,13 @@ portfolioRouter.post('/api/portfolio/transaction', pinGate, async (req, res) => 
   if (!isFinite(qtyNum) || qtyNum <= 0) return res.status(400).json({ error: 'qty_must_be_positive' });
   const priceNum = Number(price);
   if (!isFinite(priceNum) || priceNum < 0) return res.status(400).json({ error: 'invalid_price' });
+
+  // Optional fee override (留空 / undefined / null = auto-calc 台股 fee；給 number = override)
+  let feeNum: number | undefined = undefined;
+  if (fee !== undefined && fee !== null && fee !== '') {
+    feeNum = Number(fee);
+    if (!isFinite(feeNum) || feeNum < 0) return res.status(400).json({ error: 'invalid_fee' });
+  }
 
   const normalizedSymbol = symbol.trim().toUpperCase();
 
@@ -297,6 +304,7 @@ portfolioRouter.post('/api/portfolio/transaction', pinGate, async (req, res) => 
       txn_type,
       qty: qtyNum,
       price: priceNum,
+      fee: feeNum,
       note: typeof note === 'string' ? note.trim() : undefined,
     });
     res.json({ transaction: txn });

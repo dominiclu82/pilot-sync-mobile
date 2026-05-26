@@ -29,7 +29,7 @@ export function getPortfolioHtml(): string {
         <div style="min-width:0;flex:1">
           <div class="hdr-title">
             📈 投資組合
-            <span class="ver" id="ver-tag" onclick="openAbout()">V1.0.3</span>
+            <span class="ver" id="ver-tag" onclick="openAbout()">V1.0.4</span>
           </div>
           <div class="hdr-user" id="hdr-user" onclick="changeUid()">—</div>
         </div>
@@ -84,16 +84,18 @@ export function getPortfolioHtml(): string {
             <button class="seg-btn" id="seg-sell" onclick="setSide('sell')">賣出</button>
           </div>
           <label>市場
-            <select id="f-market">
+            <select id="f-market" onchange="updateFeePreview()">
               <option value="TW">台股 TW</option>
               <option value="US">美股 US</option>
             </select>
           </label>
           <label>代號 <input id="f-symbol" type="text" placeholder="2330 / AAPL" autocomplete="off"></label>
           <label>日期 <input id="f-date" type="date"></label>
-          <label>股數 <input id="f-qty" type="number" step="0.0001" min="0.0001" inputmode="decimal"></label>
-          <label>價格 <input id="f-price" type="number" step="0.0001" min="0" inputmode="decimal"></label>
+          <label>股數 <input id="f-qty" type="number" step="0.0001" min="0.0001" inputmode="decimal" oninput="updateFeePreview()"></label>
+          <label>價格 <input id="f-price" type="number" step="0.0001" min="0" inputmode="decimal" oninput="updateFeePreview()"></label>
+          <label>手續費（空白 = 自動算 / 賣方含證交稅）<input id="f-fee" type="number" step="1" min="0" inputmode="decimal" placeholder="auto"></label>
           <label>備註（可選）<input id="f-note" type="text" maxlength="100"></label>
+          <div id="fee-preview" class="muted muted-small" style="text-align:right;font-size:.82em" hidden></div>
           <div class="modal-actions">
             <button class="btn btn-ghost" onclick="closeAddModal()">取消</button>
             <button class="btn btn-primary" onclick="submitAdd()">儲存</button>
@@ -145,7 +147,20 @@ export function getPortfolioHtml(): string {
         <div class="modal-body" style="max-height:60vh;overflow-y:auto">
           <div class="muted muted-small">獨立投資組合子系統 — 多筆買賣帳本、自動算均價、三視角持倉分析、opt-in PIN 保護</div>
           <div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border)">
-            <div style="font-weight:700;margin-bottom:6px">V1.0.3 — 字型 ± 無反應 hotfix</div>
+            <div style="font-weight:700;margin-bottom:6px">V1.0.4 — 台股手續費 + 證交稅</div>
+            <div class="muted" style="font-size:.85em;line-height:1.6;margin-bottom:12px">
+              • 台股自動算手續費（0.1425%，最低 NT$ 20）<br>
+              • 賣方自動加證交稅（0.3%，一般股票）<br>
+              • 美股暫不算 fee（多數 broker $0 commission）<br>
+              • 加交易 modal 即時顯示「估算手續費」preview<br>
+              • <strong>手續費欄位可手動覆寫</strong>（user 自己 input 從 broker app
+                抄真實值，留空就用 auto-calc）<br>
+              • Cost basis 算法：買入 fee 加進成本、賣出 fee + 稅扣 realized PnL<br>
+              • FIFO Lot tracking：賣出 fee 按各 lot 比例分配
+            </div>
+          </div>
+          <div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border)">
+            <div style="font-weight:700;margin-bottom:6px;color:var(--muted)">V1.0.3 — 字型 ± 無反應 hotfix</div>
             <div class="muted" style="font-size:.85em;line-height:1.6;margin-bottom:12px">
               修 V1.0.2 字型 A+/A- 按了沒變化：CSS 寫成 <code>html, body { font-size: 15px }</code>
               把 body 也寫死 15px，<code>bumpFont</code> 改 html 的 inline font-size 但
@@ -770,6 +785,7 @@ function renderDetail(d, q) {
     let timing = '';
     if (t.txn_type === 'buy' || t.txn_type === 'sell') {
       detail = \`\${fmtNum(t.qty)} 股 @ \${fmtNum(t.price)}\`;
+      if (t.fee && t.fee > 0) detail += \` <span class="muted muted-small">(費 \${fmtNum(t.fee)})</span>\`;
       if (t.txn_type === 'buy' && timingMap[t.id]) {
         const tm = timingMap[t.id];
         const cls = tm.diffTotal > 0 ? 'up' : tm.diffTotal < 0 ? 'down' : '';
@@ -832,9 +848,11 @@ function openAddModal() {
   document.getElementById('f-symbol').value = '';
   document.getElementById('f-qty').value = '';
   document.getElementById('f-price').value = '';
+  document.getElementById('f-fee').value = '';
   document.getElementById('f-note').value = '';
   document.getElementById('modal-error').hidden = true;
   setSide('buy');
+  updateFeePreview();
 }
 function closeAddModal() { document.getElementById('modal-add').hidden = true; }
 function setSide(side) {
@@ -842,6 +860,28 @@ function setSide(side) {
   document.getElementById('seg-buy').classList.toggle('active', side === 'buy');
   document.getElementById('seg-sell').classList.toggle('active', side === 'sell');
   document.getElementById('modal-title').textContent = side === 'buy' ? '加買入交易' : '加賣出交易';
+  updateFeePreview();
+}
+
+// 加交易 modal 內 estimated fee 即時顯示 (台股 only，跟 backend queries.ts calcTwFee 邏輯一致)
+function updateFeePreview() {
+  const preview = document.getElementById('fee-preview');
+  if (!preview) return;
+  const market = document.getElementById('f-market').value;
+  const qty = parseFloat(document.getElementById('f-qty').value);
+  const price = parseFloat(document.getElementById('f-price').value);
+  const side = _state.side;
+  if (market !== 'TW' || !isFinite(qty) || qty <= 0 || !isFinite(price) || price <= 0) {
+    preview.hidden = true;
+    return;
+  }
+  const gross = qty * price;
+  const brokerFee = Math.max(20, Math.round(gross * 0.001425));
+  const tax = side === 'sell' ? Math.round(gross * 0.003) : 0;
+  preview.hidden = false;
+  preview.textContent = side === 'sell'
+    ? '估算手續費 NT$' + brokerFee + ' + 證交稅 NT$' + tax + ' = NT$' + (brokerFee + tax)
+    : '估算手續費 NT$' + brokerFee;
 }
 
 async function submitAdd() {
@@ -850,6 +890,7 @@ async function submitAdd() {
   const txn_date = document.getElementById('f-date').value;
   const qty = parseFloat(document.getElementById('f-qty').value);
   const price = parseFloat(document.getElementById('f-price').value);
+  const feeRaw = document.getElementById('f-fee').value.trim();
   const note = document.getElementById('f-note').value.trim() || undefined;
 
   const err = document.getElementById('modal-error');
@@ -861,10 +902,18 @@ async function submitAdd() {
   if (!isFinite(qty) || qty <= 0) return showErr('股數要 > 0');
   if (!isFinite(price) || price < 0) return showErr('價格不可為負');
 
+  const body = { symbol, market, txn_date, txn_type: _state.side, qty, price, note };
+  // 手續費 optional override (留空 backend 自動算台股 fee)
+  if (feeRaw !== '') {
+    const feeNum = parseFloat(feeRaw);
+    if (!isFinite(feeNum) || feeNum < 0) return showErr('手續費不可為負');
+    body.fee = feeNum;
+  }
+
   try {
     await apiFetch('/transaction', {
       method: 'POST',
-      body: JSON.stringify({ symbol, market, txn_date, txn_type: _state.side, qty, price, note }),
+      body: JSON.stringify(body),
     });
     closeAddModal();
     refreshAll();
@@ -892,7 +941,7 @@ async function deleteTxn(id) {
 
 // ── Theme / Font / About ─────────────────────────────────────────────────────
 
-const PORTFOLIO_VERSION = 'V1.0.3';
+const PORTFOLIO_VERSION = 'V1.0.4';
 const THEME_KEY = 'portfolio_theme';
 const FONT_SCALE_KEY = 'portfolio_font_scale';
 
