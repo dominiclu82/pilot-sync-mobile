@@ -30,7 +30,7 @@ export function getPortfolioHtml(): string {
         <div style="min-width:0;flex:1">
           <div class="hdr-title">
             📈 投資組合
-            <span class="ver" id="ver-tag" onclick="openAbout()">V1.0.6</span>
+            <span class="ver" id="ver-tag" onclick="openAbout()">V1.0.7</span>
           </div>
           <div class="hdr-user" id="hdr-user" onclick="changeUid()">—</div>
         </div>
@@ -167,7 +167,23 @@ export function getPortfolioHtml(): string {
         <div class="modal-body" style="max-height:60vh;overflow-y:auto">
           <div class="muted muted-small">獨立投資組合子系統 — 多筆買賣帳本、自動算均價、三視角持倉分析、opt-in PIN 保護</div>
           <div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border)">
-            <div style="font-weight:700;margin-bottom:6px">V1.0.6 — 圖表 range + 歷史補資料 + Quick Add + 雙均價</div>
+            <div style="font-weight:700;margin-bottom:6px">V1.0.7 — 第一次開圖自動補歷史</div>
+            <div class="muted" style="font-size:.85em;line-height:1.6;margin-bottom:12px">
+              修 V1.0.6 user 抱怨「至少也有四月的資料可以顯示給我吧!!!」：<br>
+              • 第一次開 chart 偵測到 ≤ 1 個 snapshot point + user 有持倉 →
+                自動 trigger backfill 90 天，不用 user 自己按「📥 補歷史」<br>
+              • 等 backfill 完自動 reload，看到完整歷史曲線<br>
+              • 加 flag <code>_autoBackfillTried</code> 避免無限迴圈<br>
+              • Backfill 失敗 fallback 顯示 manual button<br>
+              <br>
+              <strong>Versioning policy 更正（user 反映「為什麼 portfolio 改要動
+              CrewSync 版號」）</strong>：從本版起 Portfolio 改不再 cross-bump
+              CrewSync V8.0.X — 各 module 獨立 versioning（跟晨報 V1.3.X /
+              Pilot Log V1.0.X 過往做法對齊）。
+            </div>
+          </div>
+          <div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border)">
+            <div style="font-weight:700;margin-bottom:6px;color:var(--muted)">V1.0.6 — 圖表 range + 歷史補資料 + Quick Add + 雙均價</div>
             <div class="muted" style="font-size:.85em;line-height:1.6;margin-bottom:12px">
               <strong>📊 資產變化圖</strong><br>
               • 兩層 selector：頻率（日/月/年）+ 範圍 — 日 30/60/90、
@@ -1115,6 +1131,7 @@ const PERIOD_UNIT = { daily: '天', monthly: '月', yearly: '年' };
 let _chartInstance = null;
 let _chartPeriod = 'daily';
 let _chartRange = 30;
+let _autoBackfillTried = false;  // 第一次 chart load 自動 backfill 一次
 
 async function loadChart() {
   const card = document.getElementById('chart-card');
@@ -1126,10 +1143,35 @@ async function loadChart() {
   card.hidden = false;
   try {
     const data = await apiFetch('/chart?period=' + _chartPeriod + '&range=' + _chartRange);
-    renderChart(data.points || [], data.note || '');
+    const points = data.points || [];
+    // 第一次只有 0~1 個 point 且 user 有持倉 → 自動 backfill 90 天，
+    // 避免 user 不知道要按「📥 補歷史」結果只看到 1 個點
+    if (points.length <= 1 && !_autoBackfillTried && _state.holdings.length > 0) {
+      _autoBackfillTried = true;
+      await autoBackfill();
+      return;  // autoBackfill 結束會 reload
+    }
+    renderChart(points, data.note || '');
   } catch (e) {
     const note = document.getElementById('chart-note');
     if (note) { note.textContent = '圖表載入失敗：' + e.message; note.hidden = false; }
+  }
+}
+
+/** 首次 chart load 自動 backfill (避免 user 看到 1 個 point 困惑) */
+async function autoBackfill() {
+  const note = document.getElementById('chart-note');
+  const btn = document.getElementById('btn-backfill');
+  if (note) { note.textContent = '⏳ 第一次載入，從 Yahoo Finance 抓 90 天歷史…'; note.hidden = false; }
+  if (btn) { btn.textContent = '⏳ 載入中…'; btn.disabled = true; }
+  try {
+    await apiFetch('/backfill?days=90', { method: 'POST' });
+    if (btn) { btn.textContent = '📥 補歷史'; btn.disabled = false; }
+    // 跑完重抓 chart，這次 _autoBackfillTried = true 不會再迴圈
+    await loadChart();
+  } catch (e) {
+    if (note) note.textContent = '歷史載入失敗，可點「📥 補歷史」手動重試：' + e.message;
+    if (btn) { btn.textContent = '📥 補歷史'; btn.disabled = false; }
   }
 }
 
@@ -1246,7 +1288,7 @@ function renderChart(points, note) {
 
 // ── Theme / Font / About ─────────────────────────────────────────────────────
 
-const PORTFOLIO_VERSION = 'V1.0.6';
+const PORTFOLIO_VERSION = 'V1.0.7';
 const THEME_KEY = 'portfolio_theme';
 const FONT_SCALE_KEY = 'portfolio_font_scale';
 
