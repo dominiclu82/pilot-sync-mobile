@@ -37,6 +37,7 @@ import { getPortfolioHtml } from './frontend.js';
 import { cnyesBatch } from '../morning-builder.js';
 import { querySnapshots, snapshotUser, startSnapshotCron } from './snapshot.js';
 import { backfillUser } from './backfill.js';
+import { fetchDividendInfo } from './dividend.js';
 import {
   validatePinFormat,
   hashPin,
@@ -416,6 +417,26 @@ portfolioRouter.get('/api/portfolio/chart', pinGate, async (req, res) => {
     res.json({ period, range, points });
   } catch (e: any) {
     res.status(500).json({ error: e.message });
+  }
+});
+
+/** GET /api/portfolio/dividend-info?symbols=TW:3231,US:NVDA — 從 Yahoo 抓配股配息 */
+portfolioRouter.get('/api/portfolio/dividend-info', async (req, res) => {
+  // 配息資料是公開市場資訊 — 不需要 user_id / PIN
+  const symbolsRaw = String(req.query.symbols || '').trim();
+  if (!symbolsRaw) return res.json({ info: {} });
+  const parsed: Array<{ symbol: string; market: 'TW' | 'US' }> = [];
+  for (const pair of symbolsRaw.split(',')) {
+    const [market, symbol] = pair.split(':');
+    if ((market === 'TW' || market === 'US') && symbol) {
+      parsed.push({ market, symbol: symbol.trim().toUpperCase() });
+    }
+  }
+  try {
+    const info = await fetchDividendInfo(parsed);
+    res.json({ info });
+  } catch (e: any) {
+    res.status(500).json({ error: e.message, info: {} });
   }
 });
 

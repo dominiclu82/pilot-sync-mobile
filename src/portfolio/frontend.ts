@@ -46,7 +46,7 @@ export function getPortfolioHtml(): string {
         <div style="min-width:0;flex:1">
           <div class="hdr-title">
             <span class="hdr-user" id="hdr-user" onclick="changeUid()">—</span>
-            <span class="ver" id="ver-tag" onclick="openAbout()">V1.0.10</span>
+            <span class="ver" id="ver-tag" onclick="openAbout()">V1.0.11</span>
           </div>
         </div>
       </div>
@@ -174,7 +174,22 @@ export function getPortfolioHtml(): string {
         <div class="modal-body" style="max-height:60vh;overflow-y:auto">
           <div class="muted muted-small">獨立投資組合子系統 — 多筆買賣帳本、自動算均價、三視角持倉分析、opt-in PIN 保護</div>
           <div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border)">
-            <div style="font-weight:700;margin-bottom:6px">V1.0.10 — 拿掉重複 module name + 平板 / 桌面全寬</div>
+            <div style="font-weight:700;margin-bottom:6px">V1.0.11 — 配股配息資訊 + 股票名點開 cnyes</div>
+            <div class="muted" style="font-size:.85em;line-height:1.6;margin-bottom:12px">
+              (1) 持倉 row 加 <strong>💰 配股配息</strong> 顯示：殖利率、年配息、除息日 — 從
+              Yahoo Finance <code>quoteSummary</code> endpoint 抓，後端 24h memory cache。
+              沒 dividend 的股票該段 hide 不留空。<br>
+              (2) 股票代號 + 名稱包成 <code>&lt;a&gt;</code> 連結，點開**跳 cnyes 外部
+              詳細頁面**（台股 <code>cnyes.com/twstock/X</code>、美股
+              <code>invest.cnyes.com/usstock/detail/X</code>）。<code>event.stopPropagation</code>
+              避免 trigger row 整個 click 跳 portfolio detail 頁；＋ 加交易 button 一樣
+              stop propagation 不影響。<br>
+              (3) 新增後端 <code>GET /api/portfolio/dividend-info?symbols=TW:3231,US:NVDA</code>
+              endpoint，batch 並行抓 yahoo (5 個一組)，配息屬公開市場資料不需 PIN。
+            </div>
+          </div>
+          <div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border)">
+            <div style="font-weight:700;margin-bottom:6px;color:var(--muted)">V1.0.10 — 拿掉重複 module name + 平板 / 桌面全寬</div>
             <div class="muted" style="font-size:.85em;line-height:1.6;margin-bottom:12px">
               修兩個 user 反映：(1)「navbar 已寫晨報，底下又寫一次 redundant」— hdr title 拿掉「📈 投資組合」字眼，只剩 @user + 版號（晨報那邊同步拿掉「的晨報」字尾）。(2)「畫面要根據平板 / 手機調整螢幕寬度，不要有空白」— 拿掉 .page max-width:720px 限制，改用 full width + responsive padding (768px↑ 加 padding 24px)。
             </div>
@@ -449,6 +464,10 @@ body { font-size: 1rem; }
 .h-row1 { display: flex; align-items: baseline; gap: 10px; }
 .h-symbol { font-weight: 700; flex: 1; }
 .h-symbol .h-mkt { color: var(--muted); font-size: .8em; margin-right: 4px; }
+a.h-symbol-link { color: inherit; text-decoration: none; display: block; min-width: 0; }
+a.h-symbol-link:hover, a.h-symbol-link:active { color: var(--accent); text-decoration: underline dotted; }
+.h-div { color: var(--muted); font-size: .82em; margin-top: 4px; }
+.h-div .yield { color: var(--accent); font-weight: 600; }
 .h-price { font-weight: 600; }
 .h-chg { font-size: .85em; }
 .h-row2 { display: flex; gap: 12px; margin-top: 4px; color: var(--muted); font-size: .85em; }
@@ -539,6 +558,7 @@ const API = '/api/portfolio';
 let _state = {
   holdings: [],
   quotes: {},
+  dividends: {},   // V1.0.11: { 'TW:3231': { dividendYield, dividendRate, exDividendDate } }
   side: 'buy',
   pinFormMode: 'set',  // 'set' | 'change' | 'unset'
   pinEnabled: false,
@@ -809,8 +829,13 @@ async function refreshAll() {
       status.textContent = '';
       return;
     }
-    const quotes = await fetchQuotes(holdings.map(h => ({ symbol: h.symbol, market: h.market })));
+    const symbolList = holdings.map(h => ({ symbol: h.symbol, market: h.market }));
+    const [quotes, dividends] = await Promise.all([
+      fetchQuotes(symbolList),
+      fetchDividends(symbolList),
+    ]);
     _state.quotes = quotes;
+    _state.dividends = dividends;
     renderMain();
     loadChart();
     status.textContent = '已更新：' + new Date().toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit' });
@@ -837,6 +862,18 @@ async function fetchQuotes(symbols) {
   return j.quotes || {};
 }
 
+async function fetchDividends(symbols) {
+  if (symbols.length === 0) return {};
+  const pairs = symbols.map(s => s.market + ':' + s.symbol).join(',');
+  try {
+    const r = await fetch(API + '/dividend-info?symbols=' + encodeURIComponent(pairs));
+    const j = await r.json();
+    return j.info || {};
+  } catch {
+    return {};
+  }
+}
+
 async function fetchDetail(market, symbol) {
   return await apiFetch('/holdings/' + market + '/' + encodeURIComponent(symbol));
 }
@@ -860,10 +897,26 @@ function renderMain() {
     const priceTxt = price != null ? fmtNum(price) : '—';
     const chgTxt = (chg != null && chgPct != null) ? \`\${arrow}\${fmtNum(chg)} (\${fmtPct(chgPct)})\` : '';
     const name = q.name || '';
+    // Stock name 跳 cnyes 外部 detail (V1.0.11)
+    const cnyesUrl = h.market === 'TW'
+      ? 'https://www.cnyes.com/twstock/' + h.symbol
+      : 'https://invest.cnyes.com/usstock/detail/' + h.symbol;
+    // 配股配息資訊 (V1.0.11，從 yahoo 抓)
+    const div = _state.dividends[h.market + ':' + h.symbol];
+    let divHtml = '';
+    if (div && (div.dividendYield || div.dividendRate)) {
+      const parts = [];
+      if (div.dividendYield != null) parts.push('<span class="yield">殖利率 ' + (div.dividendYield * 100).toFixed(2) + '%</span>');
+      if (div.dividendRate != null) parts.push('配 ' + fmtNum(div.dividendRate));
+      if (div.exDividendDate) parts.push('除息 ' + div.exDividendDate);
+      divHtml = '<div class="h-div">💰 ' + parts.join(' · ') + '</div>';
+    }
     return \`
       <div class="holding" onclick="goDetail('\${h.market}', '\${h.symbol}')">
         <div class="h-row1">
-          <div class="h-symbol"><span class="h-mkt">\${h.market}</span>\${h.symbol}<span class="muted muted-small"> \${name}</span></div>
+          <a class="h-symbol h-symbol-link" href="\${cnyesUrl}" target="_blank" onclick="event.stopPropagation()" title="開 cnyes 詳細頁">
+            <span class="h-mkt">\${h.market}</span>\${h.symbol}<span class="muted muted-small"> \${name}</span>
+          </a>
           <div class="h-price">\${priceTxt}</div>
           <div class="h-chg \${chgClass}">\${chgTxt}</div>
           <span class="h-add" onclick="event.stopPropagation(); quickAddTxn('\${h.market}', '\${h.symbol}')" title="加交易">＋</span>
@@ -872,6 +925,7 @@ function renderMain() {
           <span>\${fmtNum(h.qty)} 股 · 均價 \${fmtNum(h.avgCost)}</span>
           <span class="h-pnl \${unrealizedClass}">\${unrealized != null ? (unrealized > 0 ? '+' : '') + fmtNum(unrealized) : ''}</span>
         </div>
+        \${divHtml}
       </div>
     \`;
   }).join('');
@@ -1349,7 +1403,7 @@ function renderChart(points, note) {
 
 // ── Theme / Font / About ─────────────────────────────────────────────────────
 
-const PORTFOLIO_VERSION = 'V1.0.10';
+const PORTFOLIO_VERSION = 'V1.0.11';
 const THEME_KEY = 'portfolio_theme';
 const FONT_SCALE_KEY = 'portfolio_font_scale';
 
