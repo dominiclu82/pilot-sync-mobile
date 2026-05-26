@@ -29,7 +29,7 @@ export function getPortfolioHtml(): string {
         <div style="min-width:0;flex:1">
           <div class="hdr-title">
             📈 投資組合
-            <span class="ver" id="ver-tag" onclick="openAbout()">V1.0.2</span>
+            <span class="ver" id="ver-tag" onclick="openAbout()">V1.0.3</span>
           </div>
           <div class="hdr-user" id="hdr-user" onclick="changeUid()">—</div>
         </div>
@@ -145,7 +145,17 @@ export function getPortfolioHtml(): string {
         <div class="modal-body" style="max-height:60vh;overflow-y:auto">
           <div class="muted muted-small">獨立投資組合子系統 — 多筆買賣帳本、自動算均價、三視角持倉分析、opt-in PIN 保護</div>
           <div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border)">
-            <div style="font-weight:700;margin-bottom:6px">V1.0.2 — UX 對齊晨報</div>
+            <div style="font-weight:700;margin-bottom:6px">V1.0.3 — 字型 ± 無反應 hotfix</div>
+            <div class="muted" style="font-size:.85em;line-height:1.6;margin-bottom:12px">
+              修 V1.0.2 字型 A+/A- 按了沒變化：CSS 寫成 <code>html, body { font-size: 15px }</code>
+              把 body 也寫死 15px，<code>bumpFont</code> 改 html 的 inline font-size 但
+              子元素 em 是相對 body 算（body 還是 15px 沒變）→ 視覺無變化。<br>
+              拆成 <code>html { font-size: 15px }</code> + <code>body { font-size: 1rem }</code>，
+              body 跟著 root 變動。
+            </div>
+          </div>
+          <div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border)">
+            <div style="font-weight:700;margin-bottom:6px;color:var(--muted)">V1.0.2 — UX 對齊晨報</div>
             <div class="muted" style="font-size:.85em;line-height:1.6;margin-bottom:12px">
               • 版號 / 字型 ± / 日夜切換按鈕**搬到 header 右上**（對齊晨報位置，
                 不再藏在 footer 跟 settings modal 內）<br>
@@ -243,7 +253,9 @@ function getStyles(): string {
 }
 * { box-sizing: border-box; }
 [hidden] { display: none !important; }  /* hotfix: 強制 hidden 屬性 override 任何 author CSS display */
-html, body { margin: 0; padding: 0; background: var(--bg); color: var(--fg); font-family: -apple-system, "Segoe UI", system-ui, "Microsoft JhengHei", sans-serif; font-size: 15px; }
+html { font-size: 15px; }
+html, body { margin: 0; padding: 0; background: var(--bg); color: var(--fg); font-family: -apple-system, "Segoe UI", system-ui, "Microsoft JhengHei", sans-serif; }
+body { font-size: 1rem; }
 .page { max-width: 720px; margin: 0 auto; padding: 12px 14px 80px; }
 .hdr { display: flex; align-items: center; gap: 10px; margin: 6px 0 16px; }
 .hdr-title { font-size: 1.2em; font-weight: 700; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
@@ -880,7 +892,7 @@ async function deleteTxn(id) {
 
 // ── Theme / Font / About ─────────────────────────────────────────────────────
 
-const PORTFOLIO_VERSION = 'V1.0.2';
+const PORTFOLIO_VERSION = 'V1.0.3';
 const THEME_KEY = 'portfolio_theme';
 const FONT_SCALE_KEY = 'portfolio_font_scale';
 

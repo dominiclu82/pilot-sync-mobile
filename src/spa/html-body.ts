@@ -1509,7 +1509,7 @@ export function getSpaHtmlBody(): string {
       <button class="tab-util-btn tab-install-btn" id="tab-install-btn" onclick="showInstallGuide()" style="display:none">
         <span>📲</span>安裝
       </button>
-      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer;text-decoration:underline" onclick="showAbout()">V8.0.35</span>
+      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer;text-decoration:underline" onclick="showAbout()">V8.0.36</span>
     </div>
   </div>
 </div>
@@ -1540,7 +1540,12 @@ export function getSpaHtmlBody(): string {
       <div style="color:var(--muted)">Best experience on iPad in landscape mode. Android devices may not display correctly.</div>
     </div>
     <div style="max-height:50vh;overflow-y:auto;-webkit-overflow-scrolling:touch;margin-bottom:10px">
-    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V8.0.35</div>
+    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V8.0.36</div>
+    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
+      <div>Portfolio V1.0.3 hotfix：A+/A- 字型按了沒變化 — CSS 寫成 <code>html, body { font-size: 15px }</code> 把 body 也寫死 15px，<code>bumpFont</code> 改 html inline style 但子元素 em 相對 body 算（body 還 15px）→ 視覺零變化。拆成 <code>html { font-size: 15px }</code> + <code>body { font-size: 1rem }</code>，body 跟著 root 動。</div>
+      <div>Portfolio V1.0.3 hotfix: A+/A- font-scale buttons had no visible effect — CSS combined <code>html, body { font-size: 15px }</code> hardcoded body too; <code>bumpFont</code> changed html inline style but body kept overriding (children's em relative to body, not html). Split into <code>html { font-size: 15px }</code> + <code>body { font-size: 1rem }</code>.</div>
+    </div>
+    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V8.0.35</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
       <div>Portfolio V1.0.2: UX 對齊晨報 — 1) 版號 / 字型 ± / 日夜切換按鈕從 footer + settings modal **搬到 header 右上**，跟晨報同位置（user 反映「都說了要對齊晨報」）。2) 漲跌顏色從歐美 convention（綠漲紅跌）改成**台灣股市慣例**（漲紅 / 跌綠），buy 紅 sell 綠也配合改。3) Theme button 改 icon only（☀️ / 🌙）。</div>
       <div>Portfolio V1.0.2: UX alignment with morning report — 1) Version tag / font ± / theme toggle moved from footer + settings modal **into the header top-right**, matching morning report position. 2) Up/down colors changed from Western (green up / red down) to Taiwan stock convention (red up / green down); buy/sell colors also flipped to match. 3) Theme button reduced to icon only.</div>
