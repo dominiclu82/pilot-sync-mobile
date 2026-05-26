@@ -267,18 +267,21 @@ portfolioRouter.post('/api/portfolio/transaction', pinGate, async (req, res) => 
 
   const normalizedSymbol = symbol.trim().toUpperCase();
 
-  // Sell pre-check：不可超賣（codex P1 fix）
-  // holdings.ts 內部用 Math.min 安全降級，但 ledger 跟 derived view 會 diverge → API 上 reject
+  // Sell pre-check：不可超賣（codex P1 fix，含 date-aware 防 backdated sell）
+  // 用 txn_date <= sell.txn_date 過濾，避免 backdated sell 用未來的 buy 來 cover
+  // (例：existing buy 2024-02-01，user 提 sell 2024-01-15 → 那一天根本沒持股)
   if (txn_type === 'sell') {
     try {
       const existing = await listTransactionsForSymbol(userId, normalizedSymbol, market);
-      const overall = calcOverall(existing);
+      const beforeSell = existing.filter(t => t.txn_date <= txn_date);
+      const overall = calcOverall(beforeSell);
       const currentQty = overall ? overall.qty : 0;
       if (qtyNum > currentQty) {
         return res.status(400).json({
           error: 'sell_exceeds_holding',
           current_qty: currentQty,
           attempted_sell_qty: qtyNum,
+          as_of_date: txn_date,
         });
       }
     } catch (e: any) {
