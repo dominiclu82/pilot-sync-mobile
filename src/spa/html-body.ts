@@ -1509,7 +1509,7 @@ export function getSpaHtmlBody(): string {
       <button class="tab-util-btn tab-install-btn" id="tab-install-btn" onclick="showInstallGuide()" style="display:none">
         <span>📲</span>安裝
       </button>
-      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer;text-decoration:underline" onclick="showAbout()">V8.0.37</span>
+      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer;text-decoration:underline" onclick="showAbout()">V8.0.38</span>
     </div>
   </div>
 </div>
@@ -1540,7 +1540,12 @@ export function getSpaHtmlBody(): string {
       <div style="color:var(--muted)">Best experience on iPad in landscape mode. Android devices may not display correctly.</div>
     </div>
     <div style="max-height:50vh;overflow-y:auto;-webkit-overflow-scrolling:touch;margin-bottom:10px">
-    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V8.0.37</div>
+    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V8.0.38</div>
+    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
+      <div>Portfolio V1.0.5: 1) 交易紀錄每筆加 ✏️ 編輯按鈕（user 反映「萬一打錯只能重來」），複用加交易 modal edit mode 可改日期/股數/價格/手續費/備註，symbol/方向鎖住。2) 主畫面加 📊 <strong>資產變化圖</strong>，按日/月/年切換 — daily cron 23:30 台北 snapshot 全 user 的 portfolio 總值，從 V1.0.5 上線那天開始累積。Chart.js 4.4.7 CDN 載入 (~90KB)。</div>
+      <div>Portfolio V1.0.5: 1) ✏️ Edit button on each transaction (user feedback "what if I mistype"); reuses add-txn modal in edit mode — date/qty/price/fee/note editable, symbol/side locked. 2) 📊 Asset history chart with daily/monthly/yearly toggle. Daily cron at 23:30 Taipei snapshots all users' portfolio total value; chart accumulates from V1.0.5 launch. Chart.js 4.4.7 via CDN (~90KB).</div>
+    </div>
+    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V8.0.37</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
       <div>Portfolio V1.0.4: 台股手續費 + 證交稅自動算 — 買賣自動套用 0.1425% 手續費（最低 NT$20），賣方加 0.3% 證交稅。加交易 modal 即時 preview 估算 fee；同時保留**手動覆寫欄位**（user 從券商 app 抄實際 fee 填進去，留空就 auto-calc）。Cost basis 算法：買 fee 加進成本、賣 fee+稅扣 realized PnL；FIFO Lot 視角的賣出 fee 按各 lot 比例分配。Detail 頁交易紀錄每筆 buy/sell 後面顯示 (費 NT$X)。美股暫不算 fee（多數 broker $0 commission）。</div>
       <div>Portfolio V1.0.4: Auto Taiwan stock fees + capital gains tax — 0.1425% broker fee (min NT$20) on both sides, 0.3% transaction tax on sell. Add-txn modal shows live fee preview; manual override field also available (paste actual fee from broker app, leave blank for auto). Cost basis: buy fee added to cost, sell fee+tax deducted from realized PnL; FIFO lot view splits sell fee proportionally across lots. Detail txn rows show (fee NT$X) suffix. US side keeps fee=0 ($0 commission at most brokers).</div>

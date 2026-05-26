@@ -20,6 +20,7 @@ export function getPortfolioHtml(): string {
 <meta name="theme-color" content="#0a0a0f">
 <title>投資組合</title>
 <style>${getStyles()}</style>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
 </head>
 <body>
   <div id="app">
@@ -29,7 +30,7 @@ export function getPortfolioHtml(): string {
         <div style="min-width:0;flex:1">
           <div class="hdr-title">
             📈 投資組合
-            <span class="ver" id="ver-tag" onclick="openAbout()">V1.0.4</span>
+            <span class="ver" id="ver-tag" onclick="openAbout()">V1.0.5</span>
           </div>
           <div class="hdr-user" id="hdr-user" onclick="changeUid()">—</div>
         </div>
@@ -48,6 +49,21 @@ export function getPortfolioHtml(): string {
       </div>
       <div id="main-status" class="status"></div>
       <div id="holdings-list" class="list"></div>
+      <!-- 資產變化圖 -->
+      <div id="chart-card" class="card" style="margin-top:16px" hidden>
+        <div class="card-hdr">
+          <span>📊 資產變化</span>
+          <span style="display:flex;gap:4px;flex-shrink:0">
+            <button class="period-btn active" data-period="daily" onclick="setPeriod('daily')">日</button>
+            <button class="period-btn" data-period="monthly" onclick="setPeriod('monthly')">月</button>
+            <button class="period-btn" data-period="yearly" onclick="setPeriod('yearly')">年</button>
+          </span>
+        </div>
+        <div class="card-body">
+          <canvas id="asset-chart" style="max-height:220px"></canvas>
+          <div id="chart-note" class="muted muted-small" style="text-align:center;margin-top:6px" hidden></div>
+        </div>
+      </div>
       <div class="footer">
         <span class="muted">資料源：cnyes</span>
       </div>
@@ -147,7 +163,22 @@ export function getPortfolioHtml(): string {
         <div class="modal-body" style="max-height:60vh;overflow-y:auto">
           <div class="muted muted-small">獨立投資組合子系統 — 多筆買賣帳本、自動算均價、三視角持倉分析、opt-in PIN 保護</div>
           <div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border)">
-            <div style="font-weight:700;margin-bottom:6px">V1.0.4 — 台股手續費 + 證交稅</div>
+            <div style="font-weight:700;margin-bottom:6px">V1.0.5 — 編輯交易 + 資產變化圖</div>
+            <div class="muted" style="font-size:.85em;line-height:1.6;margin-bottom:12px">
+              • 交易紀錄每筆加 ✏️ 編輯按鈕 — 點開複用加交易 modal (edit mode)
+                可改日期 / 股數 / 價格 / 手續費 / 備註（symbol / market / 方向
+                lock 住不能改，避免改錯算法 break）<br>
+              • 主畫面 holdings 下方加 📊 <strong>資產變化圖表</strong>
+                — 按日 / 月 / 年切換<br>
+              • 後台 daily cron 每天 23:30 台北自動 snapshot 全部 user 的
+                portfolio 總值 + 總成本，存進新 <code>portfolio_snapshots</code> 表<br>
+              • 圖表顯示「總值（accent 線）vs 總成本（虛線）」，越多天資料越完整<br>
+              • 第一次開圖會 trigger 即時 snapshot 當天值當第一個 point<br>
+              • Chart.js 4.4.7 從 jsdelivr CDN 載入（~90KB）
+            </div>
+          </div>
+          <div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border)">
+            <div style="font-weight:700;margin-bottom:6px;color:var(--muted)">V1.0.4 — 台股手續費 + 證交稅</div>
             <div class="muted" style="font-size:.85em;line-height:1.6;margin-bottom:12px">
               • 台股自動算手續費（0.1425%，最低 NT$ 20）<br>
               • 賣方自動加證交稅（0.3%，一般股票）<br>
@@ -343,12 +374,21 @@ body { font-size: 1rem; }
 .txn-row .type.div { color: var(--accent); }
 .txn-row .detail { flex: 1; }
 .txn-row .timing { display: block; color: var(--muted); font-size: .82em; margin-top: 2px; }
+.txn-row .edit { cursor: pointer; color: var(--muted); padding: 0 6px; }
+.txn-row .edit:hover { color: var(--accent); }
 .txn-row .del { cursor: pointer; color: var(--muted); padding: 0 6px; }
 .txn-row .del:hover { color: var(--red); }
 .lot { padding: 8px 0; border-bottom: 1px solid var(--border); font-size: .9em; }
 .lot:last-child { border-bottom: none; }
 .lot .lot-hdr { font-weight: 600; }
 .lot .lot-info { color: var(--muted); font-size: .85em; margin-top: 2px; }
+
+/* Chart period switcher */
+.period-btn {
+  background: var(--bg-elev); border: 1px solid var(--border); color: var(--muted);
+  padding: 4px 10px; font-size: .8em; cursor: pointer; border-radius: 4px;
+}
+.period-btn.active { background: var(--accent); color: #fff; border-color: var(--accent); }
 
 /* Modal */
 .modal { position: fixed; inset: 0; background: rgba(0,0,0,.6); display: flex; align-items: center; justify-content: center; z-index: 100; padding: 16px; }
@@ -389,6 +429,7 @@ let _state = {
   side: 'buy',
   pinFormMode: 'set',  // 'set' | 'change' | 'unset'
   pinEnabled: false,
+  editingTxnId: null,  // null = 加交易模式；number = 編輯該 id
 };
 
 // ── User identity ────────────────────────────────────────────────────────────
@@ -651,12 +692,14 @@ async function refreshAll() {
     if (holdings.length === 0) {
       _state.quotes = {};
       renderMain();
+      loadChart();
       status.textContent = '';
       return;
     }
     const quotes = await fetchQuotes(holdings.map(h => ({ symbol: h.symbol, market: h.market })));
     _state.quotes = quotes;
     renderMain();
+    loadChart();
     status.textContent = '已更新：' + new Date().toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit' });
   } catch (e) {
     status.textContent = '錯誤：' + e.message;
@@ -733,11 +776,17 @@ async function goDetail(market, symbol) {
 
   try {
     const d = await fetchDetail(market, symbol);
+    _state.currentDetailTxns = d.transactions || [];
     const q = _state.quotes[market + ':' + symbol] || {};
     renderDetail(d, q);
   } catch (e) {
     document.getElementById('detail-overall').innerHTML = '<div class="error">' + e.message + '</div>';
   }
+}
+
+function editTxn(id) {
+  const txn = (_state.currentDetailTxns || []).find(t => t.id === id);
+  if (txn) openEditModal(txn);
 }
 
 function goMain() {
@@ -804,7 +853,7 @@ function renderDetail(d, q) {
         <span class="date">\${t.txn_date}</span>
         <span class="type \${typeClass}">\${typeLabel}</span>
         <span class="detail">\${detail}\${timing}</span>
-        \${t.source === 'manual' ? \`<span class="del" onclick="deleteTxn(\${t.id})" title="刪除">🗑</span>\` : ''}
+        \${t.source === 'manual' ? \`<span class="edit" onclick="editTxn(\${t.id})" title="編輯">✏️</span><span class="del" onclick="deleteTxn(\${t.id})" title="刪除">🗑</span>\` : ''}
       </div>
     \`;
   }).join('');
@@ -843,6 +892,11 @@ function toggleLots() {
 
 function openAddModal() {
   if (!getUid()) { changeUid(); return; }
+  _state.editingTxnId = null;
+  document.getElementById('f-symbol').disabled = false;
+  document.getElementById('f-market').disabled = false;
+  document.getElementById('seg-buy').disabled = false;
+  document.getElementById('seg-sell').disabled = false;
   document.getElementById('modal-add').hidden = false;
   document.getElementById('f-date').value = new Date().toISOString().slice(0, 10);
   document.getElementById('f-symbol').value = '';
@@ -854,12 +908,37 @@ function openAddModal() {
   setSide('buy');
   updateFeePreview();
 }
-function closeAddModal() { document.getElementById('modal-add').hidden = true; }
+
+function openEditModal(txn) {
+  if (!getUid()) { changeUid(); return; }
+  _state.editingTxnId = txn.id;
+  document.getElementById('modal-add').hidden = false;
+  document.getElementById('f-market').value = txn.market;
+  document.getElementById('f-market').disabled = true;
+  document.getElementById('f-symbol').value = txn.symbol;
+  document.getElementById('f-symbol').disabled = true;
+  document.getElementById('seg-buy').disabled = true;
+  document.getElementById('seg-sell').disabled = true;
+  document.getElementById('f-date').value = txn.txn_date;
+  document.getElementById('f-qty').value = txn.qty;
+  document.getElementById('f-price').value = txn.price != null ? txn.price : '';
+  document.getElementById('f-fee').value = txn.fee != null && txn.fee > 0 ? txn.fee : '';
+  document.getElementById('f-note').value = txn.note || '';
+  document.getElementById('modal-error').hidden = true;
+  setSide(txn.txn_type);
+  updateFeePreview();
+}
+
+function closeAddModal() {
+  _state.editingTxnId = null;
+  document.getElementById('modal-add').hidden = true;
+}
 function setSide(side) {
   _state.side = side;
   document.getElementById('seg-buy').classList.toggle('active', side === 'buy');
   document.getElementById('seg-sell').classList.toggle('active', side === 'sell');
-  document.getElementById('modal-title').textContent = side === 'buy' ? '加買入交易' : '加賣出交易';
+  const verb = _state.editingTxnId !== null ? '編輯' : '加';
+  document.getElementById('modal-title').textContent = verb + (side === 'buy' ? '買入交易' : '賣出交易');
   updateFeePreview();
 }
 
@@ -902,21 +981,40 @@ async function submitAdd() {
   if (!isFinite(qty) || qty <= 0) return showErr('股數要 > 0');
   if (!isFinite(price) || price < 0) return showErr('價格不可為負');
 
-  const body = { symbol, market, txn_date, txn_type: _state.side, qty, price, note };
-  // 手續費 optional override (留空 backend 自動算台股 fee)
+  // 手續費 optional override
+  let feeNum = undefined;
   if (feeRaw !== '') {
-    const feeNum = parseFloat(feeRaw);
+    feeNum = parseFloat(feeRaw);
     if (!isFinite(feeNum) || feeNum < 0) return showErr('手續費不可為負');
-    body.fee = feeNum;
   }
 
   try {
-    await apiFetch('/transaction', {
-      method: 'POST',
-      body: JSON.stringify(body),
-    });
-    closeAddModal();
-    refreshAll();
+    if (_state.editingTxnId !== null) {
+      // Edit mode: PATCH 只送可改的 fields (symbol / market / txn_type 不可改)
+      const patchBody = { txn_date, qty, price, note: note || null };
+      if (feeNum !== undefined) patchBody.fee = feeNum;
+      await apiFetch('/transaction/' + _state.editingTxnId, {
+        method: 'PATCH',
+        body: JSON.stringify(patchBody),
+      });
+      // 重新抓 detail
+      const title = document.getElementById('detail-title').textContent;
+      const parts = title.split(' ');
+      const mkt = parts[0];
+      const sym = parts[1];
+      closeAddModal();
+      if (mkt && sym) await goDetail(mkt, sym);
+    } else {
+      // Add mode: POST
+      const body = { symbol, market, txn_date, txn_type: _state.side, qty, price, note };
+      if (feeNum !== undefined) body.fee = feeNum;
+      await apiFetch('/transaction', {
+        method: 'POST',
+        body: JSON.stringify(body),
+      });
+      closeAddModal();
+      refreshAll();
+    }
   } catch (e) {
     showErr('儲存失敗：' + e.message);
   }
@@ -939,9 +1037,99 @@ async function deleteTxn(id) {
   }
 }
 
+// ── Chart (資產變化) ─────────────────────────────────────────────────────────
+
+let _chartInstance = null;
+let _chartPeriod = 'daily';
+
+async function loadChart() {
+  const card = document.getElementById('chart-card');
+  if (!card) return;
+  if (!getUid() || _state.holdings.length === 0) {
+    card.hidden = true;
+    return;
+  }
+  card.hidden = false;
+  try {
+    const data = await apiFetch('/chart?period=' + _chartPeriod);
+    renderChart(data.points || [], data.note || '');
+  } catch (e) {
+    const note = document.getElementById('chart-note');
+    if (note) { note.textContent = '圖表載入失敗：' + e.message; note.hidden = false; }
+  }
+}
+
+function setPeriod(p) {
+  _chartPeriod = p;
+  document.querySelectorAll('.period-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.period === p);
+  });
+  loadChart();
+}
+
+function renderChart(points, note) {
+  const noteEl = document.getElementById('chart-note');
+  if (note) { noteEl.textContent = note; noteEl.hidden = false; }
+  else { noteEl.hidden = true; }
+
+  const canvas = document.getElementById('asset-chart');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+
+  if (_chartInstance) { _chartInstance.destroy(); _chartInstance = null; }
+
+  if (typeof window.Chart === 'undefined') {
+    // Chart.js 沒載入 (網路問題) → fallback 顯示 last value
+    noteEl.textContent = '圖表 lib 載入失敗；最新總值 NT$' + (points.length > 0 ? fmtNum(points[points.length - 1].value) : '—');
+    noteEl.hidden = false;
+    return;
+  }
+
+  const css = getComputedStyle(document.documentElement);
+  const fg = css.getPropertyValue('--fg').trim() || '#e8e8ee';
+  const muted = css.getPropertyValue('--muted').trim() || '#7a7a8a';
+  const accent = css.getPropertyValue('--accent').trim() || '#5b9eff';
+
+  _chartInstance = new window.Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: points.map(p => p.label),
+      datasets: [
+        {
+          label: '總值',
+          data: points.map(p => p.value),
+          borderColor: accent,
+          backgroundColor: accent + '22',
+          tension: 0.2,
+          fill: true,
+        },
+        {
+          label: '總成本',
+          data: points.map(p => p.cost),
+          borderColor: muted,
+          borderDash: [4, 4],
+          tension: 0.2,
+        },
+      ],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { labels: { color: fg, font: { size: 11 } } },
+        tooltip: { callbacks: { label: (item) => item.dataset.label + ': NT$' + Math.round(item.parsed.y).toLocaleString() } },
+      },
+      scales: {
+        x: { ticks: { color: muted, font: { size: 10 }, maxRotation: 0, autoSkipPadding: 20 }, grid: { display: false } },
+        y: { ticks: { color: muted, font: { size: 10 }, callback: (v) => 'NT$' + (v >= 1000 ? Math.round(v / 1000) + 'k' : v) }, grid: { color: muted + '22' } },
+      },
+    },
+  });
+}
+
 // ── Theme / Font / About ─────────────────────────────────────────────────────
 
-const PORTFOLIO_VERSION = 'V1.0.4';
+const PORTFOLIO_VERSION = 'V1.0.5';
 const THEME_KEY = 'portfolio_theme';
 const FONT_SCALE_KEY = 'portfolio_font_scale';
 

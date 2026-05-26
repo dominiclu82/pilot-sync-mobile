@@ -35,6 +35,7 @@ import {
 import { calcOverall, calcAllViews } from './holdings.js';
 import { getPortfolioHtml } from './frontend.js';
 import { cnyesBatch } from '../morning-builder.js';
+import { querySnapshots, snapshotUser, startSnapshotCron } from './snapshot.js';
 import {
   validatePinFormat,
   hashPin,
@@ -334,6 +335,11 @@ portfolioRouter.patch('/api/portfolio/transaction/:id', pinGate, async (req, res
     if (!isFinite(n) || n < 0) return res.status(400).json({ error: 'invalid_price' });
     update.price = n;
   }
+  if (body.fee !== undefined && body.fee !== null && body.fee !== '') {
+    const n = Number(body.fee);
+    if (!isFinite(n) || n < 0) return res.status(400).json({ error: 'invalid_fee' });
+    update.fee = n;
+  }
   if (body.note !== undefined) {
     update.note = typeof body.note === 'string' ? body.note.trim() : null;
   }
@@ -381,6 +387,33 @@ portfolioRouter.get('/api/portfolio/holdings', pinGate, async (req, res) => {
   }
 });
 
+/** GET /api/portfolio/chart?period=daily|monthly|yearly — 資產變化圖資料 */
+portfolioRouter.get('/api/portfolio/chart', pinGate, async (req, res) => {
+  const userId = reqUserId(req)!;
+  const period = String(req.query.period || 'daily');
+  if (period !== 'daily' && period !== 'monthly' && period !== 'yearly') {
+    return res.status(400).json({ error: 'invalid_period' });
+  }
+  try {
+    const points = await querySnapshots(userId, period);
+    // 若無 snapshot data 但 user 有持倉 → 即時 snapshot 今天當第一個 point
+    if (points.length === 0) {
+      const today = new Date().toISOString().slice(0, 10);
+      const result = await snapshotUser(userId, today);
+      if (result) {
+        return res.json({
+          period,
+          points: [{ label: today, value: result.total_value, cost: result.total_cost }],
+          note: '尚無歷史資料；圖表會從每日 23:30 後開始累積',
+        });
+      }
+    }
+    res.json({ period, points });
+  } catch (e: any) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 portfolioRouter.get('/api/portfolio/holdings/:market/:symbol', pinGate, async (req, res) => {
   const userId = reqUserId(req)!;
   const market = req.params.market;
@@ -415,4 +448,6 @@ export async function startPortfolio(): Promise<void> {
   } catch (e: any) {
     console.error('[portfolio] migrateAllUsers crashed:', e.message);
   }
+  // 啟動 daily snapshot cron (V1.0.5)
+  startSnapshotCron();
 }

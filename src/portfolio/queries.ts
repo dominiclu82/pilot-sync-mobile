@@ -133,6 +133,7 @@ export interface UpdateTxnInput {
   txn_date?: string;
   qty?: number;
   price?: number;
+  fee?: number;
   note?: string;
 }
 
@@ -152,6 +153,7 @@ export async function updateTransaction(
   if (input.txn_date !== undefined) { sets.push(`txn_date = $${i++}`); vals.push(input.txn_date); }
   if (input.qty !== undefined) { sets.push(`qty = $${i++}`); vals.push(input.qty); }
   if (input.price !== undefined) { sets.push(`price = $${i++}`); vals.push(input.price); }
+  if (input.fee !== undefined) { sets.push(`fee = $${i++}`); vals.push(input.fee); }
   if (input.note !== undefined) { sets.push(`note = $${i++}`); vals.push(input.note); }
 
   // 若 qty/price 任一變了 → cash_amount 重算

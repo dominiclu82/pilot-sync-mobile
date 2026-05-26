@@ -68,6 +68,23 @@ export async function ensureTables(): Promise<boolean> {
     // NULL = 沒 migrate；timestamp = 已 migrate（idempotent，避免重跑）
     await pool.query(`ALTER TABLE morning_prefs ADD COLUMN IF NOT EXISTS portfolio_migrated_at TIMESTAMPTZ`).catch(() => {});
 
+    // portfolio_snapshots — 每日 portfolio 總值 snapshot (V1.0.5)
+    // 給資產變化圖用，daily cron 跑一次 insert 當天 snapshot
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS portfolio_snapshots (
+        user_id TEXT NOT NULL,
+        snapshot_date DATE NOT NULL,
+        total_value NUMERIC(20,2) NOT NULL DEFAULT 0,
+        total_cost NUMERIC(20,2) NOT NULL DEFAULT 0,
+        total_realized NUMERIC(20,2) NOT NULL DEFAULT 0,
+        total_dividend NUMERIC(20,2) NOT NULL DEFAULT 0,
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        PRIMARY KEY (user_id, snapshot_date)
+      );
+      CREATE INDEX IF NOT EXISTS idx_portfolio_snapshots_user_date
+        ON portfolio_snapshots(user_id, snapshot_date DESC);
+    `);
+
     _ready = true;
     console.log('✅ Portfolio tables ready');
     return true;
