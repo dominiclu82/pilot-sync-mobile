@@ -1,18 +1,25 @@
-// Portfolio module — Express router (Phase 1.B)
+// Portfolio module — Express router (Phase 1.D)
 //
 // Endpoints:
 //   啟動:
 //     startPortfolio()             — init schema + migrate 舊 holdings
-//   診斷:
-//     GET /api/portfolio/health    — module 已上線 marker
-//   Transactions CRUD (使用者手動 buy / sell):
+//   診斷 (無 PIN 保護):
+//     GET /api/portfolio/health
+//   公開資料 (無 PIN 保護):
+//     GET /portfolio                            — HTML PWA shell
+//     GET /api/portfolio/quotes                 — 即時股價 proxy
+//   PIN management (需 user_id，但本身不需 PIN 驗證):
+//     GET  /api/portfolio/pin/status            — { enabled: bool }
+//     POST /api/portfolio/pin/verify            — { pin } → { ok }
+//     POST /api/portfolio/pin/set               — { pin, oldPin? } 啟用 / 改
+//     POST /api/portfolio/pin/unset             — { pin } 取消
+//   PIN-protected (使用 pinGate 中間件):
 //     GET    /api/portfolio/transactions
 //     POST   /api/portfolio/transaction
 //     PATCH  /api/portfolio/transaction/:id
 //     DELETE /api/portfolio/transaction/:id
-//   Holdings (三視角 derivation):
-//     GET /api/portfolio/holdings              — user 全部 symbols 列表 + 視角 1 摘要
-//     GET /api/portfolio/holdings/:market/:symbol — 單一 symbol 三視角 full view
+//     GET    /api/portfolio/holdings
+//     GET    /api/portfolio/holdings/:market/:symbol
 
 import express from 'express';
 import { ensureTables } from './schema.js';
@@ -28,6 +35,13 @@ import {
 import { calcOverall, calcAllViews } from './holdings.js';
 import { getPortfolioHtml } from './frontend.js';
 import { cnyesBatch } from '../morning-builder.js';
+import {
+  validatePinFormat,
+  hashPin,
+  verifyUserPin,
+  userHasPin,
+  setPinHash,
+} from './pin.js';
 
 export const portfolioRouter = express.Router();
 
@@ -43,7 +57,6 @@ function reqUserId(req: express.Request): string | null {
   return decoded || null;
 }
 
-// 共用：驗證 user_id 中介層
 function requireUserId(req: express.Request, res: express.Response): string | null {
   const userId = reqUserId(req);
   if (!userId) {
@@ -53,30 +66,62 @@ function requireUserId(req: express.Request, res: express.Response): string | nu
   return userId;
 }
 
+// ── PIN gate middleware ──────────────────────────────────────────────────────
+// 沒設 PIN → pass through (sub-PIN 模式，符合 opt-in)
+// 設了 PIN → 要求 X-Portfolio-Pin header verify
+
+async function pinGate(
+  req: express.Request,
+  res: express.Response,
+  next: express.NextFunction,
+): Promise<void> {
+  const userId = reqUserId(req);
+  if (!userId) {
+    res.status(400).json({ error: 'missing_or_invalid_user_id' });
+    return;
+  }
+
+  try {
+    const has = await userHasPin(userId);
+    if (!has) return next();  // 沒啟用 PIN，直接通過
+
+    const pin = (req.header('X-Portfolio-Pin') || '').trim();
+    if (!pin) {
+      res.status(401).json({ error: 'pin_required' });
+      return;
+    }
+    const ok = await verifyUserPin(userId, pin);
+    if (!ok) {
+      res.status(401).json({ error: 'invalid_pin' });
+      return;
+    }
+    return next();
+  } catch (e: any) {
+    res.status(500).json({ error: e.message });
+  }
+}
+
 // ── 診斷 ─────────────────────────────────────────────────────────────────────
 
 portfolioRouter.get('/api/portfolio/health', async (req, res) => {
   res.json({
     ok: true,
     module: 'portfolio',
-    phase: '1.C',
+    phase: '1.D',
     user_id: reqUserId(req),
   });
 });
 
 // ── Portfolio PWA shell ──────────────────────────────────────────────────────
 
-/** GET /portfolio — serve HTML/CSS/JS PWA shell */
 portfolioRouter.get('/portfolio', (_req, res) => {
   res.setHeader('Content-Type', 'text/html; charset=utf-8');
   res.send(getPortfolioHtml());
 });
 
-// ── Quotes (即時股價 proxy 到 cnyes) ────────────────────────────────────────
+// ── Quotes (即時股價 proxy 到 cnyes) — 公開市場資料，不 PIN 保護 ──────────
 
-/** GET /api/portfolio/quotes?tw=A,B,C&us=X,Y — batch 抓股價 */
 portfolioRouter.get('/api/portfolio/quotes', async (req, res) => {
-  // quotes 不用 user_id（公開市場資料），任何 client 都可呼叫
   try {
     const twParam = String(req.query.tw || '').trim();
     const usParam = String(req.query.us || '').trim();
@@ -87,24 +132,17 @@ portfolioRouter.get('/api/portfolio/quotes', async (req, res) => {
 
     if (twCodes.length > 0) {
       const tws = await cnyesBatch(twCodes, 'TWS');
-      for (const [code, q] of Object.entries(tws)) {
-        quotes[`TW:${code}`] = q;
-      }
-      // 上市抓不到的 fallback 興櫃 TWG
+      for (const [code, q] of Object.entries(tws)) quotes[`TW:${code}`] = q;
       const missing = twCodes.filter(c => !quotes[`TW:${c}`]);
       if (missing.length > 0) {
         const twg = await cnyesBatch(missing, 'TWG');
-        for (const [code, q] of Object.entries(twg)) {
-          quotes[`TW:${code}`] = q;
-        }
+        for (const [code, q] of Object.entries(twg)) quotes[`TW:${code}`] = q;
       }
     }
 
     if (usCodes.length > 0) {
       const uss = await cnyesBatch(usCodes, 'USS');
-      for (const [code, q] of Object.entries(uss)) {
-        quotes[`US:${code}`] = q;
-      }
+      for (const [code, q] of Object.entries(uss)) quotes[`US:${code}`] = q;
     }
 
     res.json({ quotes });
@@ -113,12 +151,98 @@ portfolioRouter.get('/api/portfolio/quotes', async (req, res) => {
   }
 });
 
-// ── Transactions CRUD ────────────────────────────────────────────────────────
+// ── PIN management ──────────────────────────────────────────────────────────
 
-/** GET /api/portfolio/transactions — 列出 user 全部 transactions (DESC) */
-portfolioRouter.get('/api/portfolio/transactions', async (req, res) => {
+/** GET /api/portfolio/pin/status — 該 user 有沒有啟用 PIN？ */
+portfolioRouter.get('/api/portfolio/pin/status', async (req, res) => {
   const userId = requireUserId(req, res);
   if (!userId) return;
+  try {
+    const enabled = await userHasPin(userId);
+    res.json({ enabled });
+  } catch (e: any) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+/** POST /api/portfolio/pin/verify — { pin } → { ok } */
+portfolioRouter.post('/api/portfolio/pin/verify', async (req, res) => {
+  const userId = requireUserId(req, res);
+  if (!userId) return;
+  const pin = (req.body?.pin || '').toString();
+  try {
+    const ok = await verifyUserPin(userId, pin);
+    if (!ok) {
+      res.status(401).json({ ok: false, error: 'invalid_pin' });
+      return;
+    }
+    res.json({ ok: true });
+  } catch (e: any) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+/**
+ * POST /api/portfolio/pin/set — 啟用或更改 PIN
+ * Body: { pin: string, oldPin?: string }
+ * - 首次啟用 (沒舊 PIN)：只給 pin
+ * - 改 PIN：給 pin + oldPin，會先驗 oldPin
+ */
+portfolioRouter.post('/api/portfolio/pin/set', async (req, res) => {
+  const userId = requireUserId(req, res);
+  if (!userId) return;
+
+  const pin = (req.body?.pin || '').toString();
+  const oldPin = req.body?.oldPin ? String(req.body.oldPin) : null;
+
+  const v = validatePinFormat(pin);
+  if (!v.ok) return res.status(400).json({ error: v.reason });
+
+  try {
+    const hasOld = await userHasPin(userId);
+    if (hasOld) {
+      if (!oldPin) return res.status(400).json({ error: 'old_pin_required' });
+      const oldOk = await verifyUserPin(userId, oldPin);
+      if (!oldOk) return res.status(401).json({ error: 'invalid_old_pin' });
+    }
+
+    const hash = await hashPin(pin);
+    const ok = await setPinHash(userId, hash);
+    if (!ok) return res.status(500).json({ error: 'set_failed' });
+
+    res.json({ ok: true, enabled: true });
+  } catch (e: any) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+/**
+ * POST /api/portfolio/pin/unset — 取消 PIN
+ * Body: { pin: string } — 驗證當前 PIN 才能 unset
+ */
+portfolioRouter.post('/api/portfolio/pin/unset', async (req, res) => {
+  const userId = requireUserId(req, res);
+  if (!userId) return;
+
+  const pin = (req.body?.pin || '').toString();
+  try {
+    const hasOld = await userHasPin(userId);
+    if (!hasOld) return res.json({ ok: true, enabled: false });  // 本來就沒啟用，直接 OK
+
+    const ok = await verifyUserPin(userId, pin);
+    if (!ok) return res.status(401).json({ error: 'invalid_pin' });
+
+    await setPinHash(userId, null);
+    res.json({ ok: true, enabled: false });
+  } catch (e: any) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ── Transactions CRUD (PIN-protected) ───────────────────────────────────────
+
+portfolioRouter.get('/api/portfolio/transactions', pinGate, async (req, res) => {
+  const userId = reqUserId(req)!;  // pinGate 已驗證
   try {
     const txns = await listTransactions(userId);
     res.json({ transactions: txns });
@@ -127,15 +251,11 @@ portfolioRouter.get('/api/portfolio/transactions', async (req, res) => {
   }
 });
 
-/** POST /api/portfolio/transaction — 加一筆 buy / sell */
-portfolioRouter.post('/api/portfolio/transaction', async (req, res) => {
-  const userId = requireUserId(req, res);
-  if (!userId) return;
-
+portfolioRouter.post('/api/portfolio/transaction', pinGate, async (req, res) => {
+  const userId = reqUserId(req)!;
   const body = req.body || {};
   const { symbol, market, txn_date, txn_type, qty, price, note } = body;
 
-  // Validation
   if (!symbol || typeof symbol !== 'string') return res.status(400).json({ error: 'invalid_symbol' });
   if (market !== 'TW' && market !== 'US') return res.status(400).json({ error: 'invalid_market' });
   if (!/^\d{4}-\d{2}-\d{2}$/.test(String(txn_date))) return res.status(400).json({ error: 'invalid_txn_date' });
@@ -161,11 +281,8 @@ portfolioRouter.post('/api/portfolio/transaction', async (req, res) => {
   }
 });
 
-/** PATCH /api/portfolio/transaction/:id — 改一筆 transaction */
-portfolioRouter.patch('/api/portfolio/transaction/:id', async (req, res) => {
-  const userId = requireUserId(req, res);
-  if (!userId) return;
-
+portfolioRouter.patch('/api/portfolio/transaction/:id', pinGate, async (req, res) => {
+  const userId = reqUserId(req)!;
   const id = parseInt(req.params.id, 10);
   if (!isFinite(id) || id <= 0) return res.status(400).json({ error: 'invalid_id' });
 
@@ -200,11 +317,8 @@ portfolioRouter.patch('/api/portfolio/transaction/:id', async (req, res) => {
   }
 });
 
-/** DELETE /api/portfolio/transaction/:id */
-portfolioRouter.delete('/api/portfolio/transaction/:id', async (req, res) => {
-  const userId = requireUserId(req, res);
-  if (!userId) return;
-
+portfolioRouter.delete('/api/portfolio/transaction/:id', pinGate, async (req, res) => {
+  const userId = reqUserId(req)!;
   const id = parseInt(req.params.id, 10);
   if (!isFinite(id) || id <= 0) return res.status(400).json({ error: 'invalid_id' });
 
@@ -217,23 +331,17 @@ portfolioRouter.delete('/api/portfolio/transaction/:id', async (req, res) => {
   }
 });
 
-// ── Holdings (三視角 derivation) ────────────────────────────────────────────
+// ── Holdings (三視角，PIN-protected) ────────────────────────────────────────
 
-/** GET /api/portfolio/holdings — user 全部 symbols 的視角 1 摘要列表（主畫面用） */
-portfolioRouter.get('/api/portfolio/holdings', async (req, res) => {
-  const userId = requireUserId(req, res);
-  if (!userId) return;
-
+portfolioRouter.get('/api/portfolio/holdings', pinGate, async (req, res) => {
+  const userId = reqUserId(req)!;
   try {
     const symbols = await listUserSymbols(userId);
     const holdings = [];
     for (const { symbol, market } of symbols) {
       const txns = await listTransactionsForSymbol(userId, symbol, market);
       const overall = calcOverall(txns);
-      if (overall && overall.qty > 0) {
-        // 只回傳當前還有持股的 (qty > 0)；qty <= 0 表示全賣光，主畫面不顯示
-        holdings.push(overall);
-      }
+      if (overall && overall.qty > 0) holdings.push(overall);
     }
     res.json({ holdings });
   } catch (e: any) {
@@ -241,11 +349,8 @@ portfolioRouter.get('/api/portfolio/holdings', async (req, res) => {
   }
 });
 
-/** GET /api/portfolio/holdings/:market/:symbol — 單一 symbol 三視角 full view（detail 頁用） */
-portfolioRouter.get('/api/portfolio/holdings/:market/:symbol', async (req, res) => {
-  const userId = requireUserId(req, res);
-  if (!userId) return;
-
+portfolioRouter.get('/api/portfolio/holdings/:market/:symbol', pinGate, async (req, res) => {
+  const userId = reqUserId(req)!;
   const market = req.params.market;
   if (market !== 'TW' && market !== 'US') return res.status(400).json({ error: 'invalid_market' });
   const symbol = req.params.symbol.toUpperCase();
@@ -258,7 +363,7 @@ portfolioRouter.get('/api/portfolio/holdings/:market/:symbol', async (req, res) 
       symbol,
       market,
       ...views,
-      transactions: [...txns].reverse(),  // detail 頁交易紀錄要 DESC（最新在前）
+      transactions: [...txns].reverse(),
     });
   } catch (e: any) {
     res.status(500).json({ error: e.message });
@@ -267,9 +372,6 @@ portfolioRouter.get('/api/portfolio/holdings/:market/:symbol', async (req, res) 
 
 // ── 啟動 hook ────────────────────────────────────────────────────────────────
 
-/**
- * Server 啟動時跑：建表 + 一次性 migrate（idempotent）
- */
 export async function startPortfolio(): Promise<void> {
   const ok = await ensureTables();
   if (!ok) {

@@ -1,12 +1,15 @@
-// Portfolio module — frontend PWA shell (Phase 1.C)
+// Portfolio module — frontend PWA shell (Phase 1.D)
 //
 // 一個獨立的 portfolio 子系統前端，掛在 /portfolio。
 // 沿用晨報 localStorage key 'morning_uid' 作 user identity (同 origin 自動共用)。
+// PIN opt-in：sessionStorage 存解鎖 PIN，tab 關了要重輸入。
 //
-// 三個主要 view：
-//   1. main page — 持倉列表 + 即時股價 + 視角 1 摘要
-//   2. detail page — 單一 symbol 三視角 + 交易紀錄
-//   3. add transaction modal — buy/sell 表單
+// 主要 view:
+//   1. PIN unlock overlay — 啟用 PIN 後第一次 access 跳出
+//   2. main page — 持倉列表 + 即時股價 + 視角 1 摘要
+//   3. detail page — 單一 symbol 三視角 + 交易紀錄
+//   4. add transaction modal — buy/sell 表單
+//   5. settings modal — PIN 啟用 / 改 / 取消
 
 export function getPortfolioHtml(): string {
   return `<!DOCTYPE html>
@@ -29,6 +32,7 @@ export function getPortfolioHtml(): string {
       <div class="hdr-actions">
         <button class="btn btn-primary" onclick="openAddModal()">+ 加交易</button>
         <button class="btn btn-ghost" onclick="refreshAll()">↻ 重抓</button>
+        <button class="btn btn-ghost" onclick="openSettings()" title="設定">⚙</button>
       </div>
       <div id="main-status" class="status"></div>
       <div id="holdings-list" class="list"></div>
@@ -86,6 +90,68 @@ export function getPortfolioHtml(): string {
         </div>
       </div>
     </div>
+
+    <!-- PIN unlock overlay (啟用 PIN 後第一次 access) -->
+    <div id="modal-pin-unlock" class="modal" hidden>
+      <div class="modal-card">
+        <div class="modal-hdr"><span>🔒 解鎖投資組合</span></div>
+        <div class="modal-body">
+          <div class="muted muted-small">這個帳號啟用了 PIN 保護。輸入 PIN 進入：</div>
+          <input id="pin-unlock-input" type="password" inputmode="numeric" maxlength="6" pattern="[0-9]*" placeholder="4-6 碼 PIN" autocomplete="off">
+          <div id="pin-unlock-error" class="error" hidden></div>
+          <button class="btn btn-primary" onclick="submitPinUnlock()">解鎖</button>
+          <div class="muted muted-small">忘記 PIN？請聯絡 admin 後台 reset。</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Settings modal -->
+    <div id="modal-settings" class="modal" hidden>
+      <div class="modal-card">
+        <div class="modal-hdr">
+          <span>⚙ 設定</span>
+          <span class="modal-close" onclick="closeSettings()">✕</span>
+        </div>
+        <div class="modal-body">
+          <div class="kv">
+            <span class="k">PIN 保護</span>
+            <span class="v" id="settings-pin-status">—</span>
+          </div>
+          <div id="settings-pin-actions" class="modal-actions" style="flex-direction:column;align-items:stretch"></div>
+          <div id="settings-error" class="error" hidden></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- PIN setup / change / unset modal -->
+    <div id="modal-pin-form" class="modal" hidden>
+      <div class="modal-card">
+        <div class="modal-hdr">
+          <span id="pin-form-title">設定 PIN</span>
+          <span class="modal-close" onclick="closePinForm()">✕</span>
+        </div>
+        <div class="modal-body">
+          <div id="pin-form-old-wrap" hidden>
+            <label>當前 PIN
+              <input id="pin-form-old" type="password" inputmode="numeric" maxlength="6" pattern="[0-9]*" autocomplete="off">
+            </label>
+          </div>
+          <div id="pin-form-new-wrap">
+            <label>新 PIN (4-6 碼數字)
+              <input id="pin-form-new1" type="password" inputmode="numeric" maxlength="6" pattern="[0-9]*" autocomplete="off">
+            </label>
+            <label>再輸入一次
+              <input id="pin-form-new2" type="password" inputmode="numeric" maxlength="6" pattern="[0-9]*" autocomplete="off">
+            </label>
+          </div>
+          <div id="pin-form-error" class="error" hidden></div>
+          <div class="modal-actions">
+            <button class="btn btn-ghost" onclick="closePinForm()">取消</button>
+            <button class="btn btn-primary" id="pin-form-submit" onclick="submitPinForm()">確認</button>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 <script>${getClientJs()}</script>
 </body>
@@ -116,6 +182,7 @@ html, body { margin: 0; padding: 0; background: var(--bg); color: var(--fg); fon
 .btn { padding: 8px 14px; border-radius: 6px; border: 1px solid var(--border); background: var(--bg-card); color: var(--fg); font-size: .92em; cursor: pointer; }
 .btn-primary { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
 .btn-ghost { background: transparent; }
+.btn-danger { background: var(--red); border-color: var(--red); color: #fff; font-weight: 600; }
 .status { color: var(--muted); font-size: .85em; margin-bottom: 10px; min-height: 1.2em; }
 .list { display: flex; flex-direction: column; gap: 8px; }
 .holding {
@@ -180,18 +247,26 @@ html, body { margin: 0; padding: 0; background: var(--bg); color: var(--fg); fon
 .seg-btn.active { background: var(--accent); color: #fff; border-color: var(--accent); }
 .modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 8px; }
 .error { color: var(--red); font-size: .85em; padding: 8px; background: rgba(248,113,113,.1); border-radius: 6px; }
+
+/* PIN unlock specific */
+#modal-pin-unlock .modal-card { max-width: 360px; }
+#modal-pin-unlock input { font-size: 1.3em; text-align: center; letter-spacing: 0.3em; }
+#pin-form-new1, #pin-form-new2, #pin-form-old { font-size: 1.2em; text-align: center; letter-spacing: 0.25em; }
 `;
 }
 
 function getClientJs(): string {
   return `
-const UID_KEY = 'morning_uid';  // 沿用晨報 user identity key
+const UID_KEY = 'morning_uid';     // 沿用晨報 user identity
+const PIN_SESSION_KEY = 'portfolio_pin';  // sessionStorage，tab 關了要重輸
 const API = '/api/portfolio';
 
 let _state = {
-  holdings: [],     // [{ symbol, market, qty, avgCost, ... }]
-  quotes: {},       // { 'TW:2330': { price, change, changePct, ... } }
+  holdings: [],
+  quotes: {},
   side: 'buy',
+  pinFormMode: 'set',  // 'set' | 'change' | 'unset'
+  pinEnabled: false,
 };
 
 // ── User identity ────────────────────────────────────────────────────────────
@@ -201,6 +276,8 @@ function getUid() {
 }
 function setUid(uid) {
   try { localStorage.setItem(UID_KEY, uid); } catch {}
+  // 切 user 時清掉 PIN session
+  try { sessionStorage.removeItem(PIN_SESSION_KEY); } catch {}
   updateUidDisplay();
 }
 function updateUidDisplay() {
@@ -217,7 +294,19 @@ function changeUid() {
   const trimmed = v.trim();
   if (!trimmed) return;
   setUid(trimmed);
-  refreshAll();
+  bootstrap();
+}
+
+// ── PIN session ──────────────────────────────────────────────────────────────
+
+function getPin() {
+  try { return sessionStorage.getItem(PIN_SESSION_KEY) || ''; } catch { return ''; }
+}
+function setPin(pin) {
+  try { sessionStorage.setItem(PIN_SESSION_KEY, pin); } catch {}
+}
+function clearPin() {
+  try { sessionStorage.removeItem(PIN_SESSION_KEY); } catch {}
 }
 
 // ── Fetch helpers ────────────────────────────────────────────────────────────
@@ -229,33 +318,198 @@ async function apiFetch(path, opts = {}) {
     'X-User-Id': encodeURIComponent(uid),
     'Content-Type': 'application/json',
   });
+  const pin = getPin();
+  if (pin) headers['X-Portfolio-Pin'] = pin;
+
   const r = await fetch(API + path, { ...opts, headers });
   if (!r.ok) {
     const e = await r.json().catch(() => ({ error: 'http_' + r.status }));
+    if (e.error === 'pin_required' || e.error === 'invalid_pin') {
+      // PIN 過期或錯了，清掉 session、跳 unlock screen
+      clearPin();
+      showPinUnlock();
+      throw new Error(e.error);
+    }
     throw new Error(e.error || 'http_' + r.status);
   }
   return r.json();
 }
 
-async function fetchHoldings() {
-  const j = await apiFetch('/holdings');
-  return j.holdings || [];
+// ── Bootstrap (load 時的初始化流程) ──────────────────────────────────────────
+
+async function bootstrap() {
+  updateUidDisplay();
+  if (!getUid()) {
+    document.getElementById('main-status').textContent = '請先點右上角設定暱稱';
+    return;
+  }
+  try {
+    const r = await fetch(API + '/pin/status?uid=' + encodeURIComponent(getUid()));
+    const j = await r.json();
+    _state.pinEnabled = !!j.enabled;
+    if (j.enabled && !getPin()) {
+      showPinUnlock();
+    } else {
+      hidePinUnlock();
+      refreshAll();
+    }
+  } catch (e) {
+    document.getElementById('main-status').textContent = '連線錯誤：' + e.message;
+  }
 }
 
-async function fetchQuotes(symbols) {
-  // symbols: [{symbol, market}, ...]
-  if (symbols.length === 0) return {};
-  const tw = symbols.filter(s => s.market === 'TW').map(s => s.symbol);
-  const us = symbols.filter(s => s.market === 'US').map(s => s.symbol);
-  const params = new URLSearchParams();
-  if (tw.length) params.set('tw', tw.join(','));
-  if (us.length) params.set('us', us.join(','));
-  const j = await apiFetch('/quotes?' + params);
-  return j.quotes || {};
+// ── PIN unlock screen ───────────────────────────────────────────────────────
+
+function showPinUnlock() {
+  document.getElementById('modal-pin-unlock').hidden = false;
+  document.getElementById('pin-unlock-input').value = '';
+  document.getElementById('pin-unlock-error').hidden = true;
+  setTimeout(() => document.getElementById('pin-unlock-input').focus(), 50);
+}
+function hidePinUnlock() {
+  document.getElementById('modal-pin-unlock').hidden = true;
+}
+async function submitPinUnlock() {
+  const pin = document.getElementById('pin-unlock-input').value.trim();
+  const err = document.getElementById('pin-unlock-error');
+  err.hidden = true;
+  if (!/^\\d{4,6}$/.test(pin)) {
+    err.textContent = 'PIN 必須為 4-6 碼數字';
+    err.hidden = false;
+    return;
+  }
+  try {
+    const uid = getUid();
+    const r = await fetch(API + '/pin/verify', {
+      method: 'POST',
+      headers: { 'X-User-Id': encodeURIComponent(uid), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pin }),
+    });
+    if (!r.ok) {
+      const j = await r.json().catch(() => ({}));
+      err.textContent = j.error === 'invalid_pin' ? 'PIN 錯誤' : ('錯誤：' + (j.error || r.status));
+      err.hidden = false;
+      return;
+    }
+    setPin(pin);
+    hidePinUnlock();
+    refreshAll();
+  } catch (e) {
+    err.textContent = '連線錯誤：' + e.message;
+    err.hidden = false;
+  }
 }
 
-async function fetchDetail(market, symbol) {
-  return await apiFetch('/holdings/' + market + '/' + encodeURIComponent(symbol));
+// ── Settings (PIN management) ────────────────────────────────────────────────
+
+async function openSettings() {
+  if (!getUid()) { changeUid(); return; }
+  document.getElementById('modal-settings').hidden = false;
+  document.getElementById('settings-error').hidden = true;
+  await renderSettingsPin();
+}
+function closeSettings() {
+  document.getElementById('modal-settings').hidden = true;
+}
+async function renderSettingsPin() {
+  const statusEl = document.getElementById('settings-pin-status');
+  const actionsEl = document.getElementById('settings-pin-actions');
+  statusEl.textContent = '檢查中…';
+  actionsEl.innerHTML = '';
+  try {
+    const uid = getUid();
+    const r = await fetch(API + '/pin/status?uid=' + encodeURIComponent(uid));
+    const j = await r.json();
+    _state.pinEnabled = !!j.enabled;
+    if (j.enabled) {
+      statusEl.textContent = '✓ 已啟用';
+      statusEl.style.color = 'var(--green)';
+      actionsEl.innerHTML = \`
+        <button class="btn btn-ghost" onclick="openPinForm('change')">更換 PIN</button>
+        <button class="btn btn-danger" onclick="openPinForm('unset')">取消 PIN 保護</button>
+      \`;
+    } else {
+      statusEl.textContent = '未啟用';
+      statusEl.style.color = 'var(--muted)';
+      actionsEl.innerHTML = \`
+        <button class="btn btn-primary" onclick="openPinForm('set')">啟用 PIN 保護</button>
+      \`;
+    }
+  } catch (e) {
+    statusEl.textContent = '錯誤';
+    const err = document.getElementById('settings-error');
+    err.textContent = e.message;
+    err.hidden = false;
+  }
+}
+
+// ── PIN form (set / change / unset) ─────────────────────────────────────────
+
+function openPinForm(mode) {
+  _state.pinFormMode = mode;
+  const titles = { set: '啟用 PIN 保護', change: '更換 PIN', unset: '取消 PIN 保護' };
+  document.getElementById('pin-form-title').textContent = titles[mode];
+  document.getElementById('pin-form-old-wrap').hidden = (mode === 'set');
+  document.getElementById('pin-form-new-wrap').hidden = (mode === 'unset');
+  document.getElementById('pin-form-old').value = '';
+  document.getElementById('pin-form-new1').value = '';
+  document.getElementById('pin-form-new2').value = '';
+  document.getElementById('pin-form-error').hidden = true;
+  const submit = document.getElementById('pin-form-submit');
+  submit.className = (mode === 'unset') ? 'btn btn-danger' : 'btn btn-primary';
+  submit.textContent = (mode === 'unset') ? '確定取消' : '確認';
+  document.getElementById('modal-pin-form').hidden = false;
+}
+function closePinForm() {
+  document.getElementById('modal-pin-form').hidden = true;
+}
+
+async function submitPinForm() {
+  const mode = _state.pinFormMode;
+  const oldPin = document.getElementById('pin-form-old').value.trim();
+  const new1 = document.getElementById('pin-form-new1').value.trim();
+  const new2 = document.getElementById('pin-form-new2').value.trim();
+  const err = document.getElementById('pin-form-error');
+  err.hidden = true;
+  function showErr(m) { err.textContent = m; err.hidden = false; }
+
+  // 驗證
+  if (mode === 'change' || mode === 'unset') {
+    if (!/^\\d{4,6}$/.test(oldPin)) return showErr('當前 PIN 必須為 4-6 碼數字');
+  }
+  if (mode === 'set' || mode === 'change') {
+    if (!/^\\d{4,6}$/.test(new1)) return showErr('新 PIN 必須為 4-6 碼數字');
+    if (new1 !== new2) return showErr('兩次輸入的新 PIN 不一致');
+  }
+
+  try {
+    const uid = getUid();
+    if (mode === 'unset') {
+      const r = await fetch(API + '/pin/unset', {
+        method: 'POST',
+        headers: { 'X-User-Id': encodeURIComponent(uid), 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pin: oldPin }),
+      });
+      const j = await r.json();
+      if (!r.ok) return showErr(j.error || '取消失敗');
+      clearPin();
+    } else {
+      const body = { pin: new1 };
+      if (mode === 'change') body.oldPin = oldPin;
+      const r = await fetch(API + '/pin/set', {
+        method: 'POST',
+        headers: { 'X-User-Id': encodeURIComponent(uid), 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      const j = await r.json();
+      if (!r.ok) return showErr(j.error || '設定失敗');
+      setPin(new1);  // 新 PIN 直接寫進 session
+    }
+    closePinForm();
+    await renderSettingsPin();
+  } catch (e) {
+    showErr('連線錯誤：' + e.message);
+  }
 }
 
 // ── Main page render ─────────────────────────────────────────────────────────
@@ -279,6 +533,28 @@ async function refreshAll() {
   } catch (e) {
     status.textContent = '錯誤：' + e.message;
   }
+}
+
+async function fetchHoldings() {
+  const j = await apiFetch('/holdings');
+  return j.holdings || [];
+}
+
+async function fetchQuotes(symbols) {
+  if (symbols.length === 0) return {};
+  const tw = symbols.filter(s => s.market === 'TW').map(s => s.symbol);
+  const us = symbols.filter(s => s.market === 'US').map(s => s.symbol);
+  const params = new URLSearchParams();
+  if (tw.length) params.set('tw', tw.join(','));
+  if (us.length) params.set('us', us.join(','));
+  // quotes 不需要 PIN (公開市場資料)，不走 apiFetch
+  const r = await fetch(API + '/quotes?' + params);
+  const j = await r.json();
+  return j.quotes || {};
+}
+
+async function fetchDetail(market, symbol) {
+  return await apiFetch('/holdings/' + market + '/' + encodeURIComponent(symbol));
 }
 
 function renderMain() {
@@ -347,7 +623,6 @@ function renderDetail(d, q) {
   const unrealized = (price != null && o && o.qty > 0) ? (price - o.avgCost) * o.qty : null;
   const unrealizedPct = (unrealized != null && o.costBasis > 0) ? (unrealized / o.costBasis * 100) : null;
 
-  // Overall card (視角 1)
   document.getElementById('detail-overall').innerHTML = \`
     <div class="card-hdr"><span>持倉摘要</span><span class="muted muted-small">現價 \${price != null ? fmtNum(price) : '—'}</span></div>
     <div class="card-body">
@@ -361,8 +636,7 @@ function renderDetail(d, q) {
     </div>
   \`;
 
-  // Transactions (含視角 2 timing for buy)
-  const timingMap = {};  // txn_id → diff info
+  const timingMap = {};
   if (price != null) {
     for (const t of d.timing || []) {
       timingMap[t.txn_id] = {
@@ -411,13 +685,10 @@ function renderDetail(d, q) {
     <div class="card-body">\${txnHtml || '<div class="muted">尚無交易</div>'}</div>
   \`;
 
-  // Lots (視角 3) — 摺疊
   const lots = (d.lots || []).filter(l => l.remaining_qty > 0 || l.realized !== 0);
   const lotHtml = lots.map(l => {
     const remVal = price != null ? l.remaining_qty * price : null;
-    const remUnrealized = (price != null && l.remaining_qty > 0)
-      ? remVal - l.remaining_cost
-      : null;
+    const remUnrealized = (price != null && l.remaining_qty > 0) ? remVal - l.remaining_cost : null;
     return \`
       <div class="lot">
         <div class="lot-hdr">\${l.txn_date} · 買 \${fmtNum(l.original_qty)} @ \${fmtNum(l.original_price)}</div>
@@ -470,13 +741,12 @@ async function submitAdd() {
 
   const err = document.getElementById('modal-error');
   err.hidden = true;
+  function showErr(m) { err.textContent = m; err.hidden = false; }
 
   if (!symbol) return showErr('請輸入股票代號');
   if (!txn_date) return showErr('請選日期');
   if (!isFinite(qty) || qty <= 0) return showErr('股數要 > 0');
   if (!isFinite(price) || price < 0) return showErr('價格不可為負');
-
-  function showErr(m) { err.textContent = m; err.hidden = false; }
 
   try {
     await apiFetch('/transaction', {
@@ -494,7 +764,6 @@ async function deleteTxn(id) {
   if (!confirm('確定刪除這筆交易？')) return;
   try {
     await apiFetch('/transaction/' + id, { method: 'DELETE' });
-    // 重新抓 detail
     const title = document.getElementById('detail-title').textContent;
     const [market, symbol] = title.split(' ');
     if (market && symbol) {
@@ -522,16 +791,18 @@ function fmtPct(n) {
   return (n > 0 ? '+' : '') + n.toFixed(2) + '%';
 }
 
+// ── Enter key handler for PIN inputs ────────────────────────────────────────
+
+document.addEventListener('keydown', function(e) {
+  if (e.key !== 'Enter') return;
+  const target = e.target;
+  if (!target || !target.id) return;
+  if (target.id === 'pin-unlock-input') { e.preventDefault(); submitPinUnlock(); }
+  else if (target.id === 'pin-form-new2' || target.id === 'pin-form-old') { e.preventDefault(); submitPinForm(); }
+});
+
 // ── Init ─────────────────────────────────────────────────────────────────────
 
-(function init() {
-  updateUidDisplay();
-  if (!getUid()) {
-    // 第一次進來，沒設暱稱：提示但不強制
-    document.getElementById('main-status').textContent = '請先點右上角設定暱稱';
-  } else {
-    refreshAll();
-  }
-})();
+bootstrap();
 `;
 }
