@@ -97,7 +97,7 @@ export function getPortfolioHtml(): string {
         <div class="modal-hdr"><span>🔒 解鎖投資組合</span></div>
         <div class="modal-body">
           <div class="muted muted-small">這個帳號啟用了 PIN 保護。輸入 PIN 進入：</div>
-          <input id="pin-unlock-input" type="password" inputmode="numeric" maxlength="6" pattern="[0-9]*" placeholder="4-6 碼 PIN" autocomplete="off">
+          <input id="pin-unlock-input" type="password" maxlength="72" placeholder="輸入 PIN" autocomplete="off">
           <div id="pin-unlock-error" class="error" hidden></div>
           <button class="btn btn-primary" onclick="submitPinUnlock()">解鎖</button>
           <div class="muted muted-small">忘記 PIN？請聯絡 admin 後台 reset。</div>
@@ -133,15 +133,15 @@ export function getPortfolioHtml(): string {
         <div class="modal-body">
           <div id="pin-form-old-wrap" hidden>
             <label>當前 PIN
-              <input id="pin-form-old" type="password" inputmode="numeric" maxlength="6" pattern="[0-9]*" autocomplete="off">
+              <input id="pin-form-old" type="password" maxlength="72" autocomplete="off">
             </label>
           </div>
           <div id="pin-form-new-wrap">
-            <label>新 PIN (4-6 碼數字)
-              <input id="pin-form-new1" type="password" inputmode="numeric" maxlength="6" pattern="[0-9]*" autocomplete="off">
+            <label>新 PIN（任意長度 / 字元）
+              <input id="pin-form-new1" type="password" maxlength="72" autocomplete="off">
             </label>
             <label>再輸入一次
-              <input id="pin-form-new2" type="password" inputmode="numeric" maxlength="6" pattern="[0-9]*" autocomplete="off">
+              <input id="pin-form-new2" type="password" maxlength="72" autocomplete="off">
             </label>
           </div>
           <div id="pin-form-error" class="error" hidden></div>
@@ -172,6 +172,7 @@ function getStyles(): string {
   --border: #2a2a36;
 }
 * { box-sizing: border-box; }
+[hidden] { display: none !important; }  /* hotfix: 強制 hidden 屬性 override 任何 author CSS display */
 html, body { margin: 0; padding: 0; background: var(--bg); color: var(--fg); font-family: -apple-system, "Segoe UI", system-ui, "Microsoft JhengHei", sans-serif; font-size: 15px; }
 .page { max-width: 720px; margin: 0 auto; padding: 12px 14px 80px; }
 .hdr { display: flex; align-items: center; gap: 10px; margin: 6px 0 16px; }
@@ -373,8 +374,13 @@ async function submitPinUnlock() {
   const pin = document.getElementById('pin-unlock-input').value.trim();
   const err = document.getElementById('pin-unlock-error');
   err.hidden = true;
-  if (!/^\\d{4,6}$/.test(pin)) {
-    err.textContent = 'PIN 必須為 4-6 碼數字';
+  if (pin.length === 0) {
+    err.textContent = '請輸入 PIN';
+    err.hidden = false;
+    return;
+  }
+  if (pin.length > 72) {
+    err.textContent = 'PIN 太長（最多 72 字元）';
     err.hidden = false;
     return;
   }
@@ -473,12 +479,13 @@ async function submitPinForm() {
   err.hidden = true;
   function showErr(m) { err.textContent = m; err.hidden = false; }
 
-  // 驗證
+  // 驗證 (PIN 任意長度 / 字元，只防超過 bcrypt 72 byte 上限)
   if (mode === 'change' || mode === 'unset') {
-    if (!/^\\d{4,6}$/.test(oldPin)) return showErr('當前 PIN 必須為 4-6 碼數字');
+    if (oldPin.length === 0) return showErr('請輸入當前 PIN');
   }
   if (mode === 'set' || mode === 'change') {
-    if (!/^\\d{4,6}$/.test(new1)) return showErr('新 PIN 必須為 4-6 碼數字');
+    if (new1.length === 0) return showErr('請輸入新 PIN');
+    if (new1.length > 72) return showErr('PIN 太長（最多 72 字元）');
     if (new1 !== new2) return showErr('兩次輸入的新 PIN 不一致');
   }
 

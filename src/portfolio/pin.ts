@@ -9,13 +9,17 @@ import bcrypt from 'bcryptjs';
 import { getPool } from './schema.js';
 
 const SALT_ROUNDS = 10;
-const PIN_REGEX = /^\d{4,6}$/;  // 4-6 碼數字
+const BCRYPT_MAX_BYTES = 72;  // bcrypt 演算法上限，超過會被 truncate
 
 // ── Format validation ───────────────────────────────────────────────────────
+// 不限長度 (>= 1)，不限字元 (數字 / 字母 / symbol 全 OK)；只防超過 bcrypt 上限
 
 export function validatePinFormat(pin: any): { ok: boolean; reason?: string } {
   if (typeof pin !== 'string') return { ok: false, reason: 'pin_must_be_string' };
-  if (!PIN_REGEX.test(pin)) return { ok: false, reason: 'pin_must_be_4_to_6_digits' };
+  if (pin.length === 0) return { ok: false, reason: 'pin_required' };
+  // 用 byte length 而不是 char length（中文等多 byte 字元也要算）
+  const byteLen = new TextEncoder().encode(pin).length;
+  if (byteLen > BCRYPT_MAX_BYTES) return { ok: false, reason: 'pin_too_long' };
   return { ok: true };
 }
 
