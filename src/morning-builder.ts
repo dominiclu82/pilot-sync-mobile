@@ -230,11 +230,30 @@ async function fetchWeather(locs: Array<{ name: string; lat: number; lon: number
   });
   const url = 'https://api.open-meteo.com/v1/forecast?' + params.toString();
   // 天氣與空氣品質並行抓
-  const [r, airArr] = await Promise.all([
-    fetch(url, { headers: { 'User-Agent': 'CrewSync-Morning/1.0' } }),
-    fetchAirQuality(locs),
-  ]);
-  if (!r.ok) throw new Error('open-meteo HTTP ' + r.status);
+  // V1.3.15: 加 8 秒 fetch timeout + 1 次 retry (open-meteo 偶發 502 / 慢)
+  let r: Response | null = null;
+  let lastErr: Error | null = null;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const controller = new AbortController();
+    const tid = setTimeout(() => controller.abort(), 8000);
+    try {
+      r = await fetch(url, {
+        headers: { 'User-Agent': 'CrewSync-Morning/1.0' },
+        signal: controller.signal,
+      });
+      clearTimeout(tid);
+      if (!r.ok) throw new Error('open-meteo HTTP ' + r.status);
+      break;  // success
+    } catch (e: any) {
+      clearTimeout(tid);
+      lastErr = e;
+      r = null;
+      if (attempt < 1) await new Promise(res => setTimeout(res, 1500));
+    }
+  }
+  if (!r) throw lastErr || new Error('open-meteo fetch failed');
+  // 空氣品質獨立抓 (失敗不影響天氣)
+  const airArr = await fetchAirQuality(locs).catch(() => locs.map(() => ({ aqi: null, pm25: null })));
   const data = await r.json();
   // 多地點回傳是陣列（每個地點一個物件）；單地點回傳單一物件。統一成陣列。
   const arr = Array.isArray(data) ? data : [data];

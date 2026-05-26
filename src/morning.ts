@@ -10,8 +10,9 @@ import { JSDOM } from 'jsdom';
 import { Readability } from '@mozilla/readability';
 import { ROOT } from './config.js';
 import { buildMorningReport, fetchSection } from './morning-builder.js';
+import { listUserSymbols } from './portfolio/queries.js';
 
-export const MORNING_VERSION = 'V1.3.14';
+export const MORNING_VERSION = 'V1.3.15';
 const MORNING_CACHE = 'morning-v1-3-10';
 
 // ─── Postgres ────────────────────────────────────────────────────────
@@ -310,6 +311,20 @@ async function runBuildAll() {
       console.log('[morning] runBuildAll: no users with prefs, skipping');
       _lastBuildAt = Date.now();
       return { ok: true, users: 0 };
+    }
+    // V1.3.15: augment each user's tw/us with portfolio holdings symbols
+    // 晨報 stocks section 自動 include user 在 portfolio 持倉的 symbol，
+    // 即便 user 沒手動加進自選 list (user 反映「沒選到的庫存,你不能幫使用者新增嗎」)
+    for (const userEntry of allPrefs) {
+      try {
+        const portSymbols = await listUserSymbols(userEntry.userId);
+        const portTw = portSymbols.filter(s => s.market === 'TW').map(s => s.symbol);
+        const portUs = portSymbols.filter(s => s.market === 'US').map(s => s.symbol);
+        if (portTw.length > 0 || portUs.length > 0) {
+          userEntry.prefs.tw = Array.from(new Set([...(userEntry.prefs.tw || []), ...portTw]));
+          userEntry.prefs.us = Array.from(new Set([...(userEntry.prefs.us || []), ...portUs]));
+        }
+      } catch (e) { /* silent — fallback to prefs only */ }
     }
     // 計算 union
     const wxMap = new Map<string, { name: string; lat: number; lon: number }>();
@@ -1973,6 +1988,24 @@ a:active { opacity: 0.6; }
     </div>
     <hr style="border:none;border-top:1px solid var(--border);margin:12px 0">
     <div class="changelog-v">${MORNING_VERSION}</div>
+    <div class="changelog-txt">
+      兩個修：(1) 晨報 cron <code>runBuildAll</code> 內每個 user 的
+      <code>prefs.tw / prefs.us</code> 跟 portfolio holdings symbols 做 union，
+      即便 user 沒手動把該 symbol 加進自選 list，只要 portfolio 內有持倉就
+      自動進晨報 stocks section（user 反映「沒選到的庫存,你不能幫使用者新增嗎」）。
+      (2) <code>fetchWeather</code> 加 8 秒 AbortController fetch timeout + 1 次
+      retry（1.5 秒 gap）— Open-Meteo API 確認偶發 HTTP 502 + 慢
+      (<code>generationtime_ms: 63842</code>)。AirQuality 拆出 sequential
+      抓並加 .catch fallback，避免拖垮整個 weather build。<br>
+      Two fixes: (1) <code>runBuildAll</code> now unions each user's
+      <code>prefs.tw / prefs.us</code> with their portfolio holdings symbols
+      (per user feedback "what about holdings I didn't pick"). (2)
+      <code>fetchWeather</code> adds 8s AbortController fetch timeout + 1
+      retry (1.5s gap) — Open-Meteo confirmed intermittent 502 + slow
+      response. AirQuality decoupled with .catch fallback so it can't drag
+      down weather build.
+    </div>
+    <div class="changelog-v old">V1.3.14</div>
     <div class="changelog-txt">
       User: 「我不是說要從投資組合抓庫存嗎.你怎麼沒幫我抓過去晨報裡面?」
       晨報主畫面 stocks card 的「持 N 股 @均價」detail 過去從 localStorage
