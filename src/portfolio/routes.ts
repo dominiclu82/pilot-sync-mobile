@@ -265,9 +265,30 @@ portfolioRouter.post('/api/portfolio/transaction', pinGate, async (req, res) => 
   const priceNum = Number(price);
   if (!isFinite(priceNum) || priceNum < 0) return res.status(400).json({ error: 'invalid_price' });
 
+  const normalizedSymbol = symbol.trim().toUpperCase();
+
+  // Sell pre-check：不可超賣（codex P1 fix）
+  // holdings.ts 內部用 Math.min 安全降級，但 ledger 跟 derived view 會 diverge → API 上 reject
+  if (txn_type === 'sell') {
+    try {
+      const existing = await listTransactionsForSymbol(userId, normalizedSymbol, market);
+      const overall = calcOverall(existing);
+      const currentQty = overall ? overall.qty : 0;
+      if (qtyNum > currentQty) {
+        return res.status(400).json({
+          error: 'sell_exceeds_holding',
+          current_qty: currentQty,
+          attempted_sell_qty: qtyNum,
+        });
+      }
+    } catch (e: any) {
+      return res.status(500).json({ error: e.message });
+    }
+  }
+
   try {
     const txn = await insertManualTransaction(userId, {
-      symbol: symbol.trim().toUpperCase(),
+      symbol: normalizedSymbol,
       market,
       txn_date,
       txn_type,

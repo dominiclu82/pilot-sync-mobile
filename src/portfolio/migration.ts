@@ -52,39 +52,52 @@ export async function migrateUserHoldings(userId: string): Promise<MigrationResu
   const today = new Date().toISOString().slice(0, 10);  // YYYY-MM-DD (UTC，dev 跨日邊界差最多 8h 接受)
   let count = 0;
 
-  // TW holdings → 一筆 buy txn
-  for (const [code, h] of Object.entries(twHoldings)) {
-    if (!h || typeof h.qty !== 'number' || typeof h.cost !== 'number') continue;
-    if (h.qty <= 0 || h.cost <= 0) continue;
-    await pool.query(
-      `INSERT INTO portfolio_transactions
-       (user_id, symbol, market, txn_date, txn_type, qty, price, cash_amount, source, note)
-       VALUES ($1, $2, 'TW', $3, 'buy', $4, $5, $6, 'migration', '從舊版遷移')`,
-      [userId, code, today, h.qty, h.cost, h.qty * h.cost]
+  // Atomic: inserts 跟 migrated flag 用單一 transaction（codex P1 fix）
+  // 若中途 crash 任何 insert 失敗 → ROLLBACK → user 維持 NOT migrated → 下次重跑安全
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    // TW holdings → 一筆 buy txn
+    for (const [code, h] of Object.entries(twHoldings)) {
+      if (!h || typeof h.qty !== 'number' || typeof h.cost !== 'number') continue;
+      if (h.qty <= 0 || h.cost <= 0) continue;
+      await client.query(
+        `INSERT INTO portfolio_transactions
+         (user_id, symbol, market, txn_date, txn_type, qty, price, cash_amount, source, note)
+         VALUES ($1, $2, 'TW', $3, 'buy', $4, $5, $6, 'migration', '從舊版遷移')`,
+        [userId, code, today, h.qty, h.cost, h.qty * h.cost],
+      );
+      count++;
+    }
+
+    // US holdings → 一筆 buy txn
+    for (const [code, h] of Object.entries(usHoldings)) {
+      if (!h || typeof h.qty !== 'number' || typeof h.cost !== 'number') continue;
+      if (h.qty <= 0 || h.cost <= 0) continue;
+      await client.query(
+        `INSERT INTO portfolio_transactions
+         (user_id, symbol, market, txn_date, txn_type, qty, price, cash_amount, source, note)
+         VALUES ($1, $2, 'US', $3, 'buy', $4, $5, $6, 'migration', '從舊版遷移')`,
+        [userId, code, today, h.qty, h.cost, h.qty * h.cost],
+      );
+      count++;
+    }
+
+    // Mark migrated（即使 0 筆也標，避免下次重跑）
+    await client.query(
+      'UPDATE morning_prefs SET portfolio_migrated_at = NOW() WHERE user_id = $1',
+      [userId],
     );
-    count++;
+
+    await client.query('COMMIT');
+    return { user_id: userId, migrated: true, count, skipped: false };
+  } catch (e) {
+    await client.query('ROLLBACK').catch(() => {});
+    throw e;
+  } finally {
+    client.release();
   }
-
-  // US holdings → 一筆 buy txn
-  for (const [code, h] of Object.entries(usHoldings)) {
-    if (!h || typeof h.qty !== 'number' || typeof h.cost !== 'number') continue;
-    if (h.qty <= 0 || h.cost <= 0) continue;
-    await pool.query(
-      `INSERT INTO portfolio_transactions
-       (user_id, symbol, market, txn_date, txn_type, qty, price, cash_amount, source, note)
-       VALUES ($1, $2, 'US', $3, 'buy', $4, $5, $6, 'migration', '從舊版遷移')`,
-      [userId, code, today, h.qty, h.cost, h.qty * h.cost]
-    );
-    count++;
-  }
-
-  // Mark migrated（即使 0 筆也標，避免下次重跑）
-  await pool.query(
-    'UPDATE morning_prefs SET portfolio_migrated_at = NOW() WHERE user_id = $1',
-    [userId]
-  );
-
-  return { user_id: userId, migrated: true, count, skipped: false };
 }
 
 /**
