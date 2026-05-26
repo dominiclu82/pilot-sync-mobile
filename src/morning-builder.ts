@@ -320,7 +320,8 @@ async function cnyesBatchOne(codes, marketPrefix) {
   return out;
 }
 // Chunking：每 50 支拆一批，避免 URL 過長 / cnyes 拒絕大請求
-async function cnyesBatch(codes, marketPrefix) {
+// Phase 1.C: export 給 portfolio module 共用，避免 cnyes 邏輯 code duplication
+export async function cnyesBatch(codes, marketPrefix) {
   if (!codes || codes.length === 0) return {};
   const CHUNK = 50;
   const out: any = {};

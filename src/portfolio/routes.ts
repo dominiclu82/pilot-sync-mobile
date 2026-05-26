@@ -26,6 +26,8 @@ import {
   deleteTransaction,
 } from './queries.js';
 import { calcOverall, calcAllViews } from './holdings.js';
+import { getPortfolioHtml } from './frontend.js';
+import { cnyesBatch } from '../morning-builder.js';
 
 export const portfolioRouter = express.Router();
 
@@ -57,9 +59,58 @@ portfolioRouter.get('/api/portfolio/health', async (req, res) => {
   res.json({
     ok: true,
     module: 'portfolio',
-    phase: '1.B',
+    phase: '1.C',
     user_id: reqUserId(req),
   });
+});
+
+// ── Portfolio PWA shell ──────────────────────────────────────────────────────
+
+/** GET /portfolio — serve HTML/CSS/JS PWA shell */
+portfolioRouter.get('/portfolio', (_req, res) => {
+  res.setHeader('Content-Type', 'text/html; charset=utf-8');
+  res.send(getPortfolioHtml());
+});
+
+// ── Quotes (即時股價 proxy 到 cnyes) ────────────────────────────────────────
+
+/** GET /api/portfolio/quotes?tw=A,B,C&us=X,Y — batch 抓股價 */
+portfolioRouter.get('/api/portfolio/quotes', async (req, res) => {
+  // quotes 不用 user_id（公開市場資料），任何 client 都可呼叫
+  try {
+    const twParam = String(req.query.tw || '').trim();
+    const usParam = String(req.query.us || '').trim();
+    const twCodes = twParam ? twParam.split(',').filter(Boolean) : [];
+    const usCodes = usParam ? usParam.split(',').filter(Boolean) : [];
+
+    const quotes: Record<string, any> = {};
+
+    if (twCodes.length > 0) {
+      const tws = await cnyesBatch(twCodes, 'TWS');
+      for (const [code, q] of Object.entries(tws)) {
+        quotes[`TW:${code}`] = q;
+      }
+      // 上市抓不到的 fallback 興櫃 TWG
+      const missing = twCodes.filter(c => !quotes[`TW:${c}`]);
+      if (missing.length > 0) {
+        const twg = await cnyesBatch(missing, 'TWG');
+        for (const [code, q] of Object.entries(twg)) {
+          quotes[`TW:${code}`] = q;
+        }
+      }
+    }
+
+    if (usCodes.length > 0) {
+      const uss = await cnyesBatch(usCodes, 'USS');
+      for (const [code, q] of Object.entries(uss)) {
+        quotes[`US:${code}`] = q;
+      }
+    }
+
+    res.json({ quotes });
+  } catch (e: any) {
+    res.status(500).json({ error: e.message, quotes: {} });
+  }
 });
 
 // ── Transactions CRUD ────────────────────────────────────────────────────────
