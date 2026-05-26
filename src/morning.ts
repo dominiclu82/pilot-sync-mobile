@@ -11,7 +11,7 @@ import { Readability } from '@mozilla/readability';
 import { ROOT } from './config.js';
 import { buildMorningReport, fetchSection } from './morning-builder.js';
 
-export const MORNING_VERSION = 'V1.3.13';
+export const MORNING_VERSION = 'V1.3.14';
 const MORNING_CACHE = 'morning-v1-3-10';
 
 // ─── Postgres ────────────────────────────────────────────────────────
@@ -1974,6 +1974,23 @@ a:active { opacity: 0.6; }
     <hr style="border:none;border-top:1px solid var(--border);margin:12px 0">
     <div class="changelog-v">${MORNING_VERSION}</div>
     <div class="changelog-txt">
+      User: 「我不是說要從投資組合抓庫存嗎.你怎麼沒幫我抓過去晨報裡面?」
+      晨報主畫面 stocks card 的「持 N 股 @均價」detail 過去從 localStorage
+      <code>morning_tw_holdings</code> 讀，現在改為 fetch <code>/api/portfolio/holdings</code> 一次 + populate
+      新加的 <code>_portfolioHoldings</code> cache，4 處 render code 改用
+      <code>getMarketHoldings(market)</code> helper 拿回原 <code>{ qty, cost }</code> 格式
+      (cost 用 avgCost / 扣息派)。Settings UI 已 V1.3.11 拿掉，localStorage
+      key 完全 deprecate (user 不再可能 key 進去) — 唯一 source 是 portfolio_transactions。<br>
+      Per-stock holdings detail (qty + avg cost) now sourced from
+      <code>/api/portfolio/holdings</code> instead of legacy
+      <code>localStorage.morning_tw_holdings</code>. Populated via cache during
+      summary banner fetch; 4 render call-sites use <code>getMarketHoldings(market)</code>
+      to preserve the original <code>{ qty, cost }</code> shape. Settings edit UI
+      was already removed in V1.3.11, so the localStorage key is fully
+      deprecated — single source of truth is <code>portfolio_transactions</code>.
+    </div>
+    <div class="changelog-v old">V1.3.13</div>
+    <div class="changelog-txt">
       Hdr 拿掉「的晨報」字尾 (user 反映「navbar 已寫晨報，底下又寫一次 redundant」)，<code>hdr-user-title</code> 只顯示 <code>@uid</code>。Navbar 已是 module 標識，無需在 hdr 重複。<br>
       Removed "的晨報" suffix from header title (user: "the navbar already says 晨報, redundant below"). <code>hdr-user-title</code> now shows just <code>@uid</code> — navbar already identifies the module.
     </div>
@@ -3128,7 +3145,7 @@ window.clearHolding = clearHolding;
 function updateStockRowHoldingInline(market, code) {
   const row = document.querySelector('.stock-row[data-market="' + market + '"][data-code="' + code + '"]');
   if (!row) return;
-  const holdings = loadSetting(market === 'tw' ? 'twHoldings' : 'usHoldings', {}) || {};
+  const holdings = getMarketHoldings(market);
   const h = holdings[code];
   const priceEl = row.querySelector('.row-r .p');
   const price = priceEl ? Number(String(priceEl.textContent).replace(/,/g, '')) : NaN;
@@ -3168,7 +3185,7 @@ function updateStockSummaryInline(market) {
   if (!sec) return;
   const body = sec.querySelector('.sec-b');
   if (!body) return;
-  const holdings = loadSetting(market === 'tw' ? 'twHoldings' : 'usHoldings', {}) || {};
+  const holdings = getMarketHoldings(market);
   // 掃該區塊每一列：從 data-code 抓、讀現價從 row-r .p
   const rows = body.querySelectorAll('.stock-row');
   let totalMv = 0, totalCost = 0, totalPl = 0, hasAny = false;
@@ -3944,7 +3961,7 @@ function renderWx(w) {
 
 function renderStock(code, market, s) {
   const base = market === 'tw' ? 'https://www.cnyes.com/twstock/' : 'https://invest.cnyes.com/usstock/detail/';
-  const holdings = loadSetting(market === 'tw' ? 'twHoldings' : 'usHoldings', {});
+  const holdings = getMarketHoldings(market);
   const h = holdings && holdings[code];
   // 展開狀態不再持久化，每次 render 都從收合開始（輸入完會自動收合）
   const expandCls = '';
@@ -3998,7 +4015,7 @@ function renderStockHoldingCell(market, code, s, h) {
 
 // 股票區塊頂端加總（只有任何持倉時才顯示）
 function renderStockSummary(market, codes, stocksMap) {
-  const holdings = loadSetting(market === 'tw' ? 'twHoldings' : 'usHoldings', {}) || {};
+  const holdings = getMarketHoldings(market);
   let totalMv = 0, totalCost = 0, totalPl = 0;
   let hasAny = false;
   for (const code of codes) {
@@ -4872,6 +4889,24 @@ function bumpFont(dir) {
 }
 applyFontScale();
 
+// ── Portfolio holdings cache (V1.3.14) ──────────────────────────────────────
+// 晨報主畫面 stocks card render 過去用 localStorage 'morning_tw_holdings'
+// 抓持倉資料。改成 fetch /api/portfolio/holdings 一次 + populate 這個 cache，
+// 4 處 render 程式碼用 getMarketHoldings(market) 拿回相同格式 { qty, cost }。
+// localStorage holdings 已 deprecate (V1.3.11 拿掉 settings UI)。
+let _portfolioHoldings = {};  // key 'TW:2330' / 'US:AAPL' → { qty, cost (= avgCost) }
+
+function getMarketHoldings(market) {
+  const mk = market === 'tw' ? 'TW' : 'US';
+  const out = {};
+  for (const key in _portfolioHoldings) {
+    if (key.indexOf(mk + ':') === 0) {
+      out[key.slice(mk.length + 1)] = _portfolioHoldings[key];
+    }
+  }
+  return out;
+}
+
 // ── Portfolio summary banner (V1.3.11) ──────────────────────────────────────
 // 從 /api/portfolio/holdings + /api/portfolio/quotes 算總未實現損益，
 // 顯示在 nav 下方 banner。沒持倉就 hide。Click 整 banner 跳 /portfolio。
@@ -4887,6 +4922,11 @@ async function loadPortfolioSummary() {
     if (!r.ok) { banner.hidden = true; return; }
     const j = await r.json();
     const holdings = j.holdings || [];
+    // V1.3.14: populate cache，stocks card render 用
+    _portfolioHoldings = {};
+    for (const h of holdings) {
+      _portfolioHoldings[h.market + ':' + h.symbol] = { qty: h.qty, cost: h.avgCost };
+    }
     if (holdings.length === 0) { banner.hidden = true; return; }
 
     // 抓 quotes batch
