@@ -11,7 +11,7 @@ import { Readability } from '@mozilla/readability';
 import { ROOT } from './config.js';
 import { buildMorningReport, fetchSection } from './morning-builder.js';
 
-export const MORNING_VERSION = 'V1.3.10';
+export const MORNING_VERSION = 'V1.3.11';
 const MORNING_CACHE = 'morning-v1-3-10';
 
 // ─── Postgres ────────────────────────────────────────────────────────
@@ -1399,6 +1399,21 @@ a:active { opacity: 0.6; }
 }
 .se-clear:active { background: rgba(255,100,100,0.12); color: #ff8a8a; }
 
+/* 投資組合 summary banner (V1.3.11) — Nav 下方 sticky-ish 顯示總未實現損益 */
+.portfolio-summary {
+  background: var(--bg2); border: 1px solid var(--border); border-radius: 10px;
+  margin: 8px 12px; padding: 10px 14px;
+  display: flex; align-items: center; gap: 10px; cursor: pointer;
+  font-size: .9em;
+}
+.portfolio-summary:active { opacity: 0.7; }
+.portfolio-summary .ps-icon { font-size: 1.1em; }
+.portfolio-summary .ps-label { color: var(--muted); }
+.portfolio-summary .ps-value { font-weight: 700; margin-left: auto; font-variant-numeric: tabular-nums; }
+.portfolio-summary .ps-value.ps-up { color: #ef4444; }    /* 台股慣例：漲紅 */
+.portfolio-summary .ps-value.ps-down { color: #22c55e; }  /* 跌綠 */
+.portfolio-summary .ps-arrow { color: var(--muted); font-size: 1.1em; }
+
 /* 設定 modal 裡的持倉表格 */
 .holdings-table {
   display: flex;
@@ -1879,6 +1894,7 @@ a:active { opacity: 0.6; }
       </div>
       <button class="hdr-btn" id="btn-theme" title="日/夜">🌙</button>
       <button class="hdr-btn" id="btn-date" title="歷史">📅</button>
+      <button class="hdr-btn" onclick="location.href='/portfolio'" title="去投資組合">📈</button>
       <button class="hdr-btn" id="btn-refresh" title="重新整理">↻</button>
     </div>
   </div>
@@ -1891,6 +1907,14 @@ a:active { opacity: 0.6; }
     <button class="nav-btn" data-target="sec-ntw">🇹🇼 台灣新聞</button>
     <button class="nav-btn" data-target="sec-nww">🌍 世界新聞</button>
   </nav>
+</div>
+
+<!-- 投資組合 summary banner (V1.3.11) -->
+<div id="portfolio-summary" class="portfolio-summary" onclick="location.href='/portfolio'" hidden>
+  <span class="ps-icon">💼</span>
+  <span class="ps-label">投資未實現損益</span>
+  <span class="ps-value" id="ps-value">—</span>
+  <span class="ps-arrow">→</span>
 </div>
 
 <div id="root">
@@ -1916,6 +1940,11 @@ a:active { opacity: 0.6; }
     </div>
     <hr style="border:none;border-top:1px solid var(--border);margin:12px 0">
     <div class="changelog-v">${MORNING_VERSION}</div>
+    <div class="changelog-txt">
+      跨 PWA 互聯到「投資組合」：(1) Header 加 📈 按鈕一鍵跳投資組合 PWA。(2) Nav 下方加「💼 投資未實現損益」summary banner — 從 <code>/api/portfolio/holdings</code> + <code>/api/portfolio/quotes</code> 即時算總成本 vs 總現值，沒持倉 hide banner。Click banner 跳 portfolio detail。(3) 設定 modal 內「💼 持倉」編輯區拿掉 — 持倉編輯統一由投資組合 PWA 管理（user 反映「持股資料晨報可以直接抓投資的」），避免 source-of-truth 重複。<code>morning_prefs.tw_holdings/us_holdings</code> 後端 schema 留著但前端不再寫入。<br>
+      Cross-PWA integration with Portfolio: (1) Header 📈 button → /portfolio. (2) Summary banner under nav shows unrealized PnL aggregated across all holdings (fetched live from <code>portfolio_transactions</code> + cnyes quotes); hidden when no positions. Click banner → portfolio detail. (3) Settings modal holdings-edit section removed — portfolio is the single source of truth (per user feedback "morning report can pull from investment directly"). Legacy <code>tw_holdings/us_holdings</code> JSON field kept in <code>morning_prefs</code> for backward compat but no longer read/written by frontend.
+    </div>
+    <div class="changelog-v old">V1.3.10</div>
     <div class="changelog-txt">
       兩件修正。(1) 修匯率全空白：台銀 <code>flcsv/0/day</code> CSV 端點現在 302 導去公告頁不再回 CSV。改為 <b>CSV 主源 + HTML fallback</b>—優先打 CSV（<code>redirect: 'manual'</code> 不跟 302），失敗才解析 <code>xrt?Lang=zh-TW</code> 牌告 HTML，從每個 <code>&lt;tr&gt;</code> 抽 <code>(CCY)</code> + <code>data-table="本行XX買入/賣出"</code> 數值；現金/即期買賣價全部保留，CSV 恢復後不用再改。(2) 修 About card 可橫向滑動：<code>body</code> 補 <code>overflow-x: hidden</code>（CrewSync 早就有，晨報漏掉），modal 加 <code>overflow-wrap: break-word</code> 防長英文/code 撐爆。<br>
       Two fixes. (1) FX-blank bugfix: BOT <code>flcsv/0/day</code> now 302-redirects to a notice page instead of returning CSV. Switched to <b>CSV-first + HTML-fallback</b>: try CSV with <code>redirect: 'manual'</code>; on failure parse <code>xrt?Lang=zh-TW</code> rate table, extracting <code>(CCY)</code> + <code>data-table="本行XX買入/賣出"</code> cell values per <code>&lt;tr&gt;</code>. Cash/spot buy/sell rates preserved — no rework needed when CSV is restored. (2) About-card horizontal-scroll bugfix: added <code>body { overflow-x: hidden }</code> (already in CrewSync, missing here), plus defensive <code>overflow-wrap: break-word</code> on modal to prevent long English/code strings from blowing up width.
@@ -2048,9 +2077,12 @@ a:active { opacity: 0.6; }
         <textarea id="set-tw-custom" placeholder="4968,3515"></textarea>
       </div>
       <div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--border)">
-        <p style="margin-top:0">💼 持倉（填了才顯示市值/損益，跨裝置同步）</p>
-        <div id="tw-holdings-table" class="holdings-table"></div>
-        <button type="button" class="danger-btn" onclick="clearAllHoldings('tw')">🗑️ 清除全部台股持倉</button>
+        <p style="margin-top:0">💼 持倉</p>
+        <p style="font-size:.85em;color:var(--muted);line-height:1.5">
+          持倉編輯已搬到「投資組合」 PWA。在那邊加交易，總損益自動顯示在晨報頂部，<br>
+          這邊 settings 不再 key qty / 成本。
+        </p>
+        <button type="button" onclick="location.href='/portfolio'">→ 去投資組合</button>
       </div>
     </div>
 
@@ -2064,9 +2096,12 @@ a:active { opacity: 0.6; }
         <textarea id="set-us-custom" placeholder="GME,AMC"></textarea>
       </div>
       <div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--border)">
-        <p style="margin-top:0">💼 持倉（填了才顯示市值/損益，跨裝置同步）</p>
-        <div id="us-holdings-table" class="holdings-table"></div>
-        <button type="button" class="danger-btn" onclick="clearAllHoldings('us')">🗑️ 清除全部美股持倉</button>
+        <p style="margin-top:0">💼 持倉</p>
+        <p style="font-size:.85em;color:var(--muted);line-height:1.5">
+          持倉編輯已搬到「投資組合」 PWA。在那邊加交易，總損益自動顯示在晨報頂部，<br>
+          這邊 settings 不再 key qty / 成本。
+        </p>
+        <button type="button" onclick="location.href='/portfolio'">→ 去投資組合</button>
       </div>
     </div>
 
@@ -4792,6 +4827,55 @@ function bumpFont(dir) {
   setTimeout(updateHdrH, 50);
 }
 applyFontScale();
+
+// ── Portfolio summary banner (V1.3.11) ──────────────────────────────────────
+// 從 /api/portfolio/holdings + /api/portfolio/quotes 算總未實現損益，
+// 顯示在 nav 下方 banner。沒持倉就 hide。Click 整 banner 跳 /portfolio。
+async function loadPortfolioSummary() {
+  const banner = document.getElementById('portfolio-summary');
+  if (!banner) return;
+  const uid = getUid();
+  if (!uid) { banner.hidden = true; return; }
+  try {
+    const r = await fetch('/api/portfolio/holdings', {
+      headers: { 'X-User-Id': encodeURIComponent(uid) },
+    });
+    if (!r.ok) { banner.hidden = true; return; }
+    const j = await r.json();
+    const holdings = j.holdings || [];
+    if (holdings.length === 0) { banner.hidden = true; return; }
+
+    // 抓 quotes batch
+    const tw = holdings.filter(h => h.market === 'TW').map(h => h.symbol);
+    const us = holdings.filter(h => h.market === 'US').map(h => h.symbol);
+    const params = new URLSearchParams();
+    if (tw.length) params.set('tw', tw.join(','));
+    if (us.length) params.set('us', us.join(','));
+    const qr = await fetch('/api/portfolio/quotes?' + params);
+    const quotes = qr.ok ? ((await qr.json()).quotes || {}) : {};
+
+    let totalCost = 0;
+    let totalValue = 0;
+    for (const h of holdings) {
+      const q = quotes[h.market + ':' + h.symbol] || {};
+      const price = typeof q.price === 'number' ? q.price : h.avgCost;
+      totalCost += h.costBasis;
+      totalValue += h.qty * price;
+    }
+    const pnl = totalValue - totalCost;
+    const pct = totalCost > 0 ? (pnl / totalCost * 100) : 0;
+    const valueEl = document.getElementById('ps-value');
+    valueEl.className = 'ps-value ' + (pnl > 0 ? 'ps-up' : pnl < 0 ? 'ps-down' : '');
+    const sign = pnl > 0 ? '+' : '';
+    const fmtNum = (n) => Math.round(n).toLocaleString();
+    valueEl.textContent = sign + fmtNum(pnl) + ' (' + sign + pct.toFixed(1) + '%)';
+    banner.hidden = false;
+  } catch (e) {
+    banner.hidden = true;
+  }
+}
+// 載入後 trigger 一次 (page load); refresh 時也 trigger
+loadPortfolioSummary();
 
 // 🔄 個別區塊重抓（只換該區塊 DOM，保留捲動位置跟其他區塊）
 async function refreshPartial(section) {
