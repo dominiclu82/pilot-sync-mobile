@@ -24,24 +24,31 @@ export function getPortfolioHtml(): string {
 </head>
 <body>
   <div id="app">
+    <!-- Cross-PWA tab navbar + 功能按鈕同 row (V1.0.9) -->
+    <nav class="tab-nav">
+      <div class="tab-links">
+        <a href="/morning">🌅 晨報</a>
+        <a href="/portfolio" class="active">📈 投資組合</a>
+      </div>
+      <div class="tab-controls">
+        <div class="hdr-btn-font" title="字型大小">
+          <button onclick="bumpFont(1)">A+</button>
+          <button onclick="bumpFont(-1)">A−</button>
+        </div>
+        <button class="hdr-btn" id="btn-theme" onclick="toggleTheme()" title="日/夜">🌙</button>
+        <button class="hdr-btn" onclick="openSettings()" title="設定">⚙</button>
+      </div>
+    </nav>
+
     <!-- 主畫面 -->
     <div id="page-main" class="page">
       <div class="hdr">
         <div style="min-width:0;flex:1">
           <div class="hdr-title">
             📈 投資組合
-            <span class="ver" id="ver-tag" onclick="openAbout()">V1.0.8</span>
+            <span class="ver" id="ver-tag" onclick="openAbout()">V1.0.9</span>
           </div>
           <div class="hdr-user" id="hdr-user" onclick="changeUid()">—</div>
-        </div>
-        <div class="hdr-btns">
-          <div class="hdr-btn-font" title="字型大小">
-            <button onclick="bumpFont(1)">A+</button>
-            <button onclick="bumpFont(-1)">A−</button>
-          </div>
-          <button class="hdr-btn" id="btn-theme" onclick="toggleTheme()" title="日/夜">🌙</button>
-          <button class="hdr-btn" onclick="location.href='/morning'" title="去晨報">☀️</button>
-          <button class="hdr-btn" onclick="openSettings()" title="設定">⚙</button>
         </div>
       </div>
       <div class="hdr-actions">
@@ -168,7 +175,18 @@ export function getPortfolioHtml(): string {
         <div class="modal-body" style="max-height:60vh;overflow-y:auto">
           <div class="muted muted-small">獨立投資組合子系統 — 多筆買賣帳本、自動算均價、三視角持倉分析、opt-in PIN 保護</div>
           <div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border)">
-            <div style="font-weight:700;margin-bottom:6px">V1.0.8 — 跨 PWA 互聯</div>
+            <div style="font-weight:700;margin-bottom:6px">V1.0.9 — Tab navbar 切換晨報 / 投資組合</div>
+            <div class="muted" style="font-size:.85em;line-height:1.6;margin-bottom:12px">
+              修 V1.0.8 兩個 sun emoji 撞色問題（light theme 時 ☀️ theme toggle
+              跟 ☀️ link button 兩個都太陽）。改成最上方 sticky tab navbar：
+              <code>🌅 晨報 | 📈 投資組合</code>，active tab 底線 highlight。
+              拿掉 header 內 cross-link button。Click inactive tab navigate 到
+              對應 URL（晨報 / 投資組合 兩個 PWA 各自獨立 implement 同樣
+              navbar 視覺）。
+            </div>
+          </div>
+          <div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border)">
+            <div style="font-weight:700;margin-bottom:6px;color:var(--muted)">V1.0.8 — 跨 PWA 互聯</div>
             <div class="muted" style="font-size:.85em;line-height:1.6;margin-bottom:12px">
               Header 加 ☀️ 按鈕跳晨報；晨報那邊同步加 📈 按鈕跳回投資組合。
               晨報加「💼 投資總損益」summary banner 顯示未實現損益（從這邊
@@ -354,6 +372,32 @@ function getStyles(): string {
 }
 * { box-sizing: border-box; }
 [hidden] { display: none !important; }  /* hotfix: 強制 hidden 屬性 override 任何 author CSS display */
+
+/* Cross-PWA tab navbar + 功能按鈕同 row (V1.0.9) */
+.tab-nav {
+  display: flex; align-items: stretch; gap: 8px;
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
+  position: sticky; top: 0; z-index: 50;
+  padding: 0 8px;
+}
+.tab-links { display: flex; flex: 1; min-width: 0; }
+.tab-links a {
+  flex: 1; text-align: center; padding: 12px 8px;
+  color: var(--muted); text-decoration: none;
+  font-weight: 600; font-size: .95em;
+  border-bottom: 2px solid transparent;
+  transition: color .15s, border-color .15s;
+}
+.tab-links a.active {
+  color: var(--fg);
+  border-bottom-color: var(--accent);
+}
+.tab-links a:active { background: var(--bg-elev); }
+.tab-controls {
+  display: flex; gap: 6px; align-items: center; flex-shrink: 0;
+  padding: 6px 0;
+}
 html { font-size: 15px; }
 html, body { margin: 0; padding: 0; background: var(--bg); color: var(--fg); font-family: -apple-system, "Segoe UI", system-ui, "Microsoft JhengHei", sans-serif; }
 body { font-size: 1rem; }
@@ -1297,7 +1341,7 @@ function renderChart(points, note) {
 
 // ── Theme / Font / About ─────────────────────────────────────────────────────
 
-const PORTFOLIO_VERSION = 'V1.0.8';
+const PORTFOLIO_VERSION = 'V1.0.9';
 const THEME_KEY = 'portfolio_theme';
 const FONT_SCALE_KEY = 'portfolio_font_scale';
 

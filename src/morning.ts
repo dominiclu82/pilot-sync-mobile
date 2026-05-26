@@ -11,7 +11,7 @@ import { Readability } from '@mozilla/readability';
 import { ROOT } from './config.js';
 import { buildMorningReport, fetchSection } from './morning-builder.js';
 
-export const MORNING_VERSION = 'V1.3.11';
+export const MORNING_VERSION = 'V1.3.12';
 const MORNING_CACHE = 'morning-v1-3-10';
 
 // ─── Postgres ────────────────────────────────────────────────────────
@@ -1399,6 +1399,32 @@ a:active { opacity: 0.6; }
 }
 .se-clear:active { background: rgba(255,100,100,0.12); color: #ff8a8a; }
 
+/* Cross-PWA tab navbar + 功能按鈕同 row (V1.3.12) */
+.tab-nav {
+  display: flex; align-items: stretch; gap: 8px;
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
+  position: sticky; top: 0; z-index: 60;
+  padding: 0 8px;
+}
+.tab-links { display: flex; flex: 1; min-width: 0; }
+.tab-links a {
+  flex: 1; text-align: center; padding: 12px 8px;
+  color: var(--muted); text-decoration: none;
+  font-weight: 600; font-size: .95em;
+  border-bottom: 2px solid transparent;
+  transition: color .15s, border-color .15s;
+}
+.tab-links a.active {
+  color: var(--text);
+  border-bottom-color: var(--accent);
+}
+.tab-links a:active { background: rgba(255,255,255,0.06); }
+.tab-controls {
+  display: flex; gap: 6px; align-items: center; flex-shrink: 0;
+  padding: 6px 0;
+}
+
 /* 投資組合 summary banner (V1.3.11) — Nav 下方 sticky-ish 顯示總未實現損益 */
 .portfolio-summary {
   background: var(--bg2); border: 1px solid var(--border); border-radius: 10px;
@@ -1878,6 +1904,23 @@ a:active { opacity: 0.6; }
 </head>
 <body>
 
+<!-- Cross-PWA tab navbar + 功能按鈕同 row (V1.3.12) -->
+<nav class="tab-nav">
+  <div class="tab-links">
+    <a href="/morning" class="active">🌅 晨報</a>
+    <a href="/portfolio">📈 投資組合</a>
+  </div>
+  <div class="tab-controls">
+    <div class="hdr-btn-font" title="字型大小">
+      <button id="btn-font-up">A+</button>
+      <button id="btn-font-dn">A−</button>
+    </div>
+    <button class="hdr-btn" id="btn-theme" title="日/夜">🌙</button>
+    <button class="hdr-btn" id="btn-date" title="歷史">📅</button>
+    <button class="hdr-btn" id="btn-refresh" title="重新整理">↻</button>
+  </div>
+</nav>
+
 <div class="top-stack">
   <div class="hdr">
     <div style="min-width:0;flex:1">
@@ -1886,16 +1929,6 @@ a:active { opacity: 0.6; }
         <span class="ver" onclick="showAbout()">${MORNING_VERSION}</span>
       </div>
       <div class="hdr-date" id="hdr-date">—</div>
-    </div>
-    <div class="hdr-btns">
-      <div class="hdr-btn-font" title="字型大小">
-        <button id="btn-font-up">A+</button>
-        <button id="btn-font-dn">A−</button>
-      </div>
-      <button class="hdr-btn" id="btn-theme" title="日/夜">🌙</button>
-      <button class="hdr-btn" id="btn-date" title="歷史">📅</button>
-      <button class="hdr-btn" onclick="location.href='/portfolio'" title="去投資組合">📈</button>
-      <button class="hdr-btn" id="btn-refresh" title="重新整理">↻</button>
     </div>
   </div>
 
@@ -1940,6 +1973,11 @@ a:active { opacity: 0.6; }
     </div>
     <hr style="border:none;border-top:1px solid var(--border);margin:12px 0">
     <div class="changelog-v">${MORNING_VERSION}</div>
+    <div class="changelog-txt">
+      改 cross-PWA 切換為 <b>tab navbar</b>：最上方加 sticky tab「🌅 晨報 │ 📈 投資組合」，active tab 底線 highlight；<b>字型 / 日夜 / 歷史 / refresh 控制按鈕都搬到 tab navbar 同 row 右邊</b>（user 反映「功能按鈕跟 navbar 在一起啦」），原 hdr 內 hdr-btns 拿掉只剩 title + date。Click 對方 tab 直接跳對應 URL（兩個 PWA 各自 implement 同樣 navbar 視覺）。<br>
+      Cross-PWA navigation switched to <b>tab navbar</b>: sticky top with "🌅 Morning │ 📈 Portfolio" tabs (active underlined); <b>font/theme/history/refresh controls moved to the same row as the navbar</b> (per user "controls should sit with the navbar"), removed from hdr block. Click other tab → navigate to its URL. Both PWAs implement the same navbar visual independently.
+    </div>
+    <div class="changelog-v old">V1.3.11</div>
     <div class="changelog-txt">
       跨 PWA 互聯到「投資組合」：(1) Header 加 📈 按鈕一鍵跳投資組合 PWA。(2) Nav 下方加「💼 投資未實現損益」summary banner — 從 <code>/api/portfolio/holdings</code> + <code>/api/portfolio/quotes</code> 即時算總成本 vs 總現值，沒持倉 hide banner。Click banner 跳 portfolio detail。(3) 設定 modal 內「💼 持倉」編輯區拿掉 — 持倉編輯統一由投資組合 PWA 管理（user 反映「持股資料晨報可以直接抓投資的」），避免 source-of-truth 重複。<code>morning_prefs.tw_holdings/us_holdings</code> 後端 schema 留著但前端不再寫入。<br>
       Cross-PWA integration with Portfolio: (1) Header 📈 button → /portfolio. (2) Summary banner under nav shows unrealized PnL aggregated across all holdings (fetched live from <code>portfolio_transactions</code> + cnyes quotes); hidden when no positions. Click banner → portfolio detail. (3) Settings modal holdings-edit section removed — portfolio is the single source of truth (per user feedback "morning report can pull from investment directly"). Legacy <code>tw_holdings/us_holdings</code> JSON field kept in <code>morning_prefs</code> for backward compat but no longer read/written by frontend.
