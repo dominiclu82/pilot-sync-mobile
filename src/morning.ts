@@ -12,7 +12,7 @@ import { ROOT } from './config.js';
 import { buildMorningReport, fetchSection } from './morning-builder.js';
 import { listUserSymbols } from './portfolio/queries.js';
 
-export const MORNING_VERSION = 'V1.3.15';
+export const MORNING_VERSION = 'V1.3.16';
 const MORNING_CACHE = 'morning-v1-3-10';
 
 // ─── Postgres ────────────────────────────────────────────────────────
@@ -634,12 +634,22 @@ morningRouter.post('/api/morning-prefs', async (req, res) => {
 });
 
 // ─── GET /api/morning-prefs — 使用者取回自己的設定（跨裝置同步用） ────
+// V1.3.16: prefs.tw / prefs.us 在 return 前 union user portfolio holdings symbols,
+// 這樣 frontend render stocks section iterate 自然 include 持倉 (即便沒手動加自選)
 morningRouter.get('/api/morning-prefs', async (req, res) => {
   try {
     const userId = reqUserId(req);
     if (!userId) return res.status(400).json({ error: 'missing_or_invalid_user_id' });
     const prefs = await getPrefs(userId);
     if (!prefs) return res.status(404).json({ error: 'no_prefs' });
+    // Augment with portfolio symbols (silent fallback on error)
+    try {
+      const portSymbols = await listUserSymbols(userId);
+      const portTw = portSymbols.filter(s => s.market === 'TW').map(s => s.symbol);
+      const portUs = portSymbols.filter(s => s.market === 'US').map(s => s.symbol);
+      if (portTw.length > 0) prefs.tw = Array.from(new Set([...(prefs.tw || []), ...portTw]));
+      if (portUs.length > 0) prefs.us = Array.from(new Set([...(prefs.us || []), ...portUs]));
+    } catch (e) { /* silent */ }
     res.json(prefs);
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
@@ -1988,6 +1998,21 @@ a:active { opacity: 0.6; }
     </div>
     <hr style="border:none;border-top:1px solid var(--border);margin:12px 0">
     <div class="changelog-v">${MORNING_VERSION}</div>
+    <div class="changelog-txt">
+      V1.3.15 漏修一處：cron 階段已 union (build report 內含 portfolio symbols data)，
+      但 frontend 從 <code>/api/morning-prefs</code> GET 拿 prefs.tw/us **沒 augment**，
+      iterate render stocks section 時 portfolio symbol 沒在 list 內就不會顯示。<br>
+      Fix: <code>GET /api/morning-prefs</code> handler 在 return 之前
+      union <code>listUserSymbols(uid)</code> 進 prefs.tw/us，
+      frontend render 自然 include 持倉 symbols。<br>
+      V1.3.15 missed one spot: cron stage was augmented (so report data
+      contained portfolio symbols), but the <code>GET /api/morning-prefs</code>
+      handler returned raw prefs without portfolio union — so frontend
+      rendered stocks section iterating the unaugmented list. Fix: GET
+      handler now unions <code>listUserSymbols(uid)</code> into
+      <code>prefs.tw / prefs.us</code> before responding.
+    </div>
+    <div class="changelog-v old">V1.3.15</div>
     <div class="changelog-txt">
       兩個修：(1) 晨報 cron <code>runBuildAll</code> 內每個 user 的
       <code>prefs.tw / prefs.us</code> 跟 portfolio holdings symbols 做 union，
