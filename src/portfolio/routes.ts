@@ -34,7 +34,7 @@ import {
 } from './queries.js';
 import { calcOverall, calcAllViews } from './holdings.js';
 import { getPortfolioHtml } from './frontend.js';
-import { cnyesBatch } from '../morning-builder.js';
+import { cnyesBatch, fetchUsdTwdRate } from '../morning-builder.js';
 import { querySnapshots, snapshotUser, startSnapshotCron } from './snapshot.js';
 import { backfillUser } from './backfill.js';
 import { fetchDividendInfo } from './dividend.js';
@@ -415,6 +415,26 @@ portfolioRouter.get('/api/portfolio/chart', pinGate, async (req, res) => {
       }
     }
     res.json({ period, range, points });
+  } catch (e: any) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+/** GET /api/portfolio/fx?pair=USD/TWD — 換匯 rate (從台銀 BOT) */
+// 1h memory cache，BOT 一天 update 數次
+let _fxCache: { rate: number; at: number } | null = null;
+portfolioRouter.get('/api/portfolio/fx', async (req, res) => {
+  const pair = String(req.query.pair || '');
+  if (pair !== 'USD/TWD') return res.status(400).json({ error: 'unsupported_pair' });
+  const now = Date.now();
+  if (_fxCache && now - _fxCache.at < 60 * 60 * 1000) {
+    return res.json({ pair, rate: _fxCache.rate, cached: true });
+  }
+  try {
+    const rate = await fetchUsdTwdRate();
+    if (rate == null) return res.status(503).json({ error: 'fx_fetch_failed' });
+    _fxCache = { rate, at: now };
+    res.json({ pair, rate });
   } catch (e: any) {
     res.status(500).json({ error: e.message });
   }

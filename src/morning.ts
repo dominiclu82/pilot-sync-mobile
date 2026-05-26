@@ -12,7 +12,7 @@ import { ROOT } from './config.js';
 import { buildMorningReport, fetchSection } from './morning-builder.js';
 import { listUserSymbols } from './portfolio/queries.js';
 
-export const MORNING_VERSION = 'V1.3.16';
+export const MORNING_VERSION = 'V1.3.17';
 const MORNING_CACHE = 'morning-v1-3-10';
 
 // ─── Postgres ────────────────────────────────────────────────────────
@@ -1459,10 +1459,13 @@ a:active { opacity: 0.6; }
 }
 .portfolio-summary:active { opacity: 0.7; }
 .portfolio-summary .ps-icon { font-size: 1.1em; }
+.portfolio-summary .ps-main { display: flex; flex: 1; min-width: 0; flex-direction: row; align-items: center; flex-wrap: wrap; gap: 4px 10px; }
 .portfolio-summary .ps-label { color: var(--muted); }
 .portfolio-summary .ps-value { font-weight: 700; margin-left: auto; font-variant-numeric: tabular-nums; }
 .portfolio-summary .ps-value.ps-up { color: #ef4444; }    /* 台股慣例：漲紅 */
 .portfolio-summary .ps-value.ps-down { color: #22c55e; }  /* 跌綠 */
+.portfolio-summary .ps-fx-note { color: var(--muted); font-size: .78em; flex-basis: 100%; }
+.portfolio-summary .ps-fx-note:empty { display: none; }
 .portfolio-summary .ps-arrow { color: var(--muted); font-size: 1.1em; }
 
 /* 設定 modal 裡的持倉表格 */
@@ -1967,11 +1970,14 @@ a:active { opacity: 0.6; }
   </nav>
 </div>
 
-<!-- 投資組合 summary banner (V1.3.11) -->
+<!-- 投資組合 summary banner (V1.3.11; V1.3.17 加 fx note) -->
 <div id="portfolio-summary" class="portfolio-summary" onclick="location.href='/portfolio'" hidden>
   <span class="ps-icon">💼</span>
-  <span class="ps-label">投資未實現損益</span>
-  <span class="ps-value" id="ps-value">—</span>
+  <div class="ps-main">
+    <span class="ps-label">投資未實現損益</span>
+    <span class="ps-value" id="ps-value">—</span>
+    <span class="ps-fx-note" id="ps-fx-note"></span>
+  </div>
   <span class="ps-arrow">→</span>
 </div>
 
@@ -1998,6 +2004,21 @@ a:active { opacity: 0.6; }
     </div>
     <hr style="border:none;border-top:1px solid var(--border);margin:12px 0">
     <div class="changelog-v">${MORNING_VERSION}</div>
+    <div class="changelog-txt">
+      修 user 反映 bug：投資組合 summary banner「總未實現損益」TW + US
+      持倉直接相加，**沒換匯**（NT$ + US$ raw 數字相加 → 數字錯）。
+      Fix: <code>loadPortfolioSummary</code> 在 sum totalCost / totalValue
+      前 fetch <code>/api/portfolio/fx?pair=USD/TWD</code> 拿即期 rate，
+      美股部位 × rate 後再加進總和。Fx endpoint 走台銀 BOT CSV (跟匯率
+      card 同源)，後端 1h memory cache。fx fetch fail 用 32 fallback。<br>
+      Fixed user-reported bug: portfolio summary banner total unrealized
+      PnL summed TW (NT$) and US (US$) holdings without FX conversion,
+      producing nonsense aggregate. <code>loadPortfolioSummary</code> now
+      fetches <code>/api/portfolio/fx?pair=USD/TWD</code> (BOT CSV, 1h
+      server cache) and multiplies US holding values by the rate before
+      aggregation. Falls back to 32 on fx fetch failure.
+    </div>
+    <div class="changelog-v old">V1.3.16</div>
     <div class="changelog-txt">
       V1.3.15 漏修一處：cron 階段已 union (build report 內含 portfolio symbols data)，
       但 frontend 從 <code>/api/morning-prefs</code> GET 拿 prefs.tw/us **沒 augment**，
@@ -4996,13 +5017,24 @@ async function loadPortfolioSummary() {
     const qr = await fetch('/api/portfolio/quotes?' + params);
     const quotes = qr.ok ? ((await qr.json()).quotes || {}) : {};
 
+    // V1.3.17: 美股換匯成 TWD 再加總 (user 反映 bug: 數字直接相加沒換匯)
+    let fxUsdTwd = 32;  // fallback if fetch fail
+    try {
+      const fxR = await fetch('/api/portfolio/fx?pair=USD/TWD');
+      if (fxR.ok) {
+        const fxJ = await fxR.json();
+        if (typeof fxJ.rate === 'number' && fxJ.rate > 0) fxUsdTwd = fxJ.rate;
+      }
+    } catch {}
+
     let totalCost = 0;
     let totalValue = 0;
     for (const h of holdings) {
       const q = quotes[h.market + ':' + h.symbol] || {};
       const price = typeof q.price === 'number' ? q.price : h.avgCost;
-      totalCost += h.costBasis;
-      totalValue += h.qty * price;
+      const fx = h.market === 'US' ? fxUsdTwd : 1;
+      totalCost += h.costBasis * fx;
+      totalValue += h.qty * price * fx;
     }
     const pnl = totalValue - totalCost;
     const pct = totalCost > 0 ? (pnl / totalCost * 100) : 0;
@@ -5011,6 +5043,12 @@ async function loadPortfolioSummary() {
     const sign = pnl > 0 ? '+' : '';
     const fmtNum = (n) => Math.round(n).toLocaleString();
     valueEl.textContent = sign + fmtNum(pnl) + ' (' + sign + pct.toFixed(1) + '%)';
+    // 標註用了 USD/TWD 即期 rate 換匯，提示這是 approximation (不含買進當時 FX gain since purchase)
+    const hasUs = holdings.some(h => h.market === 'US');
+    const noteEl = document.getElementById('ps-fx-note');
+    if (noteEl) {
+      noteEl.textContent = hasUs ? '美股部位 × USD/TWD ' + fxUsdTwd.toFixed(2) + ' 換算' : '';
+    }
     banner.hidden = false;
   } catch (e) {
     banner.hidden = true;

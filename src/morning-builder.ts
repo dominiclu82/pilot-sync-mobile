@@ -421,6 +421,16 @@ function _parseBotCsv(text: string): Record<string, TwdRate> | null {
   return Object.keys(out).length > 0 ? out : null;
 }
 
+// V1.0.12: 給 portfolio module 換匯用 (USD/TWD rate from BOT CSV)
+export async function fetchUsdTwdRate(): Promise<number | null> {
+  try {
+    const rates = await _fetchBotCsvRates();
+    return rates?.USD?.rate ?? null;
+  } catch {
+    return null;
+  }
+}
+
 async function _fetchBotCsvRates(): Promise<Record<string, TwdRate> | null> {
   try {
     const url = 'https://rate.bot.com.tw/xrt/flcsv/0/day?t=' + Date.now();

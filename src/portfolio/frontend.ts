@@ -46,7 +46,7 @@ export function getPortfolioHtml(): string {
         <div style="min-width:0;flex:1">
           <div class="hdr-title">
             <span class="hdr-user" id="hdr-user" onclick="changeUid()">—</span>
-            <span class="ver" id="ver-tag" onclick="openAbout()">V1.0.11</span>
+            <span class="ver" id="ver-tag" onclick="openAbout()">V1.0.12</span>
           </div>
         </div>
       </div>
@@ -174,7 +174,21 @@ export function getPortfolioHtml(): string {
         <div class="modal-body" style="max-height:60vh;overflow-y:auto">
           <div class="muted muted-small">獨立投資組合子系統 — 多筆買賣帳本、自動算均價、三視角持倉分析、opt-in PIN 保護</div>
           <div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border)">
-            <div style="font-weight:700;margin-bottom:6px">V1.0.11 — 配股配息資訊 + 股票名點開 cnyes</div>
+            <div style="font-weight:700;margin-bottom:6px">V1.0.12 — 換 yahoo v8 chart 抓配息 + fx endpoint</div>
+            <div class="muted" style="font-size:.85em;line-height:1.6;margin-bottom:12px">
+              (1) V1.0.11 yahoo <code>quoteSummary</code> endpoint 全 null（Yahoo 2023
+              起加 crumb cookie 卡 anonymous request），改用 <code>/v8/finance/chart?events=div</code>
+              endpoint 抓過去 1 年 dividend events，自己 sum 算 trailing annual rate +
+              yield (totalRate ÷ regularMarketPrice)。 backfill module 用過同個 endpoint
+              抓歷史價，confirmed reliable。沒配過息的個股不顯示。<br>
+              (2) 新增 <code>GET /api/portfolio/fx?pair=USD/TWD</code> endpoint，從台銀
+              BOT CSV 抓即期 rate (跟晨報 fx 同源)，1h memory cache。晨報 portfolio
+              summary banner 用此 rate 換算美股部位再加總（修 V1.3.16 bug: TW + US
+              直接加沒換匯）。
+            </div>
+          </div>
+          <div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border)">
+            <div style="font-weight:700;margin-bottom:6px;color:var(--muted)">V1.0.11 — 配股配息資訊 + 股票名點開 cnyes</div>
             <div class="muted" style="font-size:.85em;line-height:1.6;margin-bottom:12px">
               (1) 持倉 row 加 <strong>💰 配股配息</strong> 顯示：殖利率、年配息、除息日 — 從
               Yahoo Finance <code>quoteSummary</code> endpoint 抓，後端 24h memory cache。
@@ -901,14 +915,19 @@ function renderMain() {
     const cnyesUrl = h.market === 'TW'
       ? 'https://www.cnyes.com/twstock/' + h.symbol
       : 'https://invest.cnyes.com/usstock/detail/' + h.symbol;
-    // 配股配息資訊 (V1.0.11，從 yahoo 抓)
+    // 配股配息資訊 (V1.0.12，yahoo v8 chart events=div)
+    // 拆 lastRate vs annual: quarterly payer 不會把累計年配跟單次除息日混在一起誤導
     const div = _state.dividends[h.market + ':' + h.symbol];
     let divHtml = '';
     if (div && (div.dividendYield || div.dividendRate)) {
       const parts = [];
       if (div.dividendYield != null) parts.push('<span class="yield">殖利率 ' + (div.dividendYield * 100).toFixed(2) + '%</span>');
-      if (div.dividendRate != null) parts.push('配 ' + fmtNum(div.dividendRate));
-      if (div.exDividendDate) parts.push('除息 ' + div.exDividendDate);
+      if (div.dividendRate != null) parts.push('年配 ' + fmtNum(div.dividendRate));
+      if (div.lastRate != null && div.exDividendDate) {
+        parts.push('最近配 ' + fmtNum(div.lastRate) + ' 除息 ' + div.exDividendDate);
+      } else if (div.exDividendDate) {
+        parts.push('除息 ' + div.exDividendDate);
+      }
       divHtml = '<div class="h-div">💰 ' + parts.join(' · ') + '</div>';
     }
     return \`
@@ -1403,7 +1422,7 @@ function renderChart(points, note) {
 
 // ── Theme / Font / About ─────────────────────────────────────────────────────
 
-const PORTFOLIO_VERSION = 'V1.0.11';
+const PORTFOLIO_VERSION = 'V1.0.12';
 const THEME_KEY = 'portfolio_theme';
 const FONT_SCALE_KEY = 'portfolio_font_scale';
 
