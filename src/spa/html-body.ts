@@ -1509,7 +1509,7 @@ export function getSpaHtmlBody(): string {
       <button class="tab-util-btn tab-install-btn" id="tab-install-btn" onclick="showInstallGuide()" style="display:none">
         <span>📲</span>安裝
       </button>
-      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer;text-decoration:underline" onclick="showAbout()">V8.0.34</span>
+      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer;text-decoration:underline" onclick="showAbout()">V8.0.35</span>
     </div>
   </div>
 </div>
@@ -1540,7 +1540,12 @@ export function getSpaHtmlBody(): string {
       <div style="color:var(--muted)">Best experience on iPad in landscape mode. Android devices may not display correctly.</div>
     </div>
     <div style="max-height:50vh;overflow-y:auto;-webkit-overflow-scrolling:touch;margin-bottom:10px">
-    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V8.0.34</div>
+    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V8.0.35</div>
+    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
+      <div>Portfolio V1.0.2: UX 對齊晨報 — 1) 版號 / 字型 ± / 日夜切換按鈕從 footer + settings modal **搬到 header 右上**，跟晨報同位置（user 反映「都說了要對齊晨報」）。2) 漲跌顏色從歐美 convention（綠漲紅跌）改成**台灣股市慣例**（漲紅 / 跌綠），buy 紅 sell 綠也配合改。3) Theme button 改 icon only（☀️ / 🌙）。</div>
+      <div>Portfolio V1.0.2: UX alignment with morning report — 1) Version tag / font ± / theme toggle moved from footer + settings modal **into the header top-right**, matching morning report position. 2) Up/down colors changed from Western (green up / red down) to Taiwan stock convention (red up / green down); buy/sell colors also flipped to match. 3) Theme button reduced to icon only.</div>
+    </div>
+    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V8.0.34</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
       <div>Portfolio module 升 V1.0.1：補上晨報 / Pilot Log 都有的 UX 基本款 — 日夜切換、字型大小 ±、版次顯示、歷史更新（about modal）。沿用晨報的 <code>data-theme</code> + <code>font-scale</code> localStorage pattern，theme + font 偏好跨裝置不同步（純本機 preference）。V1.0.0 launch 時設計遺漏，user 反映「晨報都有的東西怎麼沒看到」後補完。</div>
       <div>Portfolio module bump to V1.0.1: add the basic UX features that morning report and Pilot Log already had — light/dark toggle, font size ±, version tag, changelog history (about modal). Reuses the morning report's <code>data-theme</code> + <code>font-scale</code> localStorage pattern; theme + font are per-device (not cross-device). Filled the gap left by V1.0.0 launch after user feedback.</div>

@@ -26,20 +26,30 @@ export function getPortfolioHtml(): string {
     <!-- 主畫面 -->
     <div id="page-main" class="page">
       <div class="hdr">
-        <div class="hdr-title">📈 投資組合</div>
-        <div class="hdr-user" id="hdr-user" onclick="changeUid()">—</div>
+        <div style="min-width:0;flex:1">
+          <div class="hdr-title">
+            📈 投資組合
+            <span class="ver" id="ver-tag" onclick="openAbout()">V1.0.2</span>
+          </div>
+          <div class="hdr-user" id="hdr-user" onclick="changeUid()">—</div>
+        </div>
+        <div class="hdr-btns">
+          <div class="hdr-btn-font" title="字型大小">
+            <button onclick="bumpFont(1)">A+</button>
+            <button onclick="bumpFont(-1)">A−</button>
+          </div>
+          <button class="hdr-btn" id="btn-theme" onclick="toggleTheme()" title="日/夜">🌙</button>
+          <button class="hdr-btn" onclick="openSettings()" title="設定">⚙</button>
+        </div>
       </div>
       <div class="hdr-actions">
         <button class="btn btn-primary" onclick="openAddModal()">+ 加交易</button>
         <button class="btn btn-ghost" onclick="refreshAll()">↻ 重抓</button>
-        <button class="btn btn-ghost" onclick="openSettings()" title="設定">⚙</button>
       </div>
       <div id="main-status" class="status"></div>
       <div id="holdings-list" class="list"></div>
       <div class="footer">
         <span class="muted">資料源：cnyes</span>
-        <span class="muted">·</span>
-        <span class="ver" onclick="openAbout()" id="ver-tag">V1.0.0</span>
       </div>
     </div>
 
@@ -116,19 +126,6 @@ export function getPortfolioHtml(): string {
         </div>
         <div class="modal-body">
           <div class="kv">
-            <span class="k">外觀</span>
-            <span><button class="btn btn-ghost" onclick="toggleTheme()" id="btn-theme">🌙 深色</button></span>
-          </div>
-          <div class="kv">
-            <span class="k">字型大小</span>
-            <span style="display:flex;gap:6px;align-items:center">
-              <button class="btn btn-ghost" onclick="bumpFont(-1)" style="padding:4px 10px">A-</button>
-              <span class="muted muted-small" id="font-scale-display">0</span>
-              <button class="btn btn-ghost" onclick="bumpFont(1)" style="padding:4px 10px">A+</button>
-            </span>
-          </div>
-          <hr style="border:none;border-top:1px solid var(--border);margin:4px 0">
-          <div class="kv">
             <span class="k">PIN 保護</span>
             <span class="v" id="settings-pin-status">—</span>
           </div>
@@ -148,7 +145,18 @@ export function getPortfolioHtml(): string {
         <div class="modal-body" style="max-height:60vh;overflow-y:auto">
           <div class="muted muted-small">獨立投資組合子系統 — 多筆買賣帳本、自動算均價、三視角持倉分析、opt-in PIN 保護</div>
           <div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border)">
-            <div style="font-weight:700;margin-bottom:6px">V1.0.1 — UX 補完</div>
+            <div style="font-weight:700;margin-bottom:6px">V1.0.2 — UX 對齊晨報</div>
+            <div class="muted" style="font-size:.85em;line-height:1.6;margin-bottom:12px">
+              • 版號 / 字型 ± / 日夜切換按鈕**搬到 header 右上**（對齊晨報位置，
+                不再藏在 footer 跟 settings modal 內）<br>
+              • 漲跌顏色改**台灣股市慣例**：漲紅、跌綠（V1.0.1 用歐美 convention
+                綠漲紅跌 — user 反映 "台灣人習慣跟歐美不同"，已 reverse）<br>
+              • Buy / Sell 配合：buy = 紅（加碼）、sell = 綠（出場）<br>
+              • Theme button 改 icon only（☀️ / 🌙），不再帶文字
+            </div>
+          </div>
+          <div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border)">
+            <div style="font-weight:700;margin-bottom:6px;color:var(--muted)">V1.0.1 — UX 補完</div>
             <div class="muted" style="font-size:.85em;line-height:1.6;margin-bottom:12px">
               • 日夜切換（沿用晨報 <code>data-theme</code> pattern）<br>
               • 字型大小調整（基準 15px ± 8% / 級）<br>
@@ -238,9 +246,29 @@ function getStyles(): string {
 html, body { margin: 0; padding: 0; background: var(--bg); color: var(--fg); font-family: -apple-system, "Segoe UI", system-ui, "Microsoft JhengHei", sans-serif; font-size: 15px; }
 .page { max-width: 720px; margin: 0 auto; padding: 12px 14px 80px; }
 .hdr { display: flex; align-items: center; gap: 10px; margin: 6px 0 16px; }
-.hdr-title { font-size: 1.2em; font-weight: 700; flex: 1; }
+.hdr-title { font-size: 1.2em; font-weight: 700; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.hdr-title .ver {
+  font-size: .55em; font-weight: 600; color: var(--accent);
+  background: rgba(91,158,255,0.12); border: 1px solid rgba(91,158,255,0.3);
+  padding: 2px 7px; border-radius: 8px; cursor: pointer; letter-spacing: .02em;
+}
+.hdr-title .ver:active { opacity: .7; }
 .hdr-back { font-size: 1.5em; cursor: pointer; padding: 0 6px; user-select: none; }
 .hdr-user { color: var(--muted); font-size: .85em; cursor: pointer; text-decoration: underline dotted; }
+.hdr-btns { display: flex; gap: 6px; flex-shrink: 0; align-items: center; }
+.hdr-btn {
+  background: var(--bg-card); border: 1px solid var(--border); color: var(--fg);
+  padding: 6px 9px; border-radius: 6px; font-size: .9em; cursor: pointer;
+  min-width: 34px; line-height: 1.1;
+}
+.hdr-btn:active { opacity: 0.7; }
+.hdr-btn-font { display: flex; flex-direction: column; gap: 3px; flex-shrink: 0; }
+.hdr-btn-font button {
+  background: var(--bg-card); border: 1px solid var(--border); color: var(--fg);
+  padding: 2px 7px; font-size: .62em; font-weight: 700; line-height: 1.1;
+  min-width: 28px; border-radius: 4px; cursor: pointer;
+}
+.hdr-btn-font button:active { opacity: 0.7; }
 .hdr-actions { display: flex; gap: 8px; margin-bottom: 16px; }
 .btn { padding: 8px 14px; border-radius: 6px; border: 1px solid var(--border); background: var(--bg-card); color: var(--fg); font-size: .92em; cursor: pointer; }
 .btn-primary { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
@@ -260,8 +288,9 @@ html, body { margin: 0; padding: 0; background: var(--bg); color: var(--fg); fon
 .h-chg { font-size: .85em; }
 .h-row2 { display: flex; gap: 12px; margin-top: 4px; color: var(--muted); font-size: .85em; }
 .h-row2 .h-pnl { margin-left: auto; }
-.up { color: var(--green); }
-.down { color: var(--red); }
+/* 台灣股市慣例：漲紅 / 跌綠（跟歐美相反） */
+.up { color: var(--red); }
+.down { color: var(--green); }
 .empty { color: var(--muted); text-align: center; padding: 40px 0; }
 .footer { text-align: center; color: var(--muted); font-size: .75em; margin-top: 30px; padding-top: 16px; border-top: 1px solid var(--border); display: flex; justify-content: center; align-items: center; gap: 8px; flex-wrap: wrap; }
 .footer .ver { cursor: pointer; text-decoration: underline dotted; }
@@ -275,14 +304,15 @@ html, body { margin: 0; padding: 0; background: var(--bg); color: var(--fg); fon
 .kv { display: flex; justify-content: space-between; padding: 4px 0; font-size: .92em; }
 .kv .k { color: var(--muted); }
 .kv .v { font-weight: 600; }
-.kv .v.up { color: var(--green); }
-.kv .v.down { color: var(--red); }
+.kv .v.up { color: var(--red); }
+.kv .v.down { color: var(--green); }
 .txn-row { display: flex; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: .9em; }
 .txn-row:last-child { border-bottom: none; }
 .txn-row .date { color: var(--muted); min-width: 86px; }
 .txn-row .type { min-width: 50px; font-weight: 600; }
-.txn-row .type.buy { color: var(--green); }
-.txn-row .type.sell { color: var(--red); }
+/* 台股 convention: buy = 進場加碼 = 紅, sell = 出場 = 綠 */
+.txn-row .type.buy { color: var(--red); }
+.txn-row .type.sell { color: var(--green); }
 .txn-row .type.div { color: var(--accent); }
 .txn-row .detail { flex: 1; }
 .txn-row .timing { display: block; color: var(--muted); font-size: .82em; margin-top: 2px; }
@@ -850,7 +880,7 @@ async function deleteTxn(id) {
 
 // ── Theme / Font / About ─────────────────────────────────────────────────────
 
-const PORTFOLIO_VERSION = 'V1.0.1';
+const PORTFOLIO_VERSION = 'V1.0.2';
 const THEME_KEY = 'portfolio_theme';
 const FONT_SCALE_KEY = 'portfolio_font_scale';
 
@@ -859,7 +889,7 @@ function applyTheme() {
   if (t === 'light') document.documentElement.dataset.theme = 'light';
   else delete document.documentElement.dataset.theme;
   const btn = document.getElementById('btn-theme');
-  if (btn) btn.textContent = t === 'light' ? '☀️ 淺色' : '🌙 深色';
+  if (btn) btn.textContent = t === 'light' ? '☀️' : '🌙';
   // meta theme-color 同步切換（PWA 上下狀態列色）
   const meta = document.querySelector('meta[name="theme-color"]');
   if (meta) meta.setAttribute('content', t === 'light' ? '#f5f7fa' : '#0a0a0f');
