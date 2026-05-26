@@ -30,7 +30,7 @@ export function getPortfolioHtml(): string {
         <div style="min-width:0;flex:1">
           <div class="hdr-title">
             📈 投資組合
-            <span class="ver" id="ver-tag" onclick="openAbout()">V1.0.5</span>
+            <span class="ver" id="ver-tag" onclick="openAbout()">V1.0.6</span>
           </div>
           <div class="hdr-user" id="hdr-user" onclick="changeUid()">—</div>
         </div>
@@ -60,6 +60,10 @@ export function getPortfolioHtml(): string {
           </span>
         </div>
         <div class="card-body">
+          <div style="display:flex;gap:6px;justify-content:space-between;margin-bottom:8px;align-items:center;flex-wrap:wrap">
+            <span id="range-buttons" style="display:flex;gap:4px"></span>
+            <button class="period-btn" onclick="backfillChart()" title="從 Yahoo Finance 拉歷史" id="btn-backfill">📥 補歷史</button>
+          </div>
           <canvas id="asset-chart" style="max-height:220px"></canvas>
           <div id="chart-note" class="muted muted-small" style="text-align:center;margin-top:6px" hidden></div>
         </div>
@@ -163,7 +167,33 @@ export function getPortfolioHtml(): string {
         <div class="modal-body" style="max-height:60vh;overflow-y:auto">
           <div class="muted muted-small">獨立投資組合子系統 — 多筆買賣帳本、自動算均價、三視角持倉分析、opt-in PIN 保護</div>
           <div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border)">
-            <div style="font-weight:700;margin-bottom:6px">V1.0.5 — 編輯交易 + 資產變化圖</div>
+            <div style="font-weight:700;margin-bottom:6px">V1.0.6 — 圖表 range + 歷史補資料 + Quick Add + 雙均價</div>
+            <div class="muted" style="font-size:.85em;line-height:1.6;margin-bottom:12px">
+              <strong>📊 資產變化圖</strong><br>
+              • 兩層 selector：頻率（日/月/年）+ 範圍 — 日 30/60/90、
+                月 12/24/36、年 5/10/20<br>
+              • 「📥 補歷史」按鈕 — 從 Yahoo Finance 拉每支持股的 daily close
+                replay transactions 算每日 portfolio value，UPSERT 進
+                <code>portfolio_snapshots</code>（idempotent 可重跑）<br>
+              • 賣光的 symbol 那段 chart value = 0（user spec「我有持股的區間才
+                計算資產」）<br>
+              • TW symbol 用 yahoo <code>2330.TW</code> / US 直接 <code>AAPL</code><br>
+              <br>
+              <strong>➕ 持股 row 直接加交易</strong><br>
+              • 主畫面持倉 row 加 ＋ 按鈕 — 點開直接 pre-fill symbol/market<br>
+              • 自動 focus 到股數欄位，直接輸入<br>
+              • 不用每次手動打代號<br>
+              <br>
+              <strong>📐 雙均價同時顯示</strong><br>
+              • Detail 頁加「均價（原始）」/「未實現損益（原始）」<br>
+              • 扣息派：dividend_cash 減 cost basis（配息算成本回收）<br>
+              • 原始派：cost basis 不變（配息算 ROI，獨立累計到「累計領股利」）<br>
+              • 配股都一樣稀釋（兩派 cost 都不動，股數變多）<br>
+              • 兩派 avgCost 差額 × qty = 累計領股利
+            </div>
+          </div>
+          <div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border)">
+            <div style="font-weight:700;margin-bottom:6px;color:var(--muted)">V1.0.5 — 編輯交易 + 資產變化圖</div>
             <div class="muted" style="font-size:.85em;line-height:1.6;margin-bottom:12px">
               • 交易紀錄每筆加 ✏️ 編輯按鈕 — 點開複用加交易 modal (edit mode)
                 可改日期 / 股數 / 價格 / 手續費 / 備註（symbol / market / 方向
@@ -346,6 +376,12 @@ body { font-size: 1rem; }
 .h-chg { font-size: .85em; }
 .h-row2 { display: flex; gap: 12px; margin-top: 4px; color: var(--muted); font-size: .85em; }
 .h-row2 .h-pnl { margin-left: auto; }
+.h-add {
+  background: var(--bg-elev); border: 1px solid var(--border); color: var(--accent);
+  padding: 2px 9px; border-radius: 6px; font-size: 1em; font-weight: 700;
+  cursor: pointer; line-height: 1.1; margin-left: 4px; flex-shrink: 0;
+}
+.h-add:hover, .h-add:active { background: var(--accent); color: #fff; }
 /* 台灣股市慣例：漲紅 / 跌綠（跟歐美相反） */
 .up { color: var(--red); }
 .down { color: var(--green); }
@@ -753,6 +789,7 @@ function renderMain() {
           <div class="h-symbol"><span class="h-mkt">\${h.market}</span>\${h.symbol}<span class="muted muted-small"> \${name}</span></div>
           <div class="h-price">\${priceTxt}</div>
           <div class="h-chg \${chgClass}">\${chgTxt}</div>
+          <span class="h-add" onclick="event.stopPropagation(); quickAddTxn('\${h.market}', '\${h.symbol}')" title="加交易">＋</span>
         </div>
         <div class="h-row2">
           <span>\${fmtNum(h.qty)} 股 · 均價 \${fmtNum(h.avgCost)}</span>
@@ -797,17 +834,24 @@ function goMain() {
 function renderDetail(d, q) {
   const o = d.overall;
   const price = q.price;
+  // 扣息派 (A 派 — dividend_cash 從 cost basis 扣減)
   const unrealized = (price != null && o && o.qty > 0) ? (price - o.avgCost) * o.qty : null;
   const unrealizedPct = (unrealized != null && o.costBasis > 0) ? (unrealized / o.costBasis * 100) : null;
+  // 原始派 (B 派 — dividend_cash 不動 cost basis，配息歸到 totalDividend)
+  const unrealizedBefore = (price != null && o && o.qty > 0) ? (price - o.avgCostBeforeDiv) * o.qty : null;
+  const costBefore = o && o.qty > 0 ? o.avgCostBeforeDiv * o.qty : 0;
+  const unrealizedBeforePct = (unrealizedBefore != null && costBefore > 0) ? (unrealizedBefore / costBefore * 100) : null;
 
   document.getElementById('detail-overall').innerHTML = \`
     <div class="card-hdr"><span>持倉摘要</span><span class="muted muted-small">現價 \${price != null ? fmtNum(price) : '—'}</span></div>
     <div class="card-body">
       <div class="kv"><span class="k">當前股數</span><span class="v">\${o ? fmtNum(o.qty) : '—'}</span></div>
-      <div class="kv"><span class="k">均價（扣息後）</span><span class="v">\${o ? fmtNum(o.avgCost) : '—'}</span></div>
-      <div class="kv"><span class="k">總成本</span><span class="v">\${o ? fmtNum(o.costBasis) : '—'}</span></div>
+      <div class="kv"><span class="k">均價（扣息）</span><span class="v">\${o ? fmtNum(o.avgCost) : '—'}</span></div>
+      <div class="kv"><span class="k">均價（原始）</span><span class="v">\${o ? fmtNum(o.avgCostBeforeDiv) : '—'}</span></div>
+      <div class="kv"><span class="k">總成本（扣息）</span><span class="v">\${o ? fmtNum(o.costBasis) : '—'}</span></div>
       <div class="kv"><span class="k">現值</span><span class="v">\${(price != null && o) ? fmtNum(price * o.qty) : '—'}</span></div>
-      <div class="kv"><span class="k">未實現損益</span><span class="v \${unrealized > 0 ? 'up' : unrealized < 0 ? 'down' : ''}">\${unrealized != null ? (unrealized > 0 ? '+' : '') + fmtNum(unrealized) + (unrealizedPct != null ? ' (' + (unrealizedPct > 0 ? '+' : '') + unrealizedPct.toFixed(1) + '%)' : '') : '—'}</span></div>
+      <div class="kv"><span class="k">未實現損益（扣息）</span><span class="v \${unrealized > 0 ? 'up' : unrealized < 0 ? 'down' : ''}">\${unrealized != null ? (unrealized > 0 ? '+' : '') + fmtNum(unrealized) + (unrealizedPct != null ? ' (' + (unrealizedPct > 0 ? '+' : '') + unrealizedPct.toFixed(1) + '%)' : '') : '—'}</span></div>
+      <div class="kv"><span class="k">未實現損益（原始）</span><span class="v \${unrealizedBefore > 0 ? 'up' : unrealizedBefore < 0 ? 'down' : ''}">\${unrealizedBefore != null ? (unrealizedBefore > 0 ? '+' : '') + fmtNum(unrealizedBefore) + (unrealizedBeforePct != null ? ' (' + (unrealizedBeforePct > 0 ? '+' : '') + unrealizedBeforePct.toFixed(1) + '%)' : '') : '—'}</span></div>
       <div class="kv"><span class="k">累計實現損益</span><span class="v \${o && o.realizedPnl > 0 ? 'up' : o && o.realizedPnl < 0 ? 'down' : ''}">\${o ? (o.realizedPnl > 0 ? '+' : '') + fmtNum(o.realizedPnl) : '—'}</span></div>
       <div class="kv"><span class="k">累計領股利</span><span class="v">\${o ? fmtNum(o.totalDividend) : '—'}</span></div>
     </div>
@@ -907,6 +951,28 @@ function openAddModal() {
   document.getElementById('modal-error').hidden = true;
   setSide('buy');
   updateFeePreview();
+}
+
+/** 從持股 list 點 + 開加交易 modal，pre-fill symbol/market，user 不用再輸入 */
+function quickAddTxn(market, symbol) {
+  if (!getUid()) { changeUid(); return; }
+  _state.editingTxnId = null;
+  document.getElementById('f-symbol').disabled = false;
+  document.getElementById('f-market').disabled = false;
+  document.getElementById('seg-buy').disabled = false;
+  document.getElementById('seg-sell').disabled = false;
+  document.getElementById('modal-add').hidden = false;
+  document.getElementById('f-market').value = market;
+  document.getElementById('f-symbol').value = symbol;
+  document.getElementById('f-date').value = new Date().toISOString().slice(0, 10);
+  document.getElementById('f-qty').value = '';
+  document.getElementById('f-price').value = '';
+  document.getElementById('f-fee').value = '';
+  document.getElementById('f-note').value = '';
+  document.getElementById('modal-error').hidden = true;
+  setSide('buy');
+  updateFeePreview();
+  setTimeout(() => { const el = document.getElementById('f-qty'); if (el) el.focus(); }, 50);
 }
 
 function openEditModal(txn) {
@@ -1039,8 +1105,16 @@ async function deleteTxn(id) {
 
 // ── Chart (資產變化) ─────────────────────────────────────────────────────────
 
+const PERIOD_RANGES = {
+  daily:   [30, 60, 90],
+  monthly: [12, 24, 36],
+  yearly:  [5, 10, 20],
+};
+const PERIOD_UNIT = { daily: '天', monthly: '月', yearly: '年' };
+
 let _chartInstance = null;
 let _chartPeriod = 'daily';
+let _chartRange = 30;
 
 async function loadChart() {
   const card = document.getElementById('chart-card');
@@ -1051,7 +1125,7 @@ async function loadChart() {
   }
   card.hidden = false;
   try {
-    const data = await apiFetch('/chart?period=' + _chartPeriod);
+    const data = await apiFetch('/chart?period=' + _chartPeriod + '&range=' + _chartRange);
     renderChart(data.points || [], data.note || '');
   } catch (e) {
     const note = document.getElementById('chart-note');
@@ -1061,10 +1135,53 @@ async function loadChart() {
 
 function setPeriod(p) {
   _chartPeriod = p;
-  document.querySelectorAll('.period-btn').forEach(b => {
+  _chartRange = PERIOD_RANGES[p][0];  // reset to first range option
+  document.querySelectorAll('.period-btn[data-period]').forEach(b => {
     b.classList.toggle('active', b.dataset.period === p);
   });
+  renderRangeButtons();
   loadChart();
+}
+
+function setRange(n) {
+  _chartRange = n;
+  renderRangeButtons();
+  loadChart();
+}
+
+function renderRangeButtons() {
+  const container = document.getElementById('range-buttons');
+  if (!container) return;
+  const ranges = PERIOD_RANGES[_chartPeriod];
+  const unit = PERIOD_UNIT[_chartPeriod];
+  container.innerHTML = ranges.map(r =>
+    '<button class="period-btn' + (r === _chartRange ? ' active' : '') + '" onclick="setRange(' + r + ')">' + r + unit + '</button>'
+  ).join('');
+}
+
+async function backfillChart() {
+  // 把 range 換算成 days
+  let days = _chartRange;
+  if (_chartPeriod === 'monthly') days = _chartRange * 31;
+  else if (_chartPeriod === 'yearly') days = _chartRange * 366;
+
+  const btn = document.getElementById('btn-backfill');
+  const note = document.getElementById('chart-note');
+  btn.textContent = '⏳ 載入中…';
+  btn.disabled = true;
+  note.textContent = '從 Yahoo Finance 拉 ' + days + ' 天歷史，可能要 10-30 秒…';
+  note.hidden = false;
+  try {
+    const result = await apiFetch('/backfill?days=' + days, { method: 'POST' });
+    note.textContent = '✓ 已回填 ' + (result.backfilled || 0) + ' 天 × ' + (result.symbols || 0) + ' 支股票';
+    btn.textContent = '📥 補歷史';
+    btn.disabled = false;
+    loadChart();
+  } catch (e) {
+    note.textContent = '載入失敗：' + e.message;
+    btn.textContent = '📥 補歷史';
+    btn.disabled = false;
+  }
 }
 
 function renderChart(points, note) {
@@ -1129,7 +1246,7 @@ function renderChart(points, note) {
 
 // ── Theme / Font / About ─────────────────────────────────────────────────────
 
-const PORTFOLIO_VERSION = 'V1.0.5';
+const PORTFOLIO_VERSION = 'V1.0.6';
 const THEME_KEY = 'portfolio_theme';
 const FONT_SCALE_KEY = 'portfolio_font_scale';
 
@@ -1207,6 +1324,7 @@ if (aboutVerEl) aboutVerEl.textContent = PORTFOLIO_VERSION;
 
 applyTheme();
 applyFontScale();
+renderRangeButtons();
 bootstrap();
 `;
 }

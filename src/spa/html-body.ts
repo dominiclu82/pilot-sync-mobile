@@ -1509,7 +1509,7 @@ export function getSpaHtmlBody(): string {
       <button class="tab-util-btn tab-install-btn" id="tab-install-btn" onclick="showInstallGuide()" style="display:none">
         <span>📲</span>安裝
       </button>
-      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer;text-decoration:underline" onclick="showAbout()">V8.0.38</span>
+      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer;text-decoration:underline" onclick="showAbout()">V8.0.39</span>
     </div>
   </div>
 </div>
@@ -1540,7 +1540,12 @@ export function getSpaHtmlBody(): string {
       <div style="color:var(--muted)">Best experience on iPad in landscape mode. Android devices may not display correctly.</div>
     </div>
     <div style="max-height:50vh;overflow-y:auto;-webkit-overflow-scrolling:touch;margin-bottom:10px">
-    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V8.0.38</div>
+    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V8.0.39</div>
+    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
+      <div>Portfolio V1.0.6: 1) 資產變化圖加 range — 日 30/60/90、月 12/24/36、年 5/10/20。2) 加「📥 補歷史」按鈕從 Yahoo Finance 拉 daily close 回填 portfolio_snapshots，跑 backfill 後就能看到趨勢（V1.0.5 只 snapshot 今天無歷史 user 抱怨「只給我當下我怎麼知道變化」）。3) 主畫面持股 row 加 ＋ 按鈕，點開 pre-fill symbol/market 不用再輸入。4) Detail 頁加「均價（原始）」/「未實現損益（原始）」雙派同時顯示 — 扣息派 vs 原始派並列，差額 × qty = 累計領股利。</div>
+      <div>Portfolio V1.0.6: 1) Asset chart range selector — daily 30/60/90, monthly 12/24/36, yearly 5/10/20. 2) 「📥 Backfill」button pulls daily close from Yahoo Finance and replays transactions to fill portfolio_snapshots (V1.0.5 only had today's snapshot). 3) Quick-add ＋ button on each holding row, pre-fills symbol/market. 4) Detail page shows both cost-basis methods side-by-side: dividend-adjusted avgCost vs raw avgCost (and corresponding unrealized PnL); the diff × qty = total cash dividend received.</div>
+    </div>
+    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V8.0.38</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
       <div>Portfolio V1.0.5: 1) 交易紀錄每筆加 ✏️ 編輯按鈕（user 反映「萬一打錯只能重來」），複用加交易 modal edit mode 可改日期/股數/價格/手續費/備註，symbol/方向鎖住。2) 主畫面加 📊 <strong>資產變化圖</strong>，按日/月/年切換 — daily cron 23:30 台北 snapshot 全 user 的 portfolio 總值，從 V1.0.5 上線那天開始累積。Chart.js 4.4.7 CDN 載入 (~90KB)。</div>
       <div>Portfolio V1.0.5: 1) ✏️ Edit button on each transaction (user feedback "what if I mistype"); reuses add-txn modal in edit mode — date/qty/price/fee/note editable, symbol/side locked. 2) 📊 Asset history chart with daily/monthly/yearly toggle. Daily cron at 23:30 Taipei snapshots all users' portfolio total value; chart accumulates from V1.0.5 launch. Chart.js 4.4.7 via CDN (~90KB).</div>

@@ -150,39 +150,59 @@ export function startSnapshotCron() {
 }
 
 /**
- * 查 snapshots 按 period 聚合
- * period: 'daily' | 'monthly' | 'yearly'
+ * 查 snapshots 按 period 聚合 + range 限制
+ * period: 'daily' (range N 天) | 'monthly' (range N 月) | 'yearly' (range N 年)
+ * Output 按時間 ASC (左舊右新，給 chart 用)
  */
-export async function querySnapshots(userId: string, period: 'daily' | 'monthly' | 'yearly'): Promise<Array<{ label: string; value: number; cost: number }>> {
+export async function querySnapshots(
+  userId: string,
+  period: 'daily' | 'monthly' | 'yearly',
+  range: number,
+): Promise<Array<{ label: string; value: number; cost: number }>> {
   const pool = getPool();
   if (!pool) return [];
 
   let sql = '';
   if (period === 'daily') {
-    sql = `SELECT TO_CHAR(snapshot_date, 'YYYY-MM-DD') AS label, total_value AS value, total_cost AS cost
-           FROM portfolio_snapshots
-           WHERE user_id = $1
+    // 取最近 N 天 (DESC limit 再 reverse ASC)
+    sql = `SELECT label, value, cost FROM (
+             SELECT TO_CHAR(snapshot_date, 'YYYY-MM-DD') AS label,
+                    snapshot_date,
+                    total_value AS value,
+                    total_cost AS cost
+             FROM portfolio_snapshots
+             WHERE user_id = $1
+             ORDER BY snapshot_date DESC LIMIT $2
+           ) sub
            ORDER BY snapshot_date ASC`;
   } else if (period === 'monthly') {
-    // 每月最後 snapshot 為當月代表
-    sql = `SELECT TO_CHAR(MAX(snapshot_date), 'YYYY-MM') AS label,
-                  (array_agg(total_value ORDER BY snapshot_date DESC))[1] AS value,
-                  (array_agg(total_cost ORDER BY snapshot_date DESC))[1] AS cost
-           FROM portfolio_snapshots
-           WHERE user_id = $1
-           GROUP BY DATE_TRUNC('month', snapshot_date)
-           ORDER BY DATE_TRUNC('month', snapshot_date) ASC`;
+    // 每月最後 snapshot 為當月代表，取最近 N 個月
+    sql = `WITH monthly AS (
+             SELECT DATE_TRUNC('month', snapshot_date) AS m,
+                    (array_agg(total_value ORDER BY snapshot_date DESC))[1] AS value,
+                    (array_agg(total_cost ORDER BY snapshot_date DESC))[1] AS cost
+             FROM portfolio_snapshots
+             WHERE user_id = $1
+             GROUP BY DATE_TRUNC('month', snapshot_date)
+           )
+           SELECT TO_CHAR(m, 'YYYY-MM') AS label, value, cost
+           FROM (SELECT * FROM monthly ORDER BY m DESC LIMIT $2) sub
+           ORDER BY m ASC`;
   } else {  // yearly
-    sql = `SELECT TO_CHAR(MAX(snapshot_date), 'YYYY') AS label,
-                  (array_agg(total_value ORDER BY snapshot_date DESC))[1] AS value,
-                  (array_agg(total_cost ORDER BY snapshot_date DESC))[1] AS cost
-           FROM portfolio_snapshots
-           WHERE user_id = $1
-           GROUP BY DATE_TRUNC('year', snapshot_date)
-           ORDER BY DATE_TRUNC('year', snapshot_date) ASC`;
+    sql = `WITH yearly AS (
+             SELECT DATE_TRUNC('year', snapshot_date) AS y,
+                    (array_agg(total_value ORDER BY snapshot_date DESC))[1] AS value,
+                    (array_agg(total_cost ORDER BY snapshot_date DESC))[1] AS cost
+             FROM portfolio_snapshots
+             WHERE user_id = $1
+             GROUP BY DATE_TRUNC('year', snapshot_date)
+           )
+           SELECT TO_CHAR(y, 'YYYY') AS label, value, cost
+           FROM (SELECT * FROM yearly ORDER BY y DESC LIMIT $2) sub
+           ORDER BY y ASC`;
   }
 
-  const r = await pool.query(sql, [userId]);
+  const r = await pool.query(sql, [userId, range]);
   return r.rows.map((row: any) => ({
     label: row.label,
     value: parseFloat(row.value || 0),

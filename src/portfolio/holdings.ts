@@ -34,11 +34,12 @@ export interface PortfolioTxn {
 export interface OverallHolding {
   symbol: string;
   market: 'TW' | 'US';
-  qty: number;            // 當前持股
-  avgCost: number;        // 移動均價（扣息後）
-  costBasis: number;      // 累積成本 (qty × avgCost)
-  realizedPnl: number;    // 累計已實現損益
-  totalDividend: number;  // 累計領現金股利
+  qty: number;                // 當前持股
+  avgCost: number;            // 移動均價（扣息後 — 配息減 cost basis 的算法）
+  avgCostBeforeDiv: number;   // 原始均價（不扣息 — 純買入 cost / 累計股數）
+  costBasis: number;          // 累積成本（扣息後）
+  realizedPnl: number;        // 累計已實現損益
+  totalDividend: number;      // 累計領現金股利
 }
 
 // 視角 2: 每筆 buy 的 timing 回顧
@@ -79,46 +80,51 @@ export function calcOverall(txns: PortfolioTxn[]): OverallHolding | null {
   if (txns.length === 0) return null;
 
   let qty = 0;
-  let costBasis = 0;
+  let costBasis = 0;             // A 派：扣息後的累積成本
+  let costBasisBeforeDiv = 0;    // B 派：原始累積成本（dividend_cash 不扣）
   let realizedPnl = 0;
   let totalDividend = 0;
 
   for (const t of sortByDate(txns)) {
     if (t.txn_type === 'buy') {
       const price = t.price ?? 0;
-      // 買入手續費算進 cost basis (台股 0.1425% 預設 auto，美股 = 0)
-      costBasis += t.qty * price + (t.fee || 0);
+      const buyCost = t.qty * price + (t.fee || 0);
+      costBasis += buyCost;
+      costBasisBeforeDiv += buyCost;
       qty += t.qty;
     }
     else if (t.txn_type === 'sell') {
-      if (qty <= 0) continue;  // 空頭不支援，silent skip
+      if (qty <= 0) continue;
       const sellQty = Math.min(t.qty, qty);
       const avg = costBasis / qty;
+      const avgBefore = costBasisBeforeDiv / qty;
       const sellPrice = t.price ?? 0;
-      // 賣出 fee + 證交稅扣 realized PnL (台股 sell fee = 0.1425% + 0.3% tax)
       realizedPnl += (sellPrice - avg) * sellQty - (t.fee || 0);
       costBasis = Math.max(0, costBasis - avg * sellQty);
+      costBasisBeforeDiv = Math.max(0, costBasisBeforeDiv - avgBefore * sellQty);
       qty -= sellQty;
     }
     else if (t.txn_type === 'dividend_cash') {
       const amount = t.cash_amount ?? 0;
       totalDividend += amount;
-      // A 派：成本基礎扣息（cap 在 0 避免負數）
+      // A 派：cost basis 扣息（cap 在 0）；B 派 (BeforeDiv) cost 不變
       costBasis = Math.max(0, costBasis - amount);
     }
     else if (t.txn_type === 'dividend_stock') {
-      // 股數增加，cost 不變 → avg 自動稀釋
+      // 配股：股數增加，兩個 cost basis 都不變 → 兩個均價都自動稀釋
       qty += t.qty;
     }
   }
 
   const avgCost = qty > 0 ? costBasis / qty : 0;
+  const avgCostBeforeDiv = qty > 0 ? costBasisBeforeDiv / qty : 0;
 
   return {
     symbol: txns[0].symbol,
     market: txns[0].market,
     qty,
     avgCost,
+    avgCostBeforeDiv,
     costBasis,
     realizedPnl,
     totalDividend,

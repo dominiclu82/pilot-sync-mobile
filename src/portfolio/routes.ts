@@ -36,6 +36,7 @@ import { calcOverall, calcAllViews } from './holdings.js';
 import { getPortfolioHtml } from './frontend.js';
 import { cnyesBatch } from '../morning-builder.js';
 import { querySnapshots, snapshotUser, startSnapshotCron } from './snapshot.js';
+import { backfillUser } from './backfill.js';
 import {
   validatePinFormat,
   hashPin,
@@ -387,28 +388,45 @@ portfolioRouter.get('/api/portfolio/holdings', pinGate, async (req, res) => {
   }
 });
 
-/** GET /api/portfolio/chart?period=daily|monthly|yearly — 資產變化圖資料 */
+/** GET /api/portfolio/chart?period=daily|monthly|yearly&range=N — 資產變化圖資料 */
 portfolioRouter.get('/api/portfolio/chart', pinGate, async (req, res) => {
   const userId = reqUserId(req)!;
-  const period = String(req.query.period || 'daily');
+  const period = String(req.query.period || 'daily') as 'daily' | 'monthly' | 'yearly';
   if (period !== 'daily' && period !== 'monthly' && period !== 'yearly') {
     return res.status(400).json({ error: 'invalid_period' });
   }
+  const rangeRaw = parseInt(String(req.query.range || '30'), 10);
+  const defaults = { daily: 30, monthly: 12, yearly: 5 };
+  const range = isFinite(rangeRaw) && rangeRaw > 0 ? Math.min(rangeRaw, 365) : defaults[period];
   try {
-    const points = await querySnapshots(userId, period);
-    // 若無 snapshot data 但 user 有持倉 → 即時 snapshot 今天當第一個 point
+    const points = await querySnapshots(userId, period, range);
     if (points.length === 0) {
+      // 沒 snapshot data → 即時 snapshot 今天當第一個 point
       const today = new Date().toISOString().slice(0, 10);
       const result = await snapshotUser(userId, today);
       if (result) {
         return res.json({
           period,
+          range,
           points: [{ label: today, value: result.total_value, cost: result.total_cost }],
-          note: '尚無歷史資料；圖表會從每日 23:30 後開始累積',
+          note: '尚無歷史資料；按下方「📥 補歷史」從 Yahoo Finance 回填',
         });
       }
     }
-    res.json({ period, points });
+    res.json({ period, range, points });
+  } catch (e: any) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+/** POST /api/portfolio/backfill?days=N — 從 Yahoo Finance 回填過去 N 天 snapshot */
+portfolioRouter.post('/api/portfolio/backfill', pinGate, async (req, res) => {
+  const userId = reqUserId(req)!;
+  const daysRaw = parseInt(String(req.query.days || '90'), 10);
+  const days = isFinite(daysRaw) && daysRaw > 0 ? Math.min(daysRaw, 1825) : 90;  // cap 5 年
+  try {
+    const result = await backfillUser(userId, days);
+    res.json(result);
   } catch (e: any) {
     res.status(500).json({ error: e.message });
   }
