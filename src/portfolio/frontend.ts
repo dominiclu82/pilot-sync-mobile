@@ -38,6 +38,8 @@ export function getPortfolioHtml(): string {
       <div id="holdings-list" class="list"></div>
       <div class="footer">
         <span class="muted">資料源：cnyes</span>
+        <span class="muted">·</span>
+        <span class="ver" onclick="openAbout()" id="ver-tag">V1.0.0</span>
       </div>
     </div>
 
@@ -114,11 +116,60 @@ export function getPortfolioHtml(): string {
         </div>
         <div class="modal-body">
           <div class="kv">
+            <span class="k">外觀</span>
+            <span><button class="btn btn-ghost" onclick="toggleTheme()" id="btn-theme">🌙 深色</button></span>
+          </div>
+          <div class="kv">
+            <span class="k">字型大小</span>
+            <span style="display:flex;gap:6px;align-items:center">
+              <button class="btn btn-ghost" onclick="bumpFont(-1)" style="padding:4px 10px">A-</button>
+              <span class="muted muted-small" id="font-scale-display">0</span>
+              <button class="btn btn-ghost" onclick="bumpFont(1)" style="padding:4px 10px">A+</button>
+            </span>
+          </div>
+          <hr style="border:none;border-top:1px solid var(--border);margin:4px 0">
+          <div class="kv">
             <span class="k">PIN 保護</span>
             <span class="v" id="settings-pin-status">—</span>
           </div>
           <div id="settings-pin-actions" class="modal-actions" style="flex-direction:column;align-items:stretch"></div>
           <div id="settings-error" class="error" hidden></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- About modal (版次 + 歷史更新) -->
+    <div id="modal-about" class="modal" hidden>
+      <div class="modal-card">
+        <div class="modal-hdr">
+          <span>📈 投資組合 <span class="muted muted-small" id="about-version">V1.0.0</span></span>
+          <span class="modal-close" onclick="closeAbout()">✕</span>
+        </div>
+        <div class="modal-body" style="max-height:60vh;overflow-y:auto">
+          <div class="muted muted-small">獨立投資組合子系統 — 多筆買賣帳本、自動算均價、三視角持倉分析、opt-in PIN 保護</div>
+          <div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border)">
+            <div style="font-weight:700;margin-bottom:6px">V1.0.1 — UX 補完</div>
+            <div class="muted" style="font-size:.85em;line-height:1.6;margin-bottom:12px">
+              • 日夜切換（沿用晨報 <code>data-theme</code> pattern）<br>
+              • 字型大小調整（基準 15px ± 8% / 級）<br>
+              • 版次顯示在主畫面右下角，點開查看歷史更新<br>
+              • 設定 modal 內可調整外觀、字型、PIN 三項<br>
+              • 修 V1.0.0 launch 時遺漏的 UX 基本款（晨報 / Pilot Log 都有）
+            </div>
+          </div>
+          <div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border)">
+            <div style="font-weight:700;margin-bottom:6px;color:var(--muted)">V1.0.0 — 首次上線</div>
+            <div class="muted" style="font-size:.85em;line-height:1.6">
+              • 多筆 buy / sell 交易帳本（不限數量、可改可刪）<br>
+              • 移動均價自動計算 + 配股配息扣成本（V2 加 auto 入帳）<br>
+              • 三視角同時呈現：整體實際持倉 / 每筆 buy timing 回顧 / FIFO Lot 詳細<br>
+              • 即時股價（cnyes 抓取，按 ↻ 重抓）<br>
+              • Opt-in PIN 保護（任意長度字元，sessionStorage 解鎖）<br>
+              • 跨裝置同步沿用晨報暱稱識別<br>
+              • 從晨報舊持倉 morning_prefs.tw_holdings/us_holdings 一次性 migration<br>
+              • 日夜切換 + 字型大小調整
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -171,6 +222,17 @@ function getStyles(): string {
   --red: #f87171;
   --border: #2a2a36;
 }
+[data-theme="light"] {
+  --bg: #f5f7fa;
+  --bg-card: #ffffff;
+  --bg-elev: #eef1f5;
+  --fg: #1a1a24;
+  --muted: #6b6b78;
+  --accent: #2563eb;
+  --green: #059669;
+  --red: #dc2626;
+  --border: #d4d8e0;
+}
 * { box-sizing: border-box; }
 [hidden] { display: none !important; }  /* hotfix: 強制 hidden 屬性 override 任何 author CSS display */
 html, body { margin: 0; padding: 0; background: var(--bg); color: var(--fg); font-family: -apple-system, "Segoe UI", system-ui, "Microsoft JhengHei", sans-serif; font-size: 15px; }
@@ -201,7 +263,9 @@ html, body { margin: 0; padding: 0; background: var(--bg); color: var(--fg); fon
 .up { color: var(--green); }
 .down { color: var(--red); }
 .empty { color: var(--muted); text-align: center; padding: 40px 0; }
-.footer { text-align: center; color: var(--muted); font-size: .75em; margin-top: 30px; padding-top: 16px; border-top: 1px solid var(--border); }
+.footer { text-align: center; color: var(--muted); font-size: .75em; margin-top: 30px; padding-top: 16px; border-top: 1px solid var(--border); display: flex; justify-content: center; align-items: center; gap: 8px; flex-wrap: wrap; }
+.footer .ver { cursor: pointer; text-decoration: underline dotted; }
+.footer .ver:hover { color: var(--accent); }
 .muted { color: var(--muted); }
 .muted-small { font-size: .8em; }
 .card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; padding: 12px 14px; margin-bottom: 12px; }
@@ -784,6 +848,52 @@ async function deleteTxn(id) {
   }
 }
 
+// ── Theme / Font / About ─────────────────────────────────────────────────────
+
+const PORTFOLIO_VERSION = 'V1.0.1';
+const THEME_KEY = 'portfolio_theme';
+const FONT_SCALE_KEY = 'portfolio_font_scale';
+
+function applyTheme() {
+  const t = (function(){ try { return localStorage.getItem(THEME_KEY) || 'dark'; } catch { return 'dark'; } })();
+  if (t === 'light') document.documentElement.dataset.theme = 'light';
+  else delete document.documentElement.dataset.theme;
+  const btn = document.getElementById('btn-theme');
+  if (btn) btn.textContent = t === 'light' ? '☀️ 淺色' : '🌙 深色';
+  // meta theme-color 同步切換（PWA 上下狀態列色）
+  const meta = document.querySelector('meta[name="theme-color"]');
+  if (meta) meta.setAttribute('content', t === 'light' ? '#f5f7fa' : '#0a0a0f');
+}
+function toggleTheme() {
+  let cur = 'dark';
+  try { cur = localStorage.getItem(THEME_KEY) || 'dark'; } catch {}
+  const next = cur === 'light' ? 'dark' : 'light';
+  try { localStorage.setItem(THEME_KEY, next); } catch {}
+  applyTheme();
+}
+
+let _fontScale = 0;
+try { const s = parseInt(localStorage.getItem(FONT_SCALE_KEY) || '0'); if (!isNaN(s)) _fontScale = s; } catch {}
+function applyFontScale() {
+  // 基準 15px，每級 ±1.2px (≈8%)
+  const px = 15 * (1 + _fontScale * 0.08);
+  document.documentElement.style.fontSize = px + 'px';
+  const disp = document.getElementById('font-scale-display');
+  if (disp) disp.textContent = _fontScale > 0 ? '+' + _fontScale : String(_fontScale);
+}
+function bumpFont(dir) {
+  _fontScale = Math.max(-2, Math.min(8, _fontScale + dir));
+  try { localStorage.setItem(FONT_SCALE_KEY, String(_fontScale)); } catch {}
+  applyFontScale();
+}
+
+function openAbout() {
+  document.getElementById('modal-about').hidden = false;
+}
+function closeAbout() {
+  document.getElementById('modal-about').hidden = true;
+}
+
 // ── Format helpers ───────────────────────────────────────────────────────────
 
 function fmtNum(n) {
@@ -810,6 +920,14 @@ document.addEventListener('keydown', function(e) {
 
 // ── Init ─────────────────────────────────────────────────────────────────────
 
+// 動態 set 版號顯示（避免硬編碼三處要同步）
+const verTagEl = document.getElementById('ver-tag');
+if (verTagEl) verTagEl.textContent = PORTFOLIO_VERSION;
+const aboutVerEl = document.getElementById('about-version');
+if (aboutVerEl) aboutVerEl.textContent = PORTFOLIO_VERSION;
+
+applyTheme();
+applyFontScale();
 bootstrap();
 `;
 }

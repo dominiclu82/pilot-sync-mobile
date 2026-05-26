@@ -1509,7 +1509,7 @@ export function getSpaHtmlBody(): string {
       <button class="tab-util-btn tab-install-btn" id="tab-install-btn" onclick="showInstallGuide()" style="display:none">
         <span>📲</span>安裝
       </button>
-      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer;text-decoration:underline" onclick="showAbout()">V8.0.33</span>
+      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer;text-decoration:underline" onclick="showAbout()">V8.0.34</span>
     </div>
   </div>
 </div>
@@ -1540,7 +1540,12 @@ export function getSpaHtmlBody(): string {
       <div style="color:var(--muted)">Best experience on iPad in landscape mode. Android devices may not display correctly.</div>
     </div>
     <div style="max-height:50vh;overflow-y:auto;-webkit-overflow-scrolling:touch;margin-bottom:10px">
-    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V8.0.33</div>
+    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V8.0.34</div>
+    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
+      <div>Portfolio module 升 V1.0.1：補上晨報 / Pilot Log 都有的 UX 基本款 — 日夜切換、字型大小 ±、版次顯示、歷史更新（about modal）。沿用晨報的 <code>data-theme</code> + <code>font-scale</code> localStorage pattern，theme + font 偏好跨裝置不同步（純本機 preference）。V1.0.0 launch 時設計遺漏，user 反映「晨報都有的東西怎麼沒看到」後補完。</div>
+      <div>Portfolio module bump to V1.0.1: add the basic UX features that morning report and Pilot Log already had — light/dark toggle, font size ±, version tag, changelog history (about modal). Reuses the morning report's <code>data-theme</code> + <code>font-scale</code> localStorage pattern; theme + font are per-device (not cross-device). Filled the gap left by V1.0.0 launch after user feedback.</div>
+    </div>
+    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V8.0.33</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
       <div>Portfolio V1 hotfix 2 個 bug：1) CSS <code>.modal {display:flex}</code> 蓋過 HTML <code>hidden</code> 屬性 → 所有 modal 同時顯示，最上面一層「設定 PIN」誤導 user 以為被強迫設 PIN（實際 PIN 是 opt-in 預設 OFF）。修法：CSS 加 <code>[hidden] {display:none !important}</code> 強制 hidden override 任何 author display。2) PIN 不再限制 4-6 碼數字 — 改成任意長度（min 1, max 72 byte = bcrypt 上限）、任意字元（數字 / 字母 / symbol），兩次輸入一致即可。</div>
       <div>Portfolio V1 hotfix for 2 bugs: 1) CSS <code>.modal {display:flex}</code> overrode HTML <code>hidden</code> attribute → all modals visible at once with「設定 PIN」on top, misleading users into thinking PIN was forced (it's opt-in, default OFF). Fix: <code>[hidden] {display:none !important}</code>. 2) PIN no longer restricted to 4-6 digits — any length 1-72 bytes, any character set, just needs the two entries to match.</div>
