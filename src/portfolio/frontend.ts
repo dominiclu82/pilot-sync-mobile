@@ -34,6 +34,7 @@ export function getPortfolioHtml(): string {
               <span class="emoji">📈</span><span class="hdr-user" id="hdr-user" onclick="changeUid()">—</span>
               <span class="ver" id="ver-tag" onclick="openAbout()">V1.0.17</span>
             </div>
+            <div class="hdr-date" id="hdr-date">—</div>
           </div>
           <div class="hdr-actions-top">
             <button class="hdr-btn" onclick="openSettings()" title="設定 (PIN / 帳號)">⚙</button>
@@ -627,12 +628,14 @@ body { font-size: 1rem; padding-left: 0; padding-right: 0; }
   padding: 2px 7px; border-radius: 8px; cursor: pointer; letter-spacing: .02em;
 }
 .hdr-title .ver:active { opacity: .7; }
+.hdr-date { font-size: .85em; color: var(--muted); font-variant-numeric: tabular-nums; }
 .hdr-back { font-size: 1.5em; cursor: pointer; padding: 0 6px; user-select: none; }
 .hdr-user { color: var(--muted); font-size: .85em; cursor: pointer; text-decoration: underline dotted; }
 .hdr-btns { display: flex; gap: 6px; flex-shrink: 0; align-items: center; }
+/* V1.0.17 fix: 對齊晨報 hdr-btn CSS (bg / 圓角 / 字級) 避切換 PWA 視覺跳動 */
 .hdr-btn {
-  background: var(--bg-card); border: 1px solid var(--border); color: var(--fg);
-  padding: 6px 9px; border-radius: 6px; font-size: .9em; cursor: pointer;
+  background: rgba(255,255,255,0.08); border: 1px solid var(--border); color: var(--fg);
+  padding: 6px 9px; border-radius: 8px; font-size: .82em; cursor: pointer;
   min-width: 34px; line-height: 1.1;
 }
 .hdr-btn:active { opacity: 0.7; }
@@ -2069,13 +2072,15 @@ function setupSectionObserver() {
       else visibleSet.delete(e.target.id);
     }
     if (visibleSet.size === 0) return;
-    // 從 full visible set 挑 user 視野最上方那個 (top ≤ 0 優先, 越靠近 0 越好)
+    // 挑 user 視野上半部 (top ∈ [0, vh/2]) 最靠近 top 那個。沒有的話 fallback 最接近 top 的
+    const vh = window.innerHeight;
     let best = null, bestScore = Infinity;
     for (const id of visibleSet) {
       const el = document.getElementById(id);
       if (!el) continue;
       const top = el.getBoundingClientRect().top;
-      const score = top <= 0 ? Math.abs(top) : 1e6 + Math.abs(top);
+      // 上半部 (0 ≤ top < vh/2) 優先；其他靠 |top| 補位 (上半部 score 0~vh/2，補位 1e6+ 一定 lose)
+      const score = (top >= 0 && top < vh / 2) ? top : 1e6 + Math.abs(top);
       if (score < bestScore) { bestScore = score; best = id; }
     }
     if (best) {
@@ -2089,12 +2094,24 @@ function setupSectionObserver() {
 document.addEventListener('click', function(e) {
   const t = e.target;
   if (t && t.classList && t.classList.contains('nav-btn') && t.closest('#portfolio-section-nav')) {
-    updateSecNavHeight();  // 字型變大時 nav 變高，scroll 前 recompute
+    updateSecNavHeight();
     const id = t.getAttribute('data-target');
     const el = id ? document.getElementById(id) : null;
-    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    if (el) {
+      // V1.0.17 fix: 點當下立即 toggle active，不等 observer (avoid observer score race)
+      const nav = document.getElementById('portfolio-section-nav');
+      nav.querySelectorAll('.nav-btn').forEach(b => b.classList.toggle('active', b === t));
+      el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
   }
 });
+// V1.0.17 fix: 設 hdr-date 今日日期 (Asia/Taipei) 對齊晨報 hdr 高度避切換 PWA 跳動
+(function setHdrDate() {
+  const el = document.getElementById('hdr-date');
+  if (!el) return;
+  const tpe = new Date().toLocaleDateString('zh-TW', { timeZone: 'Asia/Taipei', year: 'numeric', month: '2-digit', day: '2-digit' });
+  el.textContent = tpe;
+})();
 window.addEventListener('resize', updateSecNavHeight);
 bootstrap();
 `;
