@@ -38,7 +38,7 @@ export function getPortfolioHtml(): string {
           </div>
           <div class="hdr-actions-top">
             <button class="hdr-btn" onclick="openSettings()" title="設定 (PIN / 帳號)">⚙</button>
-            <button class="hdr-btn" onclick="refreshAll()" title="重新整理">↻</button>
+            <button class="hdr-btn" id="btn-refresh" onclick="manualRefresh()" title="重新整理">↻</button>
           </div>
         </div>
         <nav id="portfolio-section-nav" class="sec-nav" hidden>
@@ -606,11 +606,12 @@ html, body { margin: 0; background: var(--bg); color: var(--fg); font-family: -a
 body { font-size: 1rem; padding-left: 0; padding-right: 0; }
 .page {
   width: 100%;
-  /* bottom padding: navbar height (~52px) + safe-area-inset-bottom + buffer */
-  padding: 12px 14px calc(72px + env(safe-area-inset-bottom, 0px));
+  /* V1.0.17 fix: padding-top: 0 讓 top-stack 從 body top 起 (對齊晨報 top-stack 直接 body 子的 layout)
+     避免跟晨報切換 PWA 時 top-stack 視覺位置差 12px 造成跳動感 */
+  padding: 0 14px calc(72px + env(safe-area-inset-bottom, 0px));
 }
 @media (min-width: 768px) {
-  .page { padding: 16px 24px calc(72px + env(safe-area-inset-bottom, 0px)); }
+  .page { padding: 0 24px calc(72px + env(safe-area-inset-bottom, 0px)); }
 }
 /* V1.0.17: hdr 完全對齊晨報 — gradient bg + safe-area padding 內含 + border-bottom */
 .hdr {
@@ -673,7 +674,7 @@ body { font-size: 1rem; padding-left: 0; padding-right: 0; }
   -webkit-backdrop-filter: blur(8px);
   border-bottom: 1px solid var(--border);
   display: flex; gap: 4px;
-  padding: 8px 14px;
+  padding: 8px 10px;  /* 對齊晨報 .nav padding */
   overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch;
 }
 .sec-nav::-webkit-scrollbar { display: none; }
@@ -683,7 +684,7 @@ body { font-size: 1rem; padding-left: 0; padding-right: 0; }
   border: 1px solid var(--border);
   color: var(--fg);
   padding: 6px 12px; border-radius: 20px;
-  font-size: .82em; font-weight: 600;
+  font-size: .78em; font-weight: 600;  /* 對齊晨報 .nav-btn 字級 */
   cursor: pointer; white-space: nowrap;
   transition: background .15s, border-color .15s, color .15s;
 }
@@ -1979,6 +1980,18 @@ const verTagEl = document.getElementById('ver-tag');
 if (verTagEl) verTagEl.textContent = PORTFOLIO_VERSION;
 const aboutVerEl = document.getElementById('about-version');
 if (aboutVerEl) aboutVerEl.textContent = PORTFOLIO_VERSION;
+
+// V1.0.17: ↻ refresh button 點下變「…」+ disabled 顯示 loading 中 (對齊晨報 smartRefresh)
+async function manualRefresh() {
+  const btn = document.getElementById('btn-refresh');
+  const orig = btn ? btn.textContent : null;
+  if (btn) { btn.textContent = '…'; btn.disabled = true; }
+  try {
+    await refreshAll();
+  } finally {
+    if (btn) { btn.textContent = orig || '↻'; btn.disabled = false; }
+  }
+}
 
 // V1.0.16: 10s auto-refresh quotes — 盤中市值即時感 (不重抓 holdings/dividends)
 // 盤中 only: TW 09:00-13:30 / US 21:30-05:00 (Asia/Taipei) Mon-Fri，避收盤後浪費請求
