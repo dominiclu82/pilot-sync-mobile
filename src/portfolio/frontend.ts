@@ -32,7 +32,7 @@ export function getPortfolioHtml(): string {
           <div style="min-width:0;flex:1">
             <div class="hdr-title">
               <span class="emoji">📈</span><span class="hdr-user" id="hdr-user" onclick="changeUid()">—</span>
-              <span class="ver" id="ver-tag" onclick="openAbout()">V1.0.18</span>
+              <span class="ver" id="ver-tag" onclick="openAbout()">V1.0.19</span>
             </div>
             <div class="hdr-date" id="hdr-date">—</div>
           </div>
@@ -62,7 +62,9 @@ export function getPortfolioHtml(): string {
           <div class="ov-cell" id="ov-cell-us" hidden>
             <div class="ov-cell-label">🇺🇸 美股</div>
             <div class="ov-cell-value" id="ov-us-value">—</div>
+            <div class="ov-cell-twd" id="ov-us-value-twd"></div>
             <div class="ov-cell-pnl" id="ov-us-pnl">—</div>
+            <div class="ov-cell-twd" id="ov-us-pnl-twd"></div>
           </div>
         </div>
         <div class="ov-total">
@@ -196,7 +198,19 @@ export function getPortfolioHtml(): string {
         <div class="modal-body" style="max-height:60vh;overflow-y:auto">
           <div class="muted muted-small">獨立投資組合子系統 — 多筆買賣帳本、自動算均價、三視角持倉分析、opt-in PIN 保護</div>
           <div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border)">
-            <div style="font-weight:700;margin-bottom:6px">V1.0.18 — 對齊晨報 polish + ↻ loading + 兩邊改暱稱</div>
+            <div style="font-weight:700;margin-bottom:6px">V1.0.19 — hdr-date ISO 格式 + 美股 cell 加台幣換算</div>
+            <div class="muted" style="font-size:.85em;line-height:1.6;margin-bottom:12px">
+              (1) hdr-date format 對齊晨報 <code>2026-05-27</code> ISO dash (原 zh-TW
+              locale 是 slash)。用 <code>Intl.DateTimeFormat.formatToParts</code> 抓
+              year/month/day 不依賴 locale string format (codex 抓 Safari/WebKit
+              <code>toLocaleString</code> reparse / en-CA ICU fallback 都不穩)。<br>
+              (2) 美股 overall cell 加 <strong>≈ NT$XX 台幣換算</strong>顯示，user 反映
+              「美股單位是美金，希望可以顯示美金 + 台幣」。市值 + PnL 兩個都加 ≈ NT$
+              換算 (用即期 USD/TWD rate 同 banner)。
+            </div>
+          </div>
+          <div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border)">
+            <div style="font-weight:700;margin-bottom:6px;color:var(--muted)">V1.0.18 — 對齊晨報 polish + ↻ loading + 兩邊改暱稱</div>
             <div class="muted" style="font-size:.85em;line-height:1.6;margin-bottom:12px">
               V1.0.17 後續多輪 polish 累積一版 (user rule: 每次 push 都 bump 版號):<br>
               (1) <code>.page</code> padding-top 0 + L/R 12px 對齊晨報 .sec — 切換 PWA top
@@ -727,6 +741,8 @@ body { font-size: 1rem; padding-left: 0; padding-right: 0; }
 .overall-card .ov-cell-label { color: var(--muted); font-size: .8em; }
 .overall-card .ov-cell-value { font-weight: 700; font-variant-numeric: tabular-nums; font-size: 1em; }
 .overall-card .ov-cell-pnl { font-weight: 600; font-variant-numeric: tabular-nums; font-size: .88em; }
+.overall-card .ov-cell-twd { font-size: .76em; color: var(--muted); font-variant-numeric: tabular-nums; line-height: 1.3; }
+.overall-card .ov-cell-twd:empty { display: none; }
 .overall-card .ov-cell-pnl.ov-up { color: #ef4444; }
 .overall-card .ov-cell-pnl.ov-down { color: #22c55e; }
 .overall-card .ov-total { display: flex; flex-direction: column; gap: 4px; padding-top: 6px; border-top: 1px solid var(--border); }
@@ -1269,9 +1285,15 @@ async function renderOverall() {
   } else twCell.hidden = true;
   if (usValue > 0 || usCost > 0) {
     document.getElementById('ov-us-value').textContent = '$' + fmtRound(usValue);
+    // V1.0.19: 美股 cell 加台幣換算 (≈ NT$XX) 給 user 直觀比較
+    const usValTwd = usValue * fxUsdTwd;
+    document.getElementById('ov-us-value-twd').textContent = '≈ NT$' + fmtRound(usValTwd);
     const el = document.getElementById('ov-us-pnl');
     el.textContent = sign(usPnl) + fmtRound(usPnl) + ' (' + sign(usPnl) + usPct.toFixed(1) + '%)';
     el.className = 'ov-cell-pnl ' + cls(usPnl);
+    const pnlTwdEl = document.getElementById('ov-us-pnl-twd');
+    const usPnlTwd = usPnl * fxUsdTwd;
+    pnlTwdEl.textContent = '≈ ' + sign(usPnl) + 'NT$' + fmtRound(Math.abs(usPnlTwd));
     usCell.hidden = false;
   } else usCell.hidden = true;
 
@@ -1846,7 +1868,7 @@ function renderChart(points, note) {
 
 // ── Theme / Font / About ─────────────────────────────────────────────────────
 
-const PORTFOLIO_VERSION = 'V1.0.18';
+const PORTFOLIO_VERSION = 'V1.0.19';
 // V1.0.16: theme + font scale 三個 PWA 共用 (crewsync_*) — same origin localStorage 跨 app 同步
 const THEME_KEY = 'crewsync_theme';
 const LEGACY_THEME_KEY = 'portfolio_theme';
@@ -2135,12 +2157,26 @@ document.addEventListener('click', function(e) {
     }
   }
 });
-// V1.0.18 fix: 設 hdr-date 今日日期 (Asia/Taipei) 對齊晨報 hdr 高度避切換 PWA 跳動
+// V1.0.19 fix: 用 Intl.DateTimeFormat formatToParts 明確抓 year/month/day
+// 避 locale string format 差異 (Safari toLocaleString reparse 失敗 / en-CA ICU
+// fallback 到 device locale) — formatToParts return 結構化 parts，跨 webview 穩
 (function setHdrDate() {
   const el = document.getElementById('hdr-date');
   if (!el) return;
-  const tpe = new Date().toLocaleDateString('zh-TW', { timeZone: 'Asia/Taipei', year: 'numeric', month: '2-digit', day: '2-digit' });
-  el.textContent = tpe;
+  try {
+    const parts = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Asia/Taipei',
+      year: 'numeric', month: '2-digit', day: '2-digit',
+    }).formatToParts(new Date());
+    const y = parts.find(p => p.type === 'year').value;
+    const m = parts.find(p => p.type === 'month').value;
+    const d = parts.find(p => p.type === 'day').value;
+    el.textContent = y + '-' + m + '-' + d;
+  } catch {
+    // 極端 fallback: client local time (沒 Intl.DateTimeFormat 的 ancient browser)
+    const d = new Date();
+    el.textContent = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  }
 })();
 window.addEventListener('resize', updateSecNavHeight);
 bootstrap();
