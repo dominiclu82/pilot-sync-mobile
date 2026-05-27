@@ -606,12 +606,8 @@ html, body { margin: 0; background: var(--bg); color: var(--fg); font-family: -a
 body { font-size: 1rem; padding-left: 0; padding-right: 0; }
 .page {
   width: 100%;
-  /* V1.0.17 fix: padding-top: 0 讓 top-stack 從 body top 起 (對齊晨報 top-stack 直接 body 子的 layout)
-     避免跟晨報切換 PWA 時 top-stack 視覺位置差 12px 造成跳動感 */
-  padding: 0 14px calc(72px + env(safe-area-inset-bottom, 0px));
-}
-@media (min-width: 768px) {
-  .page { padding: 0 24px calc(72px + env(safe-area-inset-bottom, 0px)); }
+  /* V1.0.17 fix: padding-top: 0 + L/R 12px 對齊晨報 .sec margin (避電腦版寬度差) */
+  padding: 0 12px calc(72px + env(safe-area-inset-bottom, 0px));
 }
 /* V1.0.17: hdr 完全對齊晨報 — gradient bg + safe-area padding 內含 + border-bottom */
 .hdr {
@@ -631,7 +627,8 @@ body { font-size: 1rem; padding-left: 0; padding-right: 0; }
 .hdr-title .ver:active { opacity: .7; }
 .hdr-date { font-size: .85em; color: var(--muted); font-variant-numeric: tabular-nums; }
 .hdr-back { font-size: 1.5em; cursor: pointer; padding: 0 6px; user-select: none; }
-.hdr-user { color: var(--muted); font-size: .85em; cursor: pointer; text-decoration: underline dotted; }
+/* V1.0.17 fix: hdr-user 繼承 hdr-title 大字 bold (對齊晨報 hdr-user-title)，只留 click affordance */
+.hdr-user { cursor: pointer; text-decoration: underline dotted; text-underline-offset: 3px; }
 .hdr-btns { display: flex; gap: 6px; flex-shrink: 0; align-items: center; }
 /* V1.0.17 fix: 對齊晨報 hdr-btn CSS (bg / 圓角 / 字級) 避切換 PWA 視覺跳動 */
 .hdr-btn {
@@ -655,16 +652,13 @@ body { font-size: 1rem; padding-left: 0; padding-right: 0; }
 .status { color: var(--muted); font-size: .85em; margin-bottom: 10px; min-height: 1.2em; }
 .list { display: flex; flex-direction: column; gap: 8px; }
 
-/* V1.0.17: top-stack — wrap sticky 跟晨報 .top-stack 一致 transparent；safe-area 處理交給 hdr 自己 */
+/* V1.0.17: top-stack — wrap sticky 跟晨報 .top-stack 一致 transparent + bleed to body edges */
 .top-stack {
   position: sticky;
   top: 0;
   z-index: 40;
-  margin: 0 -14px 10px;
+  margin: 0 -12px 10px;  /* 抵消 .page L/R 12px padding 讓 top-stack 全寬對齊晨報 */
   background: transparent;
-}
-@media (min-width: 768px) {
-  .top-stack { margin-left: -24px; margin-right: -24px; padding-left: 24px; padding-right: 24px; }
 }
 /* V1.0.17: sec-nav 對齊晨報 .nav — blur bg + 灰色預設 + active 藍色 outline
    (對齊晨報 yellow active pattern；ver tag 跟 nav-btn.active 都 var(--accent) 一致) */

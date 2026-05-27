@@ -1977,7 +1977,7 @@ body { padding-bottom: calc(64px + env(safe-area-inset-bottom, 0px)); }
   <div class="hdr">
     <div style="min-width:0;flex:1">
       <div class="hdr-title">
-        <span class="emoji">🌅</span><span id="hdr-user-title">晨報</span>
+        <span class="emoji">🌅</span><span id="hdr-user-title" onclick="changeUid()" style="cursor:pointer;text-decoration:underline dotted;text-underline-offset:3px">晨報</span>
         <span class="ver" onclick="showAbout()">${MORNING_VERSION}</span>
       </div>
       <div class="hdr-date" id="hdr-date">—</div>
@@ -2443,6 +2443,49 @@ function setUid(uid) {
   try { localStorage.setItem(LS.uid, uid); } catch (e) {}
   updateHdrTitle();
 }
+
+// V1.3.19: hdr 點暱稱改 uid (對齊投資組合 changeUid 功能 - 跨 PWA 共用)
+// User 明確要求保留本地自選快取，且資料跟著 uid 走 (跨裝置 sync via server)
+async function changeUid() {
+  const cur = getUid();
+  const v = prompt('輸入你的暱稱（晨報跟投資組合共用）：', cur);
+  if (v === null) return;
+  const trimmed = v.trim();
+  if (!trimmed || trimmed === cur) return;
+  setUid(trimmed);
+  // 對齊 submitNickname first-run 邏輯: 抓 server prefs；新 uid 沒 prefs → 用當前
+  // local prefs (即原 uid 的 watchlist) 當 seed POST 上去 build 初始 report，
+  // 達成 user 要求「保留快取 + 個人資料跟隨暱稱」
+  try {
+    const r = await apiFetch('/api/morning-prefs');
+    if (r.ok) {
+      if (typeof syncPrefsFromServer === 'function') await syncPrefsFromServer();
+    } else if (r.status === 404) {
+      // 只 404 算新 uid (server 確認沒這 user)，其他 status (5xx/network) 不該誤判
+      // 否則 transient backend 失敗會 overwrite target uid 的 server prefs
+      const wxPresetIds = loadSetting('wxPresets', DEFAULTS.wxPresets);
+      const wxCustom = loadSetting('wxCustom', DEFAULTS.wxCustom);
+      const tw = loadSetting('tw', DEFAULTS.tw);
+      const us = loadSetting('us', DEFAULTS.us);
+      const fx = loadSetting('fx', DEFAULTS.fx);
+      const wxLocs = [];
+      for (const id of wxPresetIds) {
+        if (WX_PRESET_MAP[id]) wxLocs.push({ name: WX_PRESET_MAP[id].name, lat: WX_PRESET_MAP[id].lat, lon: WX_PRESET_MAP[id].lon });
+      }
+      for (const c of wxCustom) wxLocs.push(c);
+      const initPrefs = { wx: wxLocs, tw, us, fx };
+      try {
+        await apiFetch('/api/morning-report/refresh', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(initPrefs),
+        });
+      } catch (e) { console.warn('changeUid first build failed', e); }
+    }
+  } catch (e) {}
+  if (typeof loadAndRender === 'function') await loadAndRender();
+}
+window.changeUid = changeUid;
 
 function updateHdrTitle() {
   const el = document.getElementById('hdr-user-title');
