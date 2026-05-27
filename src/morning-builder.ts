@@ -421,14 +421,22 @@ function _parseBotCsv(text: string): Record<string, TwdRate> | null {
   return Object.keys(out).length > 0 ? out : null;
 }
 
-// V1.0.12: 給 portfolio module 換匯用 (USD/TWD rate from BOT CSV)
+// V1.0.12: 給 portfolio module 換匯用 (USD/TWD rate from BOT)
+// V1.0.15: 加 HTML fallback (CSV 偶發 302 / rate-limit on Render outbound)
 export async function fetchUsdTwdRate(): Promise<number | null> {
+  // 1) CSV (fast path)
   try {
     const rates = await _fetchBotCsvRates();
-    return rates?.USD?.rate ?? null;
-  } catch {
-    return null;
-  }
+    const r = rates?.USD?.rate;
+    if (typeof r === 'number' && r > 0) return r;
+  } catch {}
+  // 2) HTML fallback (more robust against 302 redirect / rate-limit)
+  try {
+    const rates = await _fetchBotHtmlRates();
+    const r = rates?.USD?.rate;
+    if (typeof r === 'number' && r > 0) return r;
+  } catch {}
+  return null;
 }
 
 async function _fetchBotCsvRates(): Promise<Record<string, TwdRate> | null> {

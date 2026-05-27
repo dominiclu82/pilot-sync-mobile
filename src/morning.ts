@@ -27,6 +27,25 @@ function getPool() {
   }
   return _pgPool;
 }
+export { getPool };
+
+/** V1.0.15: 給 portfolio fx endpoint 用 — 讀 latest morning_reports 內 cached USD/TWD rate
+ *  跟下方匯率 card 同源，user 不會看到 banner / fx card 數字不一致 */
+export async function getCachedUsdTwdFromMorningReport(): Promise<number | null> {
+  try {
+    const pool = getPool();
+    if (!pool) return null;
+    const { rows } = await pool.query(
+      `SELECT data FROM morning_reports ORDER BY date DESC, generated_at DESC LIMIT 1`
+    );
+    if (rows.length === 0) return null;
+    const data: any = rows[0].data;
+    const rate = data?.fx?.['USD/TWD']?.rate;
+    return (typeof rate === 'number' && rate > 0) ? rate : null;
+  } catch {
+    return null;
+  }
+}
 
 async function ensurePgTables() {
   if (_pgReady) return true;

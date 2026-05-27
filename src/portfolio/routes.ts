@@ -35,6 +35,7 @@ import {
 import { calcOverall, calcAllViews } from './holdings.js';
 import { getPortfolioHtml } from './frontend.js';
 import { cnyesBatch, fetchUsdTwdRate } from '../morning-builder.js';
+import { getCachedUsdTwdFromMorningReport } from '../morning.js';
 import { querySnapshots, snapshotUser, startSnapshotCron } from './snapshot.js';
 import { backfillUser } from './backfill.js';
 import { fetchDividendInfo } from './dividend.js';
@@ -420,21 +421,29 @@ portfolioRouter.get('/api/portfolio/chart', pinGate, async (req, res) => {
   }
 });
 
-/** GET /api/portfolio/fx?pair=USD/TWD — 換匯 rate (從台銀 BOT) */
-// 1h memory cache，BOT 一天 update 數次
-let _fxCache: { rate: number; at: number } | null = null;
+/** GET /api/portfolio/fx?pair=USD/TWD — 換匯 rate
+ *  V1.0.15: 跟下方匯率 card 同源 — 優先讀 morning_reports cached fx data；
+ *  cache miss 才 live BOT；live 也 fail 才 503 */
+let _fxCache: { rate: number; at: number; src: string } | null = null;
 portfolioRouter.get('/api/portfolio/fx', async (req, res) => {
   const pair = String(req.query.pair || '');
   if (pair !== 'USD/TWD') return res.status(400).json({ error: 'unsupported_pair' });
   const now = Date.now();
   if (_fxCache && now - _fxCache.at < 60 * 60 * 1000) {
-    return res.json({ pair, rate: _fxCache.rate, cached: true });
+    return res.json({ pair, rate: _fxCache.rate, cached: true, source: _fxCache.src });
   }
   try {
-    const rate = await fetchUsdTwdRate();
+    // 1) 同源優先：讀 morning_reports cached (跟匯率 card 同數字)
+    let rate = await getCachedUsdTwdFromMorningReport();
+    let src = 'morning_cache';
+    // 2) cache miss → live BOT (CSV → HTML fallback in fetchUsdTwdRate)
+    if (rate == null) {
+      rate = await fetchUsdTwdRate();
+      src = 'bot_live';
+    }
     if (rate == null) return res.status(503).json({ error: 'fx_fetch_failed' });
-    _fxCache = { rate, at: now };
-    res.json({ pair, rate });
+    _fxCache = { rate, at: now, src };
+    res.json({ pair, rate, source: src });
   } catch (e: any) {
     res.status(500).json({ error: e.message });
   }
