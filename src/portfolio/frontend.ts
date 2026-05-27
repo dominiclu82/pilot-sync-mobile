@@ -26,13 +26,13 @@ export function getPortfolioHtml(): string {
   <div id="app">
     <!-- 主畫面 -->
     <div id="page-main" class="page">
-      <!-- V1.0.16: top-stack sticky (hdr + sec-nav 整組黏頂，比照晨報) -->
+      <!-- V1.0.17: top-stack sticky (hdr + sec-nav 整組黏頂，完全對齊晨報 layout) -->
       <div class="top-stack" id="top-stack">
         <div class="hdr">
           <div style="min-width:0;flex:1">
             <div class="hdr-title">
-              <span class="hdr-user" id="hdr-user" onclick="changeUid()">—</span>
-              <span class="ver" id="ver-tag" onclick="openAbout()">V1.0.16</span>
+              <span class="emoji">📈</span><span class="hdr-user" id="hdr-user" onclick="changeUid()">—</span>
+              <span class="ver" id="ver-tag" onclick="openAbout()">V1.0.17</span>
             </div>
           </div>
           <div class="hdr-actions-top">
@@ -195,7 +195,28 @@ export function getPortfolioHtml(): string {
         <div class="modal-body" style="max-height:60vh;overflow-y:auto">
           <div class="muted muted-small">獨立投資組合子系統 — 多筆買賣帳本、自動算均價、三視角持倉分析、opt-in PIN 保護</div>
           <div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border)">
-            <div style="font-weight:700;margin-bottom:6px">V1.0.16 — 10 秒自動 refresh + 動態島不透 + ↻ 移最右 + 總資產拆 TW/US</div>
+            <div style="font-weight:700;margin-bottom:6px">V1.0.17 — 視覺完全對齊晨報 (色系 / hdr / nav-btn / emoji)</div>
+            <div class="muted" style="font-size:.85em;line-height:1.6;margin-bottom:12px">
+              修 user 反映「比照晨報是有什麼問題?切換 PWA 畫面會小幅移動、配色不同、user 名前
+              缺 emoji、ver tag 顏色跟 nav-btn outline 不一致」：<br>
+              (1) <strong>色系完全對齊晨報</strong>: <code>--bg #0B1428</code> 深藍 (原 Portfolio
+              #0a0a0f 純黑)、<code>--bg-card #111c36</code>、加 <code>--hdr-grad-1/2</code>
+              gradient vars、<code>--nav-bg</code> blur bg。切 PWA 不會跳色。<br>
+              (2) <strong>hdr 結構對齊晨報</strong>: gradient 背景、padding 含 safe-area
+              (原本拆在 top-stack 上)、border-bottom、margin: 0。hdr-title 字級 1.15em
+              (對齊晨報)。視覺上跟晨報 hdr 同位置同高度，切換 PWA 「無縫」感<br>
+              (3) <strong>hdr 加 emoji <code>📈</code></strong> 在 user 名左邊 (對齊晨報 <code>🌅</code>)<br>
+              (4) <strong>nav-btn 顏色一致</strong>: ver tag 跟 nav-btn.active 都用
+              <code>var(--accent)</code> 藍色 (rgba(91,158,255,0.5) outline) — 對齊晨報
+              ver 跟 nav-btn.active 都用黃色 pattern<br>
+              (5) <strong>IntersectionObserver auto-active</strong>: scroll 到該 section
+              對應 nav-btn 自動加 active class (跟著 viewport 變色)，跟晨報行為一致<br>
+              (6) sec-nav 加 backdrop-filter blur(8px) + nav-bg semi-transparent — 對齊
+              晨報 .nav blur effect
+            </div>
+          </div>
+          <div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border)">
+            <div style="font-weight:700;margin-bottom:6px;color:var(--muted)">V1.0.16 — 10 秒自動 refresh + 動態島不透 + ↻ 移最右 + 總資產拆 TW/US</div>
             <div class="muted" style="font-size:.85em;line-height:1.6;margin-bottom:12px">
               (1) <strong>盤中 10 秒自動 refresh</strong>: setInterval 每 10s 抓最新 quotes
               (不重抓 holdings / dividends)，切到別 tab 自動暫停 (Page Visibility API)
@@ -518,15 +539,19 @@ export function getPortfolioHtml(): string {
 function getStyles(): string {
   return `
 :root {
-  --bg: #0a0a0f;
-  --bg-card: #15151c;
-  --bg-elev: #1d1d28;
+  /* V1.0.17: 色系完全對齊晨報，user 切換 PWA 時不會 visually 跳色 */
+  --bg: #0B1428;
+  --bg-card: #111c36;
+  --bg-elev: #1a2547;
   --fg: #e8e8ee;
-  --muted: #7a7a8a;
+  --muted: #7a8aa5;
   --accent: #5b9eff;
   --green: #34d399;
   --red: #f87171;
-  --border: #2a2a36;
+  --border: #2a3656;
+  --hdr-grad-1: #1E2740;
+  --hdr-grad-2: #141c33;
+  --nav-bg: rgba(17, 28, 54, 0.85);
 }
 [data-theme="light"] {
   --bg: #f5f7fa;
@@ -538,6 +563,9 @@ function getStyles(): string {
   --green: #059669;
   --red: #dc2626;
   --border: #d4d8e0;
+  --hdr-grad-1: #ffe9c9;
+  --hdr-grad-2: #ffd59e;
+  --nav-bg: rgba(255, 255, 255, 0.85);
 }
 * { box-sizing: border-box; }
 [hidden] { display: none !important; }  /* hotfix: 強制 hidden 屬性 override 任何 author CSS display */
@@ -583,8 +611,16 @@ body { font-size: 1rem; padding-left: 0; padding-right: 0; }
 @media (min-width: 768px) {
   .page { padding: 16px 24px calc(72px + env(safe-area-inset-bottom, 0px)); }
 }
-.hdr { display: flex; align-items: center; gap: 10px; margin: 6px 0 16px; }
-.hdr-title { font-size: 1.2em; font-weight: 700; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+/* V1.0.17: hdr 完全對齊晨報 — gradient bg + safe-area padding 內含 + border-bottom */
+.hdr {
+  background: linear-gradient(180deg, var(--hdr-grad-1) 0%, var(--hdr-grad-2) 100%);
+  padding: calc(env(safe-area-inset-top, 0px) + 10px) 12px 8px;
+  border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  margin: 0;
+}
+.hdr-title { font-size: 1.15em; font-weight: 700; display: flex; align-items: center; gap: 8px; }
+.hdr-title .emoji { font-size: 1.2em; }
 .hdr-title .ver {
   font-size: .55em; font-weight: 600; color: var(--accent);
   background: rgba(91,158,255,0.12); border: 1px solid rgba(91,158,255,0.3);
@@ -615,38 +651,45 @@ body { font-size: 1rem; padding-left: 0; padding-right: 0; }
 .status { color: var(--muted); font-size: .85em; margin-bottom: 10px; min-height: 1.2em; }
 .list { display: flex; flex-direction: column; gap: 8px; }
 
-/* V1.0.16: top-stack — hdr + sec-nav 一起 sticky (比照晨報 approach B)
-   top: 0 + padding-top: env(safe-area-inset-top) — top-stack 自己延伸進動態島區域
-   並用 bg 蓋住，scroll 時不會看到下方 content 透出 */
+/* V1.0.17: top-stack — wrap sticky 跟晨報 .top-stack 一致 transparent；safe-area 處理交給 hdr 自己 */
 .top-stack {
   position: sticky;
   top: 0;
   z-index: 40;
-  background: var(--bg);
   margin: 0 -14px 10px;
-  padding: env(safe-area-inset-top, 0px) 14px 0;
+  background: transparent;
 }
 @media (min-width: 768px) {
   .top-stack { margin-left: -24px; margin-right: -24px; padding-left: 24px; padding-right: 24px; }
 }
-/* sec-nav inside top-stack: no sticky needed (parent already sticky) */
+/* V1.0.17: sec-nav 對齊晨報 .nav — blur bg + 灰色預設 + active 藍色 outline
+   (對齊晨報 yellow active pattern；ver tag 跟 nav-btn.active 都 var(--accent) 一致) */
 .sec-nav {
-  display: flex; gap: 6px;
-  padding: 8px 0 10px;
-  overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch;
+  background: var(--nav-bg);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
   border-bottom: 1px solid var(--border);
+  display: flex; gap: 4px;
+  padding: 8px 14px;
+  overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch;
 }
 .sec-nav::-webkit-scrollbar { display: none; }
 .sec-nav .nav-btn {
   flex: 0 0 auto;
-  background: rgba(91,158,255,0.08);
+  background: rgba(255,255,255,0.06);
   border: 1px solid var(--border);
   color: var(--fg);
   padding: 6px 12px; border-radius: 20px;
   font-size: .82em; font-weight: 600;
   cursor: pointer; white-space: nowrap;
+  transition: background .15s, border-color .15s, color .15s;
 }
 .sec-nav .nav-btn:active { opacity: .6; }
+.sec-nav .nav-btn.active {
+  background: rgba(91,158,255,0.15);
+  border-color: rgba(91,158,255,0.5);
+  color: var(--accent);
+}
 .sec-block { margin-bottom: 16px; scroll-margin-top: var(--sec-nav-h, 60px); }  /* JS 動態設 nav 實際高 */
 .sec-title { font-size: 1.05em; font-weight: 700; padding: 8px 4px; color: var(--accent); }
 #chart-card { scroll-margin-top: var(--sec-nav-h, 60px); }
@@ -1304,6 +1347,8 @@ function renderMain() {
     navBar.querySelector('[data-target="sec-us"]').hidden = (us.length === 0);
     // recompute --sec-nav-h (字型變大 / nav 內按鈕數變動時)
     if (typeof updateSecNavHeight === 'function') updateSecNavHeight();
+    // V1.0.17: IntersectionObserver — scroll 到該 section nav-btn 自動 active
+    if (typeof setupSectionObserver === 'function') setupSectionObserver();
   }
 }
 
@@ -1631,6 +1676,8 @@ async function loadChart() {
     return;
   }
   card.hidden = false;
+  // V1.0.17: chart-card 從 hidden 變 visible → 重新 setup observer 把它納入監看
+  if (typeof setupSectionObserver === 'function') setupSectionObserver();
   try {
     const data = await apiFetch('/chart?period=' + _chartPeriod + '&range=' + _chartRange);
     const points = data.points || [];
@@ -1778,7 +1825,7 @@ function renderChart(points, note) {
 
 // ── Theme / Font / About ─────────────────────────────────────────────────────
 
-const PORTFOLIO_VERSION = 'V1.0.16';
+const PORTFOLIO_VERSION = 'V1.0.17';
 // V1.0.16: theme + font scale 三個 PWA 共用 (crewsync_*) — same origin localStorage 跨 app 同步
 const THEME_KEY = 'crewsync_theme';
 const LEGACY_THEME_KEY = 'portfolio_theme';
@@ -2002,6 +2049,42 @@ function updateSecNavHeight() {
   if (!stack) return;
   const h = stack.offsetHeight + 8;
   document.documentElement.style.setProperty('--sec-nav-h', h + 'px');
+}
+
+// V1.0.17: IntersectionObserver auto-active 跟著 scroll 標目前看到的 section (對齊晨報)
+let _secObserver = null;
+function setupSectionObserver() {
+  if (_secObserver) { _secObserver.disconnect(); _secObserver = null; }
+  const nav = document.getElementById('portfolio-section-nav');
+  if (!nav || nav.hidden) return;
+  const targets = ['sec-tw', 'sec-us', 'chart-card']
+    .map(id => document.getElementById(id))
+    .filter(el => el && !el.hidden);
+  if (targets.length === 0) return;
+  // 維護 currently-visible set across callbacks (entries 只是 delta，不是 full visible state)
+  const visibleSet = new Set();
+  _secObserver = new IntersectionObserver((entries) => {
+    for (const e of entries) {
+      if (e.isIntersecting) visibleSet.add(e.target.id);
+      else visibleSet.delete(e.target.id);
+    }
+    if (visibleSet.size === 0) return;
+    // 從 full visible set 挑 user 視野最上方那個 (top ≤ 0 優先, 越靠近 0 越好)
+    let best = null, bestScore = Infinity;
+    for (const id of visibleSet) {
+      const el = document.getElementById(id);
+      if (!el) continue;
+      const top = el.getBoundingClientRect().top;
+      const score = top <= 0 ? Math.abs(top) : 1e6 + Math.abs(top);
+      if (score < bestScore) { bestScore = score; best = id; }
+    }
+    if (best) {
+      nav.querySelectorAll('.nav-btn').forEach(b => {
+        b.classList.toggle('active', b.getAttribute('data-target') === best);
+      });
+    }
+  }, { rootMargin: '-30% 0px -60% 0px', threshold: 0 });
+  targets.forEach(t => _secObserver.observe(t));
 }
 document.addEventListener('click', function(e) {
   const t = e.target;
