@@ -30,7 +30,7 @@ export function getPortfolioHtml(): string {
         <div style="min-width:0;flex:1">
           <div class="hdr-title">
             <span class="hdr-user" id="hdr-user" onclick="changeUid()">—</span>
-            <span class="ver" id="ver-tag" onclick="openAbout()">V1.0.14</span>
+            <span class="ver" id="ver-tag" onclick="openAbout()">V1.0.15</span>
           </div>
         </div>
         <button class="hdr-btn" onclick="openSettings()" title="設定 (PIN / 帳號)">⚙</button>
@@ -40,6 +40,24 @@ export function getPortfolioHtml(): string {
         <button class="btn btn-ghost" onclick="refreshAll()">↻ 重抓</button>
       </div>
       <div id="main-status" class="status"></div>
+      <!-- V1.0.15: Section nav (比照晨報) -->
+      <nav id="portfolio-section-nav" class="sec-nav" hidden>
+        <button class="nav-btn" data-target="sec-tw">📈 台股</button>
+        <button class="nav-btn" data-target="sec-us">🇺🇸 美股</button>
+        <button class="nav-btn" data-target="chart-card">📊 資產變化</button>
+      </nav>
+      <!-- V1.0.15: 投資組合總覽 (總資產 + 未實現損益) -->
+      <div id="portfolio-overall" class="overall-card" hidden>
+        <div class="ov-row">
+          <span class="ov-label">總資產</span>
+          <span class="ov-value" id="ov-total-value">—</span>
+        </div>
+        <div class="ov-row">
+          <span class="ov-label">未實現損益</span>
+          <span class="ov-value" id="ov-pnl">—</span>
+        </div>
+        <div class="ov-fx-note" id="ov-fx-note"></div>
+      </div>
       <div id="holdings-list" class="list"></div>
       <!-- 資產變化圖 -->
       <div id="chart-card" class="card" style="margin-top:16px" hidden>
@@ -159,7 +177,33 @@ export function getPortfolioHtml(): string {
         <div class="modal-body" style="max-height:60vh;overflow-y:auto">
           <div class="muted muted-small">獨立投資組合子系統 — 多筆買賣帳本、自動算均價、三視角持倉分析、opt-in PIN 保護</div>
           <div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border)">
-            <div style="font-weight:700;margin-bottom:6px">V1.0.14 — 版面比照 CrewSync：navbar 移底部 + 安全區 + 20 段字型</div>
+            <div style="font-weight:700;margin-bottom:6px">V1.0.15 — 頂部總覽 + 日夜共用 + 圖示反轉 + fx 同源</div>
+            <div class="muted" style="font-size:.85em;line-height:1.6;margin-bottom:12px">
+              <strong>(0) 投資組合頂部加「總覽」card</strong> — 顯示總資產 + 未實現損益 (±N
+              ±X.X%)，跟晨報 banner 同算法 (美股部位 × USD/TWD 即期 rate 換 TWD)。
+              user 反映「投資組合最上面應該也要有總資產資料，怎麼反而沒有」。<br>
+              <strong>(0.5) 加 stale-while-revalidate cache</strong> — refreshAll 成功後存
+              <code>localStorage.portfolio_cache_v1</code> (holdings/quotes/dividends)，
+              下次開啟 bootstrap 瞬間 render cache 避跳畫面 (user 反映「進來會跳一下」)，
+              背景 refresh 完再 update。<br>
+              <strong>(0.7) 加 section nav</strong> (📈 台股 / 🇺🇸 美股 / 📊 資產變化) 比照
+              晨報，holdings 拆 TW / US 兩 section render，user 反映「往下滑整頁滑走」。<br>
+              修 user 反映「兩個 app 日夜切換獨立 + 邏輯不一樣」：<br>
+              (1) <strong>三個 PWA (CrewSync / 晨報 / 投資組合) 共用 localStorage</strong>
+              <code>crewsync_theme</code> + <code>crewsync_font_scale</code> — same origin
+              跨 app 同步。一個 app 切 light，所有 PWA 都跟著 light。<br>
+              (2) <strong>圖示反轉成「目標 mode」</strong>: 現在 dark mode → 按鈕顯示 ☀️
+              (按就切去 light)；現在 light mode → 按鈕顯示 🌙 (按就切回 dark)。跟
+              CrewSync 主 app 邏輯一致。<br>
+              (3) 舊 key (<code>portfolio_theme</code> / <code>portfolio_font_scale</code> /
+              <code>morning_theme</code> / <code>morning_font_scale</code>) 當 fallback 一次性
+              migrate — user 既有 preference 不會 reset。<br>
+              (4) Backend fix: <code>/api/portfolio/fx?pair=USD/TWD</code> 改讀 morning_reports
+              cached fx data (跟下方匯率 card 同源)，user 不再看到 banner 顯示 fallback 32。
+            </div>
+          </div>
+          <div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border)">
+            <div style="font-weight:700;margin-bottom:6px;color:var(--muted)">V1.0.14 — 版面比照 CrewSync：navbar 移底部 + 安全區 + 20 段字型</div>
             <div class="muted" style="font-size:.85em;line-height:1.6;margin-bottom:12px">
               修 user 反映 iPhone 動態島 (Dynamic Island) 跟畫面頂部重疊 + 版面大改：<br>
               (1) <strong>Tab navbar 從上方 sticky 改下方 fixed</strong> (比照 CrewSync 主 app)，
@@ -418,7 +462,7 @@ export function getPortfolioHtml(): string {
         <a href="/portfolio" class="active">📈 投資組合</a>
       </div>
       <div class="tab-controls">
-        <button class="hdr-btn" id="btn-theme" onclick="toggleTheme()" title="日/夜">🌙</button>
+        <button class="hdr-btn" id="btn-theme" onclick="toggleTheme()" title="日/夜">☀️</button>
         <div class="hdr-btn-font" title="字型大小">
           <button onclick="bumpFont(1)">A+</button>
           <button onclick="bumpFont(-1)">A−</button>
@@ -528,6 +572,36 @@ body { font-size: 1rem; padding-left: 0; padding-right: 0; }
 .btn-danger { background: var(--red); border-color: var(--red); color: #fff; font-weight: 600; }
 .status { color: var(--muted); font-size: .85em; margin-bottom: 10px; min-height: 1.2em; }
 .list { display: flex; flex-direction: column; gap: 8px; }
+
+/* V1.0.15: Section nav (台股 / 美股 / 資產變化) — 比照晨報 */
+.sec-nav { display: flex; gap: 6px; padding: 0; margin: 0 0 10px; overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+.sec-nav::-webkit-scrollbar { display: none; }
+.sec-nav .nav-btn {
+  flex: 0 0 auto;
+  background: rgba(91,158,255,0.08);
+  border: 1px solid var(--border);
+  color: var(--fg);
+  padding: 6px 12px; border-radius: 20px;
+  font-size: .82em; font-weight: 600;
+  cursor: pointer; white-space: nowrap;
+}
+.sec-nav .nav-btn:active { opacity: .6; }
+.sec-block { margin-bottom: 16px; }
+.sec-title { font-size: 1.05em; font-weight: 700; padding: 8px 4px; color: var(--accent); }
+
+/* V1.0.15: 投資組合總覽 card (頂部 dashboard — 總資產 + 未實現損益) */
+.overall-card {
+  background: var(--bg-card); border: 1px solid var(--border); border-radius: 10px;
+  padding: 12px 14px; margin-bottom: 12px;
+  display: flex; flex-direction: column; gap: 6px;
+}
+.overall-card .ov-row { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.overall-card .ov-label { color: var(--muted); font-size: .88em; }
+.overall-card .ov-value { font-weight: 700; font-variant-numeric: tabular-nums; font-size: 1.05em; }
+.overall-card .ov-value.ov-up { color: #ef4444; }   /* 台股慣例: 漲紅 */
+.overall-card .ov-value.ov-down { color: #22c55e; } /* 跌綠 */
+.overall-card .ov-fx-note { color: var(--muted); font-size: .72em; }
+.overall-card .ov-fx-note:empty { display: none; }
 .holding {
   background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px;
   padding: 10px 12px; cursor: pointer;
@@ -663,7 +737,7 @@ function setUid(uid) {
 }
 function updateUidDisplay() {
   const uid = getUid();
-  const text = uid ? '@' + uid : '(設定暱稱)';
+  const text = uid || '(設定暱稱)';
   document.getElementById('hdr-user').textContent = text;
   const du = document.getElementById('detail-user');
   if (du) du.textContent = text;
@@ -718,6 +792,49 @@ async function apiFetch(path, opts = {}) {
 
 // ── Bootstrap (load 時的初始化流程) ──────────────────────────────────────────
 
+// V1.0.15: stale-while-revalidate cache — 開啟瞬間 render 上次資料避免跳畫面
+// uid-scoped 避免 user A 切去 B 之後瞬間看到 A 的持倉 (codex P1)
+const CACHE_KEY = 'portfolio_cache_v1';
+function saveCache() {
+  try {
+    localStorage.setItem(CACHE_KEY, JSON.stringify({
+      uid: getUid(),
+      holdings: _state.holdings,
+      quotes: _state.quotes,
+      dividends: _state.dividends,
+      at: Date.now(),
+    }));
+  } catch {}
+}
+function clearCache() {
+  try { localStorage.removeItem(CACHE_KEY); } catch {}
+}
+function loadCache() {
+  try {
+    const raw = localStorage.getItem(CACHE_KEY);
+    if (!raw) return null;
+    const obj = JSON.parse(raw);
+    if (!obj || !Array.isArray(obj.holdings)) return null;
+    if (obj.uid !== getUid()) return null;  // uid 不 match → 不 render 別人的 cache
+    return obj;
+  } catch { return null; }
+}
+function showCacheImmediate() {
+  const cached = loadCache();
+  if (!cached || cached.holdings.length === 0) return;
+  _state.holdings = cached.holdings;
+  _state.quotes = cached.quotes || {};
+  _state.dividends = cached.dividends || {};
+  renderMain();
+  // 不 call renderOverall — 它 await fx 異步; cache renderOverall 可能 resolve 在
+  // refreshAll renderOverall 之後 → 用 stale 蓋掉新總覽 (race). refreshAll 完整體 update
+  const status = document.getElementById('main-status');
+  if (status) {
+    const t = new Date(cached.at).toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit' });
+    status.textContent = '上次更新：' + t + '（更新中…）';
+  }
+}
+
 async function bootstrap() {
   updateUidDisplay();
   if (!getUid()) {
@@ -729,9 +846,12 @@ async function bootstrap() {
     const j = await r.json();
     _state.pinEnabled = !!j.enabled;
     if (j.enabled && !getPin()) {
+      // PIN 保護中：不 render cache 避免外人在 lock-screen 前看到 holdings
       showPinUnlock();
     } else {
       hidePinUnlock();
+      // 先 render cache 避跳畫面（PIN 已通過 / 未啟用 才走這條）
+      showCacheImmediate();
       refreshAll();
     }
   } catch (e) {
@@ -909,8 +1029,10 @@ async function refreshAll() {
     _state.holdings = holdings;
     if (holdings.length === 0) {
       _state.quotes = {};
+      document.getElementById('portfolio-overall').hidden = true;
       renderMain();
       loadChart();
+      clearCache();  // V1.0.15: 持倉全清 → 砍 cache 避免下次開啟還閃舊持倉
       status.textContent = '';
       return;
     }
@@ -922,7 +1044,9 @@ async function refreshAll() {
     _state.quotes = quotes;
     _state.dividends = dividends;
     renderMain();
+    renderOverall();  // V1.0.15: 頂部總覽 (總資產 + 未實現損益)
     loadChart();
+    saveCache();  // V1.0.15: 存 cache 給下次開啟瞬間 render
     status.textContent = '已更新：' + new Date().toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit' });
   } catch (e) {
     status.textContent = '錯誤：' + e.message;
@@ -963,13 +1087,50 @@ async function fetchDetail(market, symbol) {
   return await apiFetch('/holdings/' + market + '/' + encodeURIComponent(symbol));
 }
 
+// V1.0.15: 頂部總覽 — 總資產 + 未實現損益 (跟晨報 banner 同算法)
+async function renderOverall() {
+  const card = document.getElementById('portfolio-overall');
+  const holdings = _state.holdings || [];
+  if (holdings.length === 0) { card.hidden = true; return; }
+  // 美股部位用即期 USD/TWD 換 TWD (跟晨報 banner 同源 endpoint)
+  let fxUsdTwd = 32;  // fallback
+  try {
+    const r = await fetch('/api/portfolio/fx?pair=USD/TWD');
+    if (r.ok) {
+      const j = await r.json();
+      if (typeof j.rate === 'number' && j.rate > 0) fxUsdTwd = j.rate;
+    }
+  } catch {}
+  let totalCost = 0, totalValue = 0;
+  for (const h of holdings) {
+    const q = _state.quotes[h.market + ':' + h.symbol] || {};
+    const price = typeof q.price === 'number' ? q.price : h.avgCost;
+    const fx = h.market === 'US' ? fxUsdTwd : 1;
+    totalCost += h.costBasis * fx;
+    totalValue += (h.qty * price) * fx;
+  }
+  const pnl = totalValue - totalCost;
+  const pct = totalCost > 0 ? (pnl / totalCost * 100) : 0;
+  const fmtRound = (n) => Math.round(n).toLocaleString();
+  document.getElementById('ov-total-value').textContent = 'NT$' + fmtRound(totalValue);
+  const pnlEl = document.getElementById('ov-pnl');
+  pnlEl.className = 'ov-value ' + (pnl > 0 ? 'ov-up' : pnl < 0 ? 'ov-down' : '');
+  const sign = pnl > 0 ? '+' : '';
+  pnlEl.textContent = sign + fmtRound(pnl) + ' (' + sign + pct.toFixed(1) + '%)';
+  const hasUs = holdings.some(h => h.market === 'US');
+  document.getElementById('ov-fx-note').textContent = hasUs ? '美股部位 × USD/TWD ' + fxUsdTwd.toFixed(2) + ' 換算' : '';
+  card.hidden = false;
+}
+
 function renderMain() {
   const root = document.getElementById('holdings-list');
   if (_state.holdings.length === 0) {
     root.innerHTML = '<div class="empty">尚無持倉。<br>按上方「+ 加交易」開始記錄你的買賣。</div>';
+    document.getElementById('portfolio-section-nav').hidden = true;
     return;
   }
-  const html = _state.holdings.map(h => {
+  // V1.0.15: 拆台股 / 美股 兩 section (比照晨報) + 顯示 section nav
+  const renderHolding = (h) => {
     const key = h.market + ':' + h.symbol;
     const q = _state.quotes[key] || {};
     const price = q.price;
@@ -1021,8 +1182,24 @@ function renderMain() {
         \${divHtml}
       </div>
     \`;
-  }).join('');
+  };
+  const tw = _state.holdings.filter(h => h.market === 'TW');
+  const us = _state.holdings.filter(h => h.market === 'US');
+  let html = '';
+  if (tw.length > 0) {
+    html += '<section id="sec-tw" class="sec-block"><div class="sec-title">📈 台股</div><div class="sec-body">' + tw.map(renderHolding).join('') + '</div></section>';
+  }
+  if (us.length > 0) {
+    html += '<section id="sec-us" class="sec-block"><div class="sec-title">🇺🇸 美股</div><div class="sec-body">' + us.map(renderHolding).join('') + '</div></section>';
+  }
   root.innerHTML = html;
+  // Section nav 顯示 + 只 show 有資料的 tab
+  const navBar = document.getElementById('portfolio-section-nav');
+  if (navBar) {
+    navBar.hidden = false;
+    navBar.querySelector('[data-target="sec-tw"]').hidden = (tw.length === 0);
+    navBar.querySelector('[data-target="sec-us"]').hidden = (us.length === 0);
+  }
 }
 
 // ── Detail page render ───────────────────────────────────────────────────────
@@ -1496,32 +1673,50 @@ function renderChart(points, note) {
 
 // ── Theme / Font / About ─────────────────────────────────────────────────────
 
-const PORTFOLIO_VERSION = 'V1.0.14';
-const THEME_KEY = 'portfolio_theme';
-const FONT_SCALE_KEY = 'portfolio_font_scale';
+const PORTFOLIO_VERSION = 'V1.0.15';
+// V1.0.15: theme + font scale 三個 PWA 共用 (crewsync_*) — same origin localStorage 跨 app 同步
+const THEME_KEY = 'crewsync_theme';
+const LEGACY_THEME_KEY = 'portfolio_theme';
+const FONT_SCALE_KEY = 'crewsync_font_scale';
+const LEGACY_FONT_SCALE_KEY = 'portfolio_font_scale';
+
+function readTheme() {
+  // Same origin so 'morning_theme' 也可 access；fallback chain: shared → portfolio legacy → morning legacy
+  try {
+    return localStorage.getItem(THEME_KEY)
+      || localStorage.getItem(LEGACY_THEME_KEY)
+      || localStorage.getItem('morning_theme')
+      || 'dark';
+  } catch { return 'dark'; }
+}
 
 function applyTheme() {
-  const t = (function(){ try { return localStorage.getItem(THEME_KEY) || 'dark'; } catch { return 'dark'; } })();
+  const t = readTheme();
   if (t === 'light') document.documentElement.dataset.theme = 'light';
   else delete document.documentElement.dataset.theme;
   const btn = document.getElementById('btn-theme');
-  if (btn) btn.textContent = t === 'light' ? '☀️' : '🌙';
+  // icon 顯示「目標 mode」: 現在 dark → 顯 ☀️ (按就切去 light)；現在 light → 顯 🌙
+  if (btn) btn.textContent = t === 'light' ? '🌙' : '☀️';
   // meta theme-color 同步切換（PWA 上下狀態列色）
   const meta = document.querySelector('meta[name="theme-color"]');
   if (meta) meta.setAttribute('content', t === 'light' ? '#f5f7fa' : '#0a0a0f');
 }
 function toggleTheme() {
-  let cur = 'dark';
-  try { cur = localStorage.getItem(THEME_KEY) || 'dark'; } catch {}
+  const cur = readTheme();
   const next = cur === 'light' ? 'dark' : 'light';
   try { localStorage.setItem(THEME_KEY, next); } catch {}
   applyTheme();
 }
 
-// V1.0.14: 20-step font scale (跟 CrewSync 同邏輯 [-2, +17] 共 20 段 / 8% per step)
-// 基準 15px 因 html stylesheet 設了；inline px override，避免 % 跟 stylesheet 衝突
+// V1.0.14: 20-step font scale; V1.0.15: shared key crewsync_font_scale 跨 PWA + morning fallback
 let _fontScale = 0;
-try { const s = parseInt(localStorage.getItem(FONT_SCALE_KEY) || '0'); if (!isNaN(s) && s >= -2 && s <= 17) _fontScale = s; } catch {}
+try {
+  const raw = localStorage.getItem(FONT_SCALE_KEY)
+    ?? localStorage.getItem(LEGACY_FONT_SCALE_KEY)
+    ?? localStorage.getItem('morning_font_scale');
+  const s = parseInt(raw || '0');
+  if (!isNaN(s) && s >= -2 && s <= 17) _fontScale = s;
+} catch {}
 function applyFontScale() {
   const px = 15 * (1 + _fontScale * 0.08);  // -2 → 12.6px, 0 → 15px, +17 → 35.4px
   document.documentElement.style.fontSize = px + 'px';
@@ -1631,6 +1826,15 @@ if (aboutVerEl) aboutVerEl.textContent = PORTFOLIO_VERSION;
 applyTheme();
 applyFontScale();
 renderRangeButtons();
+// V1.0.15: section nav click → scroll
+document.addEventListener('click', function(e) {
+  const t = e.target;
+  if (t && t.classList && t.classList.contains('nav-btn') && t.closest('#portfolio-section-nav')) {
+    const id = t.getAttribute('data-target');
+    const el = id ? document.getElementById(id) : null;
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+});
 bootstrap();
 `;
 }

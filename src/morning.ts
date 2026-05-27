@@ -12,7 +12,7 @@ import { ROOT } from './config.js';
 import { buildMorningReport, fetchSection } from './morning-builder.js';
 import { listUserSymbols } from './portfolio/queries.js';
 
-export const MORNING_VERSION = 'V1.3.18';
+export const MORNING_VERSION = 'V1.3.19';
 const MORNING_CACHE = 'morning-v1-3-10';
 
 // ─── Postgres ────────────────────────────────────────────────────────
@@ -1963,7 +1963,7 @@ body { padding-bottom: calc(64px + env(safe-area-inset-bottom, 0px)); }
     <a href="/portfolio">📈 投資組合</a>
   </div>
   <div class="tab-controls">
-    <button class="hdr-btn" id="btn-theme" title="日/夜">🌙</button>
+    <button class="hdr-btn" id="btn-theme" title="日/夜">☀️</button>
     <div class="hdr-btn-font" title="字型大小">
       <button id="btn-font-up">A+</button>
       <button id="btn-font-dn">A−</button>
@@ -2030,6 +2030,17 @@ body { padding-bottom: calc(64px + env(safe-area-inset-bottom, 0px)); }
     </div>
     <hr style="border:none;border-top:1px solid var(--border);margin:12px 0">
     <div class="changelog-v">${MORNING_VERSION}</div>
+    <div class="changelog-txt">
+      三個 PWA (CrewSync / 晨報 / 投資組合) 日夜 + 字型共用 localStorage
+      <code>crewsync_theme</code> + <code>crewsync_font_scale</code> — same origin
+      跨 app 同步。一個 app 切 light，所有 PWA 跟著 light。舊 key
+      <code>morning_theme</code> / <code>morning_font_scale</code> 當 fallback 一次性
+      migrate user preference 不會 reset。順便拿掉 user 名稱前面的「@」前綴。<br>
+      Three PWAs now share localStorage for theme + font scale; old
+      per-PWA keys serve as a one-shot migration fallback. Also removed
+      the «@» prefix from username display.
+    </div>
+    <div class="changelog-v old">V1.3.18</div>
     <div class="changelog-txt">
       版面比照 CrewSync 大改 — 修動態島重疊 + 改 navbar 位置 + 字型 20 段：<br>
       (1) <strong>Tab navbar 從上方 sticky 改下方 fixed</strong>，左側 tabs (晨報/投資組合)
@@ -2436,7 +2447,7 @@ function updateHdrTitle() {
   if (!el) return;
   const uid = getUid();
   // V1.3.13: 拿掉「的晨報」字樣 (navbar 已標 module 名)，只顯示暱稱
-  el.textContent = uid ? ('@' + uid) : '請設暱稱';
+  el.textContent = uid || '請設暱稱';
 }
 
 // Wrapped fetch that always adds X-User-Id header
@@ -4977,29 +4988,44 @@ function calNav(delta) {
   renderCalendar();
 }
 
-// ── Theme (day/night) ────────────────────────────────────────────
+// ── Theme (day/night) — V1.3.19: 三 PWA 共用 localStorage 'crewsync_theme'
+function readThemeKey() {
+  // Same origin: 也 fallback portfolio_theme (user 若只在另一 PWA 設過要 preserve)
+  try {
+    return localStorage.getItem('crewsync_theme')
+      || localStorage.getItem('morning_theme')
+      || localStorage.getItem('portfolio_theme')
+      || 'dark';
+  } catch { return 'dark'; }
+}
 function applyTheme() {
-  const t = localStorage.getItem('morning_theme') || 'dark';
+  const t = readThemeKey();
   const icon = document.getElementById('btn-theme');
   if (t === 'light') {
     document.documentElement.dataset.theme = 'light';
-    if (icon) icon.textContent = '🌙';
+    if (icon) icon.textContent = '🌙';  // light 顯示 🌙 (按切回 dark)
   } else {
     delete document.documentElement.dataset.theme;
-    if (icon) icon.textContent = '☀️';
+    if (icon) icon.textContent = '☀️';  // dark 顯示 ☀️ (按切去 light)
   }
 }
 function toggleTheme() {
-  const cur = localStorage.getItem('morning_theme') || 'dark';
-  localStorage.setItem('morning_theme', cur === 'light' ? 'dark' : 'light');
+  const cur = readThemeKey();
+  try { localStorage.setItem('crewsync_theme', cur === 'light' ? 'dark' : 'light'); } catch {}
   applyTheme();
 }
 applyTheme();
 
 // ── Font scale ───────────────────────────────────────────────────
-// V1.3.18: 20-step font scale (跟 CrewSync 對齊) — range [-2, +17]
+// V1.3.18: 20-step font scale; V1.3.19: shared key 'crewsync_font_scale' 跨 PWA + portfolio fallback
 let _fontScale = 0;
-try { const s = parseInt(localStorage.getItem('morning_font_scale') || '0'); if (!isNaN(s) && s >= -2 && s <= 17) _fontScale = s; } catch (e) {}
+try {
+  const raw = localStorage.getItem('crewsync_font_scale')
+    ?? localStorage.getItem('morning_font_scale')
+    ?? localStorage.getItem('portfolio_font_scale');
+  const s = parseInt(raw || '0');
+  if (!isNaN(s) && s >= -2 && s <= 17) _fontScale = s;
+} catch (e) {}
 function applyFontScale() {
   // 基準 15px，每級 +/- 1.2px (≈8%)
   const px = 15 * (1 + _fontScale * 0.08);
@@ -5007,7 +5033,7 @@ function applyFontScale() {
 }
 function bumpFont(dir) {
   _fontScale = Math.max(-2, Math.min(17, _fontScale + dir));
-  try { localStorage.setItem('morning_font_scale', String(_fontScale)); } catch (e) {}
+  try { localStorage.setItem('crewsync_font_scale', String(_fontScale)); } catch (e) {}
   applyFontScale();
   setTimeout(updateHdrH, 50);
 }
