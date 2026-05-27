@@ -46,7 +46,7 @@ export function getPortfolioHtml(): string {
         <div style="min-width:0;flex:1">
           <div class="hdr-title">
             <span class="hdr-user" id="hdr-user" onclick="changeUid()">—</span>
-            <span class="ver" id="ver-tag" onclick="openAbout()">V1.0.12</span>
+            <span class="ver" id="ver-tag" onclick="openAbout()">V1.0.13</span>
           </div>
         </div>
       </div>
@@ -174,7 +174,26 @@ export function getPortfolioHtml(): string {
         <div class="modal-body" style="max-height:60vh;overflow-y:auto">
           <div class="muted muted-small">獨立投資組合子系統 — 多筆買賣帳本、自動算均價、三視角持倉分析、opt-in PIN 保護</div>
           <div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border)">
-            <div style="font-weight:700;margin-bottom:6px">V1.0.12 — 換 yahoo v8 chart 抓配息 + fx endpoint</div>
+            <div style="font-weight:700;margin-bottom:6px">V1.0.13 — 除權息 20 年歷史 + 即將除息預告</div>
+            <div class="muted" style="font-size:.85em;line-height:1.6;margin-bottom:12px">
+              (1) 持倉 row 「💰」改顯示 <strong>當年累計配息</strong>：當年有 events →「2026
+              年配 X · 殖利率 Y%」；當年無 events fallback 前一年。整行可點，打開
+              <strong>除權息詳情 modal</strong>，按年份分組列 events table (20 年歷史)。
+              即將除息 events 標 <code>⏳</code> 排最前面。<br>
+              (2) 資料來源多 source 整合：<br>
+              　• 台股歷史：Yahoo Finance v8 chart events=div (lookback 20 年)<br>
+              　• 台股即將：TWSE OpenAPI <code>/v1/exchangeReport/TWT48U_ALL</code> 預告表
+              (全市場一次抓 + server 6h cache)<br>
+              　• 美股歷史：Yahoo Finance v8 chart events=div (cover NYSE + NASDAQ)<br>
+              　• 美股即將：nasdaq.com <code>/api/quote/X/dividends</code> 取 future rows<br>
+              (3) Backend dividend.ts 全 rewrite — DividendInfo schema 從 5 個 scalar
+              field 改成 <code>events: [{date, amount, upcoming}]</code> + summary fields
+              (displayYear/displayRate/dividendYield/nextExDate/lastExDate)。Cache TTL
+              從 24h 縮到 6h 配合 TWSE 預告日更頻繁更新。
+            </div>
+          </div>
+          <div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border)">
+            <div style="font-weight:700;margin-bottom:6px;color:var(--muted)">V1.0.12 — 換 yahoo v8 chart 抓配息 + fx endpoint (被 V1.0.13 取代)</div>
             <div class="muted" style="font-size:.85em;line-height:1.6;margin-bottom:12px">
               (1) V1.0.11 yahoo <code>quoteSummary</code> endpoint 全 null（Yahoo 2023
               起加 crumb cookie 卡 anonymous request），改用 <code>/v8/finance/chart?events=div</code>
@@ -346,6 +365,22 @@ export function getPortfolioHtml(): string {
     </div>
 
     <!-- PIN setup / change / unset modal -->
+    <div id="modal-dividend-detail" class="modal" hidden>
+      <div class="modal-card" style="max-width:560px">
+        <div class="modal-hdr">
+          <span id="dd-title">除權息資料</span>
+          <span class="modal-close" onclick="closeDividendDetail()">✕</span>
+        </div>
+        <div class="modal-body">
+          <div id="dd-summary" class="muted muted-small" style="margin-bottom:10px"></div>
+          <div id="dd-list" style="max-height:55vh;overflow-y:auto"></div>
+          <div class="muted muted-small" style="margin-top:10px;font-size:.75em">
+            來源 — 台股: Yahoo Finance 歷史 + TWSE 預告／美股: Yahoo Finance 歷史 + Nasdaq 預告
+          </div>
+        </div>
+      </div>
+    </div>
+
     <div id="modal-pin-form" class="modal" hidden>
       <div class="modal-card">
         <div class="modal-hdr">
@@ -480,8 +515,21 @@ body { font-size: 1rem; }
 .h-symbol .h-mkt { color: var(--muted); font-size: .8em; margin-right: 4px; }
 a.h-symbol-link { color: inherit; text-decoration: none; display: block; min-width: 0; }
 a.h-symbol-link:hover, a.h-symbol-link:active { color: var(--accent); text-decoration: underline dotted; }
-.h-div { color: var(--muted); font-size: .82em; margin-top: 4px; }
+.h-div { color: var(--muted); font-size: .82em; margin-top: 4px; cursor: pointer; padding: 4px 0; border-radius: 4px; }
+.h-div:hover { color: var(--text); }
 .h-div .yield { color: var(--accent); font-weight: 600; }
+.h-div .upcoming { color: var(--accent); font-weight: 600; }
+.h-div .h-div-more { color: var(--muted); margin-left: 4px; }
+
+/* Dividend detail modal table */
+.dd-year { margin-bottom: 14px; }
+.dd-year-hdr { font-weight: 700; padding: 6px 0; border-bottom: 1px solid var(--border); margin-bottom: 4px; }
+.dd-row { display: grid; grid-template-columns: 110px 1fr auto; gap: 10px; padding: 4px 4px; font-size: .9em; align-items: center; }
+.dd-row:nth-child(even) { background: rgba(255,255,255,.02); }
+.dd-date { color: var(--muted); font-variant-numeric: tabular-nums; }
+.dd-amt { font-weight: 600; font-variant-numeric: tabular-nums; }
+.dd-tag { font-size: .75em; padding: 1px 6px; border-radius: 8px; }
+.dd-tag.dd-upcoming { background: rgba(99,102,241,.15); color: var(--accent); }
 .h-price { font-weight: 600; }
 .h-chg { font-size: .85em; }
 .h-row2 { display: flex; gap: 12px; margin-top: 4px; color: var(--muted); font-size: .85em; }
@@ -572,7 +620,7 @@ const API = '/api/portfolio';
 let _state = {
   holdings: [],
   quotes: {},
-  dividends: {},   // V1.0.11: { 'TW:3231': { dividendYield, dividendRate, exDividendDate } }
+  dividends: {},   // V1.0.13: { 'TW:3231': { events, displayYear, displayRate, dividendYield, nextExDate, lastExDate, currentPrice } }
   side: 'buy',
   pinFormMode: 'set',  // 'set' | 'change' | 'unset'
   pinEnabled: false,
@@ -915,20 +963,23 @@ function renderMain() {
     const cnyesUrl = h.market === 'TW'
       ? 'https://www.cnyes.com/twstock/' + h.symbol
       : 'https://invest.cnyes.com/usstock/detail/' + h.symbol;
-    // 配股配息資訊 (V1.0.12，yahoo v8 chart events=div)
-    // 拆 lastRate vs annual: quarterly payer 不會把累計年配跟單次除息日混在一起誤導
-    const div = _state.dividends[h.market + ':' + h.symbol];
+    // 配股配息資訊 (V1.0.13: 台股 yahoo+TWSE / 美股 nasdaq.com)
+    // 當年有 events → 顯示當年累計；否則前一年。點開 modal 看歷史 + 即將
+    const divKey = h.market + ':' + h.symbol;
+    const div = _state.dividends[divKey];
     let divHtml = '';
-    if (div && (div.dividendYield || div.dividendRate)) {
+    if (div && (div.displayRate || div.nextExDate)) {
       const parts = [];
-      if (div.dividendYield != null) parts.push('<span class="yield">殖利率 ' + (div.dividendYield * 100).toFixed(2) + '%</span>');
-      if (div.dividendRate != null) parts.push('年配 ' + fmtNum(div.dividendRate));
-      if (div.lastRate != null && div.exDividendDate) {
-        parts.push('最近配 ' + fmtNum(div.lastRate) + ' 除息 ' + div.exDividendDate);
-      } else if (div.exDividendDate) {
-        parts.push('除息 ' + div.exDividendDate);
+      // 殖利率：用 displayRate + 現價 (current quote price)
+      const yieldVal = (div.displayRate != null && price != null && price > 0)
+        ? (div.displayRate / price) : (div.dividendYield != null ? div.dividendYield : null);
+      if (yieldVal != null) parts.push('<span class="yield">殖利率 ' + (yieldVal * 100).toFixed(2) + '%</span>');
+      if (div.displayYear != null && div.displayRate != null) {
+        parts.push(div.displayYear + ' 年配 ' + fmtNum(div.displayRate));
       }
-      divHtml = '<div class="h-div">💰 ' + parts.join(' · ') + '</div>';
+      if (div.nextExDate) parts.push('<span class="upcoming">⏳ 即將除息 ' + div.nextExDate + '</span>');
+      else if (div.lastExDate) parts.push('最近除息 ' + div.lastExDate);
+      divHtml = '<div class="h-div" onclick="event.stopPropagation(); showDividendDetail(\\'' + divKey + '\\')">💰 ' + parts.join(' · ') + ' <span class="h-div-more">›</span></div>';
     }
     return \`
       <div class="holding" onclick="goDetail('\${h.market}', '\${h.symbol}')">
@@ -1422,7 +1473,7 @@ function renderChart(points, note) {
 
 // ── Theme / Font / About ─────────────────────────────────────────────────────
 
-const PORTFOLIO_VERSION = 'V1.0.12';
+const PORTFOLIO_VERSION = 'V1.0.13';
 const THEME_KEY = 'portfolio_theme';
 const FONT_SCALE_KEY = 'portfolio_font_scale';
 
@@ -1464,6 +1515,63 @@ function openAbout() {
 }
 function closeAbout() {
   document.getElementById('modal-about').hidden = true;
+}
+
+// ── Dividend detail modal (V1.0.13) ─────────────────────────────────────────
+
+function showDividendDetail(key) {
+  const div = _state.dividends[key];
+  if (!div) return;
+  const [market, symbol] = key.split(':');
+  const h = _state.holdings.find(x => x.market === market && x.symbol === symbol);
+  const q = _state.quotes[key] || {};
+  const name = q.name || (h ? '' : symbol);
+  const ccy = market === 'TW' ? 'NT$' : '$';
+  document.getElementById('dd-title').textContent =
+    '💰 ' + market + ' ' + symbol + (name ? ' · ' + name : '') + ' 除權息';
+  // summary line: 當年 / 殖利率
+  const price = q.price;
+  const yieldVal = (div.displayRate != null && price && price > 0) ? (div.displayRate / price) : div.dividendYield;
+  const summaryParts = [];
+  if (div.displayYear != null && div.displayRate != null) {
+    summaryParts.push(div.displayYear + ' 年累計 ' + ccy + fmtNum(div.displayRate));
+  }
+  if (yieldVal != null) summaryParts.push('殖利率 ' + (yieldVal * 100).toFixed(2) + '%');
+  if (div.nextExDate) summaryParts.push('⏳ 下次除息 ' + div.nextExDate);
+  document.getElementById('dd-summary').textContent = summaryParts.join(' · ');
+  // events table
+  const events = div.events || [];
+  if (events.length === 0) {
+    document.getElementById('dd-list').innerHTML = '<div class="empty">沒有除權息紀錄</div>';
+  } else {
+    // group by year
+    const byYear = {};
+    for (const e of events) {
+      const y = e.date.slice(0, 4);
+      if (!byYear[y]) byYear[y] = [];
+      byYear[y].push(e);
+    }
+    const years = Object.keys(byYear).sort((a, b) => b.localeCompare(a));
+    const html = years.map(y => {
+      const yearTotal = byYear[y].reduce((s, e) => s + e.amount, 0);
+      const rows = byYear[y].map(e => {
+        const tag = e.upcoming ? '<span class="dd-tag dd-upcoming">⏳ 即將</span>' : '';
+        const stockTxt = (e.stockRatio && e.stockRatio > 0) ? ' + 配股 ' + e.stockRatio + ' 股' : '';
+        return '<div class="dd-row">' +
+          '<span class="dd-date">' + e.date + '</span>' +
+          '<span class="dd-amt">' + ccy + fmtNum(e.amount) + stockTxt + '</span>' +
+          tag +
+        '</div>';
+      }).join('');
+      return '<div class="dd-year"><div class="dd-year-hdr">' + y + ' <span class="muted muted-small">合計 ' + ccy + fmtNum(yearTotal) + '</span></div>' + rows + '</div>';
+    }).join('');
+    document.getElementById('dd-list').innerHTML = html;
+  }
+  document.getElementById('modal-dividend-detail').hidden = false;
+}
+
+function closeDividendDetail() {
+  document.getElementById('modal-dividend-detail').hidden = true;
 }
 
 // ── Format helpers ───────────────────────────────────────────────────────────

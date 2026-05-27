@@ -440,7 +440,7 @@ portfolioRouter.get('/api/portfolio/fx', async (req, res) => {
   }
 });
 
-/** GET /api/portfolio/dividend-info?symbols=TW:3231,US:NVDA — 從 Yahoo 抓配股配息 */
+/** GET /api/portfolio/dividend-info?symbols=TW:3231,US:NVDA — V1.0.13: 台股 yahoo+TWSE，美股 nasdaq.com */
 portfolioRouter.get('/api/portfolio/dividend-info', async (req, res) => {
   // 配息資料是公開市場資訊 — 不需要 user_id / PIN
   const symbolsRaw = String(req.query.symbols || '').trim();
