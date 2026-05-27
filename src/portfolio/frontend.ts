@@ -26,13 +26,13 @@ export function getPortfolioHtml(): string {
   <div id="app">
     <!-- 主畫面 -->
     <div id="page-main" class="page">
-      <!-- V1.0.15: top-stack sticky (hdr + sec-nav 整組黏頂，比照晨報) -->
+      <!-- V1.0.16: top-stack sticky (hdr + sec-nav 整組黏頂，比照晨報) -->
       <div class="top-stack" id="top-stack">
         <div class="hdr">
           <div style="min-width:0;flex:1">
             <div class="hdr-title">
               <span class="hdr-user" id="hdr-user" onclick="changeUid()">—</span>
-              <span class="ver" id="ver-tag" onclick="openAbout()">V1.0.15</span>
+              <span class="ver" id="ver-tag" onclick="openAbout()">V1.0.16</span>
             </div>
           </div>
           <div class="hdr-actions-top">
@@ -50,7 +50,7 @@ export function getPortfolioHtml(): string {
         <button class="btn btn-primary" onclick="openAddModal()">+ 加交易</button>
       </div>
       <div id="main-status" class="status"></div>
-      <!-- V1.0.15: 投資組合總覽 — 拆 TW / US + 合計 -->
+      <!-- V1.0.16: 投資組合總覽 — 拆 TW / US + 合計 -->
       <div id="portfolio-overall" class="overall-card" hidden>
         <div class="ov-grid">
           <div class="ov-cell" id="ov-cell-tw" hidden>
@@ -195,7 +195,23 @@ export function getPortfolioHtml(): string {
         <div class="modal-body" style="max-height:60vh;overflow-y:auto">
           <div class="muted muted-small">獨立投資組合子系統 — 多筆買賣帳本、自動算均價、三視角持倉分析、opt-in PIN 保護</div>
           <div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border)">
-            <div style="font-weight:700;margin-bottom:6px">V1.0.15 — 頂部總覽 + 日夜共用 + 圖示反轉 + fx 同源</div>
+            <div style="font-weight:700;margin-bottom:6px">V1.0.16 — 10 秒自動 refresh + 動態島不透 + ↻ 移最右 + 總資產拆 TW/US</div>
+            <div class="muted" style="font-size:.85em;line-height:1.6;margin-bottom:12px">
+              (1) <strong>盤中 10 秒自動 refresh</strong>: setInterval 每 10s 抓最新 quotes
+              (不重抓 holdings / dividends)，切到別 tab 自動暫停 (Page Visibility API)
+              省流量；回 visible 立刻 update 一次。user「不能下單不用真即時，10 秒就好」<br>
+              (2) <strong>動態島區不再透出</strong>: top-stack approach B — top: 0 +
+              padding-top: env(safe-area-inset-top)，自己延伸進動態島區並用 bg 蓋住，
+              scroll 不再看到下方 content 從動態島下方露出 (V1.0.15 sticky 半套之 bug)<br>
+              (3) <strong>整個 top-stack sticky</strong> (hdr + sec-nav 一起黏頂)，user
+              反映「叫你固定 nav 你只固定一半」<br>
+              (4) ↻ 重抓 swap 到 ⚙ 右邊 (rightmost) — 跟晨報 hdr 「📅 ↻」順序對齊<br>
+              (5) 總資產 overall card 拆 TW / US 兩 cell + 合計 TWD<br>
+              (6) overscroll-behavior: none 套 html/body — 禁 iOS 橡皮筋 bounce
+            </div>
+          </div>
+          <div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border)">
+            <div style="font-weight:700;margin-bottom:6px;color:var(--muted)">V1.0.15 — 頂部總覽 + 日夜共用 + 圖示反轉 + fx 同源 (被 V1.0.16 polish 取代)</div>
             <div class="muted" style="font-size:.85em;line-height:1.6;margin-bottom:12px">
               <strong>(0) 投資組合頂部加「總覽」card</strong> — 顯示總資產 + 未實現損益 (±N
               ±X.X%)，跟晨報 banner 同算法 (美股部位 × USD/TWD 即期 rate 換 TWD)。
@@ -546,8 +562,8 @@ function getStyles(): string {
   padding: 6px 4px;
 }
 
-/* iPhone Dynamic Island safe-area at top + 禁 iOS 橡皮筋 overscroll */
-body { padding-top: env(safe-area-inset-top, 0px); overscroll-behavior: none; }
+/* 禁 iOS 橡皮筋 overscroll (動態島 safe-area 由 top-stack 自己處理) */
+body { overscroll-behavior: none; }
 html { font-size: 15px; overscroll-behavior: none; }
 html, body { margin: 0; background: var(--bg); color: var(--fg); font-family: -apple-system, "Segoe UI", system-ui, "Microsoft JhengHei", sans-serif; }
 body { font-size: 1rem; padding-left: 0; padding-right: 0; }
@@ -591,15 +607,16 @@ body { font-size: 1rem; padding-left: 0; padding-right: 0; }
 .status { color: var(--muted); font-size: .85em; margin-bottom: 10px; min-height: 1.2em; }
 .list { display: flex; flex-direction: column; gap: 8px; }
 
-/* V1.0.15: top-stack — hdr + sec-nav 一起 sticky (比照晨報) */
+/* V1.0.16: top-stack — hdr + sec-nav 一起 sticky (比照晨報 approach B)
+   top: 0 + padding-top: env(safe-area-inset-top) — top-stack 自己延伸進動態島區域
+   並用 bg 蓋住，scroll 時不會看到下方 content 透出 */
 .top-stack {
   position: sticky;
-  /* notched iPhone: sticky 元素不受 body padding 保護，必須自己避動態島 */
-  top: env(safe-area-inset-top, 0px);
+  top: 0;
   z-index: 40;
   background: var(--bg);
   margin: 0 -14px 10px;
-  padding: 0 14px;
+  padding: env(safe-area-inset-top, 0px) 14px 0;
 }
 @media (min-width: 768px) {
   .top-stack { margin-left: -24px; margin-right: -24px; padding-left: 24px; padding-right: 24px; }
@@ -627,7 +644,7 @@ body { font-size: 1rem; padding-left: 0; padding-right: 0; }
 #chart-card { scroll-margin-top: var(--sec-nav-h, 60px); }
 .hdr-actions-top { display: flex; gap: 6px; align-items: center; flex-shrink: 0; }
 
-/* V1.0.15: 投資組合總覽 card — TW / US 拆解 + 合計 */
+/* V1.0.16: 投資組合總覽 card — TW / US 拆解 + 合計 */
 .overall-card {
   background: var(--bg-card); border: 1px solid var(--border); border-radius: 10px;
   padding: 12px 14px; margin-bottom: 12px;
@@ -794,6 +811,11 @@ function changeUid() {
   if (v === null) return;
   const trimmed = v.trim();
   if (!trimmed) return;
+  // V1.0.16: stop auto refresh + 清舊 state，避舊 user holdings 被 saveCache 寫進新 uid key
+  if (typeof stopAutoRefresh === 'function') stopAutoRefresh();
+  _state.holdings = [];
+  _state.quotes = {};
+  _state.dividends = {};
   setUid(trimmed);
   bootstrap();
 }
@@ -838,7 +860,7 @@ async function apiFetch(path, opts = {}) {
 
 // ── Bootstrap (load 時的初始化流程) ──────────────────────────────────────────
 
-// V1.0.15: stale-while-revalidate cache — 開啟瞬間 render 上次資料避免跳畫面
+// V1.0.16: stale-while-revalidate cache — 開啟瞬間 render 上次資料避免跳畫面
 // uid-scoped 避免 user A 切去 B 之後瞬間看到 A 的持倉 (codex P1)
 const CACHE_KEY = 'portfolio_cache_v1';
 function saveCache() {
@@ -1078,7 +1100,7 @@ async function refreshAll() {
       document.getElementById('portfolio-overall').hidden = true;
       renderMain();
       loadChart();
-      clearCache();  // V1.0.15: 持倉全清 → 砍 cache 避免下次開啟還閃舊持倉
+      clearCache();  // V1.0.16: 持倉全清 → 砍 cache 避免下次開啟還閃舊持倉
       status.textContent = '';
       return;
     }
@@ -1090,9 +1112,10 @@ async function refreshAll() {
     _state.quotes = quotes;
     _state.dividends = dividends;
     renderMain();
-    renderOverall();  // V1.0.15: 頂部總覽 (總資產 + 未實現損益)
+    renderOverall();  // V1.0.16: 頂部總覽 (總資產 + 未實現損益)
     loadChart();
-    saveCache();  // V1.0.15: 存 cache 給下次開啟瞬間 render
+    saveCache();  // V1.0.16: 存 cache 給下次開啟瞬間 render
+    startAutoRefresh();  // V1.0.16: 10 秒自動 refresh quotes (盤中市值 update)
     status.textContent = '已更新：' + new Date().toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit' });
   } catch (e) {
     status.textContent = '錯誤：' + e.message;
@@ -1133,7 +1156,7 @@ async function fetchDetail(market, symbol) {
   return await apiFetch('/holdings/' + market + '/' + encodeURIComponent(symbol));
 }
 
-// V1.0.15: 頂部總覽 — 拆 TW / US + 合計 (台股 NT$ / 美股 US$ / 合計 TWD)
+// V1.0.16: 頂部總覽 — 拆 TW / US + 合計 (台股 NT$ / 美股 US$ / 合計 TWD)
 async function renderOverall() {
   const card = document.getElementById('portfolio-overall');
   const holdings = _state.holdings || [];
@@ -1201,7 +1224,7 @@ function renderMain() {
     document.getElementById('portfolio-section-nav').hidden = true;
     return;
   }
-  // V1.0.15: 拆台股 / 美股 兩 section (比照晨報) + 顯示 section nav
+  // V1.0.16: 拆台股 / 美股 兩 section (比照晨報) + 顯示 section nav
   const renderHolding = (h) => {
     const key = h.market + ':' + h.symbol;
     const q = _state.quotes[key] || {};
@@ -1747,8 +1770,8 @@ function renderChart(points, note) {
 
 // ── Theme / Font / About ─────────────────────────────────────────────────────
 
-const PORTFOLIO_VERSION = 'V1.0.15';
-// V1.0.15: theme + font scale 三個 PWA 共用 (crewsync_*) — same origin localStorage 跨 app 同步
+const PORTFOLIO_VERSION = 'V1.0.16';
+// V1.0.16: theme + font scale 三個 PWA 共用 (crewsync_*) — same origin localStorage 跨 app 同步
 const THEME_KEY = 'crewsync_theme';
 const LEGACY_THEME_KEY = 'portfolio_theme';
 const FONT_SCALE_KEY = 'crewsync_font_scale';
@@ -1782,7 +1805,7 @@ function toggleTheme() {
   applyTheme();
 }
 
-// V1.0.14: 20-step font scale; V1.0.15: shared key crewsync_font_scale 跨 PWA + morning fallback
+// V1.0.14: 20-step font scale; V1.0.16: shared key crewsync_font_scale 跨 PWA + morning fallback
 let _fontScale = 0;
 try {
   const raw = localStorage.getItem(FONT_SCALE_KEY)
@@ -1899,10 +1922,42 @@ if (verTagEl) verTagEl.textContent = PORTFOLIO_VERSION;
 const aboutVerEl = document.getElementById('about-version');
 if (aboutVerEl) aboutVerEl.textContent = PORTFOLIO_VERSION;
 
+// V1.0.16: 10s auto-refresh quotes — 盤中市值即時感 (不重抓 holdings/dividends)
+let _autoRefreshTimer = null;
+async function refreshQuotesOnly() {
+  if (!_state.holdings || _state.holdings.length === 0) return;
+  if (document.visibilityState !== 'visible') return;
+  try {
+    const symbolList = _state.holdings.map(h => ({ symbol: h.symbol, market: h.market }));
+    const quotes = await fetchQuotes(symbolList);
+    _state.quotes = quotes;
+    renderMain();
+    renderOverall();
+    saveCache();
+    const status = document.getElementById('main-status');
+    if (status) status.textContent = '已更新：' + new Date().toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  } catch {}
+}
+function startAutoRefresh() {
+  if (_autoRefreshTimer) return;
+  _autoRefreshTimer = setInterval(refreshQuotesOnly, 10000);
+}
+function stopAutoRefresh() {
+  if (_autoRefreshTimer) { clearInterval(_autoRefreshTimer); _autoRefreshTimer = null; }
+}
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden') {
+    stopAutoRefresh();
+  } else if (_state.holdings && _state.holdings.length > 0) {
+    startAutoRefresh();
+    refreshQuotesOnly();  // 切回 visible 立刻 update 一次
+  }
+});
+
 applyTheme();
 applyFontScale();
 renderRangeButtons();
-// V1.0.15: section nav click → scroll + 動態算 top-stack 高度設 scroll-margin-top
+// V1.0.16: section nav click → scroll + 動態算 top-stack 高度設 scroll-margin-top
 // 量整個 top-stack (hdr + sec-nav) 不只 sec-nav，scroll 才不會藏在 hdr 後
 function updateSecNavHeight() {
   const stack = document.getElementById('top-stack');
