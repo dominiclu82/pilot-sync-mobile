@@ -199,7 +199,13 @@ export function getPortfolioHtml(): string {
             <div class="muted" style="font-size:.85em;line-height:1.6;margin-bottom:12px">
               (1) <strong>盤中 10 秒自動 refresh</strong>: setInterval 每 10s 抓最新 quotes
               (不重抓 holdings / dividends)，切到別 tab 自動暫停 (Page Visibility API)
-              省流量；回 visible 立刻 update 一次。user「不能下單不用真即時，10 秒就好」<br>
+              省流量；回 visible 立刻 update 一次。user「不能下單不用真即時，10 秒就好」
+              <strong>盤中限定</strong>: TW 09:00-13:30 / US 21:30-05:00 (Asia/Taipei)
+              Mon-Fri 才 refresh；收盤後 skip 省 cnyes 請求。只抓有開盤 market 的 symbols
+              (台股盤中只抓 TW、美股盤中只抓 US、兩個都開抓全部)。<br>
+              修 Codex P2 (V1.0.16 引入): detail page #page-detail .hdr 加
+              padding-top: env(safe-area-inset-top) — 移 body padding 後 detail 沒
+              safe-area cover，hdr 會藏動態島下。<br>
               (2) <strong>動態島區不再透出</strong>: top-stack approach B — top: 0 +
               padding-top: env(safe-area-inset-top)，自己延伸進動態島區並用 bg 蓋住，
               scroll 不再看到下方 content 從動態島下方露出 (V1.0.15 sticky 半套之 bug)<br>
@@ -566,6 +572,8 @@ function getStyles(): string {
 body { overscroll-behavior: none; }
 html { font-size: 15px; overscroll-behavior: none; }
 html, body { margin: 0; background: var(--bg); color: var(--fg); font-family: -apple-system, "Segoe UI", system-ui, "Microsoft JhengHei", sans-serif; }
+/* V1.0.16 fix: detail page 沒 top-stack，hdr 自己處理 safe-area-top */
+#page-detail .hdr { padding-top: calc(env(safe-area-inset-top, 0px) + 6px); }
 body { font-size: 1rem; padding-left: 0; padding-right: 0; }
 .page {
   width: 100%;
@@ -1923,19 +1931,49 @@ const aboutVerEl = document.getElementById('about-version');
 if (aboutVerEl) aboutVerEl.textContent = PORTFOLIO_VERSION;
 
 // V1.0.16: 10s auto-refresh quotes — 盤中市值即時感 (不重抓 holdings/dividends)
+// 盤中 only: TW 09:00-13:30 / US 21:30-05:00 (Asia/Taipei) Mon-Fri，避收盤後浪費請求
 let _autoRefreshTimer = null;
+function isMarketOpen(market) {
+  // 用各自市場當地時區判斷，JS Date 自動處理 DST (避 codex P1: US 夏令冬令 hardcode Taipei 時段差 1 小時)
+  const now = new Date();
+  if (market === 'TW') {
+    const tpe = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Taipei' }));
+    const day = tpe.getDay();
+    if (day === 0 || day === 6) return false;
+    const mins = tpe.getHours() * 60 + tpe.getMinutes();
+    return mins >= 9 * 60 && mins <= 13 * 60 + 30;
+  }
+  if (market === 'US') {
+    // 美東當地時間 09:30-16:00 Mon-Fri (NYSE/NASDAQ regular session)
+    const ny = new Date(now.toLocaleString('en-US', { timeZone: 'America/New_York' }));
+    const day = ny.getDay();
+    if (day === 0 || day === 6) return false;
+    const mins = ny.getHours() * 60 + ny.getMinutes();
+    return mins >= 9 * 60 + 30 && mins <= 16 * 60;
+  }
+  return false;
+}
 async function refreshQuotesOnly() {
   if (!_state.holdings || _state.holdings.length === 0) return;
   if (document.visibilityState !== 'visible') return;
+  // 只抓有開盤的 market 的 symbols
+  const openSymbols = _state.holdings.filter(h => isMarketOpen(h.market))
+    .map(h => ({ symbol: h.symbol, market: h.market }));
+  const status = document.getElementById('main-status');
+  if (openSymbols.length === 0) {
+    if (status) status.textContent = '市場已收盤 — 開盤時自動更新';
+    return;
+  }
   try {
-    const symbolList = _state.holdings.map(h => ({ symbol: h.symbol, market: h.market }));
-    const quotes = await fetchQuotes(symbolList);
-    _state.quotes = quotes;
+    const newQuotes = await fetchQuotes(openSymbols);
+    // merge：只更新開盤 market 的 symbol，收盤 market 的 quote 保留舊值
+    _state.quotes = Object.assign({}, _state.quotes, newQuotes);
     renderMain();
     renderOverall();
     saveCache();
-    const status = document.getElementById('main-status');
-    if (status) status.textContent = '已更新：' + new Date().toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    const openMarkets = Array.from(new Set(openSymbols.map(s => s.market)));
+    const label = openMarkets.map(m => m === 'TW' ? '📈 台股' : '🇺🇸 美股').join(' + ');
+    if (status) status.textContent = label + ' 盤中 · 已更新 ' + new Date().toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
   } catch {}
 }
 function startAutoRefresh() {
