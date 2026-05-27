@@ -11,6 +11,8 @@
 //   4. add transaction modal — buy/sell 表單
 //   5. settings modal — PIN 啟用 / 改 / 取消
 
+import { APP_VERSION } from '../version.js';
+
 export function getPortfolioHtml(): string {
   return `<!DOCTYPE html>
 <html lang="zh-TW">
@@ -32,7 +34,7 @@ export function getPortfolioHtml(): string {
           <div style="min-width:0;flex:1">
             <div class="hdr-title">
               <span class="emoji">📈</span><span class="hdr-user" id="hdr-user" onclick="changeUid()">—</span>
-              <span class="ver" id="ver-tag" onclick="openAbout()">V1.0.20</span>
+              <span class="ver" id="ver-tag" onclick="openAbout()">${APP_VERSION}</span>
             </div>
             <div class="hdr-date" id="hdr-date">—</div>
           </div>
@@ -198,7 +200,21 @@ export function getPortfolioHtml(): string {
         <div class="modal-body" style="max-height:60vh;overflow-y:auto">
           <div class="muted muted-small">獨立投資組合子系統 — 多筆買賣帳本、自動算均價、三視角持倉分析、opt-in PIN 保護</div>
           <div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border)">
-            <div style="font-weight:700;margin-bottom:6px">V1.0.20 — font-family + line-height 對齊晨報 (修間距感)</div>
+            <div style="font-weight:700;margin-bottom:6px">${APP_VERSION} — 統一版號 (晨報 + 投資組合共用)</div>
+            <div class="muted" style="font-size:.85em;line-height:1.6;margin-bottom:12px">
+              user request: 兩 PWA 合併一個版號方便辨識。從 V2.0.01 起 milestone：<br>
+              (1) 新增 <code>src/version.ts</code> 單一 source of truth export
+              <code>APP_VERSION</code><br>
+              (2) <code>morning.ts</code> + <code>portfolio/frontend.ts</code> 都 import 同一個常數，
+              ver chip 顯示同步<br>
+              (3) 每次 push 改 <code>version.ts</code> 一處即可 — 兩邊 ver chip 跟著動<br>
+              (4) Changelog 之後分 [全域] / [晨報] / [投資組合] tag 分區<br>
+              (5) CrewSync 主版 V8.0.X 不在此範圍 (per 各 module 獨立 versioning 規則)<br>
+              先前: 晨報 V1.3.20 / 投資組合 V1.0.20 各自獨立 numbering
+            </div>
+          </div>
+          <div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border)">
+            <div style="font-weight:700;margin-bottom:6px;color:var(--muted)">V1.0.20 — font-family + line-height 對齊晨報 (修間距感)</div>
             <div class="muted" style="font-size:.85em;line-height:1.6;margin-bottom:12px">
               user 反映「名字跟日期的間距還是不一樣」— root cause: <br>
               (1) <strong>font-family 不同</strong>: 晨報用 <code>BlinkMacSystemFont, Roboto,
@@ -1887,7 +1903,7 @@ function renderChart(points, note) {
 
 // ── Theme / Font / About ─────────────────────────────────────────────────────
 
-const PORTFOLIO_VERSION = 'V1.0.20';
+const PORTFOLIO_VERSION = '${APP_VERSION}';
 // V1.0.16: theme + font scale 三個 PWA 共用 (crewsync_*) — same origin localStorage 跨 app 同步
 const THEME_KEY = 'crewsync_theme';
 const LEGACY_THEME_KEY = 'portfolio_theme';

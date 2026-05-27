@@ -11,8 +11,10 @@ import { Readability } from '@mozilla/readability';
 import { ROOT } from './config.js';
 import { buildMorningReport, fetchSection } from './morning-builder.js';
 import { listUserSymbols } from './portfolio/queries.js';
+import { APP_VERSION } from './version.js';
 
-export const MORNING_VERSION = 'V1.3.20';
+// V2.0.0: 統一版號 — 跟 Portfolio 共用 APP_VERSION。MORNING_VERSION alias 保留向後相容
+export const MORNING_VERSION = APP_VERSION;
 const MORNING_CACHE = 'morning-v1-3-10';
 
 // ─── Postgres ────────────────────────────────────────────────────────
@@ -2032,6 +2034,15 @@ body { padding-bottom: calc(64px + env(safe-area-inset-bottom, 0px)); }
     </div>
     <hr style="border:none;border-top:1px solid var(--border);margin:12px 0">
     <div class="changelog-v">${MORNING_VERSION}</div>
+    <div class="changelog-txt">
+      <strong>統一版號 milestone</strong>: 晨報 + 投資組合從此共用一個版號
+      (V2.0.01 起跳)，user 看 ver chip 兩邊永遠同步。
+      新增 <code>src/version.ts</code> 單一 source of truth，每次 push 改一處即可。
+      之前: 晨報 V1.3.20 / 投資組合 V1.0.20 各自 numbering。
+      Changelog 從現在起 tag [全域] / [晨報] / [投資組合] 區分改動範圍。
+      CrewSync 主版 V8.0.X 不在此範圍。
+    </div>
+    <div class="changelog-v old">V1.3.20</div>
     <div class="changelog-txt">
       hdr-user-title 加 onclick="changeUid()" + dotted underline — 晨報也能點
       暱稱改 uid (對齊投資組合 changeUid 功能)。changeUid 內 404 路徑對齊
