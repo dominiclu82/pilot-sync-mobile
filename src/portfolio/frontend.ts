@@ -26,13 +26,13 @@ export function getPortfolioHtml(): string {
   <div id="app">
     <!-- 主畫面 -->
     <div id="page-main" class="page">
-      <!-- V1.0.17: top-stack sticky (hdr + sec-nav 整組黏頂，完全對齊晨報 layout) -->
+      <!-- V1.0.18: top-stack sticky (hdr + sec-nav 整組黏頂，完全對齊晨報 layout) -->
       <div class="top-stack" id="top-stack">
         <div class="hdr">
           <div style="min-width:0;flex:1">
             <div class="hdr-title">
               <span class="emoji">📈</span><span class="hdr-user" id="hdr-user" onclick="changeUid()">—</span>
-              <span class="ver" id="ver-tag" onclick="openAbout()">V1.0.17</span>
+              <span class="ver" id="ver-tag" onclick="openAbout()">V1.0.18</span>
             </div>
             <div class="hdr-date" id="hdr-date">—</div>
           </div>
@@ -196,7 +196,28 @@ export function getPortfolioHtml(): string {
         <div class="modal-body" style="max-height:60vh;overflow-y:auto">
           <div class="muted muted-small">獨立投資組合子系統 — 多筆買賣帳本、自動算均價、三視角持倉分析、opt-in PIN 保護</div>
           <div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border)">
-            <div style="font-weight:700;margin-bottom:6px">V1.0.17 — 視覺完全對齊晨報 (色系 / hdr / nav-btn / emoji)</div>
+            <div style="font-weight:700;margin-bottom:6px">V1.0.18 — 對齊晨報 polish + ↻ loading + 兩邊改暱稱</div>
+            <div class="muted" style="font-size:.85em;line-height:1.6;margin-bottom:12px">
+              V1.0.17 後續多輪 polish 累積一版 (user rule: 每次 push 都 bump 版號):<br>
+              (1) <code>.page</code> padding-top 0 + L/R 12px 對齊晨報 .sec — 切換 PWA top
+              區域不再差 12px<br>
+              (2) <code>.hdr-btn</code> bg/圓角/字級對齊晨報 (rgba(255,255,255,0.08) / 8px / .82em)<br>
+              (3) <code>.hdr-date</code> row 加日期顯示 (對齊晨報 hdr 高度)<br>
+              (4) <code>.sec-nav</code> padding 8px 10px / nav-btn 字級 .78em 對齊晨報 .nav<br>
+              (5) <code>.top-stack</code> 移除多餘 bottom margin (晨報沒有) / z-index 50<br>
+              (6) <code>.hdr-actions</code> 加 14px top margin 補回視覺 gap<br>
+              (7) <strong>:root vars 1:1 對齊晨報</strong>: --muted/--border/--nav-bg/--bg-elev/
+              --fg/--green/--red 精確值對齊 (--accent 維持藍色)<br>
+              (8) <code>.hdr-user</code> 字級對齊 hdr-title 1.15em bold (原 .85em 灰小字)<br>
+              (9) 晨報加 changeUid 功能 (hdr-user-title 可點)，跨 PWA 都可改暱稱，保留 local
+              cache + 跨裝置走 server sync<br>
+              (10) ↻ 重抓 button 加 manualRefresh wrapper — 點下變「…」+ disabled (對齊
+              晨報 smartRefresh visual feedback)<br>
+              (11) Backend fx 同源 fix: 改讀 morning_reports cached fx (跟下方匯率 card 同源)
+            </div>
+          </div>
+          <div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border)">
+            <div style="font-weight:700;margin-bottom:6px;color:var(--muted)">V1.0.17 — 視覺完全對齊晨報 (色系 / hdr / nav-btn / emoji)</div>
             <div class="muted" style="font-size:.85em;line-height:1.6;margin-bottom:12px">
               修 user 反映「比照晨報是有什麼問題?切換 PWA 畫面會小幅移動、配色不同、user 名前
               缺 emoji、ver tag 顏色跟 nav-btn outline 不一致」：<br>
@@ -540,7 +561,7 @@ export function getPortfolioHtml(): string {
 function getStyles(): string {
   return `
 :root {
-  /* V1.0.17: 全部 vars 精確對齊晨報 (除 --accent 用藍取代黃 — user 同意 Portfolio 藍色 theme)
+  /* V1.0.18: 全部 vars 精確對齊晨報 (除 --accent 用藍取代黃 — user 同意 Portfolio 藍色 theme)
      切換 PWA 時 border / nav-bg / muted 視覺微差累積成「跳動感」— 此版全 1:1 對齊 */
   --bg: #0B1428;
   --bg-card: #111c36;
@@ -607,10 +628,10 @@ html, body { margin: 0; background: var(--bg); color: var(--fg); font-family: -a
 body { font-size: 1rem; padding-left: 0; padding-right: 0; }
 .page {
   width: 100%;
-  /* V1.0.17 fix: padding-top: 0 + L/R 12px 對齊晨報 .sec margin (避電腦版寬度差) */
+  /* V1.0.18 fix: padding-top: 0 + L/R 12px 對齊晨報 .sec margin (避電腦版寬度差) */
   padding: 0 12px calc(72px + env(safe-area-inset-bottom, 0px));
 }
-/* V1.0.17: hdr 完全對齊晨報 — gradient bg + safe-area padding 內含 + border-bottom */
+/* V1.0.18: hdr 完全對齊晨報 — gradient bg + safe-area padding 內含 + border-bottom */
 .hdr {
   background: linear-gradient(180deg, var(--hdr-grad-1) 0%, var(--hdr-grad-2) 100%);
   padding: calc(env(safe-area-inset-top, 0px) + 10px) 12px 8px;
@@ -628,10 +649,10 @@ body { font-size: 1rem; padding-left: 0; padding-right: 0; }
 .hdr-title .ver:active { opacity: .7; }
 .hdr-date { font-size: .85em; color: var(--muted); font-variant-numeric: tabular-nums; }
 .hdr-back { font-size: 1.5em; cursor: pointer; padding: 0 6px; user-select: none; }
-/* V1.0.17 fix: hdr-user 繼承 hdr-title 大字 bold (對齊晨報 hdr-user-title)，只留 click affordance */
+/* V1.0.18 fix: hdr-user 繼承 hdr-title 大字 bold (對齊晨報 hdr-user-title)，只留 click affordance */
 .hdr-user { cursor: pointer; text-decoration: underline dotted; text-underline-offset: 3px; }
 .hdr-btns { display: flex; gap: 6px; flex-shrink: 0; align-items: center; }
-/* V1.0.17 fix: 對齊晨報 hdr-btn CSS (bg / 圓角 / 字級) 避切換 PWA 視覺跳動 */
+/* V1.0.18 fix: 對齊晨報 hdr-btn CSS (bg / 圓角 / 字級) 避切換 PWA 視覺跳動 */
 .hdr-btn {
   background: rgba(255,255,255,0.08); border: 1px solid var(--border); color: var(--fg);
   padding: 6px 9px; border-radius: 8px; font-size: .82em; cursor: pointer;
@@ -645,7 +666,7 @@ body { font-size: 1rem; padding-left: 0; padding-right: 0; }
   min-width: 28px; border-radius: 4px; cursor: pointer;
 }
 .hdr-btn-font button:active { opacity: 0.7; }
-/* V1.0.17 fix: 14px top margin 對齊晨報 .sec 第一個 card 跟 top-stack 的 gap */
+/* V1.0.18 fix: 14px top margin 對齊晨報 .sec 第一個 card 跟 top-stack 的 gap */
 .hdr-actions { display: flex; gap: 8px; margin: 14px 0 16px; }
 .btn { padding: 8px 14px; border-radius: 6px; border: 1px solid var(--border); background: var(--bg-card); color: var(--fg); font-size: .92em; cursor: pointer; }
 .btn-primary { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
@@ -654,7 +675,7 @@ body { font-size: 1rem; padding-left: 0; padding-right: 0; }
 .status { color: var(--muted); font-size: .85em; margin-bottom: 10px; min-height: 1.2em; }
 .list { display: flex; flex-direction: column; gap: 8px; }
 
-/* V1.0.17: top-stack — 跟晨報 .top-stack 1:1 (sticky / top 0 / z 50)，
+/* V1.0.18: top-stack — 跟晨報 .top-stack 1:1 (sticky / top 0 / z 50)，
    L/R -12px 抵消 .page padding 讓全寬，無 bottom margin (晨報沒有) */
 .top-stack {
   position: sticky;
@@ -662,7 +683,7 @@ body { font-size: 1rem; padding-left: 0; padding-right: 0; }
   z-index: 50;
   margin: 0 -12px;
 }
-/* V1.0.17: sec-nav 對齊晨報 .nav — blur bg + 灰色預設 + active 藍色 outline
+/* V1.0.18: sec-nav 對齊晨報 .nav — blur bg + 灰色預設 + active 藍色 outline
    (對齊晨報 yellow active pattern；ver tag 跟 nav-btn.active 都 var(--accent) 一致) */
 .sec-nav {
   background: var(--nav-bg);
@@ -1347,7 +1368,7 @@ function renderMain() {
     navBar.querySelector('[data-target="sec-us"]').hidden = (us.length === 0);
     // recompute --sec-nav-h (字型變大 / nav 內按鈕數變動時)
     if (typeof updateSecNavHeight === 'function') updateSecNavHeight();
-    // V1.0.17: IntersectionObserver — scroll 到該 section nav-btn 自動 active
+    // V1.0.18: IntersectionObserver — scroll 到該 section nav-btn 自動 active
     if (typeof setupSectionObserver === 'function') setupSectionObserver();
   }
 }
@@ -1676,7 +1697,7 @@ async function loadChart() {
     return;
   }
   card.hidden = false;
-  // V1.0.17: chart-card 從 hidden 變 visible → 重新 setup observer 把它納入監看
+  // V1.0.18: chart-card 從 hidden 變 visible → 重新 setup observer 把它納入監看
   if (typeof setupSectionObserver === 'function') setupSectionObserver();
   try {
     const data = await apiFetch('/chart?period=' + _chartPeriod + '&range=' + _chartRange);
@@ -1825,7 +1846,7 @@ function renderChart(points, note) {
 
 // ── Theme / Font / About ─────────────────────────────────────────────────────
 
-const PORTFOLIO_VERSION = 'V1.0.17';
+const PORTFOLIO_VERSION = 'V1.0.18';
 // V1.0.16: theme + font scale 三個 PWA 共用 (crewsync_*) — same origin localStorage 跨 app 同步
 const THEME_KEY = 'crewsync_theme';
 const LEGACY_THEME_KEY = 'portfolio_theme';
@@ -1977,7 +1998,7 @@ if (verTagEl) verTagEl.textContent = PORTFOLIO_VERSION;
 const aboutVerEl = document.getElementById('about-version');
 if (aboutVerEl) aboutVerEl.textContent = PORTFOLIO_VERSION;
 
-// V1.0.17: ↻ refresh button 點下變「…」+ disabled 顯示 loading 中 (對齊晨報 smartRefresh)
+// V1.0.18: ↻ refresh button 點下變「…」+ disabled 顯示 loading 中 (對齊晨報 smartRefresh)
 async function manualRefresh() {
   const btn = document.getElementById('btn-refresh');
   const orig = btn ? btn.textContent : null;
@@ -2063,7 +2084,7 @@ function updateSecNavHeight() {
   document.documentElement.style.setProperty('--sec-nav-h', h + 'px');
 }
 
-// V1.0.17: IntersectionObserver auto-active 跟著 scroll 標目前看到的 section (對齊晨報)
+// V1.0.18: IntersectionObserver auto-active 跟著 scroll 標目前看到的 section (對齊晨報)
 let _secObserver = null;
 function setupSectionObserver() {
   if (_secObserver) { _secObserver.disconnect(); _secObserver = null; }
@@ -2107,14 +2128,14 @@ document.addEventListener('click', function(e) {
     const id = t.getAttribute('data-target');
     const el = id ? document.getElementById(id) : null;
     if (el) {
-      // V1.0.17 fix: 點當下立即 toggle active，不等 observer (avoid observer score race)
+      // V1.0.18 fix: 點當下立即 toggle active，不等 observer (avoid observer score race)
       const nav = document.getElementById('portfolio-section-nav');
       nav.querySelectorAll('.nav-btn').forEach(b => b.classList.toggle('active', b === t));
       el.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
   }
 });
-// V1.0.17 fix: 設 hdr-date 今日日期 (Asia/Taipei) 對齊晨報 hdr 高度避切換 PWA 跳動
+// V1.0.18 fix: 設 hdr-date 今日日期 (Asia/Taipei) 對齊晨報 hdr 高度避切換 PWA 跳動
 (function setHdrDate() {
   const el = document.getElementById('hdr-date');
   if (!el) return;

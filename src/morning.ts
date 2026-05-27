@@ -12,7 +12,7 @@ import { ROOT } from './config.js';
 import { buildMorningReport, fetchSection } from './morning-builder.js';
 import { listUserSymbols } from './portfolio/queries.js';
 
-export const MORNING_VERSION = 'V1.3.19';
+export const MORNING_VERSION = 'V1.3.20';
 const MORNING_CACHE = 'morning-v1-3-10';
 
 // ─── Postgres ────────────────────────────────────────────────────────
@@ -2032,6 +2032,14 @@ body { padding-bottom: calc(64px + env(safe-area-inset-bottom, 0px)); }
     </div>
     <hr style="border:none;border-top:1px solid var(--border);margin:12px 0">
     <div class="changelog-v">${MORNING_VERSION}</div>
+    <div class="changelog-txt">
+      hdr-user-title 加 onclick="changeUid()" + dotted underline — 晨報也能點
+      暱稱改 uid (對齊投資組合 changeUid 功能)。changeUid 內 404 路徑對齊
+      submitNickname first-run: carry-over local prefs 當 seed POST 給新 uid，
+      保留本地 watchlist 快取；非 404 (transient 5xx) 不誤判 overwrite。
+      Default button HTML 改 ☀️ 對齊新 theme icon target-mode 邏輯。
+    </div>
+    <div class="changelog-v old">V1.3.19</div>
     <div class="changelog-txt">
       三個 PWA (CrewSync / 晨報 / 投資組合) 日夜 + 字型共用 localStorage
       <code>crewsync_theme</code> + <code>crewsync_font_scale</code> — same origin
