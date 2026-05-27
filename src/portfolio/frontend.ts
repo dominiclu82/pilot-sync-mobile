@@ -24,31 +24,16 @@ export function getPortfolioHtml(): string {
 </head>
 <body>
   <div id="app">
-    <!-- Cross-PWA tab navbar + 功能按鈕同 row (V1.0.9) -->
-    <nav class="tab-nav">
-      <div class="tab-links">
-        <a href="/morning">🌅 晨報</a>
-        <a href="/portfolio" class="active">📈 投資組合</a>
-      </div>
-      <div class="tab-controls">
-        <div class="hdr-btn-font" title="字型大小">
-          <button onclick="bumpFont(1)">A+</button>
-          <button onclick="bumpFont(-1)">A−</button>
-        </div>
-        <button class="hdr-btn" id="btn-theme" onclick="toggleTheme()" title="日/夜">🌙</button>
-        <button class="hdr-btn" onclick="openSettings()" title="設定">⚙</button>
-      </div>
-    </nav>
-
     <!-- 主畫面 -->
     <div id="page-main" class="page">
       <div class="hdr">
         <div style="min-width:0;flex:1">
           <div class="hdr-title">
             <span class="hdr-user" id="hdr-user" onclick="changeUid()">—</span>
-            <span class="ver" id="ver-tag" onclick="openAbout()">V1.0.13</span>
+            <span class="ver" id="ver-tag" onclick="openAbout()">V1.0.14</span>
           </div>
         </div>
+        <button class="hdr-btn" onclick="openSettings()" title="設定 (PIN / 帳號)">⚙</button>
       </div>
       <div class="hdr-actions">
         <button class="btn btn-primary" onclick="openAddModal()">+ 加交易</button>
@@ -174,7 +159,23 @@ export function getPortfolioHtml(): string {
         <div class="modal-body" style="max-height:60vh;overflow-y:auto">
           <div class="muted muted-small">獨立投資組合子系統 — 多筆買賣帳本、自動算均價、三視角持倉分析、opt-in PIN 保護</div>
           <div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border)">
-            <div style="font-weight:700;margin-bottom:6px">V1.0.13 — 除權息 20 年歷史 + 即將除息預告</div>
+            <div style="font-weight:700;margin-bottom:6px">V1.0.14 — 版面比照 CrewSync：navbar 移底部 + 安全區 + 20 段字型</div>
+            <div class="muted" style="font-size:.85em;line-height:1.6;margin-bottom:12px">
+              修 user 反映 iPhone 動態島 (Dynamic Island) 跟畫面頂部重疊 + 版面大改：<br>
+              (1) <strong>Tab navbar 從上方 sticky 改下方 fixed</strong> (比照 CrewSync 主 app)，
+              左側 tab 切換晨報 / 投資組合，右側 function key 區。<br>
+              (2) <strong>Function key 區只保留 A+/A- + 日夜切換</strong>，app 專屬設定 (⚙ PIN /
+              帳號 / 歷史) 回到 app 內 hdr row 右側。<br>
+              (3) <strong>動態島 safe-area</strong>: <code>body { padding-top:
+              env(safe-area-inset-top, 0px) }</code>；navbar 底部 <code>padding-bottom:
+              env(safe-area-inset-bottom)</code> 避 iPhone home indicator。<br>
+              (4) <strong>字型 20 段</strong>: scale range 從 [-2, +8] 擴 [-2, +17] 共 20 段 (對齊
+              CrewSync)。每段 8%，基準 15px，min 12.6px / max 35.4px。<br>
+              (5) 版號顯示維持 app 內部 (hdr <code>@user V1.0.14</code>)，不放 function key 區。
+            </div>
+          </div>
+          <div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border)">
+            <div style="font-weight:700;margin-bottom:6px;color:var(--muted)">V1.0.13 — 除權息 20 年歷史 + 即將除息預告</div>
             <div class="muted" style="font-size:.85em;line-height:1.6;margin-bottom:12px">
               (1) 持倉 row 「💰」改顯示 <strong>當年累計配息</strong>：當年有 events →「2026
               年配 X · 殖利率 Y%」；當年無 events fallback 前一年。整行可點，打開
@@ -409,6 +410,21 @@ export function getPortfolioHtml(): string {
         </div>
       </div>
     </div>
+
+    <!-- Bottom fixed navbar: tabs (左) + function keys (右) -->
+    <nav class="tab-nav">
+      <div class="tab-links">
+        <a href="/morning">🌅 晨報</a>
+        <a href="/portfolio" class="active">📈 投資組合</a>
+      </div>
+      <div class="tab-controls">
+        <button class="hdr-btn" id="btn-theme" onclick="toggleTheme()" title="日/夜">🌙</button>
+        <div class="hdr-btn-font" title="字型大小">
+          <button onclick="bumpFont(1)">A+</button>
+          <button onclick="bumpFont(-1)">A−</button>
+        </div>
+      </div>
+    </nav>
   </div>
 <script>${getClientJs()}</script>
 </body>
@@ -442,37 +458,44 @@ function getStyles(): string {
 * { box-sizing: border-box; }
 [hidden] { display: none !important; }  /* hotfix: 強制 hidden 屬性 override 任何 author CSS display */
 
-/* Cross-PWA tab navbar + 功能按鈕同 row (V1.0.9) */
+/* V1.0.14: Bottom fixed tab navbar + function keys (跟 CrewSync 同 pattern) */
 .tab-nav {
+  position: fixed; bottom: 0; left: 0; right: 0;
   display: flex; align-items: stretch; gap: 8px;
-  background: var(--bg);
-  border-bottom: 1px solid var(--border);
-  position: sticky; top: 0; z-index: 50;
-  padding: 0 8px;
+  background: var(--bg-card); border-top: 1px solid var(--border);
+  z-index: 30; padding: 0 8px;  /* 低於 modal (z-index 100)，modal 開時 nav 被蓋住 */
+  padding-bottom: env(safe-area-inset-bottom, 0px);
 }
 .tab-links { display: flex; flex: 1; min-width: 0; }
 .tab-links a {
-  flex: 1; text-align: center; padding: 12px 8px;
+  flex: 1; text-align: center; padding: 12px 6px;
   color: var(--muted); text-decoration: none;
-  font-weight: 600; font-size: .95em;
-  border-bottom: 2px solid transparent;
+  font-weight: 600; font-size: .92em;
+  border-top: 2px solid transparent;
   transition: color .15s, border-color .15s;
 }
 .tab-links a.active {
   color: var(--fg);
-  border-bottom-color: var(--accent);
+  border-top-color: var(--accent);
 }
 .tab-links a:active { background: var(--bg-elev); }
 .tab-controls {
-  display: flex; gap: 6px; align-items: center; flex-shrink: 0;
-  padding: 6px 0;
+  display: flex; gap: 8px; align-items: center; flex-shrink: 0;
+  padding: 6px 4px;
 }
+
+/* iPhone Dynamic Island safe-area at top */
+body { padding-top: env(safe-area-inset-top, 0px); }
 html { font-size: 15px; }
-html, body { margin: 0; padding: 0; background: var(--bg); color: var(--fg); font-family: -apple-system, "Segoe UI", system-ui, "Microsoft JhengHei", sans-serif; }
-body { font-size: 1rem; }
-.page { width: 100%; padding: 12px 14px 80px; }
+html, body { margin: 0; background: var(--bg); color: var(--fg); font-family: -apple-system, "Segoe UI", system-ui, "Microsoft JhengHei", sans-serif; }
+body { font-size: 1rem; padding-left: 0; padding-right: 0; }
+.page {
+  width: 100%;
+  /* bottom padding: navbar height (~52px) + safe-area-inset-bottom + buffer */
+  padding: 12px 14px calc(72px + env(safe-area-inset-bottom, 0px));
+}
 @media (min-width: 768px) {
-  .page { padding: 16px 24px 80px; }
+  .page { padding: 16px 24px calc(72px + env(safe-area-inset-bottom, 0px)); }
 }
 .hdr { display: flex; align-items: center; gap: 10px; margin: 6px 0 16px; }
 .hdr-title { font-size: 1.2em; font-weight: 700; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
@@ -1473,7 +1496,7 @@ function renderChart(points, note) {
 
 // ── Theme / Font / About ─────────────────────────────────────────────────────
 
-const PORTFOLIO_VERSION = 'V1.0.13';
+const PORTFOLIO_VERSION = 'V1.0.14';
 const THEME_KEY = 'portfolio_theme';
 const FONT_SCALE_KEY = 'portfolio_font_scale';
 
@@ -1495,17 +1518,16 @@ function toggleTheme() {
   applyTheme();
 }
 
+// V1.0.14: 20-step font scale (跟 CrewSync 同邏輯 [-2, +17] 共 20 段 / 8% per step)
+// 基準 15px 因 html stylesheet 設了；inline px override，避免 % 跟 stylesheet 衝突
 let _fontScale = 0;
-try { const s = parseInt(localStorage.getItem(FONT_SCALE_KEY) || '0'); if (!isNaN(s)) _fontScale = s; } catch {}
+try { const s = parseInt(localStorage.getItem(FONT_SCALE_KEY) || '0'); if (!isNaN(s) && s >= -2 && s <= 17) _fontScale = s; } catch {}
 function applyFontScale() {
-  // 基準 15px，每級 ±1.2px (≈8%)
-  const px = 15 * (1 + _fontScale * 0.08);
+  const px = 15 * (1 + _fontScale * 0.08);  // -2 → 12.6px, 0 → 15px, +17 → 35.4px
   document.documentElement.style.fontSize = px + 'px';
-  const disp = document.getElementById('font-scale-display');
-  if (disp) disp.textContent = _fontScale > 0 ? '+' + _fontScale : String(_fontScale);
 }
 function bumpFont(dir) {
-  _fontScale = Math.max(-2, Math.min(8, _fontScale + dir));
+  _fontScale = Math.max(-2, Math.min(17, _fontScale + dir));
   try { localStorage.setItem(FONT_SCALE_KEY, String(_fontScale)); } catch {}
   applyFontScale();
 }

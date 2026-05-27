@@ -12,7 +12,7 @@ import { ROOT } from './config.js';
 import { buildMorningReport, fetchSection } from './morning-builder.js';
 import { listUserSymbols } from './portfolio/queries.js';
 
-export const MORNING_VERSION = 'V1.3.17';
+export const MORNING_VERSION = 'V1.3.18';
 const MORNING_CACHE = 'morning-v1-3-10';
 
 // ─── Postgres ────────────────────────────────────────────────────────
@@ -1425,30 +1425,35 @@ a:active { opacity: 0.6; }
 .se-clear:active { background: rgba(255,100,100,0.12); color: #ff8a8a; }
 
 /* Cross-PWA tab navbar + 功能按鈕同 row (V1.3.12) */
+/* V1.3.18: Bottom fixed tab navbar + function keys (跟 CrewSync 同 pattern) */
 .tab-nav {
+  position: fixed; bottom: 0; left: 0; right: 0;
   display: flex; align-items: stretch; gap: 8px;
-  background: var(--bg);
-  border-bottom: 1px solid var(--border);
-  position: sticky; top: 0; z-index: 60;
-  padding: 0 8px;
+  background: var(--bg2); border-top: 1px solid var(--border);
+  z-index: 30; padding: 0 8px;  /* 低於 .modal-wrap (z-index 100)，modal 開時 nav 被蓋住 */
+  padding-bottom: env(safe-area-inset-bottom, 0px);
 }
 .tab-links { display: flex; flex: 1; min-width: 0; }
 .tab-links a {
-  flex: 1; text-align: center; padding: 12px 8px;
+  flex: 1; text-align: center; padding: 12px 6px;
   color: var(--muted); text-decoration: none;
-  font-weight: 600; font-size: .95em;
-  border-bottom: 2px solid transparent;
+  font-weight: 600; font-size: .92em;
+  border-top: 2px solid transparent;
   transition: color .15s, border-color .15s;
 }
 .tab-links a.active {
   color: var(--text);
-  border-bottom-color: var(--accent);
+  border-top-color: var(--accent);
 }
 .tab-links a:active { background: rgba(255,255,255,0.06); }
 .tab-controls {
-  display: flex; gap: 6px; align-items: center; flex-shrink: 0;
-  padding: 6px 0;
+  display: flex; gap: 8px; align-items: center; flex-shrink: 0;
+  padding: 6px 4px;
 }
+
+/* V1.3.18: 為 bottom fixed navbar 留 body padding (top safe-area 已在 .hdr 處理) */
+body { padding-bottom: calc(64px + env(safe-area-inset-bottom, 0px)); }
+.hdr-actions-top { display: flex; gap: 6px; align-items: center; flex-shrink: 0; }
 
 /* 投資組合 summary banner (V1.3.11) — Nav 下方 sticky-ish 顯示總未實現損益 */
 .portfolio-summary {
@@ -1932,20 +1937,18 @@ a:active { opacity: 0.6; }
 </head>
 <body>
 
-<!-- Cross-PWA tab navbar + 功能按鈕同 row (V1.3.12) -->
+<!-- Bottom fixed tab navbar (V1.3.18: 比照 CrewSync 移到底部) -->
 <nav class="tab-nav">
   <div class="tab-links">
     <a href="/morning" class="active">🌅 晨報</a>
     <a href="/portfolio">📈 投資組合</a>
   </div>
   <div class="tab-controls">
+    <button class="hdr-btn" id="btn-theme" title="日/夜">🌙</button>
     <div class="hdr-btn-font" title="字型大小">
       <button id="btn-font-up">A+</button>
       <button id="btn-font-dn">A−</button>
     </div>
-    <button class="hdr-btn" id="btn-theme" title="日/夜">🌙</button>
-    <button class="hdr-btn" id="btn-date" title="歷史">📅</button>
-    <button class="hdr-btn" id="btn-refresh" title="重新整理">↻</button>
   </div>
 </nav>
 
@@ -1957,6 +1960,10 @@ a:active { opacity: 0.6; }
         <span class="ver" onclick="showAbout()">${MORNING_VERSION}</span>
       </div>
       <div class="hdr-date" id="hdr-date">—</div>
+    </div>
+    <div class="hdr-actions-top">
+      <button class="hdr-btn" id="btn-date" title="歷史">📅</button>
+      <button class="hdr-btn" id="btn-refresh" title="重新整理">↻</button>
     </div>
   </div>
 
@@ -2004,6 +2011,24 @@ a:active { opacity: 0.6; }
     </div>
     <hr style="border:none;border-top:1px solid var(--border);margin:12px 0">
     <div class="changelog-v">${MORNING_VERSION}</div>
+    <div class="changelog-txt">
+      版面比照 CrewSync 大改 — 修動態島重疊 + 改 navbar 位置 + 字型 20 段：<br>
+      (1) <strong>Tab navbar 從上方 sticky 改下方 fixed</strong>，左側 tabs (晨報/投資組合)
+      右側 function key 區 (☀️/A+/A-)。<code>position: fixed; bottom: 0</code> +
+      <code>padding-bottom: env(safe-area-inset-bottom)</code> 避 home indicator。<br>
+      (2) <strong>📅 歷史 + ↻ 重抓 button 從 navbar 拿出</strong>，移回 hdr row 右側 — 晨報自己的
+      app-level controls 不該佔 function key 區。<br>
+      (3) <strong>字型 scale 擴 20 段</strong> [-2, +17] 共 20 step，跟 CrewSync 對齊
+      (原本 [-2, +8] 只 11 段)。每段 8%，min 12.6px / max 35.4px。<br>
+      (4) Body padding-bottom 為 bottom navbar 留 64px + safe-area-inset-bottom 空間
+      避內容被 navbar 蓋住。Top safe-area-inset 已在 <code>.hdr</code> existing
+      <code>calc(env(...) + 10px)</code> 處理。<br>
+      Layout overhaul matching CrewSync main app: tab navbar moved to
+      bottom-fixed, function keys (theme/font) on right, date/refresh
+      promoted back into the in-app header, font scale extended to 20
+      steps. Top dynamic island already covered by existing .hdr padding.
+    </div>
+    <div class="changelog-v old">V1.3.17</div>
     <div class="changelog-txt">
       修 user 反映 bug：投資組合 summary banner「總未實現損益」TW + US
       持倉直接相加，**沒換匯**（NT$ + US$ raw 數字相加 → 數字錯）。
@@ -4953,15 +4978,16 @@ function toggleTheme() {
 applyTheme();
 
 // ── Font scale ───────────────────────────────────────────────────
+// V1.3.18: 20-step font scale (跟 CrewSync 對齊) — range [-2, +17]
 let _fontScale = 0;
-try { const s = parseInt(localStorage.getItem('morning_font_scale') || '0'); if (!isNaN(s)) _fontScale = s; } catch (e) {}
+try { const s = parseInt(localStorage.getItem('morning_font_scale') || '0'); if (!isNaN(s) && s >= -2 && s <= 17) _fontScale = s; } catch (e) {}
 function applyFontScale() {
   // 基準 15px，每級 +/- 1.2px (≈8%)
   const px = 15 * (1 + _fontScale * 0.08);
   document.documentElement.style.fontSize = px + 'px';
 }
 function bumpFont(dir) {
-  _fontScale = Math.max(-2, Math.min(8, _fontScale + dir));
+  _fontScale = Math.max(-2, Math.min(17, _fontScale + dir));
   try { localStorage.setItem('morning_font_scale', String(_fontScale)); } catch (e) {}
   applyFontScale();
   setTimeout(updateHdrH, 50);
