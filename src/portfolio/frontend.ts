@@ -32,7 +32,7 @@ export function getPortfolioHtml(): string {
           <div style="min-width:0;flex:1">
             <div class="hdr-title">
               <span class="emoji">📈</span><span class="hdr-user" id="hdr-user" onclick="changeUid()">—</span>
-              <span class="ver" id="ver-tag" onclick="openAbout()">V1.0.19</span>
+              <span class="ver" id="ver-tag" onclick="openAbout()">V1.0.20</span>
             </div>
             <div class="hdr-date" id="hdr-date">—</div>
           </div>
@@ -198,7 +198,21 @@ export function getPortfolioHtml(): string {
         <div class="modal-body" style="max-height:60vh;overflow-y:auto">
           <div class="muted muted-small">獨立投資組合子系統 — 多筆買賣帳本、自動算均價、三視角持倉分析、opt-in PIN 保護</div>
           <div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border)">
-            <div style="font-weight:700;margin-bottom:6px">V1.0.19 — hdr-date ISO 格式 + 美股 cell 加台幣換算</div>
+            <div style="font-weight:700;margin-bottom:6px">V1.0.20 — font-family + line-height 對齊晨報 (修間距感)</div>
+            <div class="muted" style="font-size:.85em;line-height:1.6;margin-bottom:12px">
+              user 反映「名字跟日期的間距還是不一樣」— root cause: <br>
+              (1) <strong>font-family 不同</strong>: 晨報用 <code>BlinkMacSystemFont, Roboto,
+              Noto Sans TC</code>，Portfolio 用 <code>system-ui, Microsoft JhengHei</code>
+              中文字 fallback 不同字型 → baseline 跟字距渲染不同<br>
+              (2) <strong>line-height 不同</strong>: 晨報 body <code>line-height: 1.5</code>，
+              Portfolio 沒 explicit → default normal (~1.2)，每行 baseline 差 ~0.3em<br>
+              在 hdr-title 1.15em 字級下 line-height 差 ≈ 5-6px 視覺間距感差。
+              <br>Fix: Portfolio body 加 <code>font-family</code> + <code>line-height: 1.5</code>
+              對齊晨報 verbatim。
+            </div>
+          </div>
+          <div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border)">
+            <div style="font-weight:700;margin-bottom:6px;color:var(--muted)">V1.0.19 — hdr-date ISO 格式 + 美股 cell 加台幣換算</div>
             <div class="muted" style="font-size:.85em;line-height:1.6;margin-bottom:12px">
               (1) hdr-date format 對齊晨報 <code>2026-05-27</code> ISO dash (原 zh-TW
               locale 是 slash)。用 <code>Intl.DateTimeFormat.formatToParts</code> 抓
@@ -636,7 +650,12 @@ function getStyles(): string {
 /* 禁 iOS 橡皮筋 overscroll (動態島 safe-area 由 top-stack 自己處理) */
 body { overscroll-behavior: none; }
 html { font-size: 15px; overscroll-behavior: none; }
-html, body { margin: 0; background: var(--bg); color: var(--fg); font-family: -apple-system, "Segoe UI", system-ui, "Microsoft JhengHei", sans-serif; }
+/* V1.0.20: font-family + line-height 1:1 對齊晨報 — 兩邊中文字 fallback (Noto Sans TC vs
+   Microsoft JhengHei) 跟 line-height (1.5 vs default 1.2) 差異累積成 baseline/間距感差 */
+html, body { margin: 0; background: var(--bg); color: var(--fg);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Noto Sans TC', sans-serif;
+  line-height: 1.5;
+}
 /* V1.0.16 fix: detail page 沒 top-stack，hdr 自己處理 safe-area-top */
 #page-detail .hdr { padding-top: calc(env(safe-area-inset-top, 0px) + 6px); }
 body { font-size: 1rem; padding-left: 0; padding-right: 0; }
@@ -1868,7 +1887,7 @@ function renderChart(points, note) {
 
 // ── Theme / Font / About ─────────────────────────────────────────────────────
 
-const PORTFOLIO_VERSION = 'V1.0.19';
+const PORTFOLIO_VERSION = 'V1.0.20';
 // V1.0.16: theme + font scale 三個 PWA 共用 (crewsync_*) — same origin localStorage 跨 app 同步
 const THEME_KEY = 'crewsync_theme';
 const LEGACY_THEME_KEY = 'portfolio_theme';
