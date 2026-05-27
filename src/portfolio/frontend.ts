@@ -26,39 +26,55 @@ export function getPortfolioHtml(): string {
   <div id="app">
     <!-- 主畫面 -->
     <div id="page-main" class="page">
-      <div class="hdr">
-        <div style="min-width:0;flex:1">
-          <div class="hdr-title">
-            <span class="hdr-user" id="hdr-user" onclick="changeUid()">—</span>
-            <span class="ver" id="ver-tag" onclick="openAbout()">V1.0.15</span>
+      <!-- V1.0.15: top-stack sticky (hdr + sec-nav 整組黏頂，比照晨報) -->
+      <div class="top-stack" id="top-stack">
+        <div class="hdr">
+          <div style="min-width:0;flex:1">
+            <div class="hdr-title">
+              <span class="hdr-user" id="hdr-user" onclick="changeUid()">—</span>
+              <span class="ver" id="ver-tag" onclick="openAbout()">V1.0.15</span>
+            </div>
+          </div>
+          <div class="hdr-actions-top">
+            <button class="hdr-btn" onclick="openSettings()" title="設定 (PIN / 帳號)">⚙</button>
+            <button class="hdr-btn" onclick="refreshAll()" title="重新整理">↻</button>
           </div>
         </div>
-        <div class="hdr-actions-top">
-          <button class="hdr-btn" onclick="refreshAll()" title="重新整理">↻</button>
-          <button class="hdr-btn" onclick="openSettings()" title="設定 (PIN / 帳號)">⚙</button>
-        </div>
+        <nav id="portfolio-section-nav" class="sec-nav" hidden>
+          <button class="nav-btn" data-target="sec-tw">📈 台股</button>
+          <button class="nav-btn" data-target="sec-us">🇺🇸 美股</button>
+          <button class="nav-btn" data-target="chart-card">📊 資產變化</button>
+        </nav>
       </div>
-      <!-- V1.0.15: Section nav sticky (比照晨報 .top-stack pattern) -->
-      <nav id="portfolio-section-nav" class="sec-nav" hidden>
-        <button class="nav-btn" data-target="sec-tw">📈 台股</button>
-        <button class="nav-btn" data-target="sec-us">🇺🇸 美股</button>
-        <button class="nav-btn" data-target="chart-card">📊 資產變化</button>
-      </nav>
       <div class="hdr-actions">
         <button class="btn btn-primary" onclick="openAddModal()">+ 加交易</button>
       </div>
       <div id="main-status" class="status"></div>
-      <!-- V1.0.15: 投資組合總覽 (總資產 + 未實現損益) -->
+      <!-- V1.0.15: 投資組合總覽 — 拆 TW / US + 合計 -->
       <div id="portfolio-overall" class="overall-card" hidden>
-        <div class="ov-row">
-          <span class="ov-label">總資產</span>
-          <span class="ov-value" id="ov-total-value">—</span>
+        <div class="ov-grid">
+          <div class="ov-cell" id="ov-cell-tw" hidden>
+            <div class="ov-cell-label">📈 台股</div>
+            <div class="ov-cell-value" id="ov-tw-value">—</div>
+            <div class="ov-cell-pnl" id="ov-tw-pnl">—</div>
+          </div>
+          <div class="ov-cell" id="ov-cell-us" hidden>
+            <div class="ov-cell-label">🇺🇸 美股</div>
+            <div class="ov-cell-value" id="ov-us-value">—</div>
+            <div class="ov-cell-pnl" id="ov-us-pnl">—</div>
+          </div>
         </div>
-        <div class="ov-row">
-          <span class="ov-label">未實現損益</span>
-          <span class="ov-value" id="ov-pnl">—</span>
+        <div class="ov-total">
+          <div class="ov-row">
+            <span class="ov-label">合計總資產</span>
+            <span class="ov-value" id="ov-total-value">—</span>
+          </div>
+          <div class="ov-row">
+            <span class="ov-label">合計未實現損益</span>
+            <span class="ov-value" id="ov-pnl">—</span>
+          </div>
+          <div class="ov-fx-note" id="ov-fx-note"></div>
         </div>
-        <div class="ov-fx-note" id="ov-fx-note"></div>
       </div>
       <div id="holdings-list" class="list"></div>
       <!-- 資產變化圖 -->
@@ -530,9 +546,9 @@ function getStyles(): string {
   padding: 6px 4px;
 }
 
-/* iPhone Dynamic Island safe-area at top */
-body { padding-top: env(safe-area-inset-top, 0px); }
-html { font-size: 15px; }
+/* iPhone Dynamic Island safe-area at top + 禁 iOS 橡皮筋 overscroll */
+body { padding-top: env(safe-area-inset-top, 0px); overscroll-behavior: none; }
+html { font-size: 15px; overscroll-behavior: none; }
 html, body { margin: 0; background: var(--bg); color: var(--fg); font-family: -apple-system, "Segoe UI", system-ui, "Microsoft JhengHei", sans-serif; }
 body { font-size: 1rem; padding-left: 0; padding-right: 0; }
 .page {
@@ -575,19 +591,25 @@ body { font-size: 1rem; padding-left: 0; padding-right: 0; }
 .status { color: var(--muted); font-size: .85em; margin-bottom: 10px; min-height: 1.2em; }
 .list { display: flex; flex-direction: column; gap: 8px; }
 
-/* V1.0.15: Section nav (台股 / 美股 / 資產變化) — sticky top 不會跟頁面滑走 */
-.sec-nav {
+/* V1.0.15: top-stack — hdr + sec-nav 一起 sticky (比照晨報) */
+.top-stack {
   position: sticky;
+  /* notched iPhone: sticky 元素不受 body padding 保護，必須自己避動態島 */
   top: env(safe-area-inset-top, 0px);
-  z-index: 40;  /* above content, below modal (100) */
+  z-index: 40;
   background: var(--bg);
-  display: flex; gap: 6px;
-  margin: 0 -14px 10px; padding: 8px 14px;
-  overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch;
-  border-bottom: 1px solid var(--border);
+  margin: 0 -14px 10px;
+  padding: 0 14px;
 }
 @media (min-width: 768px) {
-  .sec-nav { margin-left: -24px; margin-right: -24px; padding-left: 24px; padding-right: 24px; }
+  .top-stack { margin-left: -24px; margin-right: -24px; padding-left: 24px; padding-right: 24px; }
+}
+/* sec-nav inside top-stack: no sticky needed (parent already sticky) */
+.sec-nav {
+  display: flex; gap: 6px;
+  padding: 8px 0 10px;
+  overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch;
+  border-bottom: 1px solid var(--border);
 }
 .sec-nav::-webkit-scrollbar { display: none; }
 .sec-nav .nav-btn {
@@ -605,12 +627,20 @@ body { font-size: 1rem; padding-left: 0; padding-right: 0; }
 #chart-card { scroll-margin-top: var(--sec-nav-h, 60px); }
 .hdr-actions-top { display: flex; gap: 6px; align-items: center; flex-shrink: 0; }
 
-/* V1.0.15: 投資組合總覽 card (頂部 dashboard — 總資產 + 未實現損益) */
+/* V1.0.15: 投資組合總覽 card — TW / US 拆解 + 合計 */
 .overall-card {
   background: var(--bg-card); border: 1px solid var(--border); border-radius: 10px;
   padding: 12px 14px; margin-bottom: 12px;
-  display: flex; flex-direction: column; gap: 6px;
+  display: flex; flex-direction: column; gap: 8px;
 }
+.overall-card .ov-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.overall-card .ov-cell { background: var(--bg-elev, rgba(255,255,255,.03)); border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; display: flex; flex-direction: column; gap: 2px; }
+.overall-card .ov-cell-label { color: var(--muted); font-size: .8em; }
+.overall-card .ov-cell-value { font-weight: 700; font-variant-numeric: tabular-nums; font-size: 1em; }
+.overall-card .ov-cell-pnl { font-weight: 600; font-variant-numeric: tabular-nums; font-size: .88em; }
+.overall-card .ov-cell-pnl.ov-up { color: #ef4444; }
+.overall-card .ov-cell-pnl.ov-down { color: #22c55e; }
+.overall-card .ov-total { display: flex; flex-direction: column; gap: 4px; padding-top: 6px; border-top: 1px solid var(--border); }
 .overall-card .ov-row { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
 .overall-card .ov-label { color: var(--muted); font-size: .88em; }
 .overall-card .ov-value { font-weight: 700; font-variant-numeric: tabular-nums; font-size: 1.05em; }
@@ -1103,13 +1133,12 @@ async function fetchDetail(market, symbol) {
   return await apiFetch('/holdings/' + market + '/' + encodeURIComponent(symbol));
 }
 
-// V1.0.15: 頂部總覽 — 總資產 + 未實現損益 (跟晨報 banner 同算法)
+// V1.0.15: 頂部總覽 — 拆 TW / US + 合計 (台股 NT$ / 美股 US$ / 合計 TWD)
 async function renderOverall() {
   const card = document.getElementById('portfolio-overall');
   const holdings = _state.holdings || [];
   if (holdings.length === 0) { card.hidden = true; return; }
-  // 美股部位用即期 USD/TWD 換 TWD (跟晨報 banner 同源 endpoint)
-  let fxUsdTwd = 32;  // fallback
+  let fxUsdTwd = 32;
   try {
     const r = await fetch('/api/portfolio/fx?pair=USD/TWD');
     if (r.ok) {
@@ -1117,23 +1146,50 @@ async function renderOverall() {
       if (typeof j.rate === 'number' && j.rate > 0) fxUsdTwd = j.rate;
     }
   } catch {}
-  let totalCost = 0, totalValue = 0;
+  // 分市場累積 (原幣)
+  let twCost = 0, twValue = 0, usCost = 0, usValue = 0;
   for (const h of holdings) {
     const q = _state.quotes[h.market + ':' + h.symbol] || {};
     const price = typeof q.price === 'number' ? q.price : h.avgCost;
-    const fx = h.market === 'US' ? fxUsdTwd : 1;
-    totalCost += h.costBasis * fx;
-    totalValue += (h.qty * price) * fx;
+    const v = h.qty * price;
+    if (h.market === 'TW') { twCost += h.costBasis; twValue += v; }
+    else { usCost += h.costBasis; usValue += v; }
   }
+  const twPnl = twValue - twCost;
+  const usPnl = usValue - usCost;
+  const twPct = twCost > 0 ? (twPnl / twCost * 100) : 0;
+  const usPct = usCost > 0 ? (usPnl / usCost * 100) : 0;
+  const fmtRound = (n) => Math.round(n).toLocaleString();
+  const sign = (n) => n > 0 ? '+' : '';
+  const cls = (n) => n > 0 ? 'ov-up' : n < 0 ? 'ov-down' : '';
+
+  const twCell = document.getElementById('ov-cell-tw');
+  const usCell = document.getElementById('ov-cell-us');
+  if (twValue > 0 || twCost > 0) {
+    document.getElementById('ov-tw-value').textContent = 'NT$' + fmtRound(twValue);
+    const el = document.getElementById('ov-tw-pnl');
+    el.textContent = sign(twPnl) + fmtRound(twPnl) + ' (' + sign(twPnl) + twPct.toFixed(1) + '%)';
+    el.className = 'ov-cell-pnl ' + cls(twPnl);
+    twCell.hidden = false;
+  } else twCell.hidden = true;
+  if (usValue > 0 || usCost > 0) {
+    document.getElementById('ov-us-value').textContent = '$' + fmtRound(usValue);
+    const el = document.getElementById('ov-us-pnl');
+    el.textContent = sign(usPnl) + fmtRound(usPnl) + ' (' + sign(usPnl) + usPct.toFixed(1) + '%)';
+    el.className = 'ov-cell-pnl ' + cls(usPnl);
+    usCell.hidden = false;
+  } else usCell.hidden = true;
+
+  // 合計換 TWD
+  const totalValue = twValue + usValue * fxUsdTwd;
+  const totalCost = twCost + usCost * fxUsdTwd;
   const pnl = totalValue - totalCost;
   const pct = totalCost > 0 ? (pnl / totalCost * 100) : 0;
-  const fmtRound = (n) => Math.round(n).toLocaleString();
   document.getElementById('ov-total-value').textContent = 'NT$' + fmtRound(totalValue);
   const pnlEl = document.getElementById('ov-pnl');
-  pnlEl.className = 'ov-value ' + (pnl > 0 ? 'ov-up' : pnl < 0 ? 'ov-down' : '');
-  const sign = pnl > 0 ? '+' : '';
-  pnlEl.textContent = sign + fmtRound(pnl) + ' (' + sign + pct.toFixed(1) + '%)';
-  const hasUs = holdings.some(h => h.market === 'US');
+  pnlEl.className = 'ov-value ' + cls(pnl);
+  pnlEl.textContent = sign(pnl) + fmtRound(pnl) + ' (' + sign(pnl) + pct.toFixed(1) + '%)';
+  const hasUs = usValue > 0 || usCost > 0;
   document.getElementById('ov-fx-note').textContent = hasUs ? '美股部位 × USD/TWD ' + fxUsdTwd.toFixed(2) + ' 換算' : '';
   card.hidden = false;
 }
@@ -1846,11 +1902,12 @@ if (aboutVerEl) aboutVerEl.textContent = PORTFOLIO_VERSION;
 applyTheme();
 applyFontScale();
 renderRangeButtons();
-// V1.0.15: section nav click → scroll + 動態算 sec-nav 高度設 scroll-margin-top
+// V1.0.15: section nav click → scroll + 動態算 top-stack 高度設 scroll-margin-top
+// 量整個 top-stack (hdr + sec-nav) 不只 sec-nav，scroll 才不會藏在 hdr 後
 function updateSecNavHeight() {
-  const nav = document.getElementById('portfolio-section-nav');
-  if (!nav || nav.hidden) return;
-  const h = nav.offsetHeight + 8;
+  const stack = document.getElementById('top-stack');
+  if (!stack) return;
+  const h = stack.offsetHeight + 8;
   document.documentElement.style.setProperty('--sec-nav-h', h + 'px');
 }
 document.addEventListener('click', function(e) {

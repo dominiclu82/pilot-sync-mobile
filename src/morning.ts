@@ -1471,6 +1471,8 @@ a:active { opacity: 0.6; }
 }
 
 /* V1.3.18: 為 bottom fixed navbar 留 body padding (top safe-area 已在 .hdr 處理) */
+/* V1.3.19: 禁 iOS 橡皮筋 overscroll */
+html, body { overscroll-behavior: none; }
 body { padding-bottom: calc(64px + env(safe-area-inset-bottom, 0px)); }
 .hdr-actions-top { display: flex; gap: 6px; align-items: center; flex-shrink: 0; }
 
