@@ -540,33 +540,34 @@ export function getPortfolioHtml(): string {
 function getStyles(): string {
   return `
 :root {
-  /* V1.0.17: 色系完全對齊晨報，user 切換 PWA 時不會 visually 跳色 */
+  /* V1.0.17: 全部 vars 精確對齊晨報 (除 --accent 用藍取代黃 — user 同意 Portfolio 藍色 theme)
+     切換 PWA 時 border / nav-bg / muted 視覺微差累積成「跳動感」— 此版全 1:1 對齊 */
   --bg: #0B1428;
   --bg-card: #111c36;
-  --bg-elev: #1a2547;
-  --fg: #e8e8ee;
-  --muted: #7a8aa5;
-  --accent: #5b9eff;
-  --green: #34d399;
-  --red: #f87171;
-  --border: #2a3656;
+  --bg-elev: #1a2540;
+  --fg: #e8ecf5;
+  --muted: #8a96b0;
+  --accent: #5b9eff;     /* 藍 (Portfolio 自身 theme, 對齊晨報 --accent #F4C430 結構性位置) */
+  --green: #2ecc71;
+  --red: #ff5555;
+  --border: rgba(255,255,255,0.08);
   --hdr-grad-1: #1E2740;
   --hdr-grad-2: #141c33;
-  --nav-bg: rgba(17, 28, 54, 0.85);
+  --nav-bg: rgba(15,22,45,0.92);
 }
 [data-theme="light"] {
   --bg: #f5f7fa;
   --bg-card: #ffffff;
-  --bg-elev: #eef1f5;
-  --fg: #1a1a24;
-  --muted: #6b6b78;
+  --bg-elev: #f0f3f8;
+  --fg: #1a2540;
+  --muted: #6b7a8f;
   --accent: #2563eb;
-  --green: #059669;
-  --red: #dc2626;
-  --border: #d4d8e0;
+  --green: #00a65e;
+  --red: #d63031;
+  --border: rgba(0,0,0,0.1);
   --hdr-grad-1: #ffe9c9;
   --hdr-grad-2: #ffd59e;
-  --nav-bg: rgba(255, 255, 255, 0.85);
+  --nav-bg: rgba(255,255,255,0.92);
 }
 * { box-sizing: border-box; }
 [hidden] { display: none !important; }  /* hotfix: 強制 hidden 屬性 override 任何 author CSS display */
@@ -644,7 +645,8 @@ body { font-size: 1rem; padding-left: 0; padding-right: 0; }
   min-width: 28px; border-radius: 4px; cursor: pointer;
 }
 .hdr-btn-font button:active { opacity: 0.7; }
-.hdr-actions { display: flex; gap: 8px; margin-bottom: 16px; }
+/* V1.0.17 fix: 14px top margin 對齊晨報 .sec 第一個 card 跟 top-stack 的 gap */
+.hdr-actions { display: flex; gap: 8px; margin: 14px 0 16px; }
 .btn { padding: 8px 14px; border-radius: 6px; border: 1px solid var(--border); background: var(--bg-card); color: var(--fg); font-size: .92em; cursor: pointer; }
 .btn-primary { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
 .btn-ghost { background: transparent; }
@@ -652,13 +654,13 @@ body { font-size: 1rem; padding-left: 0; padding-right: 0; }
 .status { color: var(--muted); font-size: .85em; margin-bottom: 10px; min-height: 1.2em; }
 .list { display: flex; flex-direction: column; gap: 8px; }
 
-/* V1.0.17: top-stack — wrap sticky 跟晨報 .top-stack 一致 transparent + bleed to body edges */
+/* V1.0.17: top-stack — 跟晨報 .top-stack 1:1 (sticky / top 0 / z 50)，
+   L/R -12px 抵消 .page padding 讓全寬，無 bottom margin (晨報沒有) */
 .top-stack {
   position: sticky;
   top: 0;
-  z-index: 40;
-  margin: 0 -12px 10px;  /* 抵消 .page L/R 12px padding 讓 top-stack 全寬對齊晨報 */
-  background: transparent;
+  z-index: 50;
+  margin: 0 -12px;
 }
 /* V1.0.17: sec-nav 對齊晨報 .nav — blur bg + 灰色預設 + active 藍色 outline
    (對齊晨報 yellow active pattern；ver tag 跟 nav-btn.active 都 var(--accent) 一致) */
