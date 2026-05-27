@@ -33,19 +33,21 @@ export function getPortfolioHtml(): string {
             <span class="ver" id="ver-tag" onclick="openAbout()">V1.0.15</span>
           </div>
         </div>
-        <button class="hdr-btn" onclick="openSettings()" title="設定 (PIN / 帳號)">⚙</button>
+        <div class="hdr-actions-top">
+          <button class="hdr-btn" onclick="refreshAll()" title="重新整理">↻</button>
+          <button class="hdr-btn" onclick="openSettings()" title="設定 (PIN / 帳號)">⚙</button>
+        </div>
       </div>
-      <div class="hdr-actions">
-        <button class="btn btn-primary" onclick="openAddModal()">+ 加交易</button>
-        <button class="btn btn-ghost" onclick="refreshAll()">↻ 重抓</button>
-      </div>
-      <div id="main-status" class="status"></div>
-      <!-- V1.0.15: Section nav (比照晨報) -->
+      <!-- V1.0.15: Section nav sticky (比照晨報 .top-stack pattern) -->
       <nav id="portfolio-section-nav" class="sec-nav" hidden>
         <button class="nav-btn" data-target="sec-tw">📈 台股</button>
         <button class="nav-btn" data-target="sec-us">🇺🇸 美股</button>
         <button class="nav-btn" data-target="chart-card">📊 資產變化</button>
       </nav>
+      <div class="hdr-actions">
+        <button class="btn btn-primary" onclick="openAddModal()">+ 加交易</button>
+      </div>
+      <div id="main-status" class="status"></div>
       <!-- V1.0.15: 投資組合總覽 (總資產 + 未實現損益) -->
       <div id="portfolio-overall" class="overall-card" hidden>
         <div class="ov-row">
@@ -573,8 +575,20 @@ body { font-size: 1rem; padding-left: 0; padding-right: 0; }
 .status { color: var(--muted); font-size: .85em; margin-bottom: 10px; min-height: 1.2em; }
 .list { display: flex; flex-direction: column; gap: 8px; }
 
-/* V1.0.15: Section nav (台股 / 美股 / 資產變化) — 比照晨報 */
-.sec-nav { display: flex; gap: 6px; padding: 0; margin: 0 0 10px; overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+/* V1.0.15: Section nav (台股 / 美股 / 資產變化) — sticky top 不會跟頁面滑走 */
+.sec-nav {
+  position: sticky;
+  top: env(safe-area-inset-top, 0px);
+  z-index: 40;  /* above content, below modal (100) */
+  background: var(--bg);
+  display: flex; gap: 6px;
+  margin: 0 -14px 10px; padding: 8px 14px;
+  overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch;
+  border-bottom: 1px solid var(--border);
+}
+@media (min-width: 768px) {
+  .sec-nav { margin-left: -24px; margin-right: -24px; padding-left: 24px; padding-right: 24px; }
+}
 .sec-nav::-webkit-scrollbar { display: none; }
 .sec-nav .nav-btn {
   flex: 0 0 auto;
@@ -586,8 +600,10 @@ body { font-size: 1rem; padding-left: 0; padding-right: 0; }
   cursor: pointer; white-space: nowrap;
 }
 .sec-nav .nav-btn:active { opacity: .6; }
-.sec-block { margin-bottom: 16px; }
+.sec-block { margin-bottom: 16px; scroll-margin-top: var(--sec-nav-h, 60px); }  /* JS 動態設 nav 實際高 */
 .sec-title { font-size: 1.05em; font-weight: 700; padding: 8px 4px; color: var(--accent); }
+#chart-card { scroll-margin-top: var(--sec-nav-h, 60px); }
+.hdr-actions-top { display: flex; gap: 6px; align-items: center; flex-shrink: 0; }
 
 /* V1.0.15: 投資組合總覽 card (頂部 dashboard — 總資產 + 未實現損益) */
 .overall-card {
@@ -1199,6 +1215,8 @@ function renderMain() {
     navBar.hidden = false;
     navBar.querySelector('[data-target="sec-tw"]').hidden = (tw.length === 0);
     navBar.querySelector('[data-target="sec-us"]').hidden = (us.length === 0);
+    // recompute --sec-nav-h (字型變大 / nav 內按鈕數變動時)
+    if (typeof updateSecNavHeight === 'function') updateSecNavHeight();
   }
 }
 
@@ -1724,6 +1742,8 @@ function applyFontScale() {
 function bumpFont(dir) {
   _fontScale = Math.max(-2, Math.min(17, _fontScale + dir));
   try { localStorage.setItem(FONT_SCALE_KEY, String(_fontScale)); } catch {}
+  // 字型變了 nav 高度也變 — recompute scroll offset
+  if (typeof updateSecNavHeight === 'function') setTimeout(updateSecNavHeight, 50);
   applyFontScale();
 }
 
@@ -1826,15 +1846,23 @@ if (aboutVerEl) aboutVerEl.textContent = PORTFOLIO_VERSION;
 applyTheme();
 applyFontScale();
 renderRangeButtons();
-// V1.0.15: section nav click → scroll
+// V1.0.15: section nav click → scroll + 動態算 sec-nav 高度設 scroll-margin-top
+function updateSecNavHeight() {
+  const nav = document.getElementById('portfolio-section-nav');
+  if (!nav || nav.hidden) return;
+  const h = nav.offsetHeight + 8;
+  document.documentElement.style.setProperty('--sec-nav-h', h + 'px');
+}
 document.addEventListener('click', function(e) {
   const t = e.target;
   if (t && t.classList && t.classList.contains('nav-btn') && t.closest('#portfolio-section-nav')) {
+    updateSecNavHeight();  // 字型變大時 nav 變高，scroll 前 recompute
     const id = t.getAttribute('data-target');
     const el = id ? document.getElementById(id) : null;
     if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 });
+window.addEventListener('resize', updateSecNavHeight);
 bootstrap();
 `;
 }
