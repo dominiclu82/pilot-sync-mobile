@@ -45,8 +45,8 @@ import { getSpaPilotLogJs } from '../spa/js-pilot-log.js';
 
 // ── 版本（比照 CrewSync / Morning：每次推版必更新；SW cache 名稱跟著走） ────
 // 本機 preview build 會暫時加 -tNN 後綴方便對版；推正式版前拿掉只留乾淨版號。
-export const PILOT_LOG_VERSION = 'V1.2.05';
-const PILOT_LOG_CACHE = 'pilotlog-v1-2-05';
+export const PILOT_LOG_VERSION = 'V1.2.06';
+const PILOT_LOG_CACHE = 'pilotlog-v1-2-06';
 
 export const pilotLogRouter = express.Router();
 
@@ -329,6 +329,11 @@ if (document.readyState !== 'loading') pilotLogInit();
 function _renderPilotLogChangelog(): string {
   return `
     <div class="pl-cl-v">${PILOT_LOG_VERSION}</div>
+    <div class="pl-cl-txt">
+      <b>[Admin/Ops] 可查詢的 DB 用量後台。</b>不用再每次問 — 新增 <code>/pilot-log/admin</code> 後台頁面：輸入 admin 密碼（<code>PILOT_LOG_ADMIN_PW</code>，存 sessionStorage 免重打）→ 顯示<b>整個資料庫對 1GB 的用量進度條</b>、<b>餐廳 + 其他 vs Pilot Log 組成</b>、<b>各表大小排行</b>（餐廳出勤系統的表也看得到）、使用者/航班統計、Top users。admin/stats 端點同步加 <code>pg_database_size</code>（整個 DB 含餐廳）+ 全表 size 排行 + 剩餘空間。純後台 ops 功能，一般使用者體驗不變。<br>
+      <b>[Admin/Ops] Queryable DB-usage dashboard.</b> New <code>/pilot-log/admin</code> page: enter the admin password (<code>PILOT_LOG_ADMIN_PW</code>, cached in sessionStorage) → shows whole-database usage vs the 1 GB plan (progress bar), restaurant+other vs Pilot Log composition, per-table size ranking (the restaurant/attendance tables show up too), user/flight stats, and top users. The admin/stats endpoint now also returns <code>pg_database_size</code> (whole DB incl. restaurant), an all-table size ranking, and free space. Ops-only; no change to the normal pilot experience.
+    </div>
+    <div class="pl-cl-v old">V1.2.05</div>
     <div class="pl-cl-txt">
       <b>真正能分析 + 一鍵 Confirm + Deadhead 標記 + Aircraft 依機型分組。</b><b>(1) Analyze 依機型 + 依公司明細表：</b>每列顯示 班數 / Block / PIC 時數 / <b>PIC Sec（PIC 段數）</b> / SIC / Night / 起飛 / 落地 + 總計列；<b>依機型</b>跟<b>依公司</b>（operator，用 tail 對機尾庫）兩張表。PIC/SIC 用實際時數。<b>deadhead 一律排除在所有飛行統計外</b>（Analyze 卡片 / 明細表 / Report recency+時數 / CSV / stats 查詢都加 <code>is_deadhead</code> 排除 — codex P1/P2）。取代原本只有長度的 by-type 長條，真正能整理分析。<b>(2) 一鍵 Confirm All：</b>Logbook 工具列加「✓ Confirm All」，把<b>過去日期</b>的 draft 一次標 confirmed（匯入歷史 logbook 後清草稿用；未來計畫航班不動 — codex P1）。後端 <code>POST /api/pilot-log/entries/confirm-drafts</code>。<b>(3) Deadhead 記錄：</b>新增 <code>is_deadhead</code> 欄，Editor 加「Deadhead / positioning」勾選可手動標（LogTen 多數匯出不帶此欄），Logbook 列顯示紫色 <b>DH</b> badge + 🧳 圖示，讓飛行與 deadhead 區分；deadhead 不算 PIC/SIC、不算起降。<b>(4) Aircraft 依機型分組：</b>機尾庫從「全部混一起」改成先列機型（type + 完整廠商機型 + tail 數 + 該型總航班），底下才是各 tail（按飛行數排序），點 tail 進原 drill-down。<br>
       <b>Real analysis + Confirm-all + Deadhead marking + Aircraft grouped by type.</b> (1) Analyze by-type table: per type → flights / block / PIC / SIC / night / takeoffs / landings + totals (PIC/SIC use actual minutes; deadheads excluded). (2) One-tap "Confirm All" in the Logbook toolbar flips all drafts to confirmed (<code>POST /entries/confirm-drafts</code>) — for cleaning up after a historical import. (3) Deadhead recording: new <code>is_deadhead</code> column, an editor "Deadhead / positioning" toggle (most LogTen exports omit the column, so manual marking matters), purple <b>DH</b> badge + 🧳 icon in the list; deadheads don't count toward PIC/SIC or takeoff/landing currency. (4) Aircraft list grouped by type: instead of one flat mixed list, types are listed first (type + full make/model + tail count + flights), with each tail underneath (sorted by flights); tap a tail for the existing drill-down.
@@ -1054,7 +1059,13 @@ pilotLogRouter.get('/api/pilot-log/admin/stats', async (req, res) => {
     for (const r of byStatus.rows) statusMap[r.status] = r.c;
 
     // ── Tables 區（三個 size 都回） ────
-    const tableNames = ['pilot_users', 'pilot_user_emails', 'pilot_user_sessions', 'pilot_log_entries', 'pilot_aircraft'];
+    // ⚠️ 這份清單必須涵蓋 schema.ts ensureTables() 建的「所有」pilot-log 表，
+    //    因為「餐廳+其他用量」是用 DB 總量扣掉這裡的加總算出來的；漏一張表就會高報餐廳。
+    //    新增 pilot-log 表時務必同步補進來（目前 = schema.ts 的 8 張 CREATE TABLE）。
+    const tableNames = [
+      'pilot_users', 'pilot_user_emails', 'pilot_user_sessions', 'pilot_log_entries',
+      'pilot_aircraft', 'pilot_aircraft_types', 'crew', 'crew_employee_ids',
+    ];
     const tables: Record<string, any> = {};
     let totalSize = 0;
     for (const t of tableNames) {
@@ -1075,6 +1086,26 @@ pilotLogRouter.get('/api/pilot-log/admin/stats', async (req, res) => {
       };
       totalSize += Number(row.total_bytes);
     }
+
+    // ── V1.2.06：整個資料庫總量（含餐廳 POS 等所有表）+ 全表 size 排行 ─────────────
+    // pilot-log 跟餐廳出勤系統共用同一個 Postgres，這裡才看得到「總共用多少 / 還剩多少 / 餐廳吃多少」。
+    const dbSizeRow = await pool.query(`SELECT pg_database_size(current_database())::bigint AS bytes`);
+    const dbTotalBytes = Number(dbSizeRow.rows[0].bytes);
+    const GB = 1024 * 1024 * 1024;
+    const topTablesRow = await pool.query(`
+      SELECT relname AS name,
+             pg_total_relation_size(relid)::bigint AS total_bytes,
+             n_live_tup::bigint                    AS approx_rows
+      FROM pg_stat_user_tables
+      ORDER BY total_bytes DESC
+      LIMIT 30
+    `);
+    const topTablesBySize = topTablesRow.rows.map((r: any) => ({
+      name: r.name,
+      total_mb: Math.round(Number(r.total_bytes) / 1024 / 1024 * 100) / 100,
+      total_bytes: Number(r.total_bytes),
+      approx_rows: Number(r.approx_rows),
+    }));
 
     // ── Top users by entry count（永遠抓 max 50 進 cache，response 再 slice）────
     const topUsers = await pool.query(`
@@ -1103,9 +1134,16 @@ pilotLogRouter.get('/api/pilot-log/admin/stats', async (req, res) => {
         },
         total_pilot_log_size_bytes: totalSize,
         total_pilot_log_size_mb: Math.round(totalSize / 1024 / 1024 * 10) / 10,
+        // V1.2.06：整個 DB（含餐廳 POS）對 1GB 的用量
+        db_total_size_bytes: dbTotalBytes,
+        db_total_size_mb: Math.round(dbTotalBytes / 1024 / 1024 * 10) / 10,
+        db_used_pct_of_1gb: Math.round(dbTotalBytes / GB * 1000) / 10,
+        db_free_mb_of_1gb: Math.round((GB - dbTotalBytes) / 1024 / 1024 * 10) / 10,
+        restaurant_etc_size_mb: Math.round((dbTotalBytes - totalSize) / 1024 / 1024 * 10) / 10,  // 總量扣掉 pilot-log = 餐廳+晨報+其他+開銷
       },
       breakdown: {
         tables,
+        top_tables_by_size: topTablesBySize,     // ← 全 DB 各表 size 排行（餐廳的表會在這）
         top_users_by_entries: topUsers.rows,    // ← 永遠 top 50
       },
       warnings: [],
@@ -1117,6 +1155,115 @@ pilotLogRouter.get('/api/pilot-log/admin/stats', async (req, res) => {
     console.error('[pilot-log] admin stats error:', e.message);
     res.status(500).json({ error: 'internal', detail: e.message });
   }
+});
+
+// ── Admin dashboard 頁面（V1.2.06）─────────────────────────────────────────────
+// 可查詢的後台 UI：輸入 admin pw → 顯示 DB 用量 / 各表 size / users。
+// 頁面本身不含機密（pw 由 user 輸入、存 sessionStorage），資料 fetch 仍走 pw-gated 的 stats endpoint。
+pilotLogRouter.get('/pilot-log/admin', (_req, res) => {
+  res.setHeader('Content-Type', 'text/html; charset=utf-8');
+  res.setHeader('Cache-Control', 'no-store');
+  res.send(`<!DOCTYPE html>
+<html lang="zh-Hant"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex">
+<title>Pilot Log · DB Admin</title>
+<style>
+* { box-sizing: border-box; }
+body { margin:0; background:#0a0e1a; color:#e2e8f0; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; font-size:15px; padding:16px; padding-top:max(16px,env(safe-area-inset-top)); }
+h1 { font-size:1.1em; margin:0 0 14px; }
+.card { background:#1a1f2e; border:1px solid #334155; border-radius:12px; padding:14px; margin-bottom:12px; }
+.lbl { color:#94a3b8; font-size:.72em; text-transform:uppercase; letter-spacing:.5px; margin-bottom:6px; }
+.big { font-size:1.6em; font-weight:800; }
+.muted { color:#94a3b8; }
+.bar { height:14px; border-radius:7px; background:rgba(255,255,255,.08); overflow:hidden; margin:8px 0 4px; }
+.bar > i { display:block; height:100%; background:linear-gradient(90deg,#3b82f6,#60a5fa); }
+input { background:#0a0e1a; color:#e2e8f0; border:1px solid #334155; border-radius:8px; padding:9px 11px; font-size:.9em; width:100%; }
+button { background:#3b82f6; color:#fff; border:0; border-radius:8px; padding:9px 16px; font-size:.85em; font-weight:700; cursor:pointer; }
+table { width:100%; border-collapse:collapse; font-size:.8em; }
+th,td { text-align:right; padding:5px 8px; white-space:nowrap; font-variant-numeric:tabular-nums; }
+th:first-child,td:first-child { text-align:left; }
+th { color:#94a3b8; font-weight:700; }
+tr+tr td { border-top:1px solid #283449; }
+.tbar { display:inline-block; height:8px; border-radius:4px; background:#3b82f6; vertical-align:middle; }
+.err { color:#fca5a5; }
+.row2 { display:flex; gap:10px; flex-wrap:wrap; }
+.row2 > .card { flex:1; min-width:130px; }
+</style></head>
+<body>
+<h1>📊 Pilot Log · DB Admin</h1>
+<div class="card" id="pwcard">
+  <div class="lbl">Admin password</div>
+  <div style="display:flex;gap:8px">
+    <input id="pw" type="password" placeholder="PILOT_LOG_ADMIN_PW" onkeydown="if(event.key==='Enter')load()">
+    <button onclick="load()">查詢</button>
+  </div>
+  <div id="msg" class="muted" style="font-size:.72em;margin-top:6px"></div>
+</div>
+<div id="out"></div>
+<script>
+var PW_KEY = 'pl_admin_pw';
+function fmtMB(v){ return (v==null?'—':v) + ' MB'; }
+function el(id){ return document.getElementById(id); }
+async function load(){
+  var pw = el('pw').value.trim();
+  if(!pw){ el('msg').textContent='請輸入密碼'; return; }
+  el('msg').textContent='查詢中…';
+  try{
+    var r = await fetch('/api/pilot-log/admin/stats?pw=' + encodeURIComponent(pw) + '&limit=50');
+    if(r.status===403){ el('msg').innerHTML='<span class="err">密碼錯誤</span>'; return; }
+    if(!r.ok){ el('msg').innerHTML='<span class="err">查詢失敗 '+r.status+'</span>'; return; }
+    var j = await r.json();
+    try{ sessionStorage.setItem(PW_KEY, pw); }catch(e){}
+    el('msg').textContent='更新於 ' + new Date(j.generated_at).toLocaleString('zh-TW') + (j.cached?'（快取）':'');
+    render(j);
+  }catch(e){ el('msg').innerHTML='<span class="err">'+(e&&e.message||'error')+'</span>'; }
+}
+function render(j){
+  var s = j.summary || {}, b = j.breakdown || {};
+  var pct = s.db_used_pct_of_1gb || 0;
+  var out = '';
+  // 儲存總覽
+  out += '<div class="card"><div class="lbl">整個資料庫 / 1 GB（含餐廳 + pilot-log + 全部）</div>' +
+    '<div class="big">' + fmtMB(s.db_total_size_mb) + ' <span class="muted" style="font-size:.5em">/ 1024 MB · ' + pct + '%</span></div>' +
+    '<div class="bar"><i style="width:' + Math.min(pct,100) + '%"></i></div>' +
+    '<div class="muted" style="font-size:.78em">剩餘 ' + fmtMB(s.db_free_mb_of_1gb) + '</div></div>';
+  // 組成
+  out += '<div class="row2">' +
+    '<div class="card"><div class="lbl">餐廳 + 其他</div><div class="big">' + fmtMB(s.restaurant_etc_size_mb) + '</div></div>' +
+    '<div class="card"><div class="lbl">Pilot Log</div><div class="big">' + fmtMB(s.total_pilot_log_size_mb) + '</div></div>' +
+    '</div>';
+  // 各表 size 排行
+  var tt = b.top_tables_by_size || [];
+  if(tt.length){
+    var maxmb = tt[0].total_mb || 1;
+    var rows = tt.map(function(t){
+      var w = Math.max(2, Math.round((t.total_mb/maxmb)*100));
+      return '<tr><td>'+esc(t.name)+'</td><td>'+(t.approx_rows!=null?t.approx_rows.toLocaleString():'—')+'</td><td>'+t.total_mb+'</td>' +
+        '<td style="width:90px"><span class="tbar" style="width:'+w+'%"></span></td></tr>';
+    }).join('');
+    out += '<div class="card"><div class="lbl">各表大小排行（餐廳的表也在這）</div>' +
+      '<table><tr><th>Table</th><th>Rows</th><th>MB</th><th></th></tr>'+rows+'</table></div>';
+  }
+  // Users
+  var u = s.users || {}, en = s.entries || {};
+  out += '<div class="card"><div class="lbl">使用者 / 紀錄</div>' +
+    '<div class="muted" style="font-size:.82em;line-height:1.8">使用者 '+ (u.total||0) +'（有資料 '+(u.with_entries||0)+'、近 7 天活躍 '+(u.active_7d||0)+'）<br>' +
+    '航班總筆數 '+ (en.total||0) +'（confirmed '+((en.by_status||{}).confirmed||0)+' / draft '+((en.by_status||{}).draft||0)+'）</div></div>';
+  // top users
+  var tu = b.top_users_by_entries || [];
+  if(tu.length){
+    var urows = tu.map(function(x){ return '<tr><td>'+esc(x.primary_email||x.user_id)+'</td><td>'+x.entry_count+'</td><td>'+x.aircraft_count+'</td></tr>'; }).join('');
+    out += '<div class="card"><div class="lbl">Top users</div><table><tr><th>User</th><th>Flights</th><th>Aircraft</th></tr>'+urows+'</table></div>';
+  }
+  out += '<div style="text-align:center;margin:6px 0 20px"><button onclick="load()">↻ 重新整理</button></div>';
+  el('out').innerHTML = out;
+}
+function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
+// 自動帶上次密碼
+(function(){ try{ var p=sessionStorage.getItem(PW_KEY); if(p){ el('pw').value=p; load(); } }catch(e){} })();
+</script>
+</body></html>`);
 });
 
 // ── Quick suggest ────────────────────────────────────────────────────────────
