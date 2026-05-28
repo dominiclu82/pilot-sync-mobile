@@ -66,6 +66,9 @@ function _plClearSession() {
   _pl.accessToken = null;
   _pl.refreshToken = null;
   _pl.user = null;
+  // V1.2：把 IDB 的 user 一起清掉，否則下次 init _plCacheLoadAll 又把 user 撈回來、
+  // 形成「看起來登入但 token 都沒了 → 401 → resurrect → 又 401」的死循環（codex P1 衍生）
+  if (typeof _plIDBSet === 'function') _plIDBSet('user', null);
 }
 
 // === SECTION: chrome（底部 tab / 日夜 / 字級）═══════════════════════════════
@@ -144,6 +147,101 @@ function switchPlTab(tab, btn) {
   else if (tab === 'report') _plRenderReport();
   else _plRenderMain();
   window.scrollTo(0, 0);
+}
+
+// === SECTION: cache + offline（V1.2）═══════════════════════════════════════
+// 解 iOS PWA 在 7 天無互動清掉 localStorage 把飛行員踢回登入頁的問題。
+// (1) Refresh token 後端用 HttpOnly cookie，iOS 對 cookie 比 localStorage 寬容。
+// (2) 拉到的資料寫一份 IDB（容量比 localStorage 大、iOS 保護較好）；
+//     下次打開先用 IDB 立刻 render，網路掛了還能看上次同步的 logbook。
+// (3) 啟動時 navigator.storage.persist() 申請 persistent storage（iOS 不保證，但延長保留）。
+
+var _PL_DB_NAME = 'pilotlog';
+var _PL_DB_VER = 1;
+var _PL_DB_STORE = 'cache';
+
+function _plIDB() {
+  return new Promise(function(resolve, reject) {
+    try {
+      var req = indexedDB.open(_PL_DB_NAME, _PL_DB_VER);
+      req.onupgradeneeded = function(e) {
+        var db = e.target.result;
+        if (!db.objectStoreNames.contains(_PL_DB_STORE)) db.createObjectStore(_PL_DB_STORE);
+      };
+      req.onsuccess = function(e) { resolve(e.target.result); };
+      req.onerror = function() { reject(req.error); };
+    } catch (e) { reject(e); }
+  });
+}
+
+function _plIDBSet(key, val) {
+  return _plIDB().then(function(db) {
+    return new Promise(function(resolve, reject) {
+      var tx = db.transaction(_PL_DB_STORE, 'readwrite');
+      tx.objectStore(_PL_DB_STORE).put(val, key);
+      tx.oncomplete = function() { resolve(); };
+      tx.onerror = function() { reject(tx.error); };
+    });
+  }).catch(function() {});      // 隱私模式 / quota 全滿就靜默不擋主流程
+}
+
+function _plIDBGet(key) {
+  return _plIDB().then(function(db) {
+    return new Promise(function(resolve, reject) {
+      var tx = db.transaction(_PL_DB_STORE, 'readonly');
+      var r = tx.objectStore(_PL_DB_STORE).get(key);
+      r.onsuccess = function() { resolve(r.result); };
+      r.onerror = function() { reject(r.error); };
+    });
+  }).catch(function() { return undefined; });
+}
+
+function _plRequestPersist() {
+  try {
+    if (navigator.storage && navigator.storage.persist) {
+      navigator.storage.persist().catch(function() {});
+    }
+  } catch (e) {}
+}
+
+// 寫所有當前 _pl 拉到的資料進 IDB（網路 fetch 成功後呼叫）
+function _plCacheSaveAll() {
+  _plIDBSet('entries', _pl.entries);
+  _plIDBSet('filter', _pl.filter);          // 跟 entries 配對存：entries 是當下 filter 的子集，
+                                            // 不存 filter 的話下次離線開、UI 預設 'all' 但資料只有 draft 會嚴重誤導（codex P3）
+  _plIDBSet('stats', _pl.stats);
+  _plIDBSet('aircraft', _pl.aircraft);
+  _plIDBSet('aircraftTypes', _pl.aircraftTypes);
+  _plIDBSet('crew', _pl.crew);
+  _plIDBSet('suggest', _pl.suggest);
+  _plIDBSet('user', _pl.user);
+}
+function _plCacheSaveAircraftEntries() {
+  if (_pl.aircraftEntries) _plIDBSet('aircraftEntries', _pl.aircraftEntries);
+}
+
+// 從 IDB 撈回填 _pl；回傳是否有任何快取（用來判斷「曾經登入過」）
+async function _plCacheLoadAll() {
+  var keys = ['entries', 'stats', 'aircraft', 'aircraftTypes', 'crew', 'suggest', 'aircraftEntries', 'user', 'filter'];
+  var vals = await Promise.all(keys.map(_plIDBGet));
+  var any = false;
+  if (vals[0]) { _pl.entries = vals[0]; any = true; }
+  if (vals[1]) { _pl.stats = vals[1]; any = true; }
+  if (vals[2]) { _pl.aircraft = vals[2]; any = true; }
+  if (vals[3]) { _pl.aircraftTypes = vals[3]; any = true; }
+  if (vals[4]) { _pl.crew = vals[4]; any = true; }
+  if (vals[5]) { _pl.suggest = vals[5]; any = true; }
+  if (vals[6]) { _pl.aircraftEntries = vals[6]; any = true; }
+  if (vals[7] && !_pl.user) { _pl.user = vals[7]; any = true; }
+  if (vals[8]) { _pl.filter = vals[8]; }    // 把 filter 還原成跟快取 entries 配對的值（codex P3）
+  return any;
+}
+
+// 切離線/連線狀態 — 控制頂部 OFFLINE 提示條
+function _plSetOffline(off) {
+  var bar = document.getElementById('pl-offline-bar');
+  if (bar) bar.classList.toggle('show', !!off);
+  document.body.classList.toggle('pl-offline', !!off);
 }
 
 // === SECTION: utils ═════════════════════════════════════════════════════════
@@ -293,22 +391,25 @@ async function _plOnGoogleCredential(response) {
 var _plRefreshPromise = null;
 
 async function _plTryRefresh() {
-  if (!_pl.refreshToken) return false;
-  // 已經有 refresh 進行中 → 共用同一個 promise，其他 caller await 同個結果即可
+  // V1.2：拿掉「沒 refreshToken 就 fail」的早退，讓 cookie-only 流程也能跑 —
+  // localStorage 被 iOS 清掉時，HttpOnly cookie 還在，空 body 送出去、cookie 自動附上、
+  // server 端會用 cookie 認，回新 token 把 session 復活。
   if (_plRefreshPromise) return _plRefreshPromise;
   _plRefreshPromise = (async () => {
     try {
+      var body = _pl.refreshToken ? { refreshToken: _pl.refreshToken } : {};
       var r = await fetch('/api/pilot-log/auth/refresh', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ refreshToken: _pl.refreshToken }),
+        credentials: 'same-origin',     // 明示 cookie 隨行（同源預設值，留下意圖紀錄）
+        body: JSON.stringify(body),
       });
       if (r.ok) {
         var j = await r.json();
         _plSaveSession(j);
         return true;
       }
-      // 只有 401 = server 確認 refresh token 失效 → 清 session 強制重登
+      // 401 = server 確認 refresh token + cookie 都失效 → 清 session 強制重登
       // 其他（5xx 服務暫時不可用 / 網路錯誤）= 暫時性失敗，不清 session，下次再試
       if (r.status === 401) _plClearSession();
       return false;
@@ -367,23 +468,39 @@ async function _plDeleteAccount() {
 }
 
 // === SECTION: list ══════════════════════════════════════════════════════════
+// V1.2：網路失敗時 catch 起來、保留現有 _pl 資料（可能來自 IDB 快取）、設 OFFLINE 旗標；
+// 不讓網路掛掉的 throw 把 caller 炸掉。成功時順手寫一份進 IDB。
 async function _plFetchAll() {
   var q = '';
   if (_pl.filter !== 'all') q = '?status=' + _pl.filter;
-  var [eRes, sRes, aRes, qRes, atRes, cRes] = await Promise.all([
-    _plApi('/api/pilot-log/entries' + q),
-    _plApi('/api/pilot-log/stats'),
-    _plApi('/api/pilot-log/aircraft'),
-    _plApi('/api/pilot-log/quick-suggest'),
-    _plApi('/api/pilot-log/aircraft-types'),  // V1.0.11
-    _plApi('/api/pilot-log/crew'),            // V1.0.11
-  ]);
-  if (eRes.ok) { var ej = await eRes.json(); _pl.entries = ej.entries || []; }
-  if (sRes.ok) { _pl.stats = await sRes.json(); }
-  if (aRes.ok) { var aj = await aRes.json(); _pl.aircraft = aj.aircraft || []; }
-  if (qRes.ok) { _pl.suggest = await qRes.json(); }
-  if (atRes.ok) { var atj = await atRes.json(); _pl.aircraftTypes = atj.aircraft_types || []; }
-  if (cRes.ok) { var cj = await cRes.json(); _pl.crew = cj.crew || []; }
+  try {
+    var [eRes, sRes, aRes, qRes, atRes, cRes] = await Promise.all([
+      _plApi('/api/pilot-log/entries' + q),
+      _plApi('/api/pilot-log/stats'),
+      _plApi('/api/pilot-log/aircraft'),
+      _plApi('/api/pilot-log/quick-suggest'),
+      _plApi('/api/pilot-log/aircraft-types'),  // V1.0.11
+      _plApi('/api/pilot-log/crew'),            // V1.0.11
+    ]);
+    if (eRes.ok) { var ej = await eRes.json(); _pl.entries = ej.entries || []; }
+    if (sRes.ok) { _pl.stats = await sRes.json(); }
+    if (aRes.ok) { var aj = await aRes.json(); _pl.aircraft = aj.aircraft || []; }
+    if (qRes.ok) { _pl.suggest = await qRes.json(); }
+    if (atRes.ok) { var atj = await atRes.json(); _pl.aircraftTypes = atj.aircraft_types || []; }
+    if (cRes.ok) { var cj = await cRes.json(); _pl.crew = cj.crew || []; }
+    // codex fast P1：fetch 過程中如果 token 過期 + refresh/cookie 真的失效，_plApi 內部會清
+    // session（_pl.user=null）。此時不能假裝成功，否則 caller 會繼續顯示「沒授權但有快取」的 stale UI。
+    if (!_pl.user) {
+      _plSetOffline(false);
+      return false;
+    }
+    _plCacheSaveAll();
+    _plSetOffline(false);
+    return true;
+  } catch (e) {
+    _plSetOffline(true);
+    return false;
+  }
 }
 
 function _plRenderStats() {
@@ -1148,14 +1265,22 @@ async function _plUploadAddressBook() {
 // 獨立 fetch：撈完整 entries（不過主頁 filter、不分頁），給 Aircraft 列表 / drill-down 用
 // 主頁 _pl.entries 受 filter + 200 limit 影響，counts 跟 drill-down 不能用它
 async function _plFetchAircraftEntries() {
-  // 用 limit=50000（server 端剛調的上限），覆蓋任何真實飛行員職涯範圍
-  var res = await _plApi('/api/pilot-log/entries?limit=50000');
-  if (!res.ok) {
-    _pl.aircraftEntries = [];
-    return;
+  // 用 limit=50000（server 端剛調的上限），覆蓋任何真實飛行員職涯範圍。
+  // V1.2：網路掛掉保留既有快照（可能來自 IDB），設 OFFLINE 旗標；成功就寫一份回 IDB。
+  try {
+    var res = await _plApi('/api/pilot-log/entries?limit=50000');
+    if (!res.ok) {
+      if (!_pl.aircraftEntries) _pl.aircraftEntries = [];
+      return;
+    }
+    var j = await res.json();
+    _pl.aircraftEntries = j.entries || [];
+    _plCacheSaveAircraftEntries();
+    _plSetOffline(false);
+  } catch (e) {
+    _plSetOffline(true);
+    if (!_pl.aircraftEntries) _pl.aircraftEntries = [];
   }
-  var j = await res.json();
-  _pl.aircraftEntries = j.entries || [];
 }
 
 async function _plOpenAircraft() {
@@ -1554,6 +1679,7 @@ async function _plRenderAnalyze() {
   _plHighlightTab('analyze');
   c.innerHTML = '<div style="text-align:center;color:var(--muted);padding:40px;font-size:.85em">Loading stats…</div>';
   await Promise.all([_plFetchAll(), _plFetchAircraftEntries()]);
+  if (!_pl.user) { _plRenderLogin(); return; }   // fetch 中 session 失效 → 回登入（codex fast P1）
   _plRenderAnalyzeContent();
 }
 
@@ -1656,6 +1782,7 @@ async function _plRenderReport() {
   _plHighlightTab('report');
   c.innerHTML = '<div style="text-align:center;color:var(--muted);padding:40px;font-size:.85em">Loading report…</div>';
   await _plFetchAircraftEntries();
+  if (!_pl.user) { _plRenderLogin(); return; }   // fetch 中 session 失效 → 回登入（codex fast P1）
   _plRenderReportContent();
 }
 
@@ -1836,14 +1963,34 @@ async function pilotLogInit() {
   if (!_pl.initialized) {
     _plLoadSession();
     _pl.initialized = true;
+    _plRequestPersist();           // V1.2：請瀏覽器把儲存標 persistent，iOS 7 天清除延緩
   }
   if (_pl.editing) { _plRenderEditor(); return; }
-  if (_pl.user) {
-    // 回到使用者上次所在的分頁（codex P3）：整合進主 SPA 後，切走再切回不該掉出 Analyze/Report
-    if (_pl.tab === 'analyze') { await _plRenderAnalyze(); }
-    else if (_pl.tab === 'report') { await _plRenderReport(); }
-    else { await _plFetchAll(); _plRenderMain(); }
-  } else {
-    _plRenderLogin();
+
+  // V1.2：cache-first 啟動流程
+  // 1) 先把 IDB 快取塞回 _pl（離線時這就是唯一資料來源）
+  var hadCache = await _plCacheLoadAll();
+
+  // 2) 只要 accessToken 不在記憶體就試 cookie resurrection（codex deep P1）—
+  //    不能只看 _pl.user，因為 cache 會把 user 撈回來、看起來「像登入」但其實 token 已被 iOS 清掉，
+  //    跳過 refresh 的話 _plApi 全部送出 Bearer undefined 永遠 401。
+  if (!_pl.accessToken) {
+    var ok = await _plTryRefresh();
+    if (!ok && !_pl.user) {
+      _plRenderLogin();
+      return;
+    }
+    // refresh 失敗但 _pl.user 還在（cache 撈到的）→ 用快取資料顯示，OFFLINE 條會亮，
+    // user 連回網就會自然恢復；若 refresh 回 401 _plTryRefresh 內部已清 session 把 user 也清掉。
   }
+
+  // 3) 用快取（或剛拿到的新 session）立刻 render，不等網路
+  if (_pl.tab === 'analyze') { _plRenderAnalyze(); }
+  else if (_pl.tab === 'report') { _plRenderReport(); }
+  else { _plRenderMain(); _plFetchAll().then(function(ok) {
+    // 背景刷新後若 session 已被清（token+cookie 都失效）→ 送回登入，不顯示 stale UI（codex fast P1）
+    if (!_pl.user) { _plRenderLogin(); return; }
+    // 成功 → 重畫 list 反映新資料（保留 user 互動，不重建整個 split）
+    if (ok && _pl.tab === 'logbook' && !_pl.editing) _plRenderList();
+  }); }
 }

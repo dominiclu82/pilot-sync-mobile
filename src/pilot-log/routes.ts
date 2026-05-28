@@ -3,8 +3,9 @@
 //
 // Public:
 //   POST   /api/pilot-log/auth/login          { idToken }   → { accessToken, refreshToken, ... }
-//   POST   /api/pilot-log/auth/refresh        { refreshToken } → 同上 (rotated)
-//   POST   /api/pilot-log/auth/logout         { refreshToken }
+//                                              + Set-Cookie: plrt (HttpOnly, Secure, 90d, path=/api/pilot-log/auth)
+//   POST   /api/pilot-log/auth/refresh        cookie plrt OR { refreshToken } → 同上 (rotated, 新 cookie)
+//   POST   /api/pilot-log/auth/logout         cookie plrt OR { refreshToken } → revoke + clear cookie
 //
 // Authed (Authorization: Bearer <accessToken>):
 //   GET    /api/pilot-log/me
@@ -44,8 +45,8 @@ import { getSpaPilotLogJs } from '../spa/js-pilot-log.js';
 
 // ── 版本（比照 CrewSync / Morning：每次推版必更新；SW cache 名稱跟著走） ────
 // 本機 preview build 會暫時加 -tNN 後綴方便對版；推正式版前拿掉只留乾淨版號。
-export const PILOT_LOG_VERSION = 'V1.1.02';
-const PILOT_LOG_CACHE = 'pilotlog-v1-1-02';
+export const PILOT_LOG_VERSION = 'V1.2.01';
+const PILOT_LOG_CACHE = 'pilotlog-v1-2-01';
 
 export const pilotLogRouter = express.Router();
 
@@ -219,9 +220,22 @@ body {
 }
 
 @media print {
-  .pl-tab-bar, .pl-modal-wrap { display: none !important; }
+  .pl-tab-bar, .pl-modal-wrap, .pl-offline-bar { display: none !important; }
   body { padding-bottom: 0; }
 }
+
+/* V1.2：頂部 OFFLINE 提示條（網路掛掉、使用 IDB 快取資料時顯示） */
+.pl-offline-bar {
+  display: none; position: fixed;
+  top: env(safe-area-inset-top);
+  left: 0; right: 0; z-index: 250;
+  background: #f59e0b; color: #1a1f2e;
+  font-size: .68em; font-weight: 700; text-align: center;
+  padding: 5px 12px; line-height: 1.35;
+  letter-spacing: .2px;
+}
+.pl-offline-bar.show { display: block; }
+body.pl-offline { padding-top: calc(env(safe-area-inset-top) + 28px); }
 </style>
 <script>
 /* 早期套用主題 + 字級，避免 FOUC（在 content render 前先讀 localStorage） */
@@ -239,6 +253,7 @@ body {
 </script>
 </head>
 <body>
+<div id="pl-offline-bar" class="pl-offline-bar">📡 OFFLINE — 顯示上次快取的資料 · Showing last cached data</div>
 <main>
   <div id="pilotlog-content"></div>
 </main>
@@ -314,6 +329,11 @@ if (document.readyState !== 'loading') pilotLogInit();
 function _renderPilotLogChangelog(): string {
   return `
     <div class="pl-cl-v">${PILOT_LOG_VERSION}</div>
+    <div class="pl-cl-txt">
+      <b>離線可用（飛機上不會再被踢回登入頁）：</b>飛行員核心痛點修正。<b>(1) Refresh token 多放一份 HttpOnly cookie：</b><code>POST /auth/login</code> 跟 <code>/auth/refresh</code> 額外 <code>Set-Cookie: plrt</code>（HttpOnly / Secure / SameSite=Lax / 90 天 / Path 限 <code>/api/pilot-log/auth</code>），iOS 對 server 設的 cookie 比 localStorage 寬容很多，PWA 7 天無互動清儲存時 cookie 通常還在；<code>/auth/refresh</code> 改成讀 cookie 優先、缺才退回 body，舊 client 100% 相容。<b>(2) IndexedDB 快取：</b>網路成功後把 entries / stats / aircraft / crew / aircraft_types / suggest / aircraftEntries / user 寫一份進 IDB（容量比 localStorage 大、適合 50k 筆 entries、iOS 對 IDB 保護較佳）；下次打開 <b>cache-first</b>：先用 IDB 快取秒出畫面、再背景刷新。<b>(3) Cookie-only session 復活：</b><code>_plTryRefresh</code> 拿掉「沒 refreshToken 就 fail」的早退，localStorage 被清也能靠 cookie 復活一個新 session。<b>(4) OFFLINE 旗標：</b>頂部琥珀色細條「OFFLINE — Showing last cached data」，網路掛了顯示、回來自動消，列表/統計/報表全部用快取資料運作不卡死。<b>(5) Persistent storage 申請：</b>啟動時 <code>navigator.storage.persist()</code> 請瀏覽器把儲存標 persistent，iOS 不保證 100% 但會延長保留。<b>(6) <code>_plFetchAll</code> 跟 <code>_plFetchAircraftEntries</code> 改 try/catch 包起來</b>：網路異常不再讓 caller 炸掉，全部 graceful 降級到快取。SW cache 跟 <code>pilotlog-v1-2-01</code>。<br>
+      <b>Offline-capable (you will no longer be kicked back to login on the plane):</b> fixes the core pilot pain point. <b>(1) Refresh token also in HttpOnly cookie:</b> <code>/auth/login</code> and <code>/auth/refresh</code> now <code>Set-Cookie: plrt</code> (HttpOnly / Secure / SameSite=Lax / 90 days / Path scoped to <code>/api/pilot-log/auth</code>); iOS treats server-set cookies more leniently than localStorage, so even when the 7-day PWA storage eviction wipes localStorage, the cookie typically survives. <code>/auth/refresh</code> reads cookie first, body second — old clients still work. <b>(2) IndexedDB cache:</b> on successful fetch the app writes entries / stats / aircraft / crew / aircraft_types / suggest / aircraftEntries / user into IDB (larger than localStorage, fits ~50k entries, iOS protects IDB better). Next launch is <b>cache-first</b>: instant render from IDB, then background refresh. <b>(3) Cookie-only session resurrection:</b> <code>_plTryRefresh</code> no longer early-exits when localStorage is empty — a cookie-only call can revive the session. <b>(4) OFFLINE banner:</b> a thin amber top bar appears when network is down; list / stats / report all keep working off cached data. <b>(5) Persistent storage request:</b> <code>navigator.storage.persist()</code> on init asks the browser to mark storage persistent (iOS not guaranteed but extends retention). <b>(6) <code>_plFetchAll</code> / <code>_plFetchAircraftEntries</code> wrap in try/catch</b>: network failures no longer throw into callers, everything degrades gracefully to cache. SW cache follows to <code>pilotlog-v1-2-01</code>.
+    </div>
+    <div class="pl-cl-v old">V1.1.02</div>
     <div class="pl-cl-txt">
       <b>iPad 分割視窗（master-detail）對齊 LogTen Pro：</b>Logbook 在寬螢幕（≥768px）改為左列表＋右明細並排，點一筆右側直接開 editor、不跳全螢幕，左側被選取的列藍框 highlight；iPhone 維持點一筆全螢幕的行為，跳轉照舊。<b>列表改 LogTen 四行密集卡：</b>大日期（日／MON 'YY）／起飛 HHMM ── 飛時 hrs ── 落地 HHMM（中間用線連起來）／大字 ORIGIN ... DEST／✈ 機尾，機型 ... Flt#／組員姓名（單行省略）。原本 iPad 單行擠到兩端、中間留白的「空蕩」感消除。Aircraft / Crew drill-down 點航班仍走全螢幕 editor（那兩頁沒分割面板），切到 Analyze / Report 時選取自動清除。SW cache 跟著走 <code>pilotlog-v1-1-02</code>。<br>
       <b>iPad master-detail split aligning with LogTen Pro:</b> on screens ≥768px the Logbook is now a side-by-side list + detail layout — tapping a row opens the editor on the right (no full-screen jump), with the selected row outlined in accent; iPhone keeps the tap → full-screen behavior unchanged. <b>Rows redesigned as LogTen-style dense 4-line cards:</b> big day / DEP HHMM ── duration ── ARR HHMM (connector line) / big airport codes ORIGIN ... DEST / ✈ tail, type ... Flt# / crew names (single-line ellipsis). Removes the empty-middle look of the previous single-line iPad row. Aircraft / Crew drill-down tap still uses the full-screen editor (those pages have no detail pane); switching to Analyze / Report auto-clears the selection. SW cache follows to <code>pilotlog-v1-1-02</code>.
@@ -505,6 +525,35 @@ pilotLogRouter.get('/api/pilot-log/config', (_req, res) => {
 });
 
 // ── Auth ─────────────────────────────────────────────────────────────────────
+// V1.2：refresh token 同步用 HttpOnly cookie 維持 session — iOS 對 PWA 的 7 天無互動
+// 清儲存政策會把 localStorage 清掉但對 server 設的 cookie 比較寬容，飛行員在飛機上開不
+// 上來重登的痛點主修。Path 限制在 /api/pilot-log/auth 不外洩到其他 API。
+
+const _PL_RT_COOKIE = 'plrt';
+const _PL_RT_COOKIE_OPTS = {
+  httpOnly: true,
+  secure: true,                                   // 只走 HTTPS（prod Render 必為 HTTPS）
+  sameSite: 'lax' as const,
+  maxAge: 90 * 24 * 60 * 60 * 1000,               // 跟 refresh token 一致 90 天
+  path: '/api/pilot-log/auth',
+};
+
+// 手寫 cookie 解析避免新增 cookie-parser dep（只用在這幾個 handler）
+function _plReadCookie(req: { headers: { cookie?: string } }, name: string): string | null {
+  const header = req.headers.cookie;
+  if (!header) return null;
+  const parts = String(header).split(';');
+  for (const p of parts) {
+    const idx = p.indexOf('=');
+    if (idx < 0) continue;
+    if (p.slice(0, idx).trim() === name) {
+      try { return decodeURIComponent(p.slice(idx + 1).trim()); }
+      catch { return p.slice(idx + 1).trim(); }
+    }
+  }
+  return null;
+}
+
 pilotLogRouter.post('/api/pilot-log/auth/login', async (req, res) => {
   const idToken = req.body?.idToken;
   if (!idToken || typeof idToken !== 'string') {
@@ -513,21 +562,37 @@ pilotLogRouter.post('/api/pilot-log/auth/login', async (req, res) => {
   const ua = req.headers['user-agent'] || undefined;
   const session = await loginWithGoogle(idToken, ua);
   if (!session) return res.status(401).json({ error: 'login_failed' });
+  res.cookie(_PL_RT_COOKIE, session.refreshToken, _PL_RT_COOKIE_OPTS);
   res.json(session);
 });
 
 pilotLogRouter.post('/api/pilot-log/auth/refresh', async (req, res) => {
-  const rt = req.body?.refreshToken;
-  if (!rt || typeof rt !== 'string') return res.status(400).json({ error: 'missing_refresh_token' });
+  // 先 cookie，失敗（cookie 過期 / 換裝置 rotate 過）再 fallback body —
+  // 不能無條件偏 cookie，否則 stale cookie 會把舊 client 還在傳的有效 body token 殺掉（codex P2）
+  const cookieRt = _plReadCookie(req, _PL_RT_COOKIE);
+  const bodyRt = typeof req.body?.refreshToken === 'string' ? req.body.refreshToken : null;
+  if (!cookieRt && !bodyRt) return res.status(400).json({ error: 'missing_refresh_token' });
   const ua = req.headers['user-agent'] || undefined;
-  const session = await rotateRefreshToken(rt, ua);
-  if (!session) return res.status(401).json({ error: 'invalid_refresh_token' });
+
+  let session = null;
+  if (cookieRt) session = await rotateRefreshToken(cookieRt, ua);
+  // cookie 失敗 + body 有另一個（不同的）rt → 再試 body
+  if (!session && bodyRt && bodyRt !== cookieRt) {
+    session = await rotateRefreshToken(bodyRt, ua);
+  }
+
+  if (!session) {
+    res.clearCookie(_PL_RT_COOKIE, { path: _PL_RT_COOKIE_OPTS.path });
+    return res.status(401).json({ error: 'invalid_refresh_token' });
+  }
+  res.cookie(_PL_RT_COOKIE, session.refreshToken, _PL_RT_COOKIE_OPTS);
   res.json(session);
 });
 
 pilotLogRouter.post('/api/pilot-log/auth/logout', async (req, res) => {
-  const rt = req.body?.refreshToken;
+  const rt = req.body?.refreshToken || _plReadCookie(req, _PL_RT_COOKIE);
   if (rt && typeof rt === 'string') await revokeRefreshToken(rt);
+  res.clearCookie(_PL_RT_COOKIE, { path: _PL_RT_COOKIE_OPTS.path });
   res.json({ ok: true });
 });
 
