@@ -821,6 +821,22 @@ function _plEditorField(label, name, type, opts) {
     input + '</div>';
 }
 
+// 語意分組：固定 N 欄的 grid row（minmax(0,1fr) 允許窄螢幕收縮、不溢出）。
+// 取代原本 auto-fit「塞得下就配對」造成的眼花排版。
+function _plFieldRow(cols, fieldsHtml) {
+  return '<div style="display:grid;grid-template-columns:repeat(' + cols + ',minmax(0,1fr));gap:10px">' + fieldsHtml + '</div>';
+}
+function _plFieldSub(label) {
+  return '<div style="font-size:.58em;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;font-weight:700;margin:10px 0 3px">' + _plEsc(label) + '</div>';
+}
+// crew.X 是 JSONB 巢狀欄位（不是 top-level），用專屬 input id ple-crew-X，跟 _plSaveEntry 讀法對齊
+function _plCrewField(label, key, e) {
+  var v = (e.crew && e.crew[key]) || '';
+  return '<div style="margin-bottom:8px">' +
+    '<div style="font-size:.62em;color:var(--muted);margin-bottom:2px">' + _plEsc(label) + '</div>' +
+    '<input id="ple-crew-' + key + '" style="width:100%;background:var(--bg,#0a0e1a);color:var(--text);border:1px solid var(--border,#334155);border-radius:6px;padding:6px 8px;font-size:.78em" value="' + _plEsc(v) + '"></div>';
+}
+
 // target：'pilotlog-content'（預設，全螢幕）或 'pl-detail-pane'（iPad 右側明細面板）。
 // 兩個目標差別只在 header 的關閉鈕標籤（← 回列表 / ✕ 關閉明細）。
 function _plRenderEditor(target) {
@@ -850,66 +866,57 @@ function _plRenderEditor(target) {
       (e.id ? '<button onclick="_plDeleteEntry()" style="background:transparent;color:#ef4444;border:1px solid #ef4444;border-radius:6px;padding:6px 10px;font-size:.74em;cursor:pointer">Delete</button>' : '') +
     '</div>' +
 
-    '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;background:var(--card);border-radius:10px;padding:12px">' +
-      '<div style="grid-column:span 2">' + _plEditorField('Date', 'flight_date', 'date') + '</div>' +
-      _plEditorField('Flight #', 'flight_no', 'text') +
-      _plEditorField('From (ICAO)', 'origin', 'text') +
-      _plEditorField('To (ICAO)', 'dest', 'text') +
-      _plEditorField('Aircraft Type', 'aircraft_type', 'select', { options: typeOptions }) +
-      _plEditorField('Tail #', 'tail_no', 'text', { placeholder: 'B-58504' }) +
-      _plEditorField('Position', 'position', 'select', { options: ['', 'PIC', 'SIC', 'OBSERVER'] }) +
+    // ── Flight：Date+Flight# / From+To / Type+Tail+Position ──
+    '<div style="background:var(--card);border-radius:10px;padding:12px">' +
+      '<div style="font-size:.7em;font-weight:700;color:var(--muted);text-transform:uppercase;margin-bottom:8px">Flight</div>' +
+      _plFieldRow(2, _plEditorField('Date', 'flight_date', 'date') + _plEditorField('Flight #', 'flight_no', 'text')) +
+      _plFieldRow(2, _plEditorField('From (ICAO)', 'origin', 'text') + _plEditorField('To (ICAO)', 'dest', 'text')) +
+      _plFieldRow(3, _plEditorField('Aircraft Type', 'aircraft_type', 'select', { options: typeOptions }) +
+        _plEditorField('Tail #', 'tail_no', 'text', { placeholder: 'B-58504' }) +
+        _plEditorField('Position', 'position', 'select', { options: ['', 'PIC', 'SIC', 'OBSERVER'] })) +
     '</div>' +
 
+    // ── Times：Scheduled 一行 / OOOI 一行 / Duty 一行 ──
     '<div style="margin-top:12px;background:var(--card);border-radius:10px;padding:12px">' +
-      '<div style="font-size:.7em;font-weight:700;color:var(--muted);text-transform:uppercase;margin-bottom:8px">Times (UTC HHMM)</div>' +
-      '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:10px">' +
-        _plEditorField('Sched Out', 'std_utc', 'time-utc') +
-        _plEditorField('Sched In', 'sta_utc', 'time-utc') +
-        _plEditorField('Out', 'out_utc', 'time-utc') +
-        _plEditorField('Off', 'off_utc', 'time-utc') +
-        _plEditorField('On', 'on_utc', 'time-utc') +
-        _plEditorField('In', 'in_utc', 'time-utc') +
-        _plEditorField('On Duty', 'on_duty_utc', 'time-utc') +
-        _plEditorField('Off Duty', 'off_duty_utc', 'time-utc') +
-      '</div>' +
-      '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:10px;margin-top:8px">' +
-        _plEditorField('Block', 'block_minutes', 'hhmm-dur') +
-        _plEditorField('Air', 'air_minutes', 'hhmm-dur') +
-        _plEditorField('Night', 'night_minutes', 'hhmm-dur') +
-        _plEditorField('Total Duty', 'total_duty_minutes', 'hhmm-dur') +
-        _plEditorField('Distance (NM)', 'distance_nm', 'number', { step: '0.1' }) +
-      '</div>' +
+      '<div style="font-size:.7em;font-weight:700;color:var(--muted);text-transform:uppercase;margin-bottom:2px">Times (UTC HHMM)</div>' +
+      _plFieldSub('Scheduled') +
+      _plFieldRow(2, _plEditorField('Sched Out', 'std_utc', 'time-utc') + _plEditorField('Sched In', 'sta_utc', 'time-utc')) +
+      _plFieldSub('Actual · OOOI') +
+      _plFieldRow(4, _plEditorField('Out', 'out_utc', 'time-utc') + _plEditorField('Off', 'off_utc', 'time-utc') +
+        _plEditorField('On', 'on_utc', 'time-utc') + _plEditorField('In', 'in_utc', 'time-utc')) +
+      _plFieldSub('Duty') +
+      _plFieldRow(2, _plEditorField('On Duty', 'on_duty_utc', 'time-utc') + _plEditorField('Off Duty', 'off_duty_utc', 'time-utc')) +
+    '</div>' +
+
+    // ── Hours：時數獨立區，不再跟 OOOI 混在一起 ──
+    '<div style="margin-top:12px;background:var(--card);border-radius:10px;padding:12px">' +
+      '<div style="font-size:.7em;font-weight:700;color:var(--muted);text-transform:uppercase;margin-bottom:8px">Hours</div>' +
+      _plFieldRow(3, _plEditorField('Block', 'block_minutes', 'hhmm-dur') + _plEditorField('Air', 'air_minutes', 'hhmm-dur') +
+        _plEditorField('Night', 'night_minutes', 'hhmm-dur')) +
+      _plFieldRow(2, _plEditorField('Total Duty', 'total_duty_minutes', 'hhmm-dur') +
+        _plEditorField('Distance (NM)', 'distance_nm', 'number', { step: '0.1' })) +
       _plEditorField('Pilot Flying', 'pilot_flying', 'check', { checkLabel: 'I was the Pilot Flying' }) +
     '</div>' +
 
+    // ── Take-offs / Landings：日/夜成對 ──
     '<div style="margin-top:12px;background:var(--card);border-radius:10px;padding:12px">' +
       '<div style="font-size:.7em;font-weight:700;color:var(--muted);text-transform:uppercase;margin-bottom:8px">Take-offs / Landings</div>' +
-      '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(90px,1fr));gap:10px">' +
-        _plEditorField('Day T/O', 'day_takeoffs', 'number') +
-        _plEditorField('Night T/O', 'night_takeoffs', 'number') +
-        _plEditorField('Day Ldg', 'day_landings', 'number') +
-        _plEditorField('Night Ldg', 'night_landings', 'number') +
-        _plEditorField('Autolands', 'autolands', 'number') +
-        _plEditorField('Pax', 'pax_count', 'number') +
-      '</div>' +
+      _plFieldRow(2, _plEditorField('Day T/O', 'day_takeoffs', 'number') + _plEditorField('Night T/O', 'night_takeoffs', 'number')) +
+      _plFieldRow(2, _plEditorField('Day Ldg', 'day_landings', 'number') + _plEditorField('Night Ldg', 'night_landings', 'number')) +
+      _plFieldRow(2, _plEditorField('Autolands', 'autolands', 'number') + _plEditorField('Pax', 'pax_count', 'number')) +
     '</div>' +
 
+    // ── Crew：PIC+SIC / FO1+FO2 ──
     '<div style="margin-top:12px;background:var(--card);border-radius:10px;padding:12px">' +
-      '<div style="font-size:.7em;font-weight:700;color:var(--muted);text-transform:uppercase;margin-bottom:8px">Crew (姓名)</div>' +
-      '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px">' +
-        '<div><div style="font-size:.62em;color:var(--muted);margin-bottom:2px">PIC</div><input id="ple-crew-pic" style="width:100%;background:var(--bg,#0a0e1a);color:var(--text);border:1px solid var(--border,#334155);border-radius:6px;padding:6px 8px;font-size:.78em" value="' + _plEsc((e.crew && e.crew.pic) || '') + '"></div>' +
-        '<div><div style="font-size:.62em;color:var(--muted);margin-bottom:2px">SIC</div><input id="ple-crew-sic" style="width:100%;background:var(--bg,#0a0e1a);color:var(--text);border:1px solid var(--border,#334155);border-radius:6px;padding:6px 8px;font-size:.78em" value="' + _plEsc((e.crew && e.crew.sic) || '') + '"></div>' +
-        '<div><div style="font-size:.62em;color:var(--muted);margin-bottom:2px">FO 1</div><input id="ple-crew-fo1" style="width:100%;background:var(--bg,#0a0e1a);color:var(--text);border:1px solid var(--border,#334155);border-radius:6px;padding:6px 8px;font-size:.78em" value="' + _plEsc((e.crew && e.crew.fo1) || '') + '"></div>' +
-        '<div><div style="font-size:.62em;color:var(--muted);margin-bottom:2px">FO 2</div><input id="ple-crew-fo2" style="width:100%;background:var(--bg,#0a0e1a);color:var(--text);border:1px solid var(--border,#334155);border-radius:6px;padding:6px 8px;font-size:.78em" value="' + _plEsc((e.crew && e.crew.fo2) || '') + '"></div>' +
-      '</div>' +
+      '<div style="font-size:.7em;font-weight:700;color:var(--muted);text-transform:uppercase;margin-bottom:8px">Crew</div>' +
+      _plFieldRow(2, _plCrewField('PIC', 'pic', e) + _plCrewField('SIC', 'sic', e)) +
+      _plFieldRow(2, _plCrewField('FO 1', 'fo1', e) + _plCrewField('FO 2', 'fo2', e)) +
     '</div>' +
 
+    // ── Other：SID+STAR / Remarks ──
     '<div style="margin-top:12px;background:var(--card);border-radius:10px;padding:12px">' +
       '<div style="font-size:.7em;font-weight:700;color:var(--muted);text-transform:uppercase;margin-bottom:8px">Other</div>' +
-      '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px">' +
-        _plEditorField('SID', 'sid', 'text') +
-        _plEditorField('STAR', 'star', 'text') +
-      '</div>' +
+      _plFieldRow(2, _plEditorField('SID', 'sid', 'text') + _plEditorField('STAR', 'star', 'text')) +
       _plEditorField('Remarks', 'remarks', 'textarea') +
     '</div>' +
 
