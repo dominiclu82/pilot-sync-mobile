@@ -45,8 +45,8 @@ import { getSpaPilotLogJs } from '../spa/js-pilot-log.js';
 
 // ── 版本（比照 CrewSync / Morning：每次推版必更新；SW cache 名稱跟著走） ────
 // 本機 preview build 會暫時加 -tNN 後綴方便對版；推正式版前拿掉只留乾淨版號。
-export const PILOT_LOG_VERSION = 'V1.2.03';
-const PILOT_LOG_CACHE = 'pilotlog-v1-2-03';
+export const PILOT_LOG_VERSION = 'V1.2.04';
+const PILOT_LOG_CACHE = 'pilotlog-v1-2-04';
 
 export const pilotLogRouter = express.Router();
 
@@ -329,6 +329,11 @@ if (document.readyState !== 'loading') pilotLogInit();
 function _renderPilotLogChangelog(): string {
   return `
     <div class="pl-cl-v">${PILOT_LOG_VERSION}</div>
+    <div class="pl-cl-txt">
+      <b>PIC/SIC 時數對齊 LogTen + 修 draft/重複/Preview。</b>V1.2.03 用「角色 × 整段 block」反推 PIC/SIC，結果 PIC+SIC ≈ 總時間、SIC 灌爆（跟 LogTen 對不上）。<b>(1) 改成匯入 LogTen 實際 PIC/SIC 時數：</b>新增 <code>pic_minutes</code> / <code>sic_minutes</code> 欄，匯入時直接讀 LogTen 的 <code>PIC</code> / <code>SIC</code> 時數欄存進來，統計改 <code>SUM(pic_minutes)</code>（manual 舊資料 fallback 角色×block）→ 數字跟 LogTen 一致（deadhead/加強組員巡航等既非 P1 也非 P2 的時間不再被灌進來）。Editor 加 <b>PIC Time / SIC Time</b> 可手動編輯。<b>(2) draft 放寬：</b>飛行日期已過的航班一律 confirmed（deadhead、忘記記 Out 的、補登的都涵蓋），只有「未來 + 沒 Out」才 draft — 不用再依賴 Deadhead 欄。<b>(3) 修少掉的航班：</b>同檔內「日期+航班號+起降」完全相同的不同航班，原本 source_ref 碰撞會 merge 掉一筆，現在加檔內序號各自獨立。<b>(4) Preview 強化：</b>dry-run 改成<b>顯示全部 row + 可捲動</b>（不再只前 10 筆），每筆顯示 <code>role</code> / PIC / SIC 時數 / <code>DH</code>，頂部列出匯出檔欄位 headers（方便確認 PIC/SIC 時數欄有沒有被讀到）。SW cache → <code>pilotlog-v1-2-04</code>。<b>套用：</b>Wipe LogTen entries 後重匯（先 Preview）。<br>
+      <b>PIC/SIC hours aligned with LogTen + draft/dup/Preview fixes.</b> V1.2.03 derived PIC/SIC as role × full block, so PIC+SIC ≈ total and SIC was inflated (didn't match LogTen). <b>(1) Import actual PIC/SIC time:</b> new <code>pic_minutes</code>/<code>sic_minutes</code> columns; import reads LogTen's <code>PIC</code>/<code>SIC</code> time columns directly, stats now <code>SUM(pic_minutes)</code> (manual entries fall back to role×block) → matches LogTen (deadhead / augmented-crew cruise time that's neither P1 nor P2 is no longer counted). Editor gains editable <b>PIC Time / SIC Time</b>. <b>(2) Draft relaxed:</b> any past-dated flight is confirmed (covers deadheads, missed Out, back-filled), only future + no Out stays draft — no longer depends on the Deadhead column. <b>(3) Missing-flight fix:</b> different flights sharing date+flight#+from+to no longer collide on source_ref (in-file sequence added). <b>(4) Preview:</b> dry-run now shows all rows + scrolls (not just 10), each row shows role / PIC / SIC time / DH, with the export's column headers listed at top. SW cache → <code>pilotlog-v1-2-04</code>. <b>To apply:</b> Wipe LogTen entries, then re-import (Preview first).
+    </div>
+    <div class="pl-cl-v old">V1.2.03</div>
     <div class="pl-cl-txt">
       <b>匯入修正：PIC/SIC 角色 + Deadhead/positioning。</b>之前 LogTen 匯入永遠不帶 position（v1 刻意留空），導致 Analyze/Report 的 PIC/SIC 永遠 0；deadhead 因為沒 actual Out 被誤判成 draft。<b>(1) Position 推斷：</b>LogTen 沒有單一「position」欄，改成 — 優先讀你的 <code>PIC</code>/<code>SIC</code> 時數欄（有帶就最準），沒帶則比對 <code>PIC/P1</code> vs <code>SIC/P2</code> 的姓名是不是你本人（用 Address Book <code>is_self</code>）來定 PIC/SIC。position 寫進 INSERT/UPDATE（原本根本沒帶這欄），統計就會正確。<b>(2) Deadhead：</b>讀 LogTen 的 <code>Deadhead</code>（你的 positioning 標記，備援也讀 <code>Positioning</code>）→ 是就標 <b>confirmed</b>（已發生事件，不再卡 draft），position 留空（你是乘客沒操作、不算 PIC/SIC、不影響 currency）。<b>(3) Preview 強化：</b>🔍 dry-run 每筆多顯示 <code>role=PIC/SIC</code> 跟 <code>DH</code> badge，重匯前可先驗證判斷對不對。<b>套用方式：</b>因為重匯會 skip 既有 confirmed，要讓歷史資料生效請用 📥 Import 的 ⚠️ Danger Zone「Wipe all my LogTen entries」清掉後重匯一次（建議先 Preview）。<br>
       <b>Import fixes: PIC/SIC role + Deadhead/positioning.</b> LogTen import never set <code>position</code> (left blank in v1), so Analyze/Report PIC/SIC were always 0; deadheads got mis-flagged as draft because they have no actual Out. <b>(1) Role inference:</b> LogTen has no single "position" field, so we now read your <code>PIC</code>/<code>SIC</code> time columns first (most accurate), falling back to matching the <code>PIC/P1</code> vs <code>SIC/P2</code> crew name against yourself (via Address Book <code>is_self</code>). Position is now written on INSERT/UPDATE (it wasn't before), so stats compute correctly. <b>(2) Deadhead:</b> reads LogTen's <code>Deadhead</code> flag (your positioning marker; also reads <code>Positioning</code>) → marks it <b>confirmed</b> (a completed event, no longer stuck at draft), position left blank (you were a passenger — not PIC/SIC, doesn't affect currency). <b>(3) Preview:</b> the 🔍 dry-run now shows <code>role=PIC/SIC</code> and a <code>DH</code> badge per row so you can verify before importing. <b>To apply:</b> re-import skips existing confirmed entries, so to fix history use 📥 Import → ⚠️ Danger Zone "Wipe all my LogTen entries", then re-import (Preview first recommended).
@@ -695,6 +700,7 @@ const EDITABLE_FIELDS = [
   'flight_date', 'flight_no', 'origin', 'dest', 'aircraft_type', 'tail_no',
   'position', 'pilot_flying', 'std_utc', 'sta_utc', 'out_utc', 'off_utc', 'on_utc', 'in_utc',
   'block_minutes', 'air_minutes', 'night_minutes', 'distance_nm',
+  'pic_minutes', 'sic_minutes',                    // V1.2.04：實際 PIC/SIC 時數（可手動編輯）
   'on_duty_utc', 'off_duty_utc', 'total_duty_minutes',
   'crew', 'approaches',
   'day_takeoffs', 'night_takeoffs', 'day_landings', 'night_landings', 'autolands',

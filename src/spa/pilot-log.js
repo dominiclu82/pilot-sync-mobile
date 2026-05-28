@@ -721,6 +721,7 @@ function _plBlankEntry() {
     aircraft_type: '', tail_no: '', position: 'PIC', pilot_flying: false,
     std_utc: null, sta_utc: null, out_utc: null, off_utc: null, on_utc: null, in_utc: null,
     block_minutes: null, air_minutes: null, night_minutes: null,
+    pic_minutes: null, sic_minutes: null,
     distance_nm: null, on_duty_utc: null, off_duty_utc: null, total_duty_minutes: null,
     crew: {}, approaches: [],
     day_takeoffs: 0, night_takeoffs: 0, day_landings: 0, night_landings: 0, autolands: 0,
@@ -893,6 +894,8 @@ function _plRenderEditor(target) {
       '<div style="font-size:.7em;font-weight:700;color:var(--muted);text-transform:uppercase;margin-bottom:8px">Hours</div>' +
       _plFieldRow(3, _plEditorField('Block', 'block_minutes', 'hhmm-dur') + _plEditorField('Air', 'air_minutes', 'hhmm-dur') +
         _plEditorField('Night', 'night_minutes', 'hhmm-dur')) +
+      _plFieldRow(2, _plEditorField('PIC Time', 'pic_minutes', 'hhmm-dur') +
+        _plEditorField('SIC Time', 'sic_minutes', 'hhmm-dur')) +
       _plFieldRow(2, _plEditorField('Total Duty', 'total_duty_minutes', 'hhmm-dur') +
         _plEditorField('Distance (NM)', 'distance_nm', 'number', { step: '0.1' })) +
       _plEditorField('Pilot Flying', 'pilot_flying', 'check', { checkLabel: 'I was the Pilot Flying' }) +
@@ -962,6 +965,8 @@ async function _plSaveEntry(confirm) {
     block_minutes: _plReadField('block_minutes', 'hhmm-dur'),
     air_minutes: _plReadField('air_minutes', 'hhmm-dur'),
     night_minutes: _plReadField('night_minutes', 'hhmm-dur'),
+    pic_minutes: _plReadField('pic_minutes', 'hhmm-dur'),
+    sic_minutes: _plReadField('sic_minutes', 'hhmm-dur'),
     total_duty_minutes: _plReadField('total_duty_minutes', 'hhmm-dur'),
     distance_nm: _plReadField('distance_nm', 'number'),
     day_takeoffs: _plReadField('day_takeoffs', 'number') || 0,
@@ -1132,19 +1137,20 @@ function _plRenderPreviewRows(rows) {
     var col = newStatus === 'confirmed' ? '#10b981' : '#f59e0b';
     return '<span style="background:' + col + ';color:#fff;padding:1px 6px;border-radius:4px;font-size:.85em">NEW ' + (newStatus || '?') + '</span>';
   };
-  var html = '<div style="margin-top:8px;font-size:.7em;color:var(--muted)">前 ' + Math.min(rows.length, 10) + ' / 共 ' + rows.length + ' 筆預覽（NEW=新增、UPDATE=覆蓋舊 draft、SKIP=已是 confirmed 不動）：</div>' +
-    '<div style="max-height:240px;overflow-y:auto;margin-top:4px">';
-  for (var i = 0; i < Math.min(rows.length, 10); i++) {
+  // V1.2.04：顯示「全部」row（不再只前 10）、容器加高可捲動
+  var html = '<div style="margin-top:8px;font-size:.7em;color:var(--muted)">共 ' + rows.length + ' 筆預覽，可上下捲（NEW=新增、UPDATE=覆蓋舊 draft、SKIP=已是 confirmed 不動；role=你的角色、pic/sic=實際時數、DH=deadhead）：</div>' +
+    '<div style="max-height:60vh;overflow-y:auto;-webkit-overflow-scrolling:touch;margin-top:4px;border:1px solid var(--border);border-radius:6px">';
+  for (var i = 0; i < rows.length; i++) {
     var p = rows[i];
     html += '<div style="font-size:.66em;padding:4px 6px;border-bottom:1px solid var(--border);font-family:monospace;display:flex;gap:6px;align-items:center;flex-wrap:wrap">' +
       actionBadge(p.action, p.new_status) +
       '<span>' + _plEsc(p.flight_date) + ' ' + _plEsc(p.flight_no) + ' ' + _plEsc(p.origin) + '→' + _plEsc(p.dest) + '</span>' +
       '<span style="color:var(--muted)">[' + _plEsc(p.aircraft_type) + '/' + _plEsc(p.tail_no) + ']</span>' +
-      '<span style="color:var(--muted)">blk=' + _plEsc(p.block || '—') + ' out=' + _plEsc(p.out_utc ? p.out_utc.slice(11,16) + 'z' : '—') + '</span>' +
-      // V1.2.03：顯示推斷出的 position + deadhead，dry-run 就能驗證
+      '<span style="color:var(--muted)">blk=' + _plEsc(p.block || '—') + '</span>' +
+      // V1.2.03/04：顯示推斷的 role + 實際 PIC/SIC 時數 + deadhead，dry-run 即可驗證
       '<span style="color:' + (p.position ? '#38bdf8' : 'var(--muted)') + '">role=' + _plEsc(p.position || '—') + '</span>' +
+      '<span style="color:var(--muted)">PIC=' + _plEsc(p.pic_min != null ? _plMinToHHMM(p.pic_min) : '—') + ' SIC=' + _plEsc(p.sic_min != null ? _plMinToHHMM(p.sic_min) : '—') + '</span>' +
       (p.deadhead ? '<span style="background:#a855f7;color:#fff;padding:1px 5px;border-radius:4px;font-size:.85em">DH</span>' : '') +
-      '<span style="color:var(--muted)">pic=' + _plEsc(p.pic || '—') + '</span>' +
     '</div>';
   }
   html += '</div>';
@@ -1189,11 +1195,26 @@ async function _plUploadFlights(dryRun) {
   }
 
   if (dryRun) {
+    // V1.2.04：欄位偵測 — 一眼看出匯出檔有沒有帶 PIC/SIC 時數欄 + Deadhead 欄
+    var headersInfo = '';
+    if (j.headers && j.headers.length) {
+      var hset = {};
+      j.headers.forEach(function(h) { hset[String(h).toLowerCase().trim()] = true; });
+      var hasPic = hset['pic'] || hset['pic time'] || hset['flight pic'];
+      var hasSic = hset['sic'] || hset['sic time'] || hset['flight sic'];
+      var hasDh = hset['deadhead'] || hset['positioning'];
+      headersInfo = '<div style="margin-top:6px;font-size:.72em;line-height:1.6">' +
+        '欄位偵測：PIC 時數 ' + (hasPic ? '✅' : '❌缺') + '　SIC 時數 ' + (hasSic ? '✅' : '❌缺') + '　Deadhead ' + (hasDh ? '✅' : '❌缺') +
+        ((!hasPic || !hasSic) ? '<br><span style="color:#fde68a">⚠ 缺 PIC/SIC 時數欄 → 數字會對不上 LogTen。請在 LogTen 匯出時把 PIC、SIC 時數欄勾進去再重匯。</span>' : '') +
+        (!hasDh ? '<br><span style="color:#fde68a">⚠ 缺 Deadhead 欄 → deadhead 仍會靠「過去日期→confirmed」救起，只是不另外標 DH。</span>' : '') +
+      '</div>';
+    }
     var preview = _plRenderPreviewRows(j.preview);
     resBox.innerHTML = '<div style="background:#1e3a5f;color:#fff;padding:10px;border-radius:8px;font-size:.78em">' +
       '🔍 Dry-run（沒寫入 DB）：新增 <b>' + nNew + '</b>、更新舊 draft <b>' + nUpdate + '</b>、' +
       '保留 confirmed <b>' + j.duplicate_skipped + '</b>、解析失敗 <b>' + j.parse_errors + '</b><br>' +
       '<span style="font-size:.85em;color:#bfdbfe">確認 OK 後按 Import 真的寫入。</span>' +
+      headersInfo +
       preview +
       '</div>';
   } else {

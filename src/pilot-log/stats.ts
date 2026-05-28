@@ -18,8 +18,8 @@ export async function getTotals(userId: string): Promise<Totals> {
   const r = await pool.query(
     `SELECT
        COALESCE(SUM(block_minutes), 0)::int                                                AS total_minutes,
-       COALESCE(SUM(CASE WHEN position = 'PIC' THEN block_minutes ELSE 0 END), 0)::int    AS pic_minutes,
-       COALESCE(SUM(CASE WHEN position = 'SIC' THEN block_minutes ELSE 0 END), 0)::int    AS sic_minutes,
+       COALESCE(SUM(COALESCE(pic_minutes, CASE WHEN position = 'PIC' THEN block_minutes ELSE 0 END)), 0)::int AS pic_minutes,
+       COALESCE(SUM(COALESCE(sic_minutes, CASE WHEN position = 'SIC' THEN block_minutes ELSE 0 END)), 0)::int AS sic_minutes,
        COALESCE(SUM(night_minutes), 0)::int                                                AS night_minutes,
        COUNT(*)::int                                                                       AS entry_count
      FROM pilot_log_entries
@@ -53,8 +53,8 @@ async function rolling(userId: string, days: number): Promise<Totals> {
   const r = await pool.query(
     `SELECT
        COALESCE(SUM(block_minutes), 0)::int                                                AS total_minutes,
-       COALESCE(SUM(CASE WHEN position = 'PIC' THEN block_minutes ELSE 0 END), 0)::int    AS pic_minutes,
-       COALESCE(SUM(CASE WHEN position = 'SIC' THEN block_minutes ELSE 0 END), 0)::int    AS sic_minutes,
+       COALESCE(SUM(COALESCE(pic_minutes, CASE WHEN position = 'PIC' THEN block_minutes ELSE 0 END)), 0)::int AS pic_minutes,
+       COALESCE(SUM(COALESCE(sic_minutes, CASE WHEN position = 'SIC' THEN block_minutes ELSE 0 END)), 0)::int AS sic_minutes,
        COALESCE(SUM(night_minutes), 0)::int                                                AS night_minutes,
        COUNT(*)::int                                                                       AS entry_count
      FROM pilot_log_entries

@@ -109,6 +109,11 @@ export async function ensureTables(): Promise<boolean> {
       CREATE INDEX IF NOT EXISTS idx_pilot_entries_status ON pilot_log_entries(user_id, status);
       CREATE INDEX IF NOT EXISTS idx_pilot_entries_type ON pilot_log_entries(user_id, aircraft_type);
     `);
+    // V1.2.04：LogTen 實際 PIC/SIC 時數欄。之前統計用 position × block 反推，但 LogTen 的
+    // PIC/SIC 是各自獨立的實際時數（加總 < 總時間 — 因為 deadhead/加強組員巡航等既非 P1 也非 P2），
+    // 反推會把整段 block 灌進單一角色而對不上。改成直接存 LogTen 的值。
+    await pool.query(`ALTER TABLE pilot_log_entries ADD COLUMN IF NOT EXISTS pic_minutes INT`).catch(() => {});
+    await pool.query(`ALTER TABLE pilot_log_entries ADD COLUMN IF NOT EXISTS sic_minutes INT`).catch(() => {});
 
     await pool.query(`
       CREATE TABLE IF NOT EXISTS pilot_aircraft (

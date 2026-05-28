@@ -107,8 +107,9 @@ const INSERT_COLS = [
   'day_takeoffs', 'night_takeoffs', 'day_landings', 'night_landings', 'autolands',
   'pax_count', 'sid', 'star', 'remarks',
   'position',                                   // V1.2.03：匯入時推斷的角色（PIC/SIC）
+  'pic_minutes', 'sic_minutes',                 // V1.2.04：LogTen 實際 PIC/SIC 時數
 ];
-const INSERT_N = INSERT_COLS.length; // 36
+const INSERT_N = INSERT_COLS.length; // 38
 
 // V1.2.03 helpers ─────────────────────────────────────────────────────────────
 // 名字正規化（比對使用者本人）：小寫、空白收斂、去頭尾
@@ -151,7 +152,10 @@ export interface ImportLogtenFlightsResult {
     new_status: 'draft' | 'confirmed' | null;   // skip_confirmed 時為 null
     position?: string | null;                    // V1.2.03：推斷的角色（PIC/SIC/null）
     deadhead?: boolean;                          // V1.2.03：是否 positioning
+    pic_min?: number | null;                     // V1.2.04：讀到的 LogTen PIC 時數（分）
+    sic_min?: number | null;                     // V1.2.04：讀到的 LogTen SIC 時數（分）
   }>;
+  headers?: string[];                            // V1.2.04：匯出檔欄位 headers（診斷用）
   error?: string;
   dry_run?: boolean;
 }
@@ -183,6 +187,7 @@ export async function importLogtenFlights(
     inserted: 0, updated: 0, duplicate_skipped: 0, parse_errors: 0,
     bad_rows: [], preview: [],
     dry_run: !!opts.dryRun,
+    headers,                                       // V1.2.04：回傳欄位 headers，方便確認 PIC/SIC 時數欄有沒有被讀到
   };
 
   // 嚴格 Date 格式驗證 — 任何一筆爛掉就標記、整批不寫
@@ -240,6 +245,24 @@ export async function importLogtenFlights(
   const insertBatch: any[][] = [];
   const updateBatch: Array<{ id: string; params: any[] }> = [];
 
+  // V1.2.04 / codex P2：同檔內「日期+航班號+起降」完全相同的不同航班（同日同班號折返、
+  // 兩段 leg）原本 source_ref 會碰撞、被 merge 掉一筆。先掃一遍找出哪些 base 重複，
+  // 對「重複的」才加上穩定的時間戳記區分（不用列順序序號 — 否則下次匯出順序變了會對到錯紀錄）。
+  const baseCount = new Map<string, number>();
+  for (const row of rows) {
+    const d = row['Date'], f = row['Flight #'], o = row['From'], t = row['To'];
+    if (!d || !f || !o || !t) continue;
+    const b = `logten:${d}:${f}:${o}:${t}`;
+    baseCount.set(b, (baseCount.get(b) || 0) + 1);
+  }
+
+  // V1.2.04 / codex P1：判斷航班是否「已過」用來決定 confirmed。不能用單純 UTC 今天 —
+  // 否則 UTC 跨日後、當地還沒跨日的西半球 user，今天還沒飛的航班會被誤標 confirmed（之後
+  // confirmed 重匯會 skip 改不了）。改用「最落後時區(UTC-12)的當地日期」當 cutoff：航班日期
+  // 早於它，代表在任何時區都已過 → 安全。代價：近 1 天內的航班會晚點才自動 confirmed（無害，
+  // 真飛了會有 Out 直接 confirmed）。
+  const _PL_PAST_CUTOFF = new Date(Date.now() - 12 * 3600 * 1000).toISOString().slice(0, 10);
+
   for (let i = 0; i < rows.length; i++) {
     const row = rows[i];
     try {
@@ -252,7 +275,14 @@ export async function importLogtenFlights(
         continue;
       }
 
-      const sourceRef = `logten:${date}:${flightNo}:${from}:${to}`;
+      const baseRef = `logten:${date}:${flightNo}:${from}:${to}`;
+      // 唯一的 base → 直接用（向後相容）；重複的 base → 加排程/實際出發時間戳記區分（穩定、不依列順序）
+      let sourceRef = baseRef;
+      if ((baseCount.get(baseRef) || 0) > 1) {
+        const stamp = String(row['Scheduled Out'] || '').replace(/[^0-9]/g, '') + '_' +
+                      String(row['Out'] || '').replace(/[^0-9]/g, '');
+        sourceRef = `${baseRef}:${stamp}`;
+      }
 
       // 跨日 OOOI：Out → Off → On → In 順序遞增，若回繞則 +1 day
       const outUtc = parseUtcAtDate(date, row['Out']);
@@ -290,22 +320,26 @@ export async function importLogtenFlights(
       // （你被載過去、沒操作），先判它，因為它會蓋掉 position 推斷。
       const isDeadhead = _plTruthyFlag(row['Deadhead']) || _plTruthyFlag(row['Positioning']);
 
-      // V1.2.03：推斷你這趟的角色（position）— LogTen 沒單一 position 欄。
-      // 優先讀 PIC/SIC 時數欄（最準）；沒有再比對 PIC/P1 vs SIC/P2 姓名是不是本人。
-      // codex deep P2-1：deadhead 一律 position 留空 — 你是乘客沒操作，就算那筆剛好有
-      // PIC/SIC 時數或你名字在 crew 裡，也不能算成 PIC/SIC（否則 positioning 會灌進時數）。
+      // V1.2.04：讀 LogTen 實際 PIC/SIC 時數（多候選欄名，取第一個能解析成 HH:MM 的）。
+      // 這是統計要加總的真值；deadhead/加強組員巡航等既非 P1 也非 P2 的時間就不會被灌進來。
+      const picMin = parseHHColonMM(row['PIC'] || row['PIC Time'] || row['Flight PIC']);
+      const sicMin = parseHHColonMM(row['SIC'] || row['SIC Time'] || row['Flight SIC']);
+
+      // V1.2.03：推斷你這趟的角色（position，給篩選/顯示用）— deadhead 一律留空（你是乘客）。
+      // 優先看 PIC/SIC 時數欄，再退回比對 PIC/P1 vs SIC/P2 姓名是不是本人。
       let position: string | null = null;
       if (!isDeadhead) {
-        const picTimeMin = parseHHColonMM(row['PIC']);
-        const sicTimeMin = parseHHColonMM(row['SIC']);
-        if (picTimeMin && picTimeMin > 0) position = 'PIC';
-        else if (sicTimeMin && sicTimeMin > 0) position = 'SIC';
+        if (picMin && picMin > 0) position = 'PIC';
+        else if (sicMin && sicMin > 0) position = 'SIC';
         else if (pic && selfNames.has(_plNormName(pic))) position = 'PIC';
         else if (sic && selfNames.has(_plNormName(sic))) position = 'SIC';
       }
 
-      // Smart status：有 actual Out（已飛）或 deadhead（已 positioning）→ confirmed；否則仍是計畫
-      const newStatus: 'draft' | 'confirmed' = (outUtc || isDeadhead) ? 'confirmed' : 'draft';
+      // Smart status（V1.2.04 放寬）：有 actual Out（已飛）、deadhead（已 positioning）、
+      // 或飛行日期已過（LogTen 裡有的就是發生過的、可能忘了記 Out）→ confirmed；
+      // 只有「未來日期 + 沒 Out + 非 deadhead」才是 draft（真正還沒飛的計畫）。
+      const isPast = date < _PL_PAST_CUTOFF;
+      const newStatus: 'draft' | 'confirmed' = (outUtc || isDeadhead || isPast) ? 'confirmed' : 'draft';
 
       // Smart re-import：用 Map 取代 SELECT，語意不變（V1.0.02 起）
       // confirmed → skip 保護使用者編輯；draft / roster_removed → 整筆覆蓋
@@ -341,6 +375,8 @@ export async function importLogtenFlights(
         new_status: action === 'skip_confirmed' ? null : newStatus,
         position: action === 'skip_confirmed' ? null : position,
         deadhead: isDeadhead,
+        pic_min: picMin,
+        sic_min: sicMin,
       });
 
       if (action === 'skip_confirmed') {
@@ -380,6 +416,7 @@ export async function importLogtenFlights(
             paxVal, row['SID'] || null, row['STAR'] || null,
             row['Remarks'] || null,
             position,
+            picMin, sicMin,
           ],
         });
       } else {
@@ -405,6 +442,7 @@ export async function importLogtenFlights(
           paxVal, row['SID'] || null, row['STAR'] || null,
           row['Remarks'] || null,
           position,
+          picMin, sicMin,
         ]);
       }
     } catch (e: any) {
@@ -459,6 +497,7 @@ export async function importLogtenFlights(
            day_takeoffs = $24, night_takeoffs = $25, day_landings = $26, night_landings = $27, autolands = $28,
            pax_count = $29, sid = $30, star = $31, remarks = $32,
            position = $33,
+           pic_minutes = $34, sic_minutes = $35,
            updated_at = NOW()
          WHERE id = $1`,
         [u.id, ...u.params]
