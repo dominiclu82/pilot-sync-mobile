@@ -106,8 +106,20 @@ const INSERT_COLS = [
   'crew', 'approaches',
   'day_takeoffs', 'night_takeoffs', 'day_landings', 'night_landings', 'autolands',
   'pax_count', 'sid', 'star', 'remarks',
+  'position',                                   // V1.2.03：匯入時推斷的角色（PIC/SIC）
 ];
-const INSERT_N = INSERT_COLS.length; // 35
+const INSERT_N = INSERT_COLS.length; // 36
+
+// V1.2.03 helpers ─────────────────────────────────────────────────────────────
+// 名字正規化（比對使用者本人）：小寫、空白收斂、去頭尾
+function _plNormName(s: string | undefined | null): string {
+  return String(s == null ? '' : s).toLowerCase().replace(/\s+/g, ' ').trim();
+}
+// LogTen 的 Deadhead 欄位真值（匯出可能是 1 / YES / true / x …）
+function _plTruthyFlag(v: string | undefined | null): boolean {
+  const s = String(v == null ? '' : v).trim().toLowerCase();
+  return s === '1' || s === 'true' || s === 'yes' || s === 'y' || s === 'x' || s === '✓' || s === 'deadhead';
+}
 const JSONB_IDX = new Set([INSERT_COLS.indexOf('crew'), INSERT_COLS.indexOf('approaches')]);
 const INSERT_BATCH = 50;             // 50 row × 35 col = 1750 params/batch（遠低於 PG 65535 限制）
 
@@ -137,6 +149,8 @@ export interface ImportLogtenFlightsResult {
     block: string | null; pic: string | null; sic: string | null;
     action: 'insert' | 'update' | 'skip_confirmed';
     new_status: 'draft' | 'confirmed' | null;   // skip_confirmed 時為 null
+    position?: string | null;                    // V1.2.03：推斷的角色（PIC/SIC/null）
+    deadhead?: boolean;                          // V1.2.03：是否 positioning
   }>;
   error?: string;
   dry_run?: boolean;
@@ -205,6 +219,21 @@ export async function importLogtenFlights(
     }
   }
 
+  // ── V1.2.03：撈使用者本人名字（Address Book is_self）──────────────────────────
+  // LogTen 沒有單一 position 欄，沒帶 PIC/SIC 時數欄時，靠比對 PIC/P1 vs SIC/P2 的姓名
+  // 是不是本人來推斷 position。沒匯 Address Book / 沒標 self 就退回只靠時數欄。
+  const selfNames = new Set<string>();
+  try {
+    const r = await pool.query(
+      `SELECT display_name FROM crew WHERE user_id = $1 AND is_self = true`,
+      [userId]
+    );
+    for (const row of r.rows) {
+      const n = _plNormName(row.display_name);
+      if (n) selfNames.add(n);
+    }
+  } catch { /* crew 表不存在 / 沒匯 Address Book → selfNames 空，只靠時數欄判 position */ }
+
   // ── 累積 INSERT / UPDATE 任務，loop 結束後一次 bulk write ────────────────────
   // INSERT: 35 個欄位的 param tuple，照 INSERT_COLS 順序
   // UPDATE: 走逐筆（draft → confirmed 在正常流程中是少數，per-row UPDATE 不是瓶頸）
@@ -257,8 +286,26 @@ export async function importLogtenFlights(
       if (row['Observer']) crew.observer1 = row['Observer'];
       if (row['Observer 2']) crew.observer2 = row['Observer 2'];
 
-      // Smart status：有 actual Out 才算飛過，否則仍是計畫（V1.0.02 起，語意不變）
-      const newStatus: 'draft' | 'confirmed' = outUtc ? 'confirmed' : 'draft';
+      // V1.2.03：Deadhead = LogTen 標記 positioning 的欄位。deadhead 是已發生事件
+      // （你被載過去、沒操作），先判它，因為它會蓋掉 position 推斷。
+      const isDeadhead = _plTruthyFlag(row['Deadhead']) || _plTruthyFlag(row['Positioning']);
+
+      // V1.2.03：推斷你這趟的角色（position）— LogTen 沒單一 position 欄。
+      // 優先讀 PIC/SIC 時數欄（最準）；沒有再比對 PIC/P1 vs SIC/P2 姓名是不是本人。
+      // codex deep P2-1：deadhead 一律 position 留空 — 你是乘客沒操作，就算那筆剛好有
+      // PIC/SIC 時數或你名字在 crew 裡，也不能算成 PIC/SIC（否則 positioning 會灌進時數）。
+      let position: string | null = null;
+      if (!isDeadhead) {
+        const picTimeMin = parseHHColonMM(row['PIC']);
+        const sicTimeMin = parseHHColonMM(row['SIC']);
+        if (picTimeMin && picTimeMin > 0) position = 'PIC';
+        else if (sicTimeMin && sicTimeMin > 0) position = 'SIC';
+        else if (pic && selfNames.has(_plNormName(pic))) position = 'PIC';
+        else if (sic && selfNames.has(_plNormName(sic))) position = 'SIC';
+      }
+
+      // Smart status：有 actual Out（已飛）或 deadhead（已 positioning）→ confirmed；否則仍是計畫
+      const newStatus: 'draft' | 'confirmed' = (outUtc || isDeadhead) ? 'confirmed' : 'draft';
 
       // Smart re-import：用 Map 取代 SELECT，語意不變（V1.0.02 起）
       // confirmed → skip 保護使用者編輯；draft / roster_removed → 整筆覆蓋
@@ -292,6 +339,8 @@ export async function importLogtenFlights(
         sic: sic || null,
         action,
         new_status: action === 'skip_confirmed' ? null : newStatus,
+        position: action === 'skip_confirmed' ? null : position,
+        deadhead: isDeadhead,
       });
 
       if (action === 'skip_confirmed') {
@@ -330,6 +379,7 @@ export async function importLogtenFlights(
             parseInt0(row['Autolands']),
             paxVal, row['SID'] || null, row['STAR'] || null,
             row['Remarks'] || null,
+            position,
           ],
         });
       } else {
@@ -354,6 +404,7 @@ export async function importLogtenFlights(
           parseInt0(row['Autolands']),
           paxVal, row['SID'] || null, row['STAR'] || null,
           row['Remarks'] || null,
+          position,
         ]);
       }
     } catch (e: any) {
@@ -407,6 +458,7 @@ export async function importLogtenFlights(
            crew = $22::jsonb, approaches = $23::jsonb,
            day_takeoffs = $24, night_takeoffs = $25, day_landings = $26, night_landings = $27, autolands = $28,
            pax_count = $29, sid = $30, star = $31, remarks = $32,
+           position = $33,
            updated_at = NOW()
          WHERE id = $1`,
         [u.id, ...u.params]

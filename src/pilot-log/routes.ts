@@ -45,8 +45,8 @@ import { getSpaPilotLogJs } from '../spa/js-pilot-log.js';
 
 // ── 版本（比照 CrewSync / Morning：每次推版必更新；SW cache 名稱跟著走） ────
 // 本機 preview build 會暫時加 -tNN 後綴方便對版；推正式版前拿掉只留乾淨版號。
-export const PILOT_LOG_VERSION = 'V1.2.02';
-const PILOT_LOG_CACHE = 'pilotlog-v1-2-02';
+export const PILOT_LOG_VERSION = 'V1.2.03';
+const PILOT_LOG_CACHE = 'pilotlog-v1-2-03';
 
 export const pilotLogRouter = express.Router();
 
@@ -329,6 +329,11 @@ if (document.readyState !== 'loading') pilotLogInit();
 function _renderPilotLogChangelog(): string {
   return `
     <div class="pl-cl-v">${PILOT_LOG_VERSION}</div>
+    <div class="pl-cl-txt">
+      <b>匯入修正：PIC/SIC 角色 + Deadhead/positioning。</b>之前 LogTen 匯入永遠不帶 position（v1 刻意留空），導致 Analyze/Report 的 PIC/SIC 永遠 0；deadhead 因為沒 actual Out 被誤判成 draft。<b>(1) Position 推斷：</b>LogTen 沒有單一「position」欄，改成 — 優先讀你的 <code>PIC</code>/<code>SIC</code> 時數欄（有帶就最準），沒帶則比對 <code>PIC/P1</code> vs <code>SIC/P2</code> 的姓名是不是你本人（用 Address Book <code>is_self</code>）來定 PIC/SIC。position 寫進 INSERT/UPDATE（原本根本沒帶這欄），統計就會正確。<b>(2) Deadhead：</b>讀 LogTen 的 <code>Deadhead</code>（你的 positioning 標記，備援也讀 <code>Positioning</code>）→ 是就標 <b>confirmed</b>（已發生事件，不再卡 draft），position 留空（你是乘客沒操作、不算 PIC/SIC、不影響 currency）。<b>(3) Preview 強化：</b>🔍 dry-run 每筆多顯示 <code>role=PIC/SIC</code> 跟 <code>DH</code> badge，重匯前可先驗證判斷對不對。<b>套用方式：</b>因為重匯會 skip 既有 confirmed，要讓歷史資料生效請用 📥 Import 的 ⚠️ Danger Zone「Wipe all my LogTen entries」清掉後重匯一次（建議先 Preview）。<br>
+      <b>Import fixes: PIC/SIC role + Deadhead/positioning.</b> LogTen import never set <code>position</code> (left blank in v1), so Analyze/Report PIC/SIC were always 0; deadheads got mis-flagged as draft because they have no actual Out. <b>(1) Role inference:</b> LogTen has no single "position" field, so we now read your <code>PIC</code>/<code>SIC</code> time columns first (most accurate), falling back to matching the <code>PIC/P1</code> vs <code>SIC/P2</code> crew name against yourself (via Address Book <code>is_self</code>). Position is now written on INSERT/UPDATE (it wasn't before), so stats compute correctly. <b>(2) Deadhead:</b> reads LogTen's <code>Deadhead</code> flag (your positioning marker; also reads <code>Positioning</code>) → marks it <b>confirmed</b> (a completed event, no longer stuck at draft), position left blank (you were a passenger — not PIC/SIC, doesn't affect currency). <b>(3) Preview:</b> the 🔍 dry-run now shows <code>role=PIC/SIC</code> and a <code>DH</code> badge per row so you can verify before importing. <b>To apply:</b> re-import skips existing confirmed entries, so to fix history use 📥 Import → ⚠️ Danger Zone "Wipe all my LogTen entries", then re-import (Preview first recommended).
+    </div>
+    <div class="pl-cl-v old">V1.2.02</div>
     <div class="pl-cl-txt">
       <b>Entry 編輯表單重排 — 語意分組、不再眼花：</b>原本用 <code>auto-fit</code> 自動流（欄位「塞得下就配對」沒邏輯），改成固定語意分組的 grid 列。<b>Flight：</b>Date + Flight# 一行、<b>From + To 一行</b>、Aircraft Type + Tail# + Position 一行。<b>Times：</b>分三組小標題 — <b>Scheduled</b>（Sched Out + Sched In 一行）、<b>Actual · OOOI</b>（<b>Out + Off + On + In 同一行</b>）、<b>Duty</b>（On Duty + Off Duty 一行）。時數獨立成 <b>Hours</b> 區（Block/Air/Night 一行、Total Duty + Distance 一行），不再跟 OOOI 混。Take-offs/Landings 日夜成對、Crew（PIC+SIC / FO1+FO2）、Other（SID+STAR / Remarks）。窄螢幕用 <code>minmax(0,1fr)</code> 收縮不溢出。純前端排版，欄位與儲存邏輯不動。<br>
       <b>Entry editor form reorganized into logical groups (no more visual clutter):</b> replaced <code>auto-fit</code> (which paired fields by whatever fit) with fixed semantic grid rows. <b>Flight:</b> Date + Flight#, <b>From + To on one line</b>, Aircraft Type + Tail# + Position. <b>Times:</b> three labeled groups — <b>Scheduled</b> (Sched Out + Sched In), <b>Actual · OOOI</b> (<b>Out + Off + On + In on one line</b>), <b>Duty</b> (On Duty + Off Duty). Durations split into their own <b>Hours</b> section (Block/Air/Night, then Total Duty + Distance), no longer mixed with OOOI. Take-offs/Landings paired day/night, Crew (PIC+SIC / FO1+FO2), Other (SID+STAR / Remarks). Narrow screens shrink via <code>minmax(0,1fr)</code>. Frontend layout only; fields and save logic unchanged.

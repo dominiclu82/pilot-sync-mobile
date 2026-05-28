@@ -1141,6 +1141,9 @@ function _plRenderPreviewRows(rows) {
       '<span>' + _plEsc(p.flight_date) + ' ' + _plEsc(p.flight_no) + ' ' + _plEsc(p.origin) + '→' + _plEsc(p.dest) + '</span>' +
       '<span style="color:var(--muted)">[' + _plEsc(p.aircraft_type) + '/' + _plEsc(p.tail_no) + ']</span>' +
       '<span style="color:var(--muted)">blk=' + _plEsc(p.block || '—') + ' out=' + _plEsc(p.out_utc ? p.out_utc.slice(11,16) + 'z' : '—') + '</span>' +
+      // V1.2.03：顯示推斷出的 position + deadhead，dry-run 就能驗證
+      '<span style="color:' + (p.position ? '#38bdf8' : 'var(--muted)') + '">role=' + _plEsc(p.position || '—') + '</span>' +
+      (p.deadhead ? '<span style="background:#a855f7;color:#fff;padding:1px 5px;border-radius:4px;font-size:.85em">DH</span>' : '') +
       '<span style="color:var(--muted)">pic=' + _plEsc(p.pic || '—') + '</span>' +
     '</div>';
   }
