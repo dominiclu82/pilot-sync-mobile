@@ -114,6 +114,9 @@ export async function ensureTables(): Promise<boolean> {
     // 反推會把整段 block 灌進單一角色而對不上。改成直接存 LogTen 的值。
     await pool.query(`ALTER TABLE pilot_log_entries ADD COLUMN IF NOT EXISTS pic_minutes INT`).catch(() => {});
     await pool.query(`ALTER TABLE pilot_log_entries ADD COLUMN IF NOT EXISTS sic_minutes INT`).catch(() => {});
+    // V1.2.05：deadhead / positioning 標記。LogTen 多數匯出不帶此欄，主要靠 editor 手動標，
+    // 讓「飛行」跟「deadhead」能區分（deadhead 不算 PIC/SIC、不算起降 currency）。
+    await pool.query(`ALTER TABLE pilot_log_entries ADD COLUMN IF NOT EXISTS is_deadhead BOOLEAN DEFAULT FALSE`).catch(() => {});
 
     await pool.query(`
       CREATE TABLE IF NOT EXISTS pilot_aircraft (

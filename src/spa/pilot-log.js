@@ -551,6 +551,7 @@ function _plRenderToolbar() {
     '<button onclick="_plOpenImport()" style="background:#6366f1;color:#fff;border:0;border-radius:6px;padding:6px 12px;font-size:.8em;font-weight:700;cursor:pointer">📥 Import</button>' +
     '<button onclick="_plOpenAircraft()" style="background:#0ea5e9;color:#fff;border:0;border-radius:6px;padding:6px 12px;font-size:.8em;font-weight:700;cursor:pointer">✈️ Aircraft</button>' +
     '<button onclick="_plOpenCrew()" style="background:#a855f7;color:#fff;border:0;border-radius:6px;padding:6px 12px;font-size:.8em;font-weight:700;cursor:pointer">👥 Crew</button>' +
+    '<button onclick="_plConfirmAllDrafts()" style="background:transparent;color:#10b981;border:1px solid #10b981;border-radius:6px;padding:6px 10px;font-size:.78em;font-weight:700;cursor:pointer" title="把所有過去日期的 draft 標成已飛 confirmed（未來計畫航班不動）">✓ Confirm All</button>' +
     '<div style="flex:1"></div>' +
     filterBtn('all', 'All') + filterBtn('draft', 'Draft') +
     filterBtn('confirmed', 'Confirmed') + filterBtn('roster_removed', 'Removed') +
@@ -590,10 +591,11 @@ function _plRenderEntryRow(e) {
     mid = e.block_minutes ? _plMinToHHMM(e.block_minutes) + ' hrs' : '—';
   }
 
-  // line 3 機尾/機型 + Flt#
-  var acIcon = (e.out_utc && e.in_utc) ? '✈' : '🛠';
+  // line 3 機尾/機型 + Flt#（deadhead 標 DH badge 跟普通 flight 區分）
+  var acIcon = e.is_deadhead ? '🧳' : ((e.out_utc && e.in_utc) ? '✈' : '🛠');
   var acMeta = acIcon + ' ' + _plEsc(e.tail_no || '') + (e.aircraft_type ? ', ' + _plEsc(e.aircraft_type) : '');
-  var fltNo = e.flight_no ? 'Flt ' + _plEsc(e.flight_no) : '';
+  var dhBadge = e.is_deadhead ? '<span style="background:#a855f7;color:#fff;border-radius:4px;padding:0 5px;font-size:.85em;margin-right:5px;font-weight:700">DH</span>' : '';
+  var fltNo = dhBadge + (e.flight_no ? 'Flt ' + _plEsc(e.flight_no) : '');
 
   // line 4 組員
   var crewNames = '';
@@ -670,6 +672,20 @@ async function _plRefreshMain() {
   _plRenderMain();
 }
 
+// V1.2.05：一鍵把所有 draft 標 confirmed（匯入歷史 logbook 後清草稿用）
+async function _plConfirmAllDrafts() {
+  if (!window.confirm('把所有「過去日期」的 draft 航班一次標成 confirmed（已飛）？\n（未來日期的計畫航班不會被動到）\n適合匯入歷史 logbook 後清草稿，無法批次還原。\n\nConfirm all PAST-dated draft flights as flown?')) return;
+  try {
+    var r = await _plApi('/api/pilot-log/entries/confirm-drafts', { method: 'POST' });
+    if (!r.ok) { _plToast('操作失敗 ' + r.status, 'error'); return; }
+    var j = await r.json();
+    _plToast('已 confirm ' + (j.confirmed || 0) + ' 筆');
+    await _plRefreshMain();
+  } catch (e) {
+    _plToast('操作失敗：' + (e && e.message ? e.message : 'unknown'), 'error');
+  }
+}
+
 // Logbook tab：航班清單 + toolbar（New / Import / Aircraft / Crew）+ 篩選。
 // 統計已搬到 Analyze tab。
 // iPad（>=768px）：底下用 .pl-split 並排左列表 + 右明細（master-detail）；
@@ -721,7 +737,7 @@ function _plBlankEntry() {
     aircraft_type: '', tail_no: '', position: 'PIC', pilot_flying: false,
     std_utc: null, sta_utc: null, out_utc: null, off_utc: null, on_utc: null, in_utc: null,
     block_minutes: null, air_minutes: null, night_minutes: null,
-    pic_minutes: null, sic_minutes: null,
+    pic_minutes: null, sic_minutes: null, is_deadhead: false,
     distance_nm: null, on_duty_utc: null, off_duty_utc: null, total_duty_minutes: null,
     crew: {}, approaches: [],
     day_takeoffs: 0, night_takeoffs: 0, day_landings: 0, night_landings: 0, autolands: 0,
@@ -855,6 +871,12 @@ function _plRenderEditor(target) {
 
   var typeOptions = ['', 'A321', 'A359', 'A35K', 'B777-300ER', 'B789', 'B78X'].concat(_pl.suggest.aircraft_types || []);
   typeOptions = Array.from(new Set(typeOptions));
+  // V1.2.05：Tail # 改下拉，選項來自機尾庫（_pl.aircraft）+ 常用 suggest + 目前值。
+  // 要新增機尾到清單 → 去 ✈️ Aircraft 頁的 + Add Aircraft（或匯入 LogTen Aircraft）。
+  var tailOptions = [''].concat((_pl.aircraft || []).map(function(a) { return a.tail_no; }).filter(Boolean))
+    .concat(_pl.suggest.tail_nos || []);
+  if (e.tail_no && tailOptions.indexOf(e.tail_no) < 0) tailOptions.push(e.tail_no);
+  tailOptions = Array.from(new Set(tailOptions));
 
   c.innerHTML =
     '<div style="padding:10px 14px">' +
@@ -873,8 +895,9 @@ function _plRenderEditor(target) {
       _plFieldRow(2, _plEditorField('Date', 'flight_date', 'date') + _plEditorField('Flight #', 'flight_no', 'text')) +
       _plFieldRow(2, _plEditorField('From (ICAO)', 'origin', 'text') + _plEditorField('To (ICAO)', 'dest', 'text')) +
       _plFieldRow(3, _plEditorField('Aircraft Type', 'aircraft_type', 'select', { options: typeOptions }) +
-        _plEditorField('Tail #', 'tail_no', 'text', { placeholder: 'B-58504' }) +
+        _plEditorField('Tail #（清單來自 ✈️ Aircraft）', 'tail_no', 'select', { options: tailOptions }) +
         _plEditorField('Position', 'position', 'select', { options: ['', 'PIC', 'SIC', 'OBSERVER'] })) +
+      _plEditorField('Deadhead', 'is_deadhead', 'check', { checkLabel: 'Deadhead / positioning（我是乘客、非操作 — 不算 PIC/SIC 與起降）' }) +
     '</div>' +
 
     // ── Times：Scheduled 一行 / OOOI 一行 / Duty 一行 ──
@@ -967,6 +990,7 @@ async function _plSaveEntry(confirm) {
     night_minutes: _plReadField('night_minutes', 'hhmm-dur'),
     pic_minutes: _plReadField('pic_minutes', 'hhmm-dur'),
     sic_minutes: _plReadField('sic_minutes', 'hhmm-dur'),
+    is_deadhead: !!_plReadField('is_deadhead'),
     total_duty_minutes: _plReadField('total_duty_minutes', 'hhmm-dur'),
     distance_nm: _plReadField('distance_nm', 'number'),
     day_takeoffs: _plReadField('day_takeoffs', 'number') || 0,
@@ -1351,27 +1375,39 @@ function _plRenderAircraftList() {
   if (_pl.aircraft.length === 0) {
     rows = '<div style="text-align:center;color:var(--muted);padding:30px;font-size:.85em">機尾庫是空的。點 <b>+ Add Aircraft</b> 手動加，或從 <b>📥 Import</b> 上傳 LogTen Aircraft 檔。<br>No aircraft yet — tap <b>+ Add Aircraft</b>, or upload a LogTen Aircraft file via <b>📥 Import</b>.</div>';
   } else {
+    // V1.2.05：先依機型（type_code）分組，type header 下列 tail（不再全部混一起）
+    var groups = {}, order = [];
     for (var ai = 0; ai < _pl.aircraft.length; ai++) {
       var a = _pl.aircraft[ai];
-      var count = tailCount[a.tail_no] || 0;
-      var typeStr = _plEsc(a.type_code || '');
-      // 機型顯示優先序：(1) pilot_aircraft 自己的 make/model（手動建的可能有）
-      //                (2) Aircraft Types catalog 查到的完整名（V1.0.11）
-      var modelStr = '';
-      if (a.make || a.model) {
-        modelStr = _plEsc([a.make, a.model].filter(Boolean).join(' '));
-      } else if (a.type_code) {
-        var fromCatalog = _plLookupTypeFullName(a.type_code);
-        if (fromCatalog) modelStr = _plEsc(fromCatalog);
+      var tc = a.type_code || '—';
+      if (!groups[tc]) { groups[tc] = []; order.push(tc); }
+      groups[tc].push(a);
+    }
+    var typeFlights = function(tc) {
+      var s = 0; groups[tc].forEach(function(a) { s += tailCount[a.tail_no] || 0; }); return s;
+    };
+    order.sort(function(x, y) { return typeFlights(y) - typeFlights(x); });  // 飛最多的機型在前
+    for (var gi = 0; gi < order.length; gi++) {
+      var gtc = order[gi];
+      var list = groups[gtc];
+      var full = _plLookupTypeFullName(gtc);
+      rows += '<div style="margin:14px 0 6px;display:flex;align-items:baseline;gap:8px">' +
+        '<span style="font-size:.95em;font-weight:800">' + _plEsc(gtc) + '</span>' +
+        (full ? '<span style="font-size:.66em;color:var(--muted)">' + _plEsc(full) + '</span>' : '') +
+        '<span style="flex:1"></span>' +
+        '<span style="font-size:.62em;color:var(--muted)">' + list.length + ' tail · ' + typeFlights(gtc) + ' flights</span>' +
+      '</div>';
+      list.sort(function(a, b) { return (tailCount[b.tail_no] || 0) - (tailCount[a.tail_no] || 0); });
+      for (var ti = 0; ti < list.length; ti++) {
+        var ac = list[ti];
+        var count = tailCount[ac.tail_no] || 0;
+        rows += '<div onclick="_plOpenAircraftDetail(\'' + _plEsc(ac.tail_no) + '\')" ' +
+          'style="background:var(--card);border-radius:8px;padding:9px 12px;margin-bottom:5px;cursor:pointer;display:flex;gap:10px;align-items:center">' +
+          '<div style="flex:1;min-width:0"><span style="font-size:.85em;font-weight:700">' + _plEsc(ac.tail_no) + '</span>' +
+          (ac.operator ? '<span style="font-size:.62em;color:var(--muted)"> · ' + _plEsc(ac.operator) + '</span>' : '') + '</div>' +
+          '<div style="font-size:.72em;color:var(--text);text-align:right;white-space:nowrap">' + count + ' flights</div>' +
+          '</div>';
       }
-      rows += '<div onclick="_plOpenAircraftDetail(\'' + _plEsc(a.tail_no) + '\')" ' +
-        'style="background:var(--card);border-radius:8px;padding:10px 12px;margin-bottom:6px;cursor:pointer;display:flex;gap:10px;align-items:center">' +
-        '<div style="min-width:110px"><div style="font-size:.85em;font-weight:700">' + _plEsc(a.tail_no) + '</div>' +
-        (a.operator ? '<div style="font-size:.62em;color:var(--muted)">' + _plEsc(a.operator) + '</div>' : '') + '</div>' +
-        '<div style="min-width:90px;font-size:.74em;color:var(--muted)">' + typeStr + '</div>' +
-        '<div style="flex:1;font-size:.7em;color:var(--muted)">' + modelStr + '</div>' +
-        '<div style="font-size:.72em;color:var(--text);text-align:right">' + count + ' flights</div>' +
-        '</div>';
     }
   }
   c.innerHTML =
@@ -1382,7 +1418,7 @@ function _plRenderAircraftList() {
         '<div style="flex:1"></div>' +
         '<button onclick="_plOpenAddAircraft()" style="background:#10b981;color:#fff;border:0;border-radius:6px;padding:6px 12px;font-size:.78em;font-weight:700;cursor:pointer">+ Add Aircraft</button>' +
       '</div>' +
-      '<div style="font-size:.7em;color:var(--muted);margin-bottom:10px">共 ' + _pl.aircraft.length + ' 架；點任一筆查看用過這架的所有航班。 · ' + _pl.aircraft.length + ' aircraft — tap one to see every flight on that tail.</div>' +
+      '<div style="font-size:.7em;color:var(--muted);margin-bottom:10px">依機型分組，共 ' + _pl.aircraft.length + ' 架；點任一筆查看用過這架的所有航班。<br>Grouped by type — tap a tail to see every flight on it.</div>' +
       rows +
     '</div>';
 }
@@ -1782,15 +1818,83 @@ function _plRenderByTypeChart() {
   '</div>';
 }
 
+// V1.2.05：明細表 — 真正能整理分析的核心。共用 helper 給「依機型」「依公司」兩表用。
+// 每列：班數 / Block / PIC 時數 / PIC sector 數 / SIC / Night / 起飛 / 落地 + 總計。
+// PIC/SIC 時數用實際 pic_minutes，沒有就 fallback position×block（跟 stats 一致）。
+// deadhead 已在 entries 來源層排除（不算飛行），這裡不會收到。
+function _plBreakdownAgg(entries, keyFn) {
+  var map = {};
+  for (var i = 0; i < entries.length; i++) {
+    var e = entries[i];
+    var k = keyFn(e) || '—';
+    if (!map[k]) map[k] = { key: k, flights: 0, block: 0, pic: 0, picSec: 0, sic: 0, night: 0, to: 0, ldg: 0 };
+    var m = map[k];
+    var picMin = (e.pic_minutes != null) ? e.pic_minutes : (e.position === 'PIC' ? (e.block_minutes || 0) : 0);
+    var isPicSector = (e.pic_minutes != null) ? (e.pic_minutes > 0) : (e.position === 'PIC');
+    m.flights++;
+    m.block += e.block_minutes || 0;
+    m.pic += picMin;
+    if (isPicSector) m.picSec++;
+    m.sic += (e.sic_minutes != null) ? e.sic_minutes : (e.position === 'SIC' ? (e.block_minutes || 0) : 0);
+    m.night += e.night_minutes || 0;
+    m.to += (e.day_takeoffs || 0) + (e.night_takeoffs || 0);
+    m.ldg += (e.day_landings || 0) + (e.night_landings || 0);
+  }
+  var rows = Object.keys(map).map(function(k) { return map[k]; });
+  rows.sort(function(a, b) { return b.block - a.block; });
+  var tot = { key: 'Total', flights: 0, block: 0, pic: 0, picSec: 0, sic: 0, night: 0, to: 0, ldg: 0 };
+  rows.forEach(function(r) {
+    tot.flights += r.flights; tot.block += r.block; tot.pic += r.pic; tot.picSec += r.picSec;
+    tot.sic += r.sic; tot.night += r.night; tot.to += r.to; tot.ldg += r.ldg;
+  });
+  return { rows: rows, tot: tot };
+}
+
+function _plBreakdownTable(title, firstCol, entries, keyFn) {
+  if (!entries.length) return '';
+  var agg = _plBreakdownAgg(entries, keyFn);
+  var th = function(t) { return '<th style="text-align:right;padding:5px 8px;font-weight:700;color:var(--muted);white-space:nowrap">' + t + '</th>'; };
+  var head = '<tr><th style="text-align:left;padding:5px 8px;color:var(--muted)">' + firstCol + '</th>' +
+    th('Flt') + th('Block') + th('PIC') + th('PIC&nbsp;Sec') + th('SIC') + th('Night') + th('T/O') + th('Ldg') + '</tr>';
+  var tdN = function(v) { return '<td style="text-align:right;padding:5px 8px;font-variant-numeric:tabular-nums;white-space:nowrap">' + v + '</td>'; };
+  var rowHtml = function(label, r, extra) {
+    return '<tr style="' + extra + '">' +
+      '<td style="text-align:left;padding:5px 8px;font-weight:700;white-space:nowrap">' + _plEsc(label) + '</td>' +
+      tdN(r.flights) + tdN(_plMinToHHMM(r.block)) + tdN(_plMinToHHMM(r.pic)) + tdN(r.picSec) +
+      tdN(_plMinToHHMM(r.sic)) + tdN(_plMinToHHMM(r.night)) + tdN(r.to) + tdN(r.ldg) + '</tr>';
+  };
+  var body = agg.rows.map(function(r) { return rowHtml(r.key, r, 'border-top:1px solid var(--border)'); }).join('');
+  var totalRow = rowHtml('Total', agg.tot, 'border-top:2px solid var(--border);font-weight:700');
+  return '<div style="background:var(--bar-bg-soft);border-radius:10px;padding:14px;margin-bottom:10px">' +
+    '<div style="font-size:.72em;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">' + title + '</div>' +
+    '<div style="overflow-x:auto;-webkit-overflow-scrolling:touch">' +
+      '<table style="width:100%;border-collapse:collapse;font-size:.76em">' +
+        '<thead>' + head + '</thead><tbody>' + body + totalRow + '</tbody></table>' +
+    '</div></div>';
+}
+
+function _plRenderTypeBreakdown(entries) {
+  return _plBreakdownTable('依機型明細 By Type（時數=時:分、PIC Sec=PIC 段數）', 'Type', entries, function(e) { return e.aircraft_type || '—'; });
+}
+
+// 依公司（operator）分析：entry 沒存 operator，用 tail_no 對應機尾庫 _pl.aircraft 的 operator
+function _plRenderCompanyBreakdown(entries) {
+  var op = {};
+  (_pl.aircraft || []).forEach(function(a) { if (a.tail_no) op[String(a.tail_no).trim().toUpperCase()] = a.operator || ''; });
+  return _plBreakdownTable('依公司明細 By Company', 'Company', entries, function(e) {
+    return op[String(e.tail_no || '').trim().toUpperCase()] || '—';
+  });
+}
+
 function _plRenderAnalyzeContent() {
   var c = document.getElementById('pilotlog-content');
   if (!c) return;
   if (_pl.tab !== 'analyze') return;   // 防 race：切走後過期的 async render 不可覆蓋新分頁
-  // 只算已飛（confirmed）— 跟 /stats 卡片一致（codex P2）；draft/roster_removed 不進圖表
-  var entries = (_pl.aircraftEntries || []).filter(function(e) { return e.status === 'confirmed'; });
+  // 只算已飛（confirmed）且非 deadhead（V1.2.05 codex P1/P2：deadhead 不算飛行分析）
+  var entries = (_pl.aircraftEntries || []).filter(function(e) { return e.status === 'confirmed' && !e.is_deadhead; });
   var hasStats = _pl.stats && _pl.stats.totals;
   var body = hasStats
-    ? _plRenderStats() + _plRenderMonthlyChart(entries) + _plRenderByTypeChart()
+    ? _plRenderStats() + _plRenderTypeBreakdown(entries) + _plRenderCompanyBreakdown(entries) + _plRenderMonthlyChart(entries)
     : '<div style="text-align:center;color:var(--muted);padding:40px;font-size:.85em">尚無可分析的飛行紀錄，先到 <b>📒 Logbook</b> 新增或匯入 · No flights to analyze yet — add or import in <b>📒 Logbook</b>.</div>';
   c.innerHTML =
     '<div style="padding:10px 14px">' +
@@ -1854,7 +1958,8 @@ function _plRenderReportContent() {
   if (_pl.tab !== 'report') return;   // 防 race：切走後過期的 async render 不可覆蓋新分頁
   // 報表只看已飛（confirmed）— recency / 時數 / CSV 都不能把 draft（計畫中）跟
   // roster_removed 當成已飛，否則起降數、block 時數會灌水（codex P1）
-  var src = (_pl.aircraftEntries || []).filter(function(e) { return e.status === 'confirmed'; });
+  // 報表只看已飛 confirmed 且非 deadhead（deadhead 不算 PIC/SIC / 起降 currency / 時數）
+  var src = (_pl.aircraftEntries || []).filter(function(e) { return e.status === 'confirmed' && !e.is_deadhead; });
 
   // ── 90 天 recency ──
   var now = new Date();
@@ -1949,7 +2054,7 @@ function _plCsvCell(v) {
 function _plExportCsv() {
   var r = _plReportRange();
   var src = (_pl.aircraftEntries || []).filter(function(e) {
-    if (e.status !== 'confirmed') return false;   // 只匯出已飛（codex P1）
+    if (e.status !== 'confirmed' || e.is_deadhead) return false;   // 只匯出已飛、非 deadhead
     var fd = String(e.flight_date || '').slice(0, 10);
     return fd && (!r.from || fd >= r.from) && (!r.to || fd <= r.to);
   });

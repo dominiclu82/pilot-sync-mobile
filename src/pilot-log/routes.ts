@@ -45,8 +45,8 @@ import { getSpaPilotLogJs } from '../spa/js-pilot-log.js';
 
 // ── 版本（比照 CrewSync / Morning：每次推版必更新；SW cache 名稱跟著走） ────
 // 本機 preview build 會暫時加 -tNN 後綴方便對版；推正式版前拿掉只留乾淨版號。
-export const PILOT_LOG_VERSION = 'V1.2.04';
-const PILOT_LOG_CACHE = 'pilotlog-v1-2-04';
+export const PILOT_LOG_VERSION = 'V1.2.05';
+const PILOT_LOG_CACHE = 'pilotlog-v1-2-05';
 
 export const pilotLogRouter = express.Router();
 
@@ -329,6 +329,11 @@ if (document.readyState !== 'loading') pilotLogInit();
 function _renderPilotLogChangelog(): string {
   return `
     <div class="pl-cl-v">${PILOT_LOG_VERSION}</div>
+    <div class="pl-cl-txt">
+      <b>真正能分析 + 一鍵 Confirm + Deadhead 標記 + Aircraft 依機型分組。</b><b>(1) Analyze 依機型 + 依公司明細表：</b>每列顯示 班數 / Block / PIC 時數 / <b>PIC Sec（PIC 段數）</b> / SIC / Night / 起飛 / 落地 + 總計列；<b>依機型</b>跟<b>依公司</b>（operator，用 tail 對機尾庫）兩張表。PIC/SIC 用實際時數。<b>deadhead 一律排除在所有飛行統計外</b>（Analyze 卡片 / 明細表 / Report recency+時數 / CSV / stats 查詢都加 <code>is_deadhead</code> 排除 — codex P1/P2）。取代原本只有長度的 by-type 長條，真正能整理分析。<b>(2) 一鍵 Confirm All：</b>Logbook 工具列加「✓ Confirm All」，把<b>過去日期</b>的 draft 一次標 confirmed（匯入歷史 logbook 後清草稿用；未來計畫航班不動 — codex P1）。後端 <code>POST /api/pilot-log/entries/confirm-drafts</code>。<b>(3) Deadhead 記錄：</b>新增 <code>is_deadhead</code> 欄，Editor 加「Deadhead / positioning」勾選可手動標（LogTen 多數匯出不帶此欄），Logbook 列顯示紫色 <b>DH</b> badge + 🧳 圖示，讓飛行與 deadhead 區分；deadhead 不算 PIC/SIC、不算起降。<b>(4) Aircraft 依機型分組：</b>機尾庫從「全部混一起」改成先列機型（type + 完整廠商機型 + tail 數 + 該型總航班），底下才是各 tail（按飛行數排序），點 tail 進原 drill-down。<br>
+      <b>Real analysis + Confirm-all + Deadhead marking + Aircraft grouped by type.</b> (1) Analyze by-type table: per type → flights / block / PIC / SIC / night / takeoffs / landings + totals (PIC/SIC use actual minutes; deadheads excluded). (2) One-tap "Confirm All" in the Logbook toolbar flips all drafts to confirmed (<code>POST /entries/confirm-drafts</code>) — for cleaning up after a historical import. (3) Deadhead recording: new <code>is_deadhead</code> column, an editor "Deadhead / positioning" toggle (most LogTen exports omit the column, so manual marking matters), purple <b>DH</b> badge + 🧳 icon in the list; deadheads don't count toward PIC/SIC or takeoff/landing currency. (4) Aircraft list grouped by type: instead of one flat mixed list, types are listed first (type + full make/model + tail count + flights), with each tail underneath (sorted by flights); tap a tail for the existing drill-down.
+    </div>
+    <div class="pl-cl-v old">V1.2.04</div>
     <div class="pl-cl-txt">
       <b>PIC/SIC 時數對齊 LogTen + 修 draft/重複/Preview。</b>V1.2.03 用「角色 × 整段 block」反推 PIC/SIC，結果 PIC+SIC ≈ 總時間、SIC 灌爆（跟 LogTen 對不上）。<b>(1) 改成匯入 LogTen 實際 PIC/SIC 時數：</b>新增 <code>pic_minutes</code> / <code>sic_minutes</code> 欄，匯入時直接讀 LogTen 的 <code>PIC</code> / <code>SIC</code> 時數欄存進來，統計改 <code>SUM(pic_minutes)</code>（manual 舊資料 fallback 角色×block）→ 數字跟 LogTen 一致（deadhead/加強組員巡航等既非 P1 也非 P2 的時間不再被灌進來）。Editor 加 <b>PIC Time / SIC Time</b> 可手動編輯。<b>(2) draft 放寬：</b>飛行日期已過的航班一律 confirmed（deadhead、忘記記 Out 的、補登的都涵蓋），只有「未來 + 沒 Out」才 draft — 不用再依賴 Deadhead 欄。<b>(3) 修少掉的航班：</b>同檔內「日期+航班號+起降」完全相同的不同航班，原本 source_ref 碰撞會 merge 掉一筆，現在加檔內序號各自獨立。<b>(4) Preview 強化：</b>dry-run 改成<b>顯示全部 row + 可捲動</b>（不再只前 10 筆），每筆顯示 <code>role</code> / PIC / SIC 時數 / <code>DH</code>，頂部列出匯出檔欄位 headers（方便確認 PIC/SIC 時數欄有沒有被讀到）。SW cache → <code>pilotlog-v1-2-04</code>。<b>套用：</b>Wipe LogTen entries 後重匯（先 Preview）。<br>
       <b>PIC/SIC hours aligned with LogTen + draft/dup/Preview fixes.</b> V1.2.03 derived PIC/SIC as role × full block, so PIC+SIC ≈ total and SIC was inflated (didn't match LogTen). <b>(1) Import actual PIC/SIC time:</b> new <code>pic_minutes</code>/<code>sic_minutes</code> columns; import reads LogTen's <code>PIC</code>/<code>SIC</code> time columns directly, stats now <code>SUM(pic_minutes)</code> (manual entries fall back to role×block) → matches LogTen (deadhead / augmented-crew cruise time that's neither P1 nor P2 is no longer counted). Editor gains editable <b>PIC Time / SIC Time</b>. <b>(2) Draft relaxed:</b> any past-dated flight is confirmed (covers deadheads, missed Out, back-filled), only future + no Out stays draft — no longer depends on the Deadhead column. <b>(3) Missing-flight fix:</b> different flights sharing date+flight#+from+to no longer collide on source_ref (in-file sequence added). <b>(4) Preview:</b> dry-run now shows all rows + scrolls (not just 10), each row shows role / PIC / SIC time / DH, with the export's column headers listed at top. SW cache → <code>pilotlog-v1-2-04</code>. <b>To apply:</b> Wipe LogTen entries, then re-import (Preview first).
@@ -701,6 +706,7 @@ const EDITABLE_FIELDS = [
   'position', 'pilot_flying', 'std_utc', 'sta_utc', 'out_utc', 'off_utc', 'on_utc', 'in_utc',
   'block_minutes', 'air_minutes', 'night_minutes', 'distance_nm',
   'pic_minutes', 'sic_minutes',                    // V1.2.04：實際 PIC/SIC 時數（可手動編輯）
+  'is_deadhead',                                   // V1.2.05：deadhead/positioning（手動標）
   'on_duty_utc', 'off_duty_utc', 'total_duty_minutes',
   'crew', 'approaches',
   'day_takeoffs', 'night_takeoffs', 'day_landings', 'night_landings', 'autolands',
@@ -783,6 +789,21 @@ pilotLogRouter.put('/api/pilot-log/entries/:id', requireAuth, async (req: Authed
   );
   if (r.rows.length === 0) return res.status(404).json({ error: 'not_found' });
   res.json({ entry: r.rows[0] });
+});
+
+// ── Entries: 一鍵把「過去日期」的 draft 標成 confirmed（V1.2.05）────────────────
+// 匯入歷史 logbook 後常剩一堆沒 actual Out 的 draft，逐筆按 Confirm 太累。
+// codex P1：只限過去日期（flight_date < CURRENT_DATE）— 未來計畫航班不可被一鍵標成已飛，
+// 否則會污染時數 / currency。對「全是歷史資料」的使用者效果不變，但對未來班表安全。
+pilotLogRouter.post('/api/pilot-log/entries/confirm-drafts', requireAuth, async (req: AuthedRequest, res) => {
+  const pool = getPool();
+  if (!pool || !(await ensureTables())) return res.status(503).json({ error: 'database_unavailable' });
+  const r = await pool.query(
+    `UPDATE pilot_log_entries SET status = 'confirmed', updated_at = NOW()
+       WHERE user_id = $1 AND status = 'draft' AND flight_date < CURRENT_DATE RETURNING id`,
+    [req.pilotUserId]
+  );
+  res.json({ confirmed: r.rowCount ?? 0 });
 });
 
 // ── Entries: delete ──────────────────────────────────────────────────────────

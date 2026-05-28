@@ -108,8 +108,9 @@ const INSERT_COLS = [
   'pax_count', 'sid', 'star', 'remarks',
   'position',                                   // V1.2.03：匯入時推斷的角色（PIC/SIC）
   'pic_minutes', 'sic_minutes',                 // V1.2.04：LogTen 實際 PIC/SIC 時數
+  'is_deadhead',                                // V1.2.05：deadhead/positioning 標記
 ];
-const INSERT_N = INSERT_COLS.length; // 38
+const INSERT_N = INSERT_COLS.length; // 39
 
 // V1.2.03 helpers ─────────────────────────────────────────────────────────────
 // 名字正規化（比對使用者本人）：小寫、空白收斂、去頭尾
@@ -417,6 +418,7 @@ export async function importLogtenFlights(
             row['Remarks'] || null,
             position,
             picMin, sicMin,
+            isDeadhead,
           ],
         });
       } else {
@@ -443,6 +445,7 @@ export async function importLogtenFlights(
           row['Remarks'] || null,
           position,
           picMin, sicMin,
+          isDeadhead,
         ]);
       }
     } catch (e: any) {
@@ -498,6 +501,7 @@ export async function importLogtenFlights(
            pax_count = $29, sid = $30, star = $31, remarks = $32,
            position = $33,
            pic_minutes = $34, sic_minutes = $35,
+           is_deadhead = $36,
            updated_at = NOW()
          WHERE id = $1`,
         [u.id, ...u.params]
