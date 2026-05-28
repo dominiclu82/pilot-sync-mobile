@@ -26,6 +26,7 @@ var _pl = {
   tab: 'logbook',                // 底部主功能列：analyze | logbook | report
   reportFrom: null,              // Report 區間總表的起日（YYYY-MM-DD），null = 今年初
   reportTo: null,                // Report 區間總表的迄日，null = 今天
+  selectedId: null,              // iPad 分割視窗：目前在 detail pane 開的那筆 entry id
 };
 
 var _PL_LS_AT = 'pilotlog_at';
@@ -111,6 +112,19 @@ function _plShowTabBar(show) {
   if (bar) bar.style.display = show ? 'flex' : 'none';
 }
 
+// 寬螢幕（iPad/桌機）判斷：跟 CSS .pl-split 的 media query 對齊。
+// 用 matchMedia 即時讀，旋轉/視窗變動下次點擊就對。
+function _plWide() {
+  try { return window.matchMedia('(min-width: 768px)').matches; } catch (e) { return false; }
+}
+
+function _plDetailPlaceholder() {
+  return '<div class="pl-detail-empty">' +
+    '← 從左側選一筆航班看明細<br>' +
+    'Select a flight on the left to view details' +
+  '</div>';
+}
+
 function _plHighlightTab(tab) {
   ['analyze', 'logbook', 'report'].forEach(function(t) {
     var b = document.getElementById('plTabBtn-' + t);
@@ -124,6 +138,7 @@ function switchPlTab(tab, btn) {
   if (!_pl.user) return;            // 未登入時 tab bar 是藏的，保險再擋一次
   _pl.tab = tab;
   _pl.editing = null;
+  _pl.selectedId = null;            // 切走 logbook，detail pane 的選取就重置
   _plHighlightTab(tab);
   if (tab === 'analyze') _plRenderAnalyze();
   else if (tab === 'report') _plRenderReport();
@@ -426,29 +441,83 @@ function _plRenderToolbar() {
     '</div>';
 }
 
+// LogTen Pro 風格的密集 4 行卡：
+//   line 1：起飛HHMM ──飛時/sched── 落地HHMM（中間用一條線連起來）
+//   line 2：大字 ORIGIN ............... DEST
+//   line 3：✈ 機尾, 機型 ............... Flt JX001
+//   line 4：組員姓名（單行省略）
+// 左側保留狀態色條（draft/confirmed/roster_removed）+ 大日期區。
+// 被選中（iPad detail pane 開著的那筆）會套 .pl-row-sel 描邊。
+var _PL_MON = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
 function _plRenderEntryRow(e) {
   var statusColor = { draft: '#f59e0b', confirmed: '#10b981', roster_removed: '#94a3b8' }[e.status] || '#94a3b8';
-  var time = '';
-  if (e.out_utc && e.in_utc) time = _plFmtUtcHHMM(e.out_utc) + ' → ' + _plFmtUtcHHMM(e.in_utc) + 'z';
-  else if (e.std_utc && e.sta_utc) time = _plFmtUtcHHMM(e.std_utc) + '/' + _plFmtUtcHHMM(e.sta_utc) + 'z (sched)';
-  // 自適應列：左側狀態色條 + 可換行的內容區。block/position 成組靠右（margin-left:auto），
-  // 窄螢幕擠不下時整組換到第二行而不會被裁掉；iPad 全寬時維持單行。
-  return '<div onclick="_plOpenEditor(\'' + e.id + '\')" ' +
-    'style="background:var(--card);border-radius:8px;padding:10px;margin-bottom:6px;cursor:pointer;display:flex;gap:10px;align-items:stretch">' +
-    '<div style="flex:0 0 5px;background:' + statusColor + ';border-radius:3px"></div>' +
-    '<div style="flex:1 1 auto;min-width:0;display:flex;flex-wrap:wrap;gap:2px 10px;align-items:center">' +
-      '<div style="flex:0 0 auto;min-width:70px"><div style="font-size:.78em;font-weight:700">' + _plFmtDate(e.flight_date) + '</div>' +
-        '<div style="font-size:.66em;color:var(--muted)">' + _plEsc(e.flight_no || '') + '</div></div>' +
-      '<div style="flex:1 1 96px;min-width:90px;font-size:.78em">' + _plEsc(e.origin || '???') + ' → ' + _plEsc(e.dest || '???') + '</div>' +
-      '<div style="flex:0 1 auto;font-size:.7em;color:var(--muted)">' + _plEsc(e.aircraft_type || '') +
-        (e.tail_no ? ' / ' + _plEsc(e.tail_no) : '') + '</div>' +
-      (time ? '<div style="flex:0 1 auto;font-size:.68em;color:var(--muted)">' + time + '</div>' : '') +
-      '<div style="flex:0 0 auto;margin-left:auto;text-align:right">' +
-        '<div style="font-size:.78em;font-weight:700">' + (e.block_minutes ? _plMinToHHMM(e.block_minutes) : '—') + '</div>' +
-        '<div style="font-size:.6em;color:' + statusColor + '">' + _plEsc(e.position || '') + '</div>' +
-      '</div>' +
+
+  // 日期：拆 day / MON 'YY
+  var ds = String(e.flight_date || '').slice(0, 10);
+  var dayNum = '', monthYr = '';
+  if (/^\d{4}-\d{2}-\d{2}$/.test(ds)) {
+    var p = ds.split('-');
+    dayNum = p[2];
+    monthYr = _PL_MON[parseInt(p[1], 10) - 1] + " '" + p[0].slice(2);
+  }
+
+  // 起降時間 + 中段標籤
+  var dep = '', arr = '', mid = '';
+  if (e.out_utc && e.in_utc) {
+    dep = _plFmtUtcHHMM(e.out_utc); arr = _plFmtUtcHHMM(e.in_utc);
+    mid = e.block_minutes ? _plMinToHHMM(e.block_minutes) + ' hrs' : '';
+  } else if (e.std_utc && e.sta_utc) {
+    dep = _plFmtUtcHHMM(e.std_utc); arr = _plFmtUtcHHMM(e.sta_utc);
+    mid = (e.block_minutes ? _plMinToHHMM(e.block_minutes) + ' ' : '') + 'sched';
+  } else {
+    mid = e.block_minutes ? _plMinToHHMM(e.block_minutes) + ' hrs' : '—';
+  }
+
+  // line 3 機尾/機型 + Flt#
+  var acIcon = (e.out_utc && e.in_utc) ? '✈' : '🛠';
+  var acMeta = acIcon + ' ' + _plEsc(e.tail_no || '') + (e.aircraft_type ? ', ' + _plEsc(e.aircraft_type) : '');
+  var fltNo = e.flight_no ? 'Flt ' + _plEsc(e.flight_no) : '';
+
+  // line 4 組員
+  var crewNames = '';
+  try { crewNames = _plEntryCrewNames(e).join(', '); } catch (_e) {}
+
+  var selCls = (_pl.selectedId === e.id) ? ' pl-row-sel' : '';
+  var times = '<div style="display:flex;align-items:center;gap:8px;font-size:.72em;color:var(--muted)">' +
+    '<span style="min-width:34px">' + dep + '</span>' +
+    '<span style="flex:1;display:flex;align-items:center;gap:8px;min-width:0">' +
+      '<span style="flex:1;height:1px;background:var(--border)"></span>' +
+      '<span style="white-space:nowrap">' + mid + '</span>' +
+      '<span style="flex:1;height:1px;background:var(--border)"></span>' +
+    '</span>' +
+    '<span style="min-width:34px;text-align:right">' + arr + '</span>' +
+  '</div>';
+
+  var airports = '<div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px">' +
+    '<span style="font-size:1.35em;font-weight:800;letter-spacing:.5px">' + _plEsc(e.origin || '???') + '</span>' +
+    '<span style="font-size:1.35em;font-weight:800;letter-spacing:.5px">' + _plEsc(e.dest || '???') + '</span>' +
+  '</div>';
+
+  var meta = '<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;font-size:.7em;color:var(--muted)">' +
+    '<span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0">' + acMeta + '</span>' +
+    '<span style="white-space:nowrap">' + fltNo + '</span>' +
+  '</div>';
+
+  var crewLine = crewNames
+    ? '<div style="font-size:.7em;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + _plEsc(crewNames) + '</div>'
+    : '';
+
+  return '<div class="pl-row' + selCls + '" onclick="_plOpenEditor(\'' + e.id + '\')" ' +
+    'style="background:var(--card);border-radius:10px;padding:10px 12px;margin-bottom:8px;cursor:pointer;display:flex;gap:12px;align-items:stretch">' +
+    '<div style="flex:0 0 4px;background:' + statusColor + ';border-radius:3px"></div>' +
+    '<div style="flex:0 0 50px;padding-top:1px">' +
+      '<div style="font-size:1.85em;font-weight:800;line-height:.9">' + dayNum + '</div>' +
+      '<div style="font-size:.58em;color:var(--muted);margin-top:3px;letter-spacing:.5px;white-space:nowrap">' + monthYr + '</div>' +
     '</div>' +
-    '</div>';
+    '<div style="flex:1 1 auto;min-width:0;display:flex;flex-direction:column;gap:4px">' +
+      times + airports + meta + crewLine +
+    '</div>' +
+  '</div>';
 }
 
 function _plRenderList() {
@@ -465,9 +534,18 @@ function _plRenderList() {
   c.innerHTML = _pl.entries.map(_plRenderEntryRow).join('');
 }
 
-function _plSetFilter(f) {
+async function _plSetFilter(f) {
   _pl.filter = f;
-  _plRefreshMain();
+  // iPad split view 編輯中：filter 只刷 list + toolbar 高亮，不重建整個 Logbook，
+  // 否則會把右側 editor DOM 連同未存的修改一起清掉（codex deep P2-1）。
+  if (_pl.editing && _plWide() && document.getElementById('pl-detail-pane')) {
+    await _plFetchAll();
+    var tb = document.getElementById('pl-toolbar');
+    if (tb) tb.innerHTML = _plRenderToolbar();
+    _plRenderList();
+    return;
+  }
+  await _plRefreshMain();
 }
 
 async function _plRefreshMain() {
@@ -477,6 +555,8 @@ async function _plRefreshMain() {
 
 // Logbook tab：航班清單 + toolbar（New / Import / Aircraft / Crew）+ 篩選。
 // 統計已搬到 Analyze tab。
+// iPad（>=768px）：底下用 .pl-split 並排左列表 + 右明細（master-detail）；
+// iPhone（<768px）：detail-pane CSS 藏起來，列表撐滿、點一筆走 _plOpenEditor 全螢幕。
 function _plRenderMain() {
   var c = document.getElementById('pilotlog-content');
   if (!c) return;
@@ -489,8 +569,11 @@ function _plRenderMain() {
         '<div style="font-size:1em;font-weight:700">📒 Logbook</div>' +
         '<div style="font-size:.65em;color:var(--muted)">' + _plEsc(_pl.user.primaryEmail || '') + '</div>' +
       '</div>' +
-      _plRenderToolbar() +
-      '<div id="pl-list"></div>' +
+      '<div id="pl-toolbar">' + _plRenderToolbar() + '</div>' +
+      '<div class="pl-split">' +
+        '<div class="pl-list-pane"><div id="pl-list"></div></div>' +
+        '<div class="pl-detail-pane" id="pl-detail-pane">' + _plDetailPlaceholder() + '</div>' +
+      '</div>' +
     '</div>';
   _plRenderList();
 }
@@ -548,11 +631,26 @@ function _plOpenEditor(id) {
       _pl.editing.aircraft_type = _pl.aircraft[0].type_code;
     }
   }
-  _plRenderEditor();
+  // iPad（>=768px）且 logbook 的右明細面板存在 → render 到右側、列表保留；
+  // 否則（iPhone、或 Aircraft/Crew detail 等場景）→ 全螢幕（原行為）
+  _pl.selectedId = id || null;
+  if (_plWide() && document.getElementById('pl-detail-pane')) {
+    _plRenderEditor('pl-detail-pane');
+    _plRenderList();                    // 重畫列表套用 .pl-row-sel highlight
+  } else {
+    _plRenderEditor();
+  }
 }
 
 function _plCloseEditor() {
   _pl.editing = null;
+  _pl.selectedId = null;
+  // iPad split：清右側回 placeholder + 重畫列表去掉 highlight；列表保持原位不重 fetch
+  if (_plWide() && document.getElementById('pl-detail-pane')) {
+    document.getElementById('pl-detail-pane').innerHTML = _plDetailPlaceholder();
+    _plRenderList();
+    return;
+  }
   _plRenderMain();
 }
 
@@ -606,10 +704,15 @@ function _plEditorField(label, name, type, opts) {
     input + '</div>';
 }
 
-function _plRenderEditor() {
-  var c = document.getElementById('pilotlog-content');
+// target：'pilotlog-content'（預設，全螢幕）或 'pl-detail-pane'（iPad 右側明細面板）。
+// 兩個目標差別只在 header 的關閉鈕標籤（← 回列表 / ✕ 關閉明細）。
+function _plRenderEditor(target) {
+  target = target || 'pilotlog-content';
+  var c = document.getElementById(target);
   if (!c || !_pl.editing) return;
   var e = _pl.editing;
+  var inDetail = (target === 'pl-detail-pane');
+  var closeLabel = inDetail ? '✕' : '←';
   var statusBadge = e.id ? (
     '<span style="background:' +
     ({ draft:'#f59e0b', confirmed:'#10b981', roster_removed:'#94a3b8' }[e.status] || '#666') +
@@ -622,7 +725,7 @@ function _plRenderEditor() {
   c.innerHTML =
     '<div style="padding:10px 14px">' +
     '<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">' +
-      '<button onclick="_plCloseEditor()" style="background:transparent;border:0;color:var(--text);font-size:1.2em;cursor:pointer">←</button>' +
+      '<button onclick="_plCloseEditor()" style="background:transparent;border:0;color:var(--text);font-size:1.2em;cursor:pointer">' + closeLabel + '</button>' +
       '<div style="font-size:1em;font-weight:700">' + (e.id ? 'Edit Entry' : 'New Entry') + '</div>' + statusBadge +
       '<div style="flex:1"></div>' +
       (e.id && e.status !== 'confirmed' ? '<button onclick="_plSaveEntry(true)" style="background:#10b981;color:#fff;border:0;border-radius:6px;padding:6px 12px;font-size:.78em;font-weight:700;cursor:pointer">Confirm</button>' : '') +
@@ -771,6 +874,7 @@ async function _plSaveEntry(confirm) {
   }
   _plToast(confirm ? 'Confirmed' : 'Saved');
   _pl.editing = null;
+  _pl.selectedId = null;          // iPad detail pane 的選取也清掉，_plRenderMain 會重建成 placeholder
   await _plRefreshMain();
 }
 
@@ -782,6 +886,7 @@ async function _plDeleteEntry() {
   if (!r.ok) { _plToast('Delete failed', 'error'); return; }
   _plToast('Deleted');
   _pl.editing = null;
+  _pl.selectedId = null;
   await _plRefreshMain();
 }
 

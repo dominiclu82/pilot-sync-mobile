@@ -44,8 +44,8 @@ import { getSpaPilotLogJs } from '../spa/js-pilot-log.js';
 
 // ── 版本（比照 CrewSync / Morning：每次推版必更新；SW cache 名稱跟著走） ────
 // 本機 preview build 會暫時加 -tNN 後綴方便對版；推正式版前拿掉只留乾淨版號。
-export const PILOT_LOG_VERSION = 'V1.1.01';
-const PILOT_LOG_CACHE = 'pilotlog-v1-1-01';
+export const PILOT_LOG_VERSION = 'V1.1.02';
+const PILOT_LOG_CACHE = 'pilotlog-v1-1-02';
 
 export const pilotLogRouter = express.Router();
 
@@ -156,6 +156,35 @@ body {
   font-size: .82em; color: var(--muted); opacity: .8;
   cursor: pointer; text-decoration: underline; line-height: 1;
 }
+
+/* ── Logbook 分割視窗（向 LogTen Pro iPad 看齊）─────────────────────────────
+   寬螢幕(>=768px)：左列表 + 右明細並排，右側 sticky+獨立 scroll；
+   窄螢幕(iPhone)：detail-pane 藏起來，點一筆走 _plOpenEditor 全螢幕（維持原行為）。*/
+.pl-split { display: flex; flex-direction: column; gap: 10px; }
+.pl-list-pane { min-width: 0; }
+.pl-detail-pane { min-width: 0; }
+@media (min-width: 768px) {
+  .pl-split { flex-direction: row; align-items: flex-start; gap: 14px; }
+  .pl-list-pane { flex: 1 1 0; }
+  .pl-detail-pane {
+    flex: 1.25 1 0;
+    position: sticky; top: 8px;
+    max-height: calc(100dvh - 84px - env(safe-area-inset-bottom));
+    overflow-y: auto; -webkit-overflow-scrolling: touch;
+    background: var(--card); border-radius: 12px;
+    border: 1px solid var(--border);
+  }
+}
+@media (max-width: 767px) {
+  .pl-detail-pane { display: none; }
+}
+.pl-detail-empty {
+  color: var(--muted); text-align: center;
+  padding: 60px 20px; font-size: .85em; line-height: 1.6;
+}
+/* Logbook 列被選中時的外框（只 iPad 看得到，因為窄螢幕點下去直接全螢幕，沒有 highlight 需求） */
+.pl-row { transition: outline-color .12s; outline: 2px solid transparent; outline-offset: -2px; }
+.pl-row.pl-row-sel { outline-color: var(--accent); }
 
 /* About modal — 比照 Morning，加 overflow-x:hidden + overflow-wrap:break-word */
 .pl-modal-wrap {
@@ -285,6 +314,11 @@ if (document.readyState !== 'loading') pilotLogInit();
 function _renderPilotLogChangelog(): string {
   return `
     <div class="pl-cl-v">${PILOT_LOG_VERSION}</div>
+    <div class="pl-cl-txt">
+      <b>iPad 分割視窗（master-detail）對齊 LogTen Pro：</b>Logbook 在寬螢幕（≥768px）改為左列表＋右明細並排，點一筆右側直接開 editor、不跳全螢幕，左側被選取的列藍框 highlight；iPhone 維持點一筆全螢幕的行為，跳轉照舊。<b>列表改 LogTen 四行密集卡：</b>大日期（日／MON 'YY）／起飛 HHMM ── 飛時 hrs ── 落地 HHMM（中間用線連起來）／大字 ORIGIN ... DEST／✈ 機尾，機型 ... Flt#／組員姓名（單行省略）。原本 iPad 單行擠到兩端、中間留白的「空蕩」感消除。Aircraft / Crew drill-down 點航班仍走全螢幕 editor（那兩頁沒分割面板），切到 Analyze / Report 時選取自動清除。SW cache 跟著走 <code>pilotlog-v1-1-02</code>。<br>
+      <b>iPad master-detail split aligning with LogTen Pro:</b> on screens ≥768px the Logbook is now a side-by-side list + detail layout — tapping a row opens the editor on the right (no full-screen jump), with the selected row outlined in accent; iPhone keeps the tap → full-screen behavior unchanged. <b>Rows redesigned as LogTen-style dense 4-line cards:</b> big day / DEP HHMM ── duration ── ARR HHMM (connector line) / big airport codes ORIGIN ... DEST / ✈ tail, type ... Flt# / crew names (single-line ellipsis). Removes the empty-middle look of the previous single-line iPad row. Aircraft / Crew drill-down tap still uses the full-screen editor (those pages have no detail pane); switching to Analyze / Report auto-clears the selection. SW cache follows to <code>pilotlog-v1-1-02</code>.
+    </div>
+    <div class="pl-cl-v old">V1.1.0</div>
     <div class="pl-cl-txt">
       <b>介面大改版：對齊 CrewSync / 晨報。</b>主功能選單從內容頁上方的一排按鈕，改成底部固定的 <b>tab bar</b>（📊 Analyze / 📒 Logbook / 📄 Report）＋右側功能鍵區（☀️/🌙 日夜切換、A+/A- 字級 20 段、版號點開更新日誌）。<b>(1) 日夜主題：</b>新增完整淺色主題，沿用 CrewSync / 晨報 的 <code>data-theme</code> + CSS var pattern，偏好存 <code>pilotlog_theme</code> / <code>pilotlog_font_scale</code>（純本機、跨裝置不同步），load 時先套用避免 FOUC。<b>(2) Logbook：</b>原本的航班清單頁，集中所有資料管理 — 篩選、＋New Entry、📥 Import、✈️ Aircraft、👥 Crew 都在這；統計從這裡移走。<b>(3) Analyze（純統計）：</b>把 Total / PIC / SIC / Night、7/28/90 天 rolling、by-type 拉成獨立頁，再加近 12 個月 block hours 長條圖跟 by-type 水平 bar（純 inline SVG，不加 chart library、維持離線可用）。<b>(4) Report（全新）：</b>90 天起降 recency 卡片（日/夜起降次數、最後飛行日；僅供參考非官方判定）＋日期區間時數總表（預設今年至今，算 block/PIC/SIC/night/班數/落地數）＋匯出 CSV／列印。功能邏輯與既有 API 不動，純前端改版。<br>
       <b>Major UI redesign aligning with CrewSync / morning report.</b> The main menu moved from a top toolbar to a fixed bottom <b>tab bar</b> (📊 Analyze / 📒 Logbook / 📄 Report) plus a utility cluster (☀️/🌙 light-dark toggle, 20-step A+/A- font scale, version tag opening the changelog). <b>(1) Theme:</b> full light theme added, reusing CrewSync / morning report's <code>data-theme</code> + CSS-var pattern; preferences persist in <code>pilotlog_theme</code> / <code>pilotlog_font_scale</code> (per-device), applied early to avoid FOUC. <b>(2) Logbook:</b> the flight list page now centralizes all data management — filters, + New Entry, 📥 Import, ✈️ Aircraft, 👥 Crew; stats moved out. <b>(3) Analyze:</b> Total / PIC / SIC / Night, 7/28/90-day rolling, and by-type are now their own page, plus a trailing-12-month block-hours bar chart and by-type horizontal bars (pure inline SVG, no chart library, stays offline-capable). <b>(4) Report (new):</b> 90-day takeoff/landing recency cards (day/night counts, last flight date; informational, not an official currency determination) + a date-range hours summary (defaults to year-to-date: block/PIC/SIC/night/flights/landings) + CSV export / print. Backend APIs unchanged; frontend-only redesign. <b>(5) 平板／桌機全寬：</b>內容區拿掉 max-width 置中，iPad / 筆電不再兩側留白。<b>(6) 雙語說明：</b>各頁說明文字改中英對照（短標籤維持英文，飛行員通用），crew 中文名字是資料、完全不動。<b>(7) Report / Analyze 只計已飛：</b>recency / 時數 / 圖表 / CSV 都只算 <code>confirmed</code>（已飛）的 entry，draft（計畫中）跟 roster_removed 不計入，避免起降數與 block 時數灌水。<br>
