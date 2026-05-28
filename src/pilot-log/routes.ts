@@ -45,8 +45,8 @@ import { getSpaPilotLogJs } from '../spa/js-pilot-log.js';
 
 // ── 版本（比照 CrewSync / Morning：每次推版必更新；SW cache 名稱跟著走） ────
 // 本機 preview build 會暫時加 -tNN 後綴方便對版；推正式版前拿掉只留乾淨版號。
-export const PILOT_LOG_VERSION = 'V1.2.06';
-const PILOT_LOG_CACHE = 'pilotlog-v1-2-06';
+export const PILOT_LOG_VERSION = 'V1.2.07';
+const PILOT_LOG_CACHE = 'pilotlog-v1-2-07';
 
 export const pilotLogRouter = express.Router();
 
@@ -329,6 +329,11 @@ if (document.readyState !== 'loading') pilotLogInit();
 function _renderPilotLogChangelog(): string {
   return `
     <div class="pl-cl-v">${PILOT_LOG_VERSION}</div>
+    <div class="pl-cl-txt">
+      <b>[Admin/Ops] 用量成長追蹤 + 多久滿 1 GB 推估。</b>後台新增<b>「成長速度 / 多久滿 1 GB」</b>卡片：定期記錄整庫 / 餐廳+其他 / pilot-log 的大小快照（每天開一次後台各記一筆），用今天比過去算出<b>每天 +X MB、每月 +Y MB</b>（其中餐廳吃多少），並推估照現況<b>約幾個月後、哪天會到 1 GB 上限</b>。剛上線會顯示「累積中」，約 2-3 天有足夠快照後就會出現速度與滿載日。新增 <code>pilot_db_size_history</code> 表。<br>
+      <b>[Admin/Ops] Usage-growth tracking + time-to-full (1 GB) estimate.</b> The admin page gains a <b>"growth speed / time to 1 GB"</b> card: it snapshots whole-DB / restaurant+other / pilot-log sizes over time (one per day when the dashboard is opened) and derives <b>+X MB/day, +Y MB/month</b> (with the restaurant share), plus a projection of <b>how many months until — and roughly which date — the 1 GB plan limit is hit</b>. Right after launch it shows "accumulating"; after ~2-3 days of snapshots the speed and full date appear. New <code>pilot_db_size_history</code> table.
+    </div>
+    <div class="pl-cl-v old">V1.2.06</div>
     <div class="pl-cl-txt">
       <b>[Admin/Ops] 可查詢的 DB 用量後台。</b>不用再每次問 — 新增 <code>/pilot-log/admin</code> 後台頁面：輸入 admin 密碼（<code>PILOT_LOG_ADMIN_PW</code>，存 sessionStorage 免重打）→ 顯示<b>整個資料庫對 1GB 的用量進度條</b>、<b>餐廳 + 其他 vs Pilot Log 組成</b>、<b>各表大小排行</b>（餐廳出勤系統的表也看得到）、使用者/航班統計、Top users。admin/stats 端點同步加 <code>pg_database_size</code>（整個 DB 含餐廳）+ 全表 size 排行 + 剩餘空間。純後台 ops 功能，一般使用者體驗不變。<br>
       <b>[Admin/Ops] Queryable DB-usage dashboard.</b> New <code>/pilot-log/admin</code> page: enter the admin password (<code>PILOT_LOG_ADMIN_PW</code>, cached in sessionStorage) → shows whole-database usage vs the 1 GB plan (progress bar), restaurant+other vs Pilot Log composition, per-table size ranking (the restaurant/attendance tables show up too), user/flight stats, and top users. The admin/stats endpoint now also returns <code>pg_database_size</code> (whole DB incl. restaurant), an all-table size ranking, and free space. Ops-only; no change to the normal pilot experience.
@@ -1065,6 +1070,7 @@ pilotLogRouter.get('/api/pilot-log/admin/stats', async (req, res) => {
     const tableNames = [
       'pilot_users', 'pilot_user_emails', 'pilot_user_sessions', 'pilot_log_entries',
       'pilot_aircraft', 'pilot_aircraft_types', 'crew', 'crew_employee_ids',
+      'pilot_db_size_history',
     ];
     const tables: Record<string, any> = {};
     let totalSize = 0;
@@ -1107,6 +1113,76 @@ pilotLogRouter.get('/api/pilot-log/admin/stats', async (req, res) => {
       approx_rows: Number(r.approx_rows),
     }));
 
+    // ── V1.2.07：用量歷史快照 + 成長速度 / 滿載推估 ─────────────────────────────
+    // 寫入時機：距上一筆 > 20h 才插一筆（admin 開一次最多記一天的量，不另開 cron）。
+    const restaurantEtcBytes = dbTotalBytes - totalSize;
+    const lastSnap = (await pool.query(
+      `SELECT captured_at FROM pilot_db_size_history ORDER BY captured_at DESC LIMIT 1`
+    )).rows[0];
+    const SNAP_GAP_MS = 20 * 3600 * 1000;
+    if (!lastSnap || (now - new Date(lastSnap.captured_at).getTime()) > SNAP_GAP_MS) {
+      await pool.query(
+        `INSERT INTO pilot_db_size_history (db_total_bytes, pilot_log_bytes, restaurant_etc_bytes)
+         VALUES ($1, $2, $3)`,
+        [dbTotalBytes, totalSize, restaurantEtcBytes]
+      );
+    }
+    const histRows = (await pool.query(
+      `SELECT captured_at, db_total_bytes, restaurant_etc_bytes
+       FROM pilot_db_size_history ORDER BY captured_at ASC`
+    )).rows;
+    const MB = 1024 * 1024;
+    const DAY_MS = 86400 * 1000;
+    const hist = histRows.map((r: any) => ({
+      t: new Date(r.captured_at).getTime(),
+      total: Number(r.db_total_bytes),
+      rest: Number(r.restaurant_etc_bytes),
+    }));
+    const growth: any = {
+      snapshot_count: hist.length,
+      history_days: 0,        // 已記錄的時間跨度（天）
+      basis_days: 0,          // 算速度用的實際跨度
+      per_day_total_mb: null,
+      per_day_restaurant_mb: null,
+      delta_30d_total_mb: null,
+      delta_30d_restaurant_mb: null,
+      months_to_1gb: null,
+      full_date_estimate: null,
+    };
+    if (hist.length >= 2) {
+      const first = hist[0];
+      const last = hist[hist.length - 1];
+      const spanMs = last.t - first.t;
+      growth.history_days = Math.round(spanMs / DAY_MS * 10) / 10;
+      if (spanMs >= 1.5 * DAY_MS) {  // 至少 ~1.5 天跨度才算得出有意義的速度
+        const days = spanMs / DAY_MS;
+        const rateTotal = (last.total - first.total) / days;   // bytes/day
+        const rateRest = (last.rest - first.rest) / days;
+        growth.basis_days = Math.round(days * 10) / 10;
+        growth.per_day_total_mb = Math.round(rateTotal / MB * 100) / 100;
+        growth.per_day_restaurant_mb = Math.round(rateRest / MB * 100) / 100;
+        growth.delta_30d_total_mb = Math.round(rateTotal * 30 / MB * 10) / 10;
+        growth.delta_30d_restaurant_mb = Math.round(rateRest * 30 / MB * 10) / 10;
+        if (rateTotal > 0) {
+          const remaining = GB - dbTotalBytes;
+          if (remaining <= 0) {
+            // 已超過 1 GB：不要算出負的月數 / 過去的日期
+            growth.months_to_1gb = 0;
+            growth.full_date_estimate = new Date(now).toISOString().slice(0, 10);
+          } else {
+            const daysToFull = remaining / rateTotal;
+            growth.months_to_1gb = Math.round(daysToFull / 30.44 * 10) / 10;
+            growth.full_date_estimate = new Date(now + daysToFull * DAY_MS).toISOString().slice(0, 10);
+          }
+        }
+      }
+    }
+    const sizeHistory = hist.slice(-60).map((r: { t: number; total: number; rest: number }) => ({
+      at: new Date(r.t).toISOString().slice(0, 10),
+      total_mb: Math.round(r.total / MB * 10) / 10,
+      restaurant_mb: Math.round(r.rest / MB * 10) / 10,
+    }));
+
     // ── Top users by entry count（永遠抓 max 50 進 cache，response 再 slice）────
     const topUsers = await pool.query(`
       SELECT
@@ -1140,10 +1216,12 @@ pilotLogRouter.get('/api/pilot-log/admin/stats', async (req, res) => {
         db_used_pct_of_1gb: Math.round(dbTotalBytes / GB * 1000) / 10,
         db_free_mb_of_1gb: Math.round((GB - dbTotalBytes) / 1024 / 1024 * 10) / 10,
         restaurant_etc_size_mb: Math.round((dbTotalBytes - totalSize) / 1024 / 1024 * 10) / 10,  // 總量扣掉 pilot-log = 餐廳+晨報+其他+開銷
+        growth,   // V1.2.07：成長速度 + 多久滿 1GB（需要歷史快照累積）
       },
       breakdown: {
         tables,
         top_tables_by_size: topTablesBySize,     // ← 全 DB 各表 size 排行（餐廳的表會在這）
+        size_history: sizeHistory,               // ← V1.2.07：近 60 筆用量快照（畫趨勢用）
         top_users_by_entries: topUsers.rows,    // ← 永遠 top 50
       },
       warnings: [],
@@ -1228,6 +1306,25 @@ function render(j){
     '<div class="big">' + fmtMB(s.db_total_size_mb) + ' <span class="muted" style="font-size:.5em">/ 1024 MB · ' + pct + '%</span></div>' +
     '<div class="bar"><i style="width:' + Math.min(pct,100) + '%"></i></div>' +
     '<div class="muted" style="font-size:.78em">剩餘 ' + fmtMB(s.db_free_mb_of_1gb) + '</div></div>';
+  // 成長速度 / 滿載推估（V1.2.07）
+  var g = s.growth || {};
+  out += '<div class="card"><div class="lbl">成長速度 / 多久滿 1 GB</div>';
+  if(g.months_to_1gb===0){
+    out += '<div class="big err">⚠️ 已達 / 超過 1 GB</div>';
+  } else if(g.months_to_1gb!=null){
+    out += '<div class="big">約 ' + g.months_to_1gb + ' 個月後滿</div>' +
+      '<div class="muted" style="font-size:.78em">推估滿載日 ' + (g.full_date_estimate||'—') + '（依最近 ' + g.basis_days + ' 天速度）</div>' +
+      '<div class="muted" style="font-size:.82em;line-height:1.9;margin-top:8px">' +
+      '每天 +' + (g.per_day_total_mb!=null?g.per_day_total_mb:'—') + ' MB（其中餐廳 +' + (g.per_day_restaurant_mb!=null?g.per_day_restaurant_mb:'—') + '）<br>' +
+      '每月約 +' + (g.delta_30d_total_mb!=null?g.delta_30d_total_mb:'—') + ' MB（其中餐廳 +' + (g.delta_30d_restaurant_mb!=null?g.delta_30d_restaurant_mb:'—') + '）</div>';
+  } else if(g.per_day_total_mb!=null){
+    out += '<div class="big muted">用量幾乎沒增長</div>' +
+      '<div class="muted" style="font-size:.82em;margin-top:6px">每天約 ' + g.per_day_total_mb + ' MB（依最近 ' + g.basis_days + ' 天）</div>';
+  } else {
+    out += '<div class="big muted">累積中…</div>' +
+      '<div class="muted" style="font-size:.8em;margin-top:6px">需要時間累積：已記錄 ' + (g.snapshot_count||0) + ' 筆快照、跨 ' + (g.history_days||0) + ' 天。每天開一次後台各記一筆，約 2-3 天後就能估速度與滿載日。</div>';
+  }
+  out += '</div>';
   // 組成
   out += '<div class="row2">' +
     '<div class="card"><div class="lbl">餐廳 + 其他</div><div class="big">' + fmtMB(s.restaurant_etc_size_mb) + '</div></div>' +

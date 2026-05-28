@@ -191,6 +191,21 @@ export async function ensureTables(): Promise<boolean> {
       CREATE INDEX IF NOT EXISTS idx_crew_eid_crew ON crew_employee_ids(crew_id);
     `);
 
+    // ── DB 用量歷史快照（V1.2.07）──────────────────────────────────────────────
+    // 全域（非 per-user）：定期記錄整庫 / pilot-log / 餐廳+其他 的大小，
+    // 之後拿「今天 vs N 天前」算成長速度、推估多久到 1GB。
+    // 寫入時機：admin/stats 被讀取且距上一筆 > ~20h 才插一筆（不另開 cron）。
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS pilot_db_size_history (
+        id SERIAL PRIMARY KEY,
+        captured_at TIMESTAMPTZ DEFAULT NOW(),
+        db_total_bytes BIGINT NOT NULL,
+        pilot_log_bytes BIGINT NOT NULL,
+        restaurant_etc_bytes BIGINT NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_pdsh_captured ON pilot_db_size_history(captured_at);
+    `);
+
     _ready = true;
     console.log('✅ Pilot Log tables ready');
     return true;
