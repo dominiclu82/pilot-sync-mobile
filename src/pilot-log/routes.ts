@@ -44,8 +44,8 @@ import { getSpaPilotLogJs } from '../spa/js-pilot-log.js';
 
 // ── 版本（比照 CrewSync / Morning：每次推版必更新；SW cache 名稱跟著走） ────
 // 本機 preview build 會暫時加 -tNN 後綴方便對版；推正式版前拿掉只留乾淨版號。
-export const PILOT_LOG_VERSION = 'V1.1.0';
-const PILOT_LOG_CACHE = 'pilotlog-v1-1-0';
+export const PILOT_LOG_VERSION = 'V1.1.01';
+const PILOT_LOG_CACHE = 'pilotlog-v1-1-01';
 
 export const pilotLogRouter = express.Router();
 
