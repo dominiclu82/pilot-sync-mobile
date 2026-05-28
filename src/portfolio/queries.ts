@@ -196,3 +196,18 @@ export async function deleteTransaction(userId: string, id: number): Promise<boo
   );
   return (r.rowCount ?? 0) > 0;
 }
+
+/**
+ * 刪整檔持股 = 刪掉該 user 該 symbol+market 的全部交易（buy/sell/dividend）。
+ * 持倉是從交易 derive 的，所以交易刪光那檔就從持股清單消失。回傳刪除筆數。
+ * 不動 dividend_events（那是公開共享的除權息 cache，不屬於 user）。
+ */
+export async function deleteHoldingBySymbol(userId: string, market: string, symbol: string): Promise<number> {
+  const pool = getPool();
+  if (!pool) throw new Error('no_db');
+  const r = await pool.query(
+    'DELETE FROM portfolio_transactions WHERE user_id = $1 AND market = $2 AND symbol = $3 RETURNING id',
+    [userId, market, symbol],
+  );
+  return r.rowCount ?? 0;
+}

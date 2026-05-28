@@ -31,6 +31,7 @@ import {
   insertManualTransaction,
   updateTransaction,
   deleteTransaction,
+  deleteHoldingBySymbol,
 } from './queries.js';
 import { calcOverall, calcAllViews } from './holdings.js';
 import { getPortfolioHtml } from './frontend.js';
@@ -367,6 +368,23 @@ portfolioRouter.delete('/api/portfolio/transaction/:id', pinGate, async (req, re
     const ok = await deleteTransaction(userId, id);
     if (!ok) return res.status(404).json({ error: 'not_found' });
     res.json({ ok: true, id });
+  } catch (e: any) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// 刪整檔持股（逐筆刪庫存）= 刪掉該 symbol+market 的全部交易，PIN 保護
+portfolioRouter.delete('/api/portfolio/holding/:market/:symbol', pinGate, async (req, res) => {
+  const userId = reqUserId(req)!;
+  const market = String(req.params.market || '').toUpperCase();
+  // symbol 統一轉大寫 — 儲存時是大寫，不轉的話小寫 client 會靜默刪 0 筆（codex P2，對齊其他 symbol endpoint）
+  const symbol = String(req.params.symbol || '').trim().toUpperCase();
+  if (market !== 'TW' && market !== 'US') return res.status(400).json({ error: 'invalid_market' });
+  if (!symbol) return res.status(400).json({ error: 'invalid_symbol' });
+
+  try {
+    const deleted = await deleteHoldingBySymbol(userId, market, symbol);
+    res.json({ ok: true, deleted, market, symbol });
   } catch (e: any) {
     res.status(500).json({ error: e.message });
   }

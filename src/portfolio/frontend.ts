@@ -200,7 +200,14 @@ export function getPortfolioHtml(): string {
         <div class="modal-body" style="max-height:60vh;overflow-y:auto">
           <div class="muted muted-small">獨立投資組合子系統 — 多筆買賣帳本、自動算均價、三視角持倉分析、opt-in PIN 保護</div>
           <div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border)">
-            <div style="font-weight:700;margin-bottom:6px">${APP_VERSION} — 統一版號 (晨報 + 投資組合共用)</div>
+            <div style="font-weight:700;margin-bottom:6px">${APP_VERSION} — [投資組合] 逐筆刪除持股</div>
+            <div class="muted" style="font-size:.85em;line-height:1.6;margin-bottom:12px">
+              每檔持股列加 🗑 刪除鈕（在 ＋ 旁），確認後刪掉<strong>這檔的全部交易</strong>（買 / 賣 / 配息）→ 該持股從清單消失。給清掉測試資料用。<br>
+              PIN 保護、只刪你自己這檔、不動其他持股、不動公開的除權息事件 cache。後端新 <code>DELETE /api/portfolio/holding/:market/:symbol</code>，刪光交易後持倉自然從交易帳本 derive 不出來。
+            </div>
+          </div>
+          <div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border)">
+            <div style="font-weight:700;margin-bottom:6px;color:var(--muted)">V2.0.01 — 統一版號 (晨報 + 投資組合共用)</div>
             <div class="muted" style="font-size:.85em;line-height:1.6;margin-bottom:12px">
               user request: 兩 PWA 合併一個版號方便辨識。從 V2.0.01 起 milestone：<br>
               (1) 新增 <code>src/version.ts</code> 單一 source of truth export
@@ -823,6 +830,12 @@ a.h-symbol-link:hover, a.h-symbol-link:active { color: var(--accent); text-decor
   cursor: pointer; line-height: 1.1; margin-left: 4px; flex-shrink: 0;
 }
 .h-add:hover, .h-add:active { background: var(--accent); color: #fff; }
+.h-del {
+  background: var(--bg-elev); border: 1px solid var(--border); color: var(--muted);
+  padding: 2px 7px; border-radius: 6px; font-size: .9em;
+  cursor: pointer; line-height: 1.1; margin-left: 4px; flex-shrink: 0;
+}
+.h-del:hover, .h-del:active { background: #dc2626; color: #fff; border-color: #dc2626; }
 /* 台灣股市慣例：漲紅 / 跌綠（跟歐美相反） */
 .up { color: var(--red); }
 .down { color: var(--green); }
@@ -1398,6 +1411,7 @@ function renderMain() {
           <div class="h-price">\${priceTxt}</div>
           <div class="h-chg \${chgClass}">\${chgTxt}</div>
           <span class="h-add" onclick="event.stopPropagation(); quickAddTxn('\${h.market}', '\${h.symbol}')" title="加交易">＋</span>
+          <span class="h-del" onclick="event.stopPropagation(); deleteHolding('\${h.market}', '\${h.symbol}')" title="刪除這檔持股">🗑</span>
         </div>
         <div class="h-row2">
           <span>\${fmtNum(h.qty)} 股 · 均價 \${fmtNum(h.avgCost)}</span>
@@ -1712,6 +1726,17 @@ async function submitAdd() {
     }
   } catch (e) {
     showErr('儲存失敗：' + e.message);
+  }
+}
+
+// 逐筆刪庫存：刪整檔持股（該 symbol+market 全部交易），PIN 保護、兩段確認避免誤觸
+async function deleteHolding(market, symbol) {
+  if (!confirm(market + ' ' + symbol + '\\n\\n確定刪除這檔持股嗎？\\n會刪掉這檔的全部交易紀錄（買 / 賣 / 配息），無法復原。')) return;
+  try {
+    await apiFetch('/holding/' + encodeURIComponent(market) + '/' + encodeURIComponent(symbol), { method: 'DELETE' });
+    refreshAll();
+  } catch (e) {
+    alert('刪除失敗：' + e.message);
   }
 }
 
