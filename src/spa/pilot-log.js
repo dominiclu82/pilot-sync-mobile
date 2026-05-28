@@ -23,6 +23,9 @@ var _pl = {
   suggest: { tail_nos: [], aircraft_types: [], airports: [] },
   editing: null,                 // entry being edited
   initialized: false,
+  tab: 'logbook',                // 底部主功能列：analyze | logbook | report
+  reportFrom: null,              // Report 區間總表的起日（YYYY-MM-DD），null = 今年初
+  reportTo: null,                // Report 區間總表的迄日，null = 今天
 };
 
 var _PL_LS_AT = 'pilotlog_at';
@@ -62,6 +65,70 @@ function _plClearSession() {
   _pl.accessToken = null;
   _pl.refreshToken = null;
   _pl.user = null;
+}
+
+// === SECTION: chrome（底部 tab / 日夜 / 字級）═══════════════════════════════
+// 全部沿用 CrewSync / 晨報 的 pattern：data-theme + font-scale 存 localStorage、純本機。
+// 早期 FOUC 防護在 shell <head> 的 inline script 先套用；這裡只負責切換 + 圖示同步。
+
+var _plFontScale = (function() {
+  try { var s = parseInt(localStorage.getItem('pilotlog_font_scale'), 10);
+    return (s >= -2 && s <= 17) ? s : 0; } catch (e) {} return 0;
+})();
+
+function _plAdjustFontSize(dir) {
+  _plFontScale = Math.max(-2, Math.min(17, _plFontScale + dir)); // -2..17 = 20 段
+  document.documentElement.style.fontSize = (100 + _plFontScale * 8) + '%';
+  try { localStorage.setItem('pilotlog_font_scale', String(_plFontScale)); } catch (e) {}
+}
+
+function _plToggleTheme() {
+  var html = document.documentElement;
+  var icon = document.getElementById('pl-theme-icon');
+  if (html.dataset.theme === 'light') {
+    delete html.dataset.theme;
+    if (icon) icon.textContent = '☀️';
+    try { localStorage.setItem('pilotlog_theme', 'dark'); } catch (e) {}
+  } else {
+    html.dataset.theme = 'light';
+    if (icon) icon.textContent = '🌙';
+    try { localStorage.setItem('pilotlog_theme', 'light'); } catch (e) {}
+  }
+}
+
+// 載入時把主題圖示對齊目前狀態（FOUC script 只設了 data-theme，沒動圖示）
+(function() {
+  try {
+    if (localStorage.getItem('pilotlog_theme') === 'light') {
+      var i = document.getElementById('pl-theme-icon');
+      if (i) i.textContent = '🌙';
+    }
+  } catch (e) {}
+})();
+
+function _plShowTabBar(show) {
+  var bar = document.getElementById('pl-tab-bar');
+  if (bar) bar.style.display = show ? 'flex' : 'none';
+}
+
+function _plHighlightTab(tab) {
+  ['analyze', 'logbook', 'report'].forEach(function(t) {
+    var b = document.getElementById('plTabBtn-' + t);
+    if (b) b.classList.toggle('pl-tab-active', t === tab);
+  });
+}
+
+// 底部三顆主功能切換。Logbook 內的 editor/import/aircraft/crew 都是 Logbook 的 sub-view，
+// 切 tab 一律先丟掉編輯中的草稿狀態回到該 tab 的頂層。
+function switchPlTab(tab, btn) {
+  if (!_pl.user) return;            // 未登入時 tab bar 是藏的，保險再擋一次
+  _pl.tab = tab;
+  _pl.editing = null;
+  _plHighlightTab(tab);
+  if (tab === 'analyze') _plRenderAnalyze();
+  else if (tab === 'report') _plRenderReport();
+  else _plRenderMain();
+  window.scrollTo(0, 0);
 }
 
 // === SECTION: utils ═════════════════════════════════════════════════════════
@@ -364,17 +431,23 @@ function _plRenderEntryRow(e) {
   var time = '';
   if (e.out_utc && e.in_utc) time = _plFmtUtcHHMM(e.out_utc) + ' → ' + _plFmtUtcHHMM(e.in_utc) + 'z';
   else if (e.std_utc && e.sta_utc) time = _plFmtUtcHHMM(e.std_utc) + '/' + _plFmtUtcHHMM(e.sta_utc) + 'z (sched)';
+  // 自適應列：左側狀態色條 + 可換行的內容區。block/position 成組靠右（margin-left:auto），
+  // 窄螢幕擠不下時整組換到第二行而不會被裁掉；iPad 全寬時維持單行。
   return '<div onclick="_plOpenEditor(\'' + e.id + '\')" ' +
-    'style="background:var(--card);border-radius:8px;padding:10px;margin-bottom:6px;cursor:pointer;display:flex;gap:10px;align-items:center">' +
-    '<div style="width:6px;height:38px;background:' + statusColor + ';border-radius:3px"></div>' +
-    '<div style="min-width:90px"><div style="font-size:.78em;font-weight:700">' + _plFmtDate(e.flight_date) + '</div>' +
-      '<div style="font-size:.66em;color:var(--muted)">' + _plEsc(e.flight_no || '') + '</div></div>' +
-    '<div style="min-width:120px;font-size:.78em">' + _plEsc(e.origin || '???') + ' → ' + _plEsc(e.dest || '???') + '</div>' +
-    '<div style="min-width:90px;font-size:.7em;color:var(--muted)">' + _plEsc(e.aircraft_type || '') +
-      (e.tail_no ? ' / ' + _plEsc(e.tail_no) : '') + '</div>' +
-    '<div style="min-width:90px;font-size:.68em;color:var(--muted)">' + time + '</div>' +
-    '<div style="min-width:60px;font-size:.74em;text-align:right">' + (e.block_minutes ? _plMinToHHMM(e.block_minutes) : '—') + '</div>' +
-    '<div style="min-width:50px;font-size:.62em;text-align:right;color:' + statusColor + '">' + (e.position || '') + '</div>' +
+    'style="background:var(--card);border-radius:8px;padding:10px;margin-bottom:6px;cursor:pointer;display:flex;gap:10px;align-items:stretch">' +
+    '<div style="flex:0 0 5px;background:' + statusColor + ';border-radius:3px"></div>' +
+    '<div style="flex:1 1 auto;min-width:0;display:flex;flex-wrap:wrap;gap:2px 10px;align-items:center">' +
+      '<div style="flex:0 0 auto;min-width:70px"><div style="font-size:.78em;font-weight:700">' + _plFmtDate(e.flight_date) + '</div>' +
+        '<div style="font-size:.66em;color:var(--muted)">' + _plEsc(e.flight_no || '') + '</div></div>' +
+      '<div style="flex:1 1 96px;min-width:90px;font-size:.78em">' + _plEsc(e.origin || '???') + ' → ' + _plEsc(e.dest || '???') + '</div>' +
+      '<div style="flex:0 1 auto;font-size:.7em;color:var(--muted)">' + _plEsc(e.aircraft_type || '') +
+        (e.tail_no ? ' / ' + _plEsc(e.tail_no) : '') + '</div>' +
+      (time ? '<div style="flex:0 1 auto;font-size:.68em;color:var(--muted)">' + time + '</div>' : '') +
+      '<div style="flex:0 0 auto;margin-left:auto;text-align:right">' +
+        '<div style="font-size:.78em;font-weight:700">' + (e.block_minutes ? _plMinToHHMM(e.block_minutes) : '—') + '</div>' +
+        '<div style="font-size:.6em;color:' + statusColor + '">' + _plEsc(e.position || '') + '</div>' +
+      '</div>' +
+    '</div>' +
     '</div>';
 }
 
@@ -383,7 +456,9 @@ function _plRenderList() {
   if (!c) return;
   if (_pl.entries.length === 0) {
     c.innerHTML = '<div style="text-align:center;color:var(--muted);padding:30px;font-size:.85em">' +
-      (_pl.filter === 'all' ? '尚無紀錄。點 <b>+ New Entry</b> 新增，或 <b>📥 Import</b> 匯入 LogTen Pro 資料。' : '此分類無紀錄。') +
+      (_pl.filter === 'all'
+        ? '尚無紀錄。點 <b>+ New Entry</b> 新增，或 <b>📥 Import</b> 匯入 LogTen Pro 資料。<br>No entries yet — tap <b>+ New Entry</b>, or <b>📥 Import</b> your LogTen Pro data.'
+        : '此分類無紀錄。<br>No entries in this filter.') +
     '</div>';
     return;
   }
@@ -400,16 +475,20 @@ async function _plRefreshMain() {
   _plRenderMain();
 }
 
+// Logbook tab：航班清單 + toolbar（New / Import / Aircraft / Crew）+ 篩選。
+// 統計已搬到 Analyze tab。
 function _plRenderMain() {
   var c = document.getElementById('pilotlog-content');
   if (!c) return;
   if (!_pl.user) { _plRenderLogin(); return; }
+  _plShowTabBar(true);
+  _plHighlightTab('logbook');
   c.innerHTML =
-    '<div style="padding:10px">' +
+    '<div style="padding:10px 14px">' +
       '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">' +
-        '<div style="font-size:.7em;color:var(--muted)">' + _plEsc(_pl.user.primaryEmail || '') + '</div>' +
+        '<div style="font-size:1em;font-weight:700">📒 Logbook</div>' +
+        '<div style="font-size:.65em;color:var(--muted)">' + _plEsc(_pl.user.primaryEmail || '') + '</div>' +
       '</div>' +
-      _plRenderStats() +
       _plRenderToolbar() +
       '<div id="pl-list"></div>' +
     '</div>';
@@ -419,6 +498,7 @@ function _plRenderMain() {
 function _plRenderLogin() {
   var c = document.getElementById('pilotlog-content');
   if (!c) return;
+  _plShowTabBar(false);
   c.innerHTML =
     '<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:60px 20px;text-align:center;gap:14px">' +
       '<div style="font-size:2.5em">📒</div>' +
@@ -540,7 +620,7 @@ function _plRenderEditor() {
   typeOptions = Array.from(new Set(typeOptions));
 
   c.innerHTML =
-    '<div style="padding:10px;max-width:760px;margin:0 auto">' +
+    '<div style="padding:10px 14px">' +
     '<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">' +
       '<button onclick="_plCloseEditor()" style="background:transparent;border:0;color:var(--text);font-size:1.2em;cursor:pointer">←</button>' +
       '<div style="font-size:1em;font-weight:700">' + (e.id ? 'Edit Entry' : 'New Entry') + '</div>' + statusBadge +
@@ -716,43 +796,49 @@ function _plOpenImport() {
       '<div style="font-size:1em;font-weight:700">Import LogTen Pro</div>' +
     '</div>' +
     '<div style="background:var(--card);border-radius:10px;padding:14px;margin-bottom:12px">' +
-      '<div style="font-size:.85em;font-weight:700;margin-bottom:6px">✈️ Flights (Tab 動態匯出)</div>' +
+      '<div style="font-size:.85em;font-weight:700;margin-bottom:6px">✈️ Flights · Tab 動態匯出 / Dynamic Export</div>' +
       '<div style="font-size:.7em;color:var(--muted);margin-bottom:8px;line-height:1.5">' +
         'LogTen Pro 6 → File → Export → Dynamic Export Flights (Tab)。<br>' +
-        '必填欄位：Date / Flight # / From / To / Aircraft Type / Aircraft ID / Out / In / On Duty / Off Duty / PIC/P1 / SIC/P2。' +
+        '必填欄位 / Required columns：Date / Flight # / From / To / Aircraft Type / Aircraft ID / Out / In / On Duty / Off Duty / PIC/P1 / SIC/P2。' +
       '</div>' +
       '<input type="file" id="pl-flights-file" accept=".txt,.tab,.tsv,text/plain" style="font-size:.78em">' +
       '<div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap">' +
         '<button onclick="_plUploadFlights(true)" style="background:#475569;color:#fff;border:0;border-radius:6px;padding:6px 12px;font-size:.78em;font-weight:700;cursor:pointer">🔍 Preview (dry-run)</button>' +
         '<button onclick="_plUploadFlights(false)" style="background:#10b981;color:#fff;border:0;border-radius:6px;padding:6px 12px;font-size:.78em;font-weight:700;cursor:pointer">Import</button>' +
       '</div>' +
-      '<div style="font-size:.65em;color:var(--muted);margin-top:6px">建議先 Preview 確認所有 row 都解析正常，再按 Import。</div>' +
+      '<div style="font-size:.65em;color:var(--muted);margin-top:6px">建議先 Preview 確認每筆都解析正常，再按 Import。<br>Run Preview first to confirm every row parses, then Import.</div>' +
     '</div>' +
     '<div style="background:var(--card);border-radius:10px;padding:14px;margin-bottom:12px">' +
-      '<div style="font-size:.85em;font-weight:700;margin-bottom:6px">🛩️ Aircraft / 機尾庫（LogTen Aircraft 匯出）</div>' +
+      '<div style="font-size:.85em;font-weight:700;margin-bottom:6px">🛩️ Aircraft · 機尾庫 / Tail registry（LogTen Aircraft）</div>' +
       '<div style="font-size:.7em;color:var(--muted);margin-bottom:8px;line-height:1.5">' +
         '⚠️ 是 LogTen 的 <b>Aircraft</b> export（每筆有機號），<b>不是 Aircraft Types</b>。<br>' +
-        '建你的機尾庫，之後新增 entry 時 tail # 可自動帶 operator/type/notes。<br>' +
-        '必填欄位：Aircraft ID / Operator / Type。' +
+        'This is the LogTen <b>Aircraft</b> export (each row has a tail #), <b>not Aircraft Types</b>.<br>' +
+        '建你的機尾庫，新增 entry 時 tail # 可自動帶 operator/type/notes。<br>' +
+        'Builds your tail registry so new entries auto-fill operator/type/notes from the tail #.<br>' +
+        '必填欄位 / Required columns：Aircraft ID / Operator / Type。' +
       '</div>' +
       '<input type="file" id="pl-aircraft-file" accept=".txt,.tab,.tsv,text/plain" style="font-size:.78em">' +
       '<button onclick="_plUploadAircraft()" style="margin-left:8px;background:#6366f1;color:#fff;border:0;border-radius:6px;padding:6px 12px;font-size:.78em;font-weight:700;cursor:pointer">Upload</button>' +
     '</div>' +
     '<div style="background:var(--card);border-radius:10px;padding:14px;margin-bottom:12px">' +
-      '<div style="font-size:.85em;font-weight:700;margin-bottom:6px">🧭 Aircraft Types / 機型目錄（LogTen Aircraft Types 匯出）</div>' +
+      '<div style="font-size:.85em;font-weight:700;margin-bottom:6px">🧭 Aircraft Types · 機型目錄 / Type catalog（LogTen Aircraft Types）</div>' +
       '<div style="font-size:.7em;color:var(--muted);margin-bottom:8px;line-height:1.5">' +
         '⚠️ 是 LogTen 的 <b>Aircraft Types</b> export（type 為主、無機號），<b>跟上面 Aircraft 不同檔</b>。<br>' +
-        '建你的機型目錄，之後 Aircraft 列表 / drill-down 顯示完整廠商機型（例：A359 → Airbus A-350-900）。<br>' +
-        '必填欄位：Type。Make / Model / Engine Type / Category / Class / Notes 都可選。' +
+        'This is the LogTen <b>Aircraft Types</b> export (type-centric, no tail #), <b>a different file from Aircraft above</b>.<br>' +
+        '建你的機型目錄，Aircraft 列表 / drill-down 會顯示完整廠商機型（例：A359 → Airbus A-350-900）。<br>' +
+        'Builds your type catalog so the Aircraft list / drill-down shows full make/model (e.g. A359 → Airbus A-350-900).<br>' +
+        '必填欄位 / Required：Type。Make / Model / Engine Type / Category / Class / Notes 皆選填 / optional。' +
       '</div>' +
       '<input type="file" id="pl-aircraft-types-file" accept=".txt,.tab,.tsv,text/plain" style="font-size:.78em">' +
       '<button onclick="_plUploadAircraftTypes()" style="margin-left:8px;background:#6366f1;color:#fff;border:0;border-radius:6px;padding:6px 12px;font-size:.78em;font-weight:700;cursor:pointer">Upload</button>' +
     '</div>' +
     '<div style="background:var(--card);border-radius:10px;padding:14px">' +
-      '<div style="font-size:.85em;font-weight:700;margin-bottom:6px">👥 Address Book (Tab 匯出，選用)</div>' +
+      '<div style="font-size:.85em;font-weight:700;margin-bottom:6px">👥 Address Book · Tab 匯出 / export（選用 optional）</div>' +
       '<div style="font-size:.7em;color:var(--muted);margin-bottom:8px;line-height:1.5">' +
-        'LogTen Pro → File → Export → Address Book Tab。匯入 crew 名單（含 pilots 與 cabin crew）給之後篩選 / 查同事飛過的航班用。<br>' +
-        '必填欄位：Name / ID / This is Me。「This is Me=1」會自動標記成你本人，同 user 一次只能有一筆 self。' +
+        'LogTen Pro → File → Export → Address Book Tab。匯入 crew 名單（含 pilots 與 cabin crew）供日後篩選 / 查同事飛過的航班。<br>' +
+        'Imports the crew roster (pilots and cabin crew) for later filtering and shared-flight lookup.<br>' +
+        '必填欄位 / Required：Name / ID / This is Me。「This is Me=1」自動標記成你本人，每位 user 只能有一筆 self。<br>' +
+        '“This is Me=1” marks the row as yourself; only one self per user.' +
       '</div>' +
       '<input type="file" id="pl-addressbook-file" accept=".txt,.tab,.tsv,text/plain" style="font-size:.78em">' +
       '<button onclick="_plUploadAddressBook()" style="margin-left:8px;background:#6366f1;color:#fff;border:0;border-radius:6px;padding:6px 12px;font-size:.78em;font-weight:700;cursor:pointer">Upload</button>' +
@@ -761,8 +847,8 @@ function _plOpenImport() {
     '<div style="background:rgba(127,29,29,.2);border:1px solid #7f1d1d;border-radius:10px;padding:14px;margin-top:24px">' +
       '<div style="font-size:.85em;font-weight:700;margin-bottom:6px;color:#fca5a5">⚠️ Danger Zone</div>' +
       '<div style="font-size:.7em;color:var(--muted);margin-bottom:8px;line-height:1.5">' +
-        '一鍵砍掉你**所有 LogTen 來源**的 entries（manual / roster 來源不會動、機尾庫不會動）。<br>' +
-        '匯入失敗或想完全重來的時候用。<strong style="color:#fca5a5">不可復原。</strong>' +
+        '一鍵砍掉你<b>所有 LogTen 來源</b>的 entries（manual / roster 來源不動、機尾庫不動）。匯入失敗或想完全重來時用。<br>' +
+        'Deletes <b>all LogTen-sourced</b> entries (manual / roster entries and the tail registry are untouched). Use after a botched import or to start over. <strong style="color:#fca5a5">不可復原 / Cannot be undone.</strong>' +
       '</div>' +
       '<button onclick="_plWipeLogten()" style="background:#dc2626;color:#fff;border:0;border-radius:6px;padding:6px 12px;font-size:.78em;font-weight:700;cursor:pointer">🗑️ Wipe all my LogTen entries</button>' +
     '</div>' +
@@ -971,7 +1057,7 @@ async function _plOpenAircraft() {
   var c = document.getElementById('pilotlog-content');
   if (!c) return;
   // Loading state（避免空白）
-  c.innerHTML = '<div style="text-align:center;color:var(--muted);padding:40px;font-size:.85em">載入機尾庫…</div>';
+  c.innerHTML = '<div style="text-align:center;color:var(--muted);padding:40px;font-size:.85em">載入機尾庫… · Loading aircraft…</div>';
   // 同時拉 aircraft 清單跟完整 entries（兩者各自獨立、可並行）
   await Promise.all([_plFetchAll(), _plFetchAircraftEntries()]);
   _plRenderAircraftList();
@@ -1002,7 +1088,7 @@ function _plRenderAircraftList() {
   }
   var rows = '';
   if (_pl.aircraft.length === 0) {
-    rows = '<div style="text-align:center;color:var(--muted);padding:30px;font-size:.85em">機尾庫是空的。點 <b>+ Add Aircraft</b> 手動加，或從 <b>📥 Import</b> 上傳 LogTen Aircraft 檔。</div>';
+    rows = '<div style="text-align:center;color:var(--muted);padding:30px;font-size:.85em">機尾庫是空的。點 <b>+ Add Aircraft</b> 手動加，或從 <b>📥 Import</b> 上傳 LogTen Aircraft 檔。<br>No aircraft yet — tap <b>+ Add Aircraft</b>, or upload a LogTen Aircraft file via <b>📥 Import</b>.</div>';
   } else {
     for (var ai = 0; ai < _pl.aircraft.length; ai++) {
       var a = _pl.aircraft[ai];
@@ -1028,14 +1114,14 @@ function _plRenderAircraftList() {
     }
   }
   c.innerHTML =
-    '<div style="padding:10px;max-width:760px;margin:0 auto">' +
+    '<div style="padding:10px 14px">' +
       '<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">' +
         '<button onclick="_plRenderMain()" style="background:transparent;border:0;color:var(--text);font-size:1.2em;cursor:pointer">←</button>' +
         '<div style="font-size:1em;font-weight:700">✈️ Aircraft</div>' +
         '<div style="flex:1"></div>' +
         '<button onclick="_plOpenAddAircraft()" style="background:#10b981;color:#fff;border:0;border-radius:6px;padding:6px 12px;font-size:.78em;font-weight:700;cursor:pointer">+ Add Aircraft</button>' +
       '</div>' +
-      '<div style="font-size:.7em;color:var(--muted);margin-bottom:10px">共 ' + _pl.aircraft.length + ' 架；點任一筆可查看用過這架的所有航班。</div>' +
+      '<div style="font-size:.7em;color:var(--muted);margin-bottom:10px">共 ' + _pl.aircraft.length + ' 架；點任一筆查看用過這架的所有航班。 · ' + _pl.aircraft.length + ' aircraft — tap one to see every flight on that tail.</div>' +
       rows +
     '</div>';
 }
@@ -1077,13 +1163,13 @@ function _plOpenAircraftDetail(tail) {
 
   var rows = '';
   if (flights.length === 0) {
-    rows = '<div style="text-align:center;color:var(--muted);padding:30px;font-size:.85em">沒有用過這架的航班紀錄。</div>';
+    rows = '<div style="text-align:center;color:var(--muted);padding:30px;font-size:.85em">沒有用過這架的航班紀錄。 · No flights recorded on this aircraft.</div>';
   } else {
     rows = flights.map(_plRenderEntryRow).join('');
   }
 
   c.innerHTML =
-    '<div style="padding:10px;max-width:760px;margin:0 auto">' +
+    '<div style="padding:10px 14px">' +
       '<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">' +
         '<button onclick="_plOpenAircraft()" style="background:transparent;border:0;color:var(--text);font-size:1.2em;cursor:pointer">←</button>' +
         '<div style="font-size:1em;font-weight:700">' + _plEsc(tail) + ' / Flights</div>' +
@@ -1122,7 +1208,7 @@ function _plOpenAddAircraft() {
           '<button onclick="_plSubmitAddAircraft()" style="background:#10b981;color:#fff;border:0;border-radius:6px;padding:8px 14px;font-size:.85em;font-weight:700;cursor:pointer">Save</button>' +
           '<button onclick="_plOpenAircraft()" style="background:transparent;border:1px solid var(--border,#334155);color:var(--text);border-radius:6px;padding:8px 14px;font-size:.85em;cursor:pointer">Cancel</button>' +
         '</div>' +
-        '<div style="font-size:.65em;color:var(--muted);margin-top:8px">* 必填。已存在同 tail 會 merge（空欄位不會洗掉舊資料）。</div>' +
+        '<div style="font-size:.65em;color:var(--muted);margin-top:8px">* 必填。已存在同 tail 會 merge（空欄位不會洗掉舊資料）。<br>* Required. An existing tail is merged (blank fields won’t overwrite saved data).</div>' +
       '</div>' +
       '<div id="pl-add-result" style="margin-top:14px"></div>' +
     '</div>';
@@ -1171,7 +1257,7 @@ var _plCrewSearchTerm = '';
 async function _plOpenCrew() {
   var c = document.getElementById('pilotlog-content');
   if (!c) return;
-  c.innerHTML = '<div style="text-align:center;color:var(--muted);padding:40px;font-size:.85em">載入 crew…</div>';
+  c.innerHTML = '<div style="text-align:center;color:var(--muted);padding:40px;font-size:.85em">載入 crew… · Loading crew…</div>';
   // 同時拉 crew 跟完整 entries（兩者各自獨立、可並行）
   await Promise.all([_plFetchAll(), _plFetchAircraftEntries()]);
   _plRenderCrewList();
@@ -1236,9 +1322,9 @@ function _plRenderCrewList() {
 
   var rows = '';
   if (_pl.crew.length === 0) {
-    rows = '<div style="text-align:center;color:var(--muted);padding:30px;font-size:.85em">名單是空的。從 <b>📥 Import</b> 上傳 LogTen Address Book 把 crew 匯進來。</div>';
+    rows = '<div style="text-align:center;color:var(--muted);padding:30px;font-size:.85em">名單是空的。從 <b>📥 Import</b> 上傳 LogTen Address Book 把 crew 匯進來。<br>No crew yet — import a LogTen Address Book via <b>📥 Import</b>.</div>';
   } else if (filtered.length === 0) {
-    rows = '<div style="text-align:center;color:var(--muted);padding:30px;font-size:.85em">沒符合「' + _plEsc(term) + '」的 crew。</div>';
+    rows = '<div style="text-align:center;color:var(--muted);padding:30px;font-size:.85em">沒符合「' + _plEsc(term) + '」的 crew。 · No crew matching “' + _plEsc(term) + '”.</div>';
   } else {
     for (var ri = 0; ri < filtered.length; ri++) {
       var p = filtered[ri];
@@ -1260,11 +1346,11 @@ function _plRenderCrewList() {
   }
 
   var ambNotice = hasAmb
-    ? '<div style="background:#3b2f0a;border:1px solid #f59e0b;color:#fbbf24;border-radius:6px;padding:8px 10px;margin-bottom:8px;font-size:.7em">⚠ 有同名 crew（標記 <b>SAME-NAME</b>）：因為 entry.crew 只記名字、沒帶 employee_id，無法判斷某筆航班屬於哪一位，所以不顯示 flight count、drill-down 也不列航班。建議在 Address Book 內把同名的人加註 organization 或 comment 區分。</div>'
+    ? '<div style="background:#3b2f0a;border:1px solid #f59e0b;color:#fbbf24;border-radius:6px;padding:8px 10px;margin-bottom:8px;font-size:.7em">⚠ 有同名 crew（標記 <b>SAME-NAME</b>）：因為 entry.crew 只記名字、沒帶 employee_id，無法判斷某筆航班屬於哪一位，所以不顯示 flight count、drill-down 也不列航班。建議在 Address Book 內把同名的人加註 organization 或 comment 區分。<br>Some crew share a display name (<b>SAME-NAME</b>): since entries store only the name (no employee_id), we cannot tell which person a flight belongs to, so flight counts and drill-down are suppressed. Differentiate them with organization / comment in your Address Book.</div>'
     : '';
 
   c.innerHTML =
-    '<div style="padding:10px;max-width:760px;margin:0 auto">' +
+    '<div style="padding:10px 14px">' +
       '<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">' +
         '<button onclick="_plRenderMain()" style="background:transparent;border:0;color:var(--text);font-size:1.2em;cursor:pointer">←</button>' +
         '<div style="font-size:1em;font-weight:700">👥 Crew</div>' +
@@ -1275,7 +1361,7 @@ function _plRenderCrewList() {
         'oninput="_plCrewSearchInput(this.value)" ' +
         'style="width:100%;background:var(--bg,#0a0e1a);color:var(--text);border:1px solid var(--border,#334155);border-radius:6px;padding:8px 10px;font-size:.85em;margin-bottom:10px;box-sizing:border-box">' +
       ambNotice +
-      '<div style="font-size:.65em;color:var(--muted);margin-bottom:8px">flight count 用完整資料計算（不受主頁 filter 影響）。點任一筆查看一起飛過的航班。</div>' +
+      '<div style="font-size:.65em;color:var(--muted);margin-bottom:8px">flight count 用完整資料計算（不受 Logbook 篩選影響）。點任一筆查看一起飛過的航班。<br>Flight counts use all data (ignores the Logbook filter). Tap anyone to see flights flown together.</div>' +
       rows +
     '</div>';
 }
@@ -1316,11 +1402,12 @@ function _plOpenCrewDetail(crewId) {
   var countLabel;
   if (ambiguous) {
     bodyHtml = '<div style="background:#3b2f0a;border:1px solid #f59e0b;color:#fbbf24;border-radius:6px;padding:12px;font-size:.78em;line-height:1.5">' +
-      '⚠ <b>無法列出航班</b><br>' +
+      '⚠ <b>無法列出航班 / Cannot list flights</b><br>' +
       'Address Book 內有多位 crew 叫「' + _plEsc(name) + '」，但 entry 只記名字、沒帶 employee_id，' +
-      '所以我們無法判斷某筆航班是跟「這個」' + _plEsc(name) + '飛、還是另一個同名 crew 飛。' +
-      '為了避免錯誤歸屬，先不顯示。<br><br>' +
-      '建議：到 Address Book（LogTen 端）給同名的人加上不同的 organization 或備註，再重新匯入。' +
+      '所以無法判斷某筆航班是跟哪一位同名 crew 飛。為避免錯誤歸屬，先不顯示。<br>' +
+      'Multiple crew are named “' + _plEsc(name) + '”, but entries store only the name (no employee_id), so we cannot tell which one a flight was with. Suppressed to avoid misattribution.<br><br>' +
+      '建議到 Address Book（LogTen 端）給同名的人加上不同的 organization 或備註後重新匯入。<br>' +
+      'Tip: give same-named crew distinct organization / comments in LogTen, then re-import.' +
     '</div>';
     countLabel = '—';
   } else {
@@ -1332,13 +1419,13 @@ function _plOpenCrewDetail(crewId) {
     });
     flights.sort(function(a, b) { return (b.flight_date || '').localeCompare(a.flight_date || ''); });
     bodyHtml = flights.length === 0
-      ? '<div style="text-align:center;color:var(--muted);padding:30px;font-size:.85em">沒有跟這位 crew 一起飛過的紀錄。注意：比對方式是 entry.crew 內欄位的姓名是否完全一致，不同 export 的拼法可能對不到。</div>'
+      ? '<div style="text-align:center;color:var(--muted);padding:30px;font-size:.85em">沒有跟這位 crew 一起飛過的紀錄。比對方式是 entry.crew 內姓名是否完全一致，不同 export 的拼法可能對不到。<br>No flights flown with this crew. Matching is by exact name in entry.crew — spelling differences across exports may not match.</div>'
       : flights.map(_plRenderEntryRow).join('');
     countLabel = flights.length + ' flights';
   }
 
   c.innerHTML =
-    '<div style="padding:10px;max-width:760px;margin:0 auto">' +
+    '<div style="padding:10px 14px">' +
       '<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">' +
         '<button onclick="_plOpenCrew()" style="background:transparent;border:0;color:var(--text);font-size:1.2em;cursor:pointer">←</button>' +
         '<div style="font-size:1em;font-weight:700">' + _plEsc(person.display_name) + ' / Flights</div>' +
@@ -1348,6 +1435,288 @@ function _plOpenCrewDetail(crewId) {
       head +
       bodyHtml +
     '</div>';
+}
+
+// === SECTION: analyze（純統計 + 圖表）═══════════════════════════════════════
+// 統計卡片沿用 _plRenderStats()；圖表用純 CSS bar（不引 chart library，離線可用、
+// 顏色走 var()/固定 accent 兩主題都讀得清楚，切日夜不必重畫）。
+
+async function _plRenderAnalyze() {
+  var c = document.getElementById('pilotlog-content');
+  if (!c) return;
+  if (!_pl.user) { _plRenderLogin(); return; }
+  _plShowTabBar(true);
+  _plHighlightTab('analyze');
+  c.innerHTML = '<div style="text-align:center;color:var(--muted);padding:40px;font-size:.85em">Loading stats…</div>';
+  await Promise.all([_plFetchAll(), _plFetchAircraftEntries()]);
+  _plRenderAnalyzeContent();
+}
+
+// 近 12 個月各月 block 分鐘（含今天所在月）
+function _plMonthlyBlock(entries) {
+  var now = new Date();
+  var buckets = [], map = {};
+  for (var i = 11; i >= 0; i--) {
+    var d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    var ym = d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2);
+    var b = { ym: ym, mm: ('0' + (d.getMonth() + 1)).slice(-2), minutes: 0 };
+    map[ym] = b; buckets.push(b);
+  }
+  for (var j = 0; j < entries.length; j++) {
+    var fd = String(entries[j].flight_date || '').slice(0, 7);
+    if (map[fd]) map[fd].minutes += (entries[j].block_minutes || 0);
+  }
+  return buckets;
+}
+
+// 近 12 個月 block hours 直條圖（CSS bar）
+function _plRenderMonthlyChart(entries) {
+  var data = _plMonthlyBlock(entries);
+  var max = 0;
+  for (var i = 0; i < data.length; i++) if (data[i].minutes > max) max = data[i].minutes;
+  if (max === 0) {
+    return '<div style="background:var(--bar-bg-soft);border-radius:10px;padding:14px;margin-bottom:10px">' +
+      '<div style="font-size:.72em;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Block Hours · Last 12 Months</div>' +
+      '<div style="text-align:center;color:var(--muted);font-size:.8em;padding:14px">尚無資料 · No data</div></div>';
+  }
+  var bars = '';
+  for (var k = 0; k < data.length; k++) {
+    var pct = Math.round((data[k].minutes / max) * 82); // 留上下標籤空間（容器 130px）
+    var hrs = (data[k].minutes / 60);
+    var label = hrs >= 1 ? hrs.toFixed(0) : (data[k].minutes > 0 ? hrs.toFixed(1) : '');
+    bars += '<div style="flex:1;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:3px;min-width:0">' +
+      '<div style="font-size:.52em;color:var(--muted);line-height:1">' + label + '</div>' +
+      '<div title="' + _plMinToHHMM(data[k].minutes) + '" style="flex:none;width:70%;max-width:18px;height:' + Math.max(pct, data[k].minutes > 0 ? 5 : 0) + '%;min-height:' + (data[k].minutes > 0 ? '4px' : '0') + ';background:var(--accent);border-radius:3px 3px 0 0"></div>' +
+      '<div style="font-size:.52em;color:var(--muted);line-height:1">' + data[k].mm + '</div>' +
+    '</div>';
+  }
+  return '<div style="background:var(--bar-bg-soft);border-radius:10px;padding:14px;margin-bottom:10px">' +
+    '<div style="font-size:.72em;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">Block Hours · Last 12 Months (hrs)</div>' +
+    '<div style="display:flex;align-items:flex-end;gap:4px;height:130px">' + bars + '</div>' +
+  '</div>';
+}
+
+// by-type 水平 bar（用 stats.by_type）
+function _plRenderByTypeChart() {
+  var by = (_pl.stats && _pl.stats.by_type) || [];
+  if (!by.length) return '';
+  var max = 0;
+  for (var i = 0; i < by.length; i++) if ((by[i].total_minutes || 0) > max) max = by[i].total_minutes;
+  var rows = '';
+  for (var k = 0; k < by.length; k++) {
+    var t = by[k];
+    var pct = max ? Math.round((t.total_minutes / max) * 100) : 0;
+    rows += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:7px">' +
+      '<div style="min-width:64px;font-size:.72em;font-weight:700">' + _plEsc(t.aircraft_type || '—') + '</div>' +
+      '<div style="flex:1;background:var(--bar-bg);border-radius:5px;height:16px;overflow:hidden">' +
+        '<div style="width:' + Math.max(pct, 2) + '%;height:100%;background:var(--accent);border-radius:5px"></div>' +
+      '</div>' +
+      '<div style="min-width:74px;text-align:right;font-size:.68em;color:var(--muted)">' + _plMinToHHMM(t.total_minutes) + ' <span style="opacity:.6">(' + t.entry_count + ')</span></div>' +
+    '</div>';
+  }
+  return '<div style="background:var(--bar-bg-soft);border-radius:10px;padding:14px;margin-bottom:10px">' +
+    '<div style="font-size:.72em;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">By Type</div>' +
+    rows +
+  '</div>';
+}
+
+function _plRenderAnalyzeContent() {
+  var c = document.getElementById('pilotlog-content');
+  if (!c) return;
+  if (_pl.tab !== 'analyze') return;   // 防 race：切走後過期的 async render 不可覆蓋新分頁
+  // 只算已飛（confirmed）— 跟 /stats 卡片一致（codex P2）；draft/roster_removed 不進圖表
+  var entries = (_pl.aircraftEntries || []).filter(function(e) { return e.status === 'confirmed'; });
+  var hasStats = _pl.stats && _pl.stats.totals;
+  var body = hasStats
+    ? _plRenderStats() + _plRenderMonthlyChart(entries) + _plRenderByTypeChart()
+    : '<div style="text-align:center;color:var(--muted);padding:40px;font-size:.85em">尚無可分析的飛行紀錄，先到 <b>📒 Logbook</b> 新增或匯入 · No flights to analyze yet — add or import in <b>📒 Logbook</b>.</div>';
+  c.innerHTML =
+    '<div style="padding:10px 14px">' +
+      '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">' +
+        '<div style="font-size:1em;font-weight:700">📊 Analyze</div>' +
+        '<div style="font-size:.65em;color:var(--muted)">全部已飛資料 · All flown data</div>' +
+      '</div>' +
+      body +
+    '</div>';
+}
+
+// === SECTION: report（currency + 區間總表 + 匯出）═══════════════════════════
+// 全新 tab。資料用完整快照 _pl.aircraftEntries 計算。currency 僅供參考、非官方判定。
+
+async function _plRenderReport() {
+  var c = document.getElementById('pilotlog-content');
+  if (!c) return;
+  if (!_pl.user) { _plRenderLogin(); return; }
+  _plShowTabBar(true);
+  _plHighlightTab('report');
+  c.innerHTML = '<div style="text-align:center;color:var(--muted);padding:40px;font-size:.85em">Loading report…</div>';
+  await _plFetchAircraftEntries();
+  _plRenderReportContent();
+}
+
+// 取目前區間（預設今年初 → 今天）
+function _plReportRange() {
+  var now = new Date();
+  var ytd = now.getFullYear() + '-01-01';
+  var today = now.getFullYear() + '-' + ('0' + (now.getMonth() + 1)).slice(-2) + '-' + ('0' + now.getDate()).slice(-2);
+  return { from: _pl.reportFrom || ytd, to: _pl.reportTo || today };
+}
+
+// 區間內聚合（block/PIC/SIC/night/班數/起降）
+function _plAggregate(entries, from, to) {
+  var a = { block: 0, pic: 0, sic: 0, night: 0, flights: 0, landings: 0, takeoffs: 0,
+            dayLdg: 0, nightLdg: 0, dayTO: 0, nightTO: 0 };
+  for (var i = 0; i < entries.length; i++) {
+    var e = entries[i];
+    var fd = String(e.flight_date || '').slice(0, 10);
+    if (!fd) continue;
+    if (from && fd < from) continue;
+    if (to && fd > to) continue;
+    a.flights++;
+    a.block += e.block_minutes || 0;
+    a.night += e.night_minutes || 0;
+    if (e.position === 'PIC') a.pic += e.block_minutes || 0;
+    else if (e.position === 'SIC') a.sic += e.block_minutes || 0;
+    a.dayLdg += e.day_landings || 0; a.nightLdg += e.night_landings || 0;
+    a.dayTO += e.day_takeoffs || 0; a.nightTO += e.night_takeoffs || 0;
+  }
+  a.landings = a.dayLdg + a.nightLdg;
+  a.takeoffs = a.dayTO + a.nightTO;
+  return a;
+}
+
+function _plRenderReportContent() {
+  var c = document.getElementById('pilotlog-content');
+  if (!c) return;
+  if (_pl.tab !== 'report') return;   // 防 race：切走後過期的 async render 不可覆蓋新分頁
+  // 報表只看已飛（confirmed）— recency / 時數 / CSV 都不能把 draft（計畫中）跟
+  // roster_removed 當成已飛，否則起降數、block 時數會灌水（codex P1）
+  var src = (_pl.aircraftEntries || []).filter(function(e) { return e.status === 'confirmed'; });
+
+  // ── 90 天 recency ──
+  var now = new Date();
+  var d90 = new Date(now.getTime() - 90 * 86400000);
+  var d90str = d90.getFullYear() + '-' + ('0' + (d90.getMonth() + 1)).slice(-2) + '-' + ('0' + d90.getDate()).slice(-2);
+  var rec = _plAggregate(src, d90str, null);
+  // 最後飛行日
+  var lastDate = '';
+  for (var i = 0; i < src.length; i++) {
+    var fd = String(src[i].flight_date || '').slice(0, 10);
+    if (fd && fd > lastDate) lastDate = fd;
+  }
+  var daysAgo = '';
+  if (lastDate) {
+    var diff = Math.floor((now - new Date(lastDate + 'T00:00:00Z')) / 86400000);
+    daysAgo = diff <= 0 ? 'Today' : diff + ' days ago';
+  }
+  function recCard(label, value, sub) {
+    return '<div style="background:var(--card);border-radius:10px;padding:12px;flex:1;min-width:120px">' +
+      '<div style="font-size:.62em;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">' + label + '</div>' +
+      '<div style="font-size:1.4em;font-weight:700">' + value + '</div>' +
+      (sub ? '<div style="font-size:.62em;color:var(--muted);margin-top:2px">' + sub + '</div>' : '') +
+    '</div>';
+  }
+  var recencyHtml =
+    '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap">' +
+      '<div style="font-size:.85em;font-weight:700">⏱️ Last 90 Days Recency</div>' +
+      '<div style="font-size:.6em;color:var(--muted)">僅供參考、非官方 currency 判定 · For reference only — not an official currency determination</div>' +
+    '</div>' +
+    '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px">' +
+      recCard('Takeoffs', rec.takeoffs, 'Day ' + rec.dayTO + ' / Night ' + rec.nightTO) +
+      recCard('Landings', rec.landings, 'Day ' + rec.dayLdg + ' / Night ' + rec.nightLdg) +
+      recCard('Night Landings', rec.nightLdg, 'Last 90 days') +
+      recCard('Last Flight', daysAgo || '—', lastDate || 'No flights') +
+    '</div>';
+
+  // ── 區間時數總表 ──
+  var r = _plReportRange();
+  var agg = _plAggregate(src, r.from, r.to);
+  function sumCell(label, val) {
+    return '<div style="background:var(--card);border-radius:8px;padding:10px;flex:1;min-width:90px">' +
+      '<div style="font-size:.6em;color:var(--muted);text-transform:uppercase;letter-spacing:.5px">' + label + '</div>' +
+      '<div style="font-size:1.05em;font-weight:700">' + val + '</div></div>';
+  }
+  var inputStyle = 'background:var(--input-bg);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:5px 8px;font-size:.78em';
+  var rangeHtml =
+    '<div style="display:flex;align-items:center;gap:8px;margin:14px 0 8px;flex-wrap:wrap">' +
+      '<div style="font-size:.85em;font-weight:700">📅 Hours Summary</div>' +
+      '<div style="flex:1"></div>' +
+      '<input type="date" value="' + _plEsc(r.from) + '" onchange="_plSetReportFrom(this.value)" style="' + inputStyle + '">' +
+      '<span style="color:var(--muted);font-size:.78em">→</span>' +
+      '<input type="date" value="' + _plEsc(r.to) + '" onchange="_plSetReportTo(this.value)" style="' + inputStyle + '">' +
+    '</div>' +
+    '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:6px">' +
+      sumCell('Block', _plMinToHHMM(agg.block)) +
+      sumCell('PIC', _plMinToHHMM(agg.pic)) +
+      sumCell('SIC', _plMinToHHMM(agg.sic)) +
+      sumCell('Night', _plMinToHHMM(agg.night)) +
+    '</div>' +
+    '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">' +
+      sumCell('Flights', agg.flights) +
+      sumCell('Landings', agg.landings) +
+      sumCell('Takeoffs', agg.takeoffs) +
+    '</div>' +
+    '<div style="display:flex;gap:8px;flex-wrap:wrap">' +
+      '<button onclick="_plExportCsv()" style="background:#10b981;color:#fff;border:0;border-radius:6px;padding:8px 14px;font-size:.8em;font-weight:700;cursor:pointer">⬇️ Export CSV</button>' +
+      '<button onclick="window.print()" style="background:transparent;color:var(--text);border:1px solid var(--border);border-radius:6px;padding:8px 14px;font-size:.8em;font-weight:700;cursor:pointer">🖨️ Print</button>' +
+    '</div>' +
+    '<div style="font-size:.62em;color:var(--muted);margin-top:8px">CSV 為區間內已飛（confirmed）航班，含 PIC/SIC、起降、夜航時數 · CSV covers confirmed (flown) flights in the selected range (' + _plEsc(r.from) + ' → ' + _plEsc(r.to) + '): PIC/SIC, takeoffs/landings, night time.</div>';
+
+  c.innerHTML =
+    '<div style="padding:10px 14px">' +
+      '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">' +
+        '<div style="font-size:1em;font-weight:700">📄 Report</div>' +
+        '<div style="font-size:.65em;color:var(--muted)">只計已飛航班 · Flown flights only</div>' +
+      '</div>' +
+      recencyHtml +
+      '<hr style="border:none;border-top:1px solid var(--border);margin:6px 0">' +
+      rangeHtml +
+    '</div>';
+}
+
+function _plSetReportFrom(v) { _pl.reportFrom = v || null; _plRenderReportContent(); }
+function _plSetReportTo(v) { _pl.reportTo = v || null; _plRenderReportContent(); }
+
+function _plCsvCell(v) {
+  v = v == null ? '' : String(v);
+  if (/[",\n\r]/.test(v)) return '"' + v.replace(/"/g, '""') + '"';
+  return v;
+}
+
+function _plExportCsv() {
+  var r = _plReportRange();
+  var src = (_pl.aircraftEntries || []).filter(function(e) {
+    if (e.status !== 'confirmed') return false;   // 只匯出已飛（codex P1）
+    var fd = String(e.flight_date || '').slice(0, 10);
+    return fd && (!r.from || fd >= r.from) && (!r.to || fd <= r.to);
+  });
+  src.sort(function(a, b) { return (a.flight_date || '').localeCompare(b.flight_date || ''); });
+  var head = ['Date', 'Flight', 'From', 'To', 'Type', 'Tail', 'Position',
+              'Block', 'Night', 'DayTO', 'NightTO', 'DayLdg', 'NightLdg', 'PIC', 'SIC'];
+  var lines = [head.join(',')];
+  for (var i = 0; i < src.length; i++) {
+    var e = src[i];
+    var crew = e.crew || {};
+    var cells = [
+      String(e.flight_date || '').slice(0, 10), e.flight_no, e.origin, e.dest,
+      e.aircraft_type, e.tail_no, e.position,
+      _plMinToHHMM(e.block_minutes), _plMinToHHMM(e.night_minutes),
+      e.day_takeoffs || 0, e.night_takeoffs || 0, e.day_landings || 0, e.night_landings || 0,
+      crew.pic || '', crew.sic || '',
+    ];
+    lines.push(cells.map(_plCsvCell).join(','));
+  }
+  // BOM 讓 Excel 認得 UTF-8
+  var blob = new Blob([String.fromCharCode(0xFEFF) + lines.join('\r\n')], { type: 'text/csv;charset=utf-8' });
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.href = url;
+  a.download = 'pilot-log_' + r.from + '_' + r.to + '.csv';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(function() { URL.revokeObjectURL(url); }, 1000);
+  _plToast('Exported ' + src.length + ' flights to CSV');
 }
 
 // === SECTION: entry point ════════════════════════════════════════════════════
@@ -1365,8 +1734,10 @@ async function pilotLogInit() {
   }
   if (_pl.editing) { _plRenderEditor(); return; }
   if (_pl.user) {
-    await _plFetchAll();
-    _plRenderMain();
+    // 回到使用者上次所在的分頁（codex P3）：整合進主 SPA 後，切走再切回不該掉出 Analyze/Report
+    if (_pl.tab === 'analyze') { await _plRenderAnalyze(); }
+    else if (_pl.tab === 'report') { await _plRenderReport(); }
+    else { await _plFetchAll(); _plRenderMain(); }
   } else {
     _plRenderLogin();
   }

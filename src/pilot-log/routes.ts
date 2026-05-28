@@ -43,8 +43,9 @@ import { loadCredentials } from '../config.js';
 import { getSpaPilotLogJs } from '../spa/js-pilot-log.js';
 
 // ── 版本（比照 CrewSync / Morning：每次推版必更新；SW cache 名稱跟著走） ────
-export const PILOT_LOG_VERSION = 'V1.0.11';
-const PILOT_LOG_CACHE = 'pilotlog-v1-0-11';
+// 本機 preview build 會暫時加 -tNN 後綴方便對版；推正式版前拿掉只留乾淨版號。
+export const PILOT_LOG_VERSION = 'V1.1.0';
+const PILOT_LOG_CACHE = 'pilotlog-v1-1-0';
 
 export const pilotLogRouter = express.Router();
 
@@ -54,7 +55,7 @@ pilotLogRouter.use('/api/pilot-log/import', express.text({ type: '*/*', limit: '
 // ── Standalone page (/pilot-log) ─────────────────────────────────────────────
 // 初期獨立於 main SPA，等核心 flow 都測穩再決定要不要整合到 tab bar。
 // 永久保留此路由：深連結 / debug / 獨立測試用。
-function _renderPilotLogHtml(): string {
+export function _renderPilotLogHtml(): string {
   return `<!DOCTYPE html>
 <html lang="zh-Hant">
 <head>
@@ -66,6 +67,8 @@ function _renderPilotLogHtml(): string {
 <link rel="apple-touch-icon" href="/pilot-log/icon.svg">
 <title>Pilot Log ${PILOT_LOG_VERSION}</title>
 <style>
+/* 夜間（預設）+ 日間主題：沿用 CrewSync / 晨報 的 data-theme + CSS var pattern。
+   結構色全走 var()，狀態色（綠/琥珀/紅/藍）兩主題共用，淺色一樣讀得清楚。 */
 :root {
   --bg: #0a0e1a;
   --card: #1a1f2e;
@@ -73,40 +76,91 @@ function _renderPilotLogHtml(): string {
   --muted: #94a3b8;
   --border: #334155;
   --accent: #3b82f6;
+  --input-bg: #0a0e1a;
+  --bar-bg: rgba(255,255,255,.05);
+  --bar-bg-soft: rgba(255,255,255,.03);
+  --shadow: 0 -1px 0 var(--border);
+}
+[data-theme="light"] {
+  --bg: #f1f5f9;
+  --card: #ffffff;
+  --text: #0f172a;
+  --muted: #64748b;
+  --border: #cbd5e1;
+  --accent: #2563eb;
+  --input-bg: #ffffff;
+  --bar-bg: rgba(15,23,42,.05);
+  --bar-bg-soft: rgba(15,23,42,.03);
+  --shadow: 0 -1px 0 var(--border);
 }
 * { box-sizing: border-box; }
-html, body {
+html { font-size: 15px; }
+body {
   margin: 0; padding: 0;
   background: var(--bg); color: var(--text);
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  font-size: 15px;
+  font-size: 1rem;
   min-height: 100vh;
   padding-top: env(safe-area-inset-top);
-  padding-bottom: env(safe-area-inset-bottom);
+  /* 讓出底部 tab bar 高度，內容不被擋住 */
+  padding-bottom: calc(58px + env(safe-area-inset-bottom));
   overflow-x: hidden;            /* 擋橫滑（同 CrewSync / Morning 修法） */
   overscroll-behavior: none;
+  transition: background .2s, color .2s;
 }
-header {
-  display: flex; align-items: center; gap: 10px;
-  padding: 12px 16px;
-  border-bottom: 1px solid var(--border);
-  background: rgba(0,0,0,.2);
-  position: sticky; top: 0; z-index: 10;
+
+/* ── 底部主功能列（對齊 CrewSync）─────────────────────────────────────────── */
+.pl-tab-bar {
+  position: fixed; bottom: 0; left: 0; right: 0;
+  height: calc(56px + env(safe-area-inset-bottom));
+  background: var(--card);
+  border-top: 1px solid var(--border);
+  display: flex; z-index: 200;
+  padding-bottom: env(safe-area-inset-bottom);
+  overflow-x: auto; overflow-y: hidden;
+  -webkit-overflow-scrolling: touch; scrollbar-width: none;
 }
-header .h-icon { font-size: 1.4em; }
-header .h-title { font-weight: 700; font-size: 1.05em; flex: 1; }
-header .h-ver {
-  font-size: .65em; color: var(--muted);
-  background: rgba(255,255,255,.05);
-  padding: 3px 8px; border-radius: 6px;
-  cursor: pointer; user-select: none;
+.pl-tab-bar::-webkit-scrollbar { display: none; }
+.pl-tab-btn {
+  flex: 1 1 0; min-width: 64px;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 3px; border: none; background: none; color: var(--muted);
+  font-size: .7em; font-weight: 600; cursor: pointer;
+  transition: color .15s; -webkit-appearance: none; padding: 0 6px; white-space: nowrap;
 }
-header .h-ver:active { background: rgba(255,255,255,.1); }
+.pl-tab-btn.pl-tab-active { color: var(--accent); }
+.pl-tab-icon { font-size: 1.5em; line-height: 1; }
+/* 功能鍵區：自然寬度（不吃 flex:1），靠右；三組之間留 18px 舒適間距、不致誤觸。
+   主功能三顆 flex:1 會把這區推到最右，iPad 全寬時一樣貼右邊。 */
+.pl-tab-util {
+  flex: 0 0 auto; cursor: default;
+  flex-direction: row; align-items: center; justify-content: flex-end;
+  gap: 18px; padding: 0 12px 0 6px;
+}
+.pl-util-btn {
+  background: none; border: none; color: var(--muted);
+  font-size: 1.3em; line-height: 1; cursor: pointer; padding: 2px;
+  -webkit-appearance: none;
+}
+.pl-font-wrap {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
+}
+.pl-font-btn {
+  font-weight: 700; border: 1px solid var(--border); border-radius: 4px;
+  background: none; color: var(--muted); cursor: pointer; -webkit-appearance: none;
+  line-height: 1; padding: 2px 6px;
+}
+.pl-font-btn-lg { font-size: .95em; }
+.pl-font-btn-sm { font-size: .68em; }
+.pl-ver-tag {
+  font-size: .82em; color: var(--muted); opacity: .8;
+  cursor: pointer; text-decoration: underline; line-height: 1;
+}
 
 /* About modal — 比照 Morning，加 overflow-x:hidden + overflow-wrap:break-word */
 .pl-modal-wrap {
   display: none; position: fixed; inset: 0;
-  background: rgba(0,0,0,.7); z-index: 100;
+  background: rgba(0,0,0,.7); z-index: 300;
   align-items: center; justify-content: center;
   padding: 20px;
 }
@@ -134,19 +188,54 @@ header .h-ver:active { background: rgba(255,255,255,.1); }
   font-size: .76em; color: var(--muted);
   line-height: 1.6; margin-bottom: 8px;
 }
+
+@media print {
+  .pl-tab-bar, .pl-modal-wrap { display: none !important; }
+  body { padding-bottom: 0; }
+}
 </style>
+<script>
+/* 早期套用主題 + 字級，避免 FOUC（在 content render 前先讀 localStorage） */
+(function(){
+  try {
+    if (localStorage.getItem('pilotlog_theme') === 'light') {
+      document.documentElement.dataset.theme = 'light';
+    }
+    var s = parseInt(localStorage.getItem('pilotlog_font_scale'), 10);
+    if (s >= -2 && s <= 17 && s !== 0) {
+      document.documentElement.style.fontSize = (100 + s * 8) + '%';
+    }
+  } catch(e){}
+})();
+</script>
 </head>
 <body>
-<header>
-  <span class="h-icon">📒</span>
-  <span class="h-title">Pilot Log</span>
-  <span class="h-ver" onclick="plShowAbout()">${PILOT_LOG_VERSION}</span>
-</header>
 <main>
   <div id="pilotlog-content"></div>
 </main>
 
-<!-- About modal — 點 header 版號開啟 -->
+<!-- ══ 底部主功能列（Analyze / Logbook / Report + 功能鍵）══════════════════ -->
+<div class="pl-tab-bar" id="pl-tab-bar">
+  <button class="pl-tab-btn" id="plTabBtn-analyze" onclick="switchPlTab('analyze',this)">
+    <span class="pl-tab-icon">📊</span>Analyze
+  </button>
+  <button class="pl-tab-btn pl-tab-active" id="plTabBtn-logbook" onclick="switchPlTab('logbook',this)">
+    <span class="pl-tab-icon">📒</span>Logbook
+  </button>
+  <button class="pl-tab-btn" id="plTabBtn-report" onclick="switchPlTab('report',this)">
+    <span class="pl-tab-icon">📄</span>Report
+  </button>
+  <div class="pl-tab-btn pl-tab-util">
+    <button class="pl-util-btn" id="pl-theme-btn" onclick="_plToggleTheme()"><span id="pl-theme-icon">☀️</span></button>
+    <div class="pl-font-wrap">
+      <button class="pl-font-btn pl-font-btn-lg" onclick="_plAdjustFontSize(1)">A+</button>
+      <button class="pl-font-btn pl-font-btn-sm" onclick="_plAdjustFontSize(-1)">A-</button>
+    </div>
+    <span class="pl-ver-tag" onclick="plShowAbout()">${PILOT_LOG_VERSION}</span>
+  </div>
+</div>
+
+<!-- About modal — 點底部版號開啟 -->
 <div class="pl-modal-wrap" id="pl-about-wrap" onclick="if(event.target===this)plHideAbout()">
   <div class="pl-modal">
     <button class="close" onclick="plHideAbout()">✕</button>
@@ -196,6 +285,12 @@ if (document.readyState !== 'loading') pilotLogInit();
 function _renderPilotLogChangelog(): string {
   return `
     <div class="pl-cl-v">${PILOT_LOG_VERSION}</div>
+    <div class="pl-cl-txt">
+      <b>介面大改版：對齊 CrewSync / 晨報。</b>主功能選單從內容頁上方的一排按鈕，改成底部固定的 <b>tab bar</b>（📊 Analyze / 📒 Logbook / 📄 Report）＋右側功能鍵區（☀️/🌙 日夜切換、A+/A- 字級 20 段、版號點開更新日誌）。<b>(1) 日夜主題：</b>新增完整淺色主題，沿用 CrewSync / 晨報 的 <code>data-theme</code> + CSS var pattern，偏好存 <code>pilotlog_theme</code> / <code>pilotlog_font_scale</code>（純本機、跨裝置不同步），load 時先套用避免 FOUC。<b>(2) Logbook：</b>原本的航班清單頁，集中所有資料管理 — 篩選、＋New Entry、📥 Import、✈️ Aircraft、👥 Crew 都在這；統計從這裡移走。<b>(3) Analyze（純統計）：</b>把 Total / PIC / SIC / Night、7/28/90 天 rolling、by-type 拉成獨立頁，再加近 12 個月 block hours 長條圖跟 by-type 水平 bar（純 inline SVG，不加 chart library、維持離線可用）。<b>(4) Report（全新）：</b>90 天起降 recency 卡片（日/夜起降次數、最後飛行日；僅供參考非官方判定）＋日期區間時數總表（預設今年至今，算 block/PIC/SIC/night/班數/落地數）＋匯出 CSV／列印。功能邏輯與既有 API 不動，純前端改版。<br>
+      <b>Major UI redesign aligning with CrewSync / morning report.</b> The main menu moved from a top toolbar to a fixed bottom <b>tab bar</b> (📊 Analyze / 📒 Logbook / 📄 Report) plus a utility cluster (☀️/🌙 light-dark toggle, 20-step A+/A- font scale, version tag opening the changelog). <b>(1) Theme:</b> full light theme added, reusing CrewSync / morning report's <code>data-theme</code> + CSS-var pattern; preferences persist in <code>pilotlog_theme</code> / <code>pilotlog_font_scale</code> (per-device), applied early to avoid FOUC. <b>(2) Logbook:</b> the flight list page now centralizes all data management — filters, + New Entry, 📥 Import, ✈️ Aircraft, 👥 Crew; stats moved out. <b>(3) Analyze:</b> Total / PIC / SIC / Night, 7/28/90-day rolling, and by-type are now their own page, plus a trailing-12-month block-hours bar chart and by-type horizontal bars (pure inline SVG, no chart library, stays offline-capable). <b>(4) Report (new):</b> 90-day takeoff/landing recency cards (day/night counts, last flight date; informational, not an official currency determination) + a date-range hours summary (defaults to year-to-date: block/PIC/SIC/night/flights/landings) + CSV export / print. Backend APIs unchanged; frontend-only redesign. <b>(5) 平板／桌機全寬：</b>內容區拿掉 max-width 置中，iPad / 筆電不再兩側留白。<b>(6) 雙語說明：</b>各頁說明文字改中英對照（短標籤維持英文，飛行員通用），crew 中文名字是資料、完全不動。<b>(7) Report / Analyze 只計已飛：</b>recency / 時數 / 圖表 / CSV 都只算 <code>confirmed</code>（已飛）的 entry，draft（計畫中）跟 roster_removed 不計入，避免起降數與 block 時數灌水。<br>
+      <b>(5) Full-width on tablet/desktop:</b> removed the centered max-width so iPad / laptop no longer waste side margins. <b>(6) Bilingual copy:</b> descriptive text is now Chinese + English (short labels stay English, universal for pilots); crew names are data and left untouched. <b>(7) Report / Analyze count flown flights only:</b> recency, hours, charts, and CSV all count <code>confirmed</code> entries only — drafts (planned) and roster_removed are excluded, so takeoff/landing counts and block time aren’t inflated.
+    </div>
+    <div class="pl-cl-v old">V1.0.11</div>
     <div class="pl-cl-txt">
       新增 LogTen <b>Aircraft Types</b> 匯入跟 👥 <b>Crew</b> 列表頁，補齊兩個 V1.0.10 之後使用者馬上就會碰到的工作流。<b>(1) Aircraft Types：</b>LogTen 其實有兩種 export — 一種是 Aircraft（tail 為主，必填 <code>Aircraft ID / Operator</code>），另一種是 Aircraft Types（type 為主、無 tail，必填只有 <code>Type</code>）；之前 UI 只認得前者，使用者把 Aircraft Types 檔丟進 Aircraft 區塊就會撞 <code>missing_required_columns</code>。新表 <code>pilot_aircraft_types</code>（<code>type_code/make/model/engine_type/category/class/notes</code>，<code>UNIQUE(user_id, type_code)</code>）+ 兩個 endpoint <code>POST /api/pilot-log/import/logten-aircraft-types</code>、<code>GET /api/pilot-log/aircraft-types</code>，都走 COALESCE upsert 保留舊資料。📥 Import 區明確分成 📋 <b>Aircraft</b> 跟 🧭 <b>Aircraft Types</b> 兩塊（含「不是 Aircraft Types」的明確提示），Aircraft 列表 / drill-down 顯示時會把 <code>A359</code> enrich 成 <code>Airbus A-350-900</code>，方便辨識。<b>(2) Crew 列表頁：</b>V1.0.09 backend 已把 Address Book 寫進 <code>crew</code> + <code>crew_employee_ids</code>，但沒 UI，這版補上。新 endpoint <code>GET /api/pilot-log/crew</code>（<code>JOIN ... array_agg</code> 把 employee IDs 帶出），主頁工具列加紫色 👥 Crew 按鈕；列表頁可搜尋 name 或 employee ID、顯示一起飛過的航班次數、<code>is_self</code> 的人 mark 「YOU」、點進 drill-down 顯示一起飛過的所有航班。<b>(3) 同名保護（SAME-NAME）：</b>因為 <code>entry.crew</code> JSONB 只記名字、沒帶 <code>employee_id</code>，如果 Address Book 內有兩位 crew 同名，從某筆航班是無法判斷該名出自哪一位的。為避免錯誤歸屬，列表頁會給同名 crew 掛橘色 <code>SAME-NAME</code> badge、flight count 改顯示 <code>—</code>、drill-down 完全不列航班，改顯示警告框 + 建議在 LogTen 端用 organization / comment 區分後重匯。順手把 5 個新 endpoint 的 auth 401 檢查補進 smoke test。<br>
       Added LogTen <b>Aircraft Types</b> import and a 👥 <b>Crew</b> list page, closing two workflows users immediately ran into post-V1.0.10. <b>(1) Aircraft Types:</b> LogTen actually has two exports — Aircraft (tail-centric, requires <code>Aircraft ID / Operator</code>) vs Aircraft Types (type-centric, no tail, only <code>Type</code> required); the old UI only recognized the former, so dropping an Aircraft Types file into the Aircraft section returned <code>missing_required_columns</code>. New table <code>pilot_aircraft_types</code> (<code>type_code/make/model/engine_type/category/class/notes</code>, <code>UNIQUE(user_id, type_code)</code>) plus two endpoints <code>POST /api/pilot-log/import/logten-aircraft-types</code> and <code>GET /api/pilot-log/aircraft-types</code>, both COALESCE upsert to preserve existing data. The 📥 Import section now clearly separates 📋 <b>Aircraft</b> from 🧭 <b>Aircraft Types</b> (with explicit "not Aircraft Types" disambiguation), and the Aircraft list / drill-down enriches codes like <code>A359</code> into <code>Airbus A-350-900</code> for recognition. <b>(2) Crew list page:</b> V1.0.09's backend already wrote Address Book to <code>crew</code> + <code>crew_employee_ids</code>, but had no UI — fixed here. New endpoint <code>GET /api/pilot-log/crew</code> (<code>JOIN ... array_agg</code> for employee IDs), purple 👥 Crew button in the main toolbar; list page supports search by name or employee ID, shows shared-flight counts, marks <code>is_self</code> with "YOU", and drill-down lists all flights flown together. <b>(3) Same-name protection:</b> because <code>entry.crew</code> JSONB stores only names, not <code>employee_id</code>, when two Address Book crews share a display name there is no way to tell which one a given flight refers to. To prevent misattribution, the list tags same-name crew with an orange <code>SAME-NAME</code> badge, replaces the flight count with <code>—</code>, and the drill-down refuses to list any flights — instead showing a warning suggesting users differentiate them via organization / comment in LogTen and re-import. Also added auth 401 checks for the 5 new endpoints to the smoke test.
