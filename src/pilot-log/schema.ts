@@ -194,7 +194,8 @@ export async function ensureTables(): Promise<boolean> {
     // ── DB 用量歷史快照（V1.2.07）──────────────────────────────────────────────
     // 全域（非 per-user）：定期記錄整庫 / pilot-log / 餐廳+其他 的大小，
     // 之後拿「今天 vs N 天前」算成長速度、推估多久到 1GB。
-    // 寫入時機：admin/stats 被讀取且距上一筆 > ~20h 才插一筆（不另開 cron）。
+    // 寫入時機：伺服器啟動 + 每 6h 自動檢查（距上一筆 > 20h 才插一筆），
+    //          不靠任何人開後台 → 見 startPilotLogSnapshotCron()。
     await pool.query(`
       CREATE TABLE IF NOT EXISTS pilot_db_size_history (
         id SERIAL PRIMARY KEY,
@@ -213,4 +214,66 @@ export async function ensureTables(): Promise<boolean> {
     console.error('❌ Pilot Log schema init error:', e.message);
     return false;
   }
+}
+
+// ── DB 用量快照（V1.2.07）─────────────────────────────────────────────────────
+// pilot-log 自有表清單 = 單一事實來源：admin size 統計 + 快照「pilot-log 用量」都用這份。
+// ⚠️ 新增 pilot-log 表時務必同步補進來（漏一張 → 那張的量會被算成「餐廳+其他」）。
+export const PILOT_LOG_TABLES: readonly string[] = [
+  'pilot_users', 'pilot_user_emails', 'pilot_user_sessions', 'pilot_log_entries',
+  'pilot_aircraft', 'pilot_aircraft_types', 'crew', 'crew_employee_ids',
+  'pilot_db_size_history',
+];
+
+const SNAP_GAP_MS = 20 * 3600 * 1000;
+
+// 距上一筆 > minGap 才插一筆快照（避免重複）。回傳是否真的插入。永不 throw。
+export async function insertDbSizeSnapshotIfDue(
+  dbTotalBytes: number, pilotLogBytes: number, restaurantEtcBytes: number,
+  minGapMs: number = SNAP_GAP_MS
+): Promise<boolean> {
+  const pool = getPool();
+  if (!pool) return false;
+  try {
+    const last = (await pool.query(
+      `SELECT captured_at FROM pilot_db_size_history ORDER BY captured_at DESC LIMIT 1`
+    )).rows[0];
+    if (last && (Date.now() - new Date(last.captured_at).getTime()) <= minGapMs) return false;
+    await pool.query(
+      `INSERT INTO pilot_db_size_history (db_total_bytes, pilot_log_bytes, restaurant_etc_bytes)
+       VALUES ($1, $2, $3)`,
+      [dbTotalBytes, pilotLogBytes, restaurantEtcBytes]
+    );
+    return true;
+  } catch (e: any) {
+    console.error('[pilot-log] snapshot insert error:', e.message);
+    return false;
+  }
+}
+
+// 自己算整庫 / pilot-log / 餐廳+其他 大小後，距上一筆夠久就記一筆。給排程用。永不 throw。
+export async function recordDbSizeSnapshotIfDue(minGapMs: number = SNAP_GAP_MS): Promise<boolean> {
+  const pool = getPool();
+  if (!pool || !(await ensureTables())) return false;
+  try {
+    const dbRow = await pool.query(`SELECT pg_database_size(current_database())::bigint AS bytes`);
+    const dbTotalBytes = Number(dbRow.rows[0].bytes);
+    let pilotLogBytes = 0;
+    for (const t of PILOT_LOG_TABLES) {
+      const r = await pool.query(`SELECT pg_total_relation_size($1::regclass)::bigint AS b`, [t]);
+      pilotLogBytes += Number(r.rows[0].b);
+    }
+    return await insertDbSizeSnapshotIfDue(dbTotalBytes, pilotLogBytes, dbTotalBytes - pilotLogBytes, minGapMs);
+  } catch (e: any) {
+    console.error('[pilot-log] snapshot record error:', e.message);
+    return false;
+  }
+}
+
+// 伺服器啟動 30s 後記一次 + 每 6h 自動檢查（20h gap 去重）→ 不靠任何人開後台，每天都有一筆。
+export function startPilotLogSnapshotCron(): void {
+  const SIX_H = 6 * 3600 * 1000;
+  setTimeout(() => { recordDbSizeSnapshotIfDue().catch(() => {}); }, 30 * 1000);
+  setInterval(() => { recordDbSizeSnapshotIfDue().catch(() => {}); }, SIX_H);
+  console.log('🕒 Pilot Log DB-size snapshot cron started (startup + every 6h)');
 }

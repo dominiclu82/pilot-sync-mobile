@@ -27,6 +27,7 @@ import { getSpaFriendsJs } from './spa/js-friends.js';
 import { getSpaGroupsJs } from './spa/js-groups.js';
 import { morningRouter, startMorningCron } from './morning.js';
 import { pilotLogRouter } from './pilot-log/routes.js';
+import { startPilotLogSnapshotCron } from './pilot-log/schema.js';
 import { portfolioRouter, startPortfolio } from './portfolio/routes.js';
 import FR24Pkg from 'flightradarapi';
 import pg from 'pg';
@@ -1797,6 +1798,8 @@ app.listen(Number(PORT), '0.0.0.0', () => {
   startMorningCron();
   // Portfolio module：建表 + 一次性 holdings → transactions migration（idempotent）
   startPortfolio().catch(e => console.error('[portfolio] startPortfolio failed:', e));
+  // Pilot Log：DB 用量快照排程（伺服器每天自動記一筆，不靠任何人開後台）
+  startPilotLogSnapshotCron();
 });
 
 // If the registered redirect URI is on a different port, start a second mini-server for it

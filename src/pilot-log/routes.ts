@@ -35,7 +35,7 @@ import {
   requireAuth,
   AuthedRequest,
 } from './auth.js';
-import { getPool, ensureTables } from './schema.js';
+import { getPool, ensureTables, PILOT_LOG_TABLES, insertDbSizeSnapshotIfDue } from './schema.js';
 import { importLogtenFlights, importLogtenAircraft } from './import-logten.js';
 import { importLogtenAddressBook } from './import-addressbook.js';
 import { importLogtenAircraftTypes } from './import-aircraft-types.js';
@@ -330,8 +330,8 @@ function _renderPilotLogChangelog(): string {
   return `
     <div class="pl-cl-v">${PILOT_LOG_VERSION}</div>
     <div class="pl-cl-txt">
-      <b>[Admin/Ops] 用量成長追蹤 + 多久滿 1 GB 推估。</b>後台新增<b>「成長速度 / 多久滿 1 GB」</b>卡片：定期記錄整庫 / 餐廳+其他 / pilot-log 的大小快照（每天開一次後台各記一筆），用今天比過去算出<b>每天 +X MB、每月 +Y MB</b>（其中餐廳吃多少），並推估照現況<b>約幾個月後、哪天會到 1 GB 上限</b>。剛上線會顯示「累積中」，約 2-3 天有足夠快照後就會出現速度與滿載日。新增 <code>pilot_db_size_history</code> 表。<br>
-      <b>[Admin/Ops] Usage-growth tracking + time-to-full (1 GB) estimate.</b> The admin page gains a <b>"growth speed / time to 1 GB"</b> card: it snapshots whole-DB / restaurant+other / pilot-log sizes over time (one per day when the dashboard is opened) and derives <b>+X MB/day, +Y MB/month</b> (with the restaurant share), plus a projection of <b>how many months until — and roughly which date — the 1 GB plan limit is hit</b>. Right after launch it shows "accumulating"; after ~2-3 days of snapshots the speed and full date appear. New <code>pilot_db_size_history</code> table.
+      <b>[Admin/Ops] 用量成長追蹤 + 多久滿 1 GB 推估。</b>後台新增<b>「成長速度 / 多久滿 1 GB」</b>卡片：<b>伺服器每天自動記一筆</b>整庫 / 餐廳+其他 / pilot-log 的大小快照（啟動 + 每 6h 檢查，<b>不靠任何人開後台</b>），用今天比過去算出<b>每天 +X MB、每月 +Y MB</b>（其中餐廳吃多少），並推估照現況<b>約幾個月後、哪天會到 1 GB 上限</b>。剛上線會顯示「累積中」，約 2-3 天有足夠快照後就會出現速度與滿載日。新增 <code>pilot_db_size_history</code> 表。<br>
+      <b>[Admin/Ops] Usage-growth tracking + time-to-full (1 GB) estimate.</b> The admin page gains a <b>"growth speed / time to 1 GB"</b> card: the <b>server auto-records a daily snapshot</b> of whole-DB / restaurant+other / pilot-log sizes (on startup + a 6-hourly check, <b>no need for anyone to open the dashboard</b>) and derives <b>+X MB/day, +Y MB/month</b> (with the restaurant share), plus a projection of <b>how many months until — and roughly which date — the 1 GB plan limit is hit</b>. Right after launch it shows "accumulating"; after ~2-3 days of snapshots the speed and full date appear. New <code>pilot_db_size_history</code> table.
     </div>
     <div class="pl-cl-v old">V1.2.06</div>
     <div class="pl-cl-txt">
@@ -1064,14 +1064,8 @@ pilotLogRouter.get('/api/pilot-log/admin/stats', async (req, res) => {
     for (const r of byStatus.rows) statusMap[r.status] = r.c;
 
     // ── Tables 區（三個 size 都回） ────
-    // ⚠️ 這份清單必須涵蓋 schema.ts ensureTables() 建的「所有」pilot-log 表，
-    //    因為「餐廳+其他用量」是用 DB 總量扣掉這裡的加總算出來的；漏一張表就會高報餐廳。
-    //    新增 pilot-log 表時務必同步補進來（目前 = schema.ts 的 8 張 CREATE TABLE）。
-    const tableNames = [
-      'pilot_users', 'pilot_user_emails', 'pilot_user_sessions', 'pilot_log_entries',
-      'pilot_aircraft', 'pilot_aircraft_types', 'crew', 'crew_employee_ids',
-      'pilot_db_size_history',
-    ];
+    // 清單用 schema.ts 的單一事實來源 PILOT_LOG_TABLES（餐廳+其他 = DB 總量扣掉這些）。
+    const tableNames = PILOT_LOG_TABLES;
     const tables: Record<string, any> = {};
     let totalSize = 0;
     for (const t of tableNames) {
@@ -1114,19 +1108,9 @@ pilotLogRouter.get('/api/pilot-log/admin/stats', async (req, res) => {
     }));
 
     // ── V1.2.07：用量歷史快照 + 成長速度 / 滿載推估 ─────────────────────────────
-    // 寫入時機：距上一筆 > 20h 才插一筆（admin 開一次最多記一天的量，不另開 cron）。
-    const restaurantEtcBytes = dbTotalBytes - totalSize;
-    const lastSnap = (await pool.query(
-      `SELECT captured_at FROM pilot_db_size_history ORDER BY captured_at DESC LIMIT 1`
-    )).rows[0];
-    const SNAP_GAP_MS = 20 * 3600 * 1000;
-    if (!lastSnap || (now - new Date(lastSnap.captured_at).getTime()) > SNAP_GAP_MS) {
-      await pool.query(
-        `INSERT INTO pilot_db_size_history (db_total_bytes, pilot_log_bytes, restaurant_etc_bytes)
-         VALUES ($1, $2, $3)`,
-        [dbTotalBytes, totalSize, restaurantEtcBytes]
-      );
-    }
+    // 快照主要靠 startPilotLogSnapshotCron()（伺服器每天自動記）；這裡開後台時也順手補一筆
+    // （同樣 20h gap 去重），確保剛部署完第一次看就有資料。
+    await insertDbSizeSnapshotIfDue(dbTotalBytes, totalSize, dbTotalBytes - totalSize);
     const histRows = (await pool.query(
       `SELECT captured_at, db_total_bytes, restaurant_etc_bytes
        FROM pilot_db_size_history ORDER BY captured_at ASC`
@@ -1322,7 +1306,7 @@ function render(j){
       '<div class="muted" style="font-size:.82em;margin-top:6px">每天約 ' + g.per_day_total_mb + ' MB（依最近 ' + g.basis_days + ' 天）</div>';
   } else {
     out += '<div class="big muted">累積中…</div>' +
-      '<div class="muted" style="font-size:.8em;margin-top:6px">需要時間累積：已記錄 ' + (g.snapshot_count||0) + ' 筆快照、跨 ' + (g.history_days||0) + ' 天。每天開一次後台各記一筆，約 2-3 天後就能估速度與滿載日。</div>';
+      '<div class="muted" style="font-size:.8em;margin-top:6px">需要時間累積：已記錄 ' + (g.snapshot_count||0) + ' 筆快照、跨 ' + (g.history_days||0) + ' 天。伺服器每天自動記一筆，約 2-3 天後就能估速度與滿載日。</div>';
   }
   out += '</div>';
   // 組成
