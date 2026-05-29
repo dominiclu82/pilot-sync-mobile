@@ -1791,6 +1791,72 @@ function _plOpenAircraftDetail(tail) {
     '</div>';
 }
 
+// ── V1.3.04：常見廠商 / 機型目錄（Add Aircraft 下拉用）─────────────────────────
+// datalist：可下拉選、也能自己打（涵蓋各家機型）。選機型會自動帶 type code。
+var _PL_AC_CATALOG = {
+  'Airbus': [['A319', 'A-319'], ['A320', 'A-320'], ['A20N', 'A-320neo'], ['A321', 'A-321'], ['A21N', 'A-321neo'],
+    ['A332', 'A-330-200'], ['A333', 'A-330-300'], ['A339', 'A-330-900'],
+    ['A359', 'A-350-900'], ['A35K', 'A-350-1000'], ['A388', 'A-380-800'], ['BCS3', 'A220-300']],
+  'Boeing': [['B738', '737-800'], ['B38M', '737 MAX 8'], ['B39M', '737 MAX 9'], ['B752', '757-200'],
+    ['B763', '767-300'], ['B772', '777-200'], ['B77L', '777-200LR'], ['B77W', '777-300ER'], ['B779', '777-9'],
+    ['B788', '787-8'], ['B789', '787-9'], ['B78X', '787-10'], ['B744', '747-400'], ['B748', '747-8']],
+  'Embraer': [['E170', 'E170'], ['E175', 'E175'], ['E190', 'E190'], ['E195', 'E195'], ['E290', 'E190-E2'], ['E295', 'E195-E2']],
+  'ATR': [['AT72', 'ATR 72'], ['AT76', 'ATR 72-600'], ['AT45', 'ATR 42-500']],
+  'Bombardier': [['CRJ7', 'CRJ-700'], ['CRJ9', 'CRJ-900'], ['DH8D', 'Dash 8 Q400']],
+};
+// 內建目錄 + 疊上使用者既有機型目錄（_pl.aircraftTypes，可能含非 Airbus/Boeing 的自訂型）。
+// 這樣 Make/Model 下拉與 model→type 自動帶對「你匯入的機型」也有效（codex P2）。
+function _plAcMergedCatalog() {
+  var cat = {};
+  Object.keys(_PL_AC_CATALOG).forEach(function(mk) { cat[mk] = _PL_AC_CATALOG[mk].slice(); });
+  (_pl.aircraftTypes || []).forEach(function(t) {
+    if (!t.type_code) return;
+    var mk = (t.make && String(t.make).trim()) || 'Other';
+    var model = (t.model && String(t.model).trim()) || t.type_code;
+    cat[mk] = cat[mk] || [];
+    if (!cat[mk].some(function(r) { return r[0] === t.type_code; })) cat[mk].push([t.type_code, model]);
+  });
+  return cat;
+}
+function _plAcAllModels() {
+  var cat = _plAcMergedCatalog(), out = [];
+  Object.keys(cat).forEach(function(mk) { cat[mk].forEach(function(r) { out.push(r); }); });
+  return out;
+}
+function _plAcModelOptions(make) {
+  var cat = _plAcMergedCatalog();
+  var rows = (make && cat[make]) ? cat[make] : _plAcAllModels();
+  return rows.map(function(r) { return '<option value="' + _plEsc(r[1]) + '">' + _plEsc(r[0]) + '</option>'; }).join('');
+}
+function _plAcFindByModel(model) {
+  var m = String(model || '').trim().toUpperCase();
+  var cat = _plAcMergedCatalog(), found = null;
+  Object.keys(cat).forEach(function(mk) {
+    cat[mk].forEach(function(r) { if (r[1].toUpperCase() === m) found = { make: mk, code: r[0] }; });
+  });
+  return found;
+}
+function _plAcDatalists() {
+  var makes = Object.keys(_plAcMergedCatalog()).map(function(mk) { return '<option value="' + _plEsc(mk) + '">'; }).join('');
+  var codes = {};
+  _plAcAllModels().forEach(function(r) { codes[r[0]] = 1; });
+  var typeOpts = Object.keys(codes).map(function(c) { return '<option value="' + _plEsc(c) + '">'; }).join('');
+  return '<datalist id="pl-dl-makes">' + makes + '</datalist>' +
+    '<datalist id="pl-dl-models">' + _plAcModelOptions('') + '</datalist>' +
+    '<datalist id="pl-dl-types">' + typeOpts + '</datalist>';
+}
+// 選廠商 → 主要機型清單跟著換；選機型 → 自動帶 type code（+ 沒填廠商就補上）
+function _plAddAcOnMake() {
+  var dl = document.getElementById('pl-dl-models');
+  if (dl) dl.innerHTML = _plAcModelOptions((document.getElementById('pl-add-make') || {}).value || '');
+}
+function _plAddAcOnModel() {
+  var hit = _plAcFindByModel((document.getElementById('pl-add-model') || {}).value || '');
+  if (!hit) return;
+  var t = document.getElementById('pl-add-type'); if (t) t.value = hit.code;
+  var mk = document.getElementById('pl-add-make'); if (mk && !mk.value.trim()) mk.value = hit.make;
+}
+
 function _plOpenAddAircraft() {
   var c = document.getElementById('pilotlog-content');
   if (!c) return;
@@ -1801,6 +1867,15 @@ function _plOpenAddAircraft() {
         'style="width:100%;background:var(--bg,#0a0e1a);color:var(--text);border:1px solid var(--border,#334155);border-radius:6px;padding:8px 10px;font-size:.85em">' +
       '</div>';
   }
+  // V1.3.04：可下拉也可手打（datalist）。listId 提供建議清單，oninput 觸發連動。
+  function dlField(label, id, placeholder, listId, oninput) {
+    return '<div style="margin-bottom:10px">' +
+      '<div style="font-size:.7em;color:var(--muted);margin-bottom:3px">' + label + '</div>' +
+      '<input id="' + id + '" list="' + listId + '" placeholder="' + (placeholder || '') + '"' +
+        (oninput ? ' oninput="' + oninput + '"' : '') +
+        ' style="width:100%;background:var(--bg,#0a0e1a);color:var(--text);border:1px solid var(--border,#334155);border-radius:6px;padding:8px 10px;font-size:.85em">' +
+      '</div>';
+  }
   c.innerHTML =
     '<div style="padding:10px;max-width:520px;margin:0 auto">' +
       '<div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">' +
@@ -1809,11 +1884,12 @@ function _plOpenAddAircraft() {
       '</div>' +
       '<div style="background:var(--card);border-radius:10px;padding:14px">' +
         field('Tail # *（機號，例：B-58502）', 'pl-add-tail', 'B-58502') +
-        field('Type Code（機型代碼，例：A359）', 'pl-add-type', 'A359') +
-        field('Manufacturer（廠商，例：Airbus）', 'pl-add-make', 'AIRBUS INDUSTRIES') +
-        field('Model（完整機型，例：A-350-900）', 'pl-add-model', 'A-350-900') +
+        dlField('Manufacturer 廠商（可下拉選或自己打）', 'pl-add-make', '例：Airbus', 'pl-dl-makes', '_plAddAcOnMake()') +
+        dlField('Model 機型（選廠商後出現主要機型）', 'pl-add-model', '例：A-350-900', 'pl-dl-models', '_plAddAcOnModel()') +
+        dlField('Type Code 機型代碼（選機型後自動帶）', 'pl-add-type', '例：A359', 'pl-dl-types', '') +
         field('Operator（公司）', 'pl-add-operator', 'Starlux') +
         field('Notes（備註）', 'pl-add-notes', '') +
+        _plAcDatalists() +
         '<div style="display:flex;gap:8px;margin-top:6px">' +
           '<button onclick="_plSubmitAddAircraft()" style="background:#10b981;color:#fff;border:0;border-radius:6px;padding:8px 14px;font-size:.85em;font-weight:700;cursor:pointer">Save</button>' +
           '<button onclick="_plOpenAircraft()" style="background:transparent;border:1px solid var(--border,#334155);color:var(--text);border-radius:6px;padding:8px 14px;font-size:.85em;cursor:pointer">Cancel</button>' +

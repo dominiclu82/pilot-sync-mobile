@@ -45,8 +45,8 @@ import { getSpaPilotLogJs } from '../spa/js-pilot-log.js';
 
 // ── 版本（比照 CrewSync / Morning：每次推版必更新；SW cache 名稱跟著走） ────
 // 本機 preview build 會暫時加 -tNN 後綴方便對版；推正式版前拿掉只留乾淨版號。
-export const PILOT_LOG_VERSION = 'V1.3.03';
-const PILOT_LOG_CACHE = 'pilotlog-v1-3-03';
+export const PILOT_LOG_VERSION = 'V1.3.04';
+const PILOT_LOG_CACHE = 'pilotlog-v1-3-04';
 
 export const pilotLogRouter = express.Router();
 
@@ -329,6 +329,11 @@ if (document.readyState !== 'loading') pilotLogInit();
 function _renderPilotLogChangelog(): string {
   return `
     <div class="pl-cl-v">${PILOT_LOG_VERSION}</div>
+    <div class="pl-cl-txt">
+      <b>新增飛機：廠商 / 機型可下拉選，選機型自動帶機型代碼。</b>Add Aircraft 不用再全部手打：<b>Manufacturer 廠商</b>、<b>Model 機型</b>、<b>Type Code 代碼</b>都改成可下拉（內建 Airbus / Boeing / Embraer / ATR / Bombardier 常見機型目錄，也納入你既有的機型目錄）——也可以直接打自訂值。<b>選了廠商 → 機型清單跟著換；選了機型 → 自動帶出 Type Code</b>（例：選 A-350-900 自動填 A359）。<br>
+      <b>Add Aircraft: pick Manufacturer / Model from dropdowns, type code auto-fills.</b> Manufacturer, Model and Type Code are now searchable dropdowns (built-in Airbus/Boeing/Embraer/ATR/Bombardier catalog plus your existing type catalog) — you can still type custom values. Selecting a manufacturer filters the model list; selecting a model auto-fills the Type Code (e.g. A-350-900 → A359).
+    </div>
+    <div class="pl-cl-v old">V1.3.03</div>
     <div class="pl-cl-txt">
       <b>起降只算你當 Pilot Flying 的、Crew PIC 排第一、機型篩機尾修正。</b><b>(1) 匯入起降修正：</b>過去匯入會把 LogTen 某些欄位的錯值（例如某段顯示「97 個落地」）原封帶進來，而且你不是操作的那班也記了起降。改成<b>讀 LogTen 的「Pilot Flying」欄 — 只有你是操作飛行員（PF）那段才算起降</b>，非 PF 一律 0，並 clamp 掉爆值。新增儲存 <code>pilot_flying</code>。<b>套用既有資料：</b>因為重匯會跳過已 confirmed 的，要修正歷史請用 📥 Import → ⚠️ Wipe 後重匯一次。<b>(2) Crew PIC 排第一：</b>航班列的組員名單固定 PIC → SIC → FO… 順序，PIC 永遠在最前。<b>(3) 機型篩機尾：</b>選了 Aircraft Type 後 Tail # 真的只剩該機型的機尾（V1.3.02 還會混入其他，已修）。<br>
       <b>Takeoffs/landings only when you were Pilot Flying; PIC listed first; tail filter fixed.</b> (1) Import now reads LogTen's "Pilot Flying" column — takeoffs/landings count only for sectors you actually flew (0 otherwise), with bad values clamped (fixes the "97 landings" + landings logged when you weren't flying). Stores <code>pilot_flying</code>. To fix already-imported flights, Wipe + re-import (re-import skips confirmed entries). (2) Crew list always shows PIC first (PIC → SIC → FO…). (3) Selecting an Aircraft Type now strictly filters the Tail # dropdown to that type (V1.3.02 still leaked other tails).
