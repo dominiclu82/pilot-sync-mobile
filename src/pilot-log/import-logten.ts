@@ -109,8 +109,9 @@ const INSERT_COLS = [
   'position',                                   // V1.2.03：匯入時推斷的角色（PIC/SIC）
   'pic_minutes', 'sic_minutes',                 // V1.2.04：LogTen 實際 PIC/SIC 時數
   'is_deadhead',                                // V1.2.05：deadhead/positioning 標記
+  'pilot_flying',                               // V1.3.03：LogTen「Pilot Flying」欄；起降只在 PF 時計
 ];
-const INSERT_N = INSERT_COLS.length; // 39
+const INSERT_N = INSERT_COLS.length; // 40
 
 // V1.2.03 helpers ─────────────────────────────────────────────────────────────
 // 名字正規化（比對使用者本人）：小寫、空白收斂、去頭尾
@@ -326,6 +327,17 @@ export async function importLogtenFlights(
       const picMin = parseHHColonMM(row['PIC'] || row['PIC Time'] || row['Flight PIC']);
       const sicMin = parseHHColonMM(row['SIC'] || row['SIC Time'] || row['Flight SIC']);
 
+      // V1.3.03：起降只在「你是 Pilot Flying」時才算（user：不是 PF 就不該有起降紀錄）。
+      // 讀 LogTen「Pilot Flying」欄；非 PF → 起降全 0；PF → 用 LogTen 值但 clamp 掉爆值
+      // （LogTen 偶有 97 之類錯值；單一航段合理上限抓 9，訓練 circuit 也夠）。
+      const isPF = _plTruthyFlag(row['Pilot Flying']);
+      const clampLdg = (v: string | undefined): number => { const n = parseInt0(v || ''); return (n < 0 || n > 9) ? 0 : n; };
+      const dTO = isPF ? clampLdg(row['Day T/O']) : 0;
+      const nTO = isPF ? clampLdg(row['Night T/O']) : 0;
+      const dLdg = isPF ? clampLdg(row['Day Ldg']) : 0;
+      const nLdg = isPF ? clampLdg(row['Night Ldg']) : 0;
+      const alands = isPF ? clampLdg(row['Autolands']) : 0;
+
       // V1.2.03：推斷你這趟的角色（position，給篩選/顯示用）— deadhead 一律留空（你是乘客）。
       // 優先看 PIC/SIC 時數欄，再退回比對 PIC/P1 vs SIC/P2 姓名是不是本人。
       let position: string | null = null;
@@ -411,14 +423,15 @@ export async function importLogtenFlights(
             blockMin, airMin, nightMin, distanceVal,
             onDutyUtc, offDutyUtc, dutyMin,
             crewJson, approachesJson,
-            parseInt0(row['Day T/O']), parseInt0(row['Night T/O']),
-            parseInt0(row['Day Ldg']), parseInt0(row['Night Ldg']),
-            parseInt0(row['Autolands']),
+            dTO, nTO,
+            dLdg, nLdg,
+            alands,
             paxVal, row['SID'] || null, row['STAR'] || null,
             row['Remarks'] || null,
             position,
             picMin, sicMin,
             isDeadhead,
+            isPF,
           ],
         });
       } else {
@@ -438,14 +451,15 @@ export async function importLogtenFlights(
           blockMin, airMin, nightMin, distanceVal,
           onDutyUtc, offDutyUtc, dutyMin,
           crewJson, approachesJson,
-          parseInt0(row['Day T/O']), parseInt0(row['Night T/O']),
-          parseInt0(row['Day Ldg']), parseInt0(row['Night Ldg']),
-          parseInt0(row['Autolands']),
+          dTO, nTO,
+          dLdg, nLdg,
+          alands,
           paxVal, row['SID'] || null, row['STAR'] || null,
           row['Remarks'] || null,
           position,
           picMin, sicMin,
           isDeadhead,
+          isPF,
         ]);
       }
     } catch (e: any) {
@@ -502,6 +516,7 @@ export async function importLogtenFlights(
            position = $33,
            pic_minutes = $34, sic_minutes = $35,
            is_deadhead = $36,
+           pilot_flying = $37,
            updated_at = NOW()
          WHERE id = $1`,
         [u.id, ...u.params]

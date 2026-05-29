@@ -1094,15 +1094,22 @@ function _plAutoCalcLandings() {
   _plSetVal('ple-day_takeoffs', '1');
   _plSetVal('ple-day_landings', '1');
 }
-// 依目前選的機型回傳該機型的 tail 清單（無機型 = 全部）；永遠含目前值
+// 依目前選的機型回傳 tail 清單；永遠含目前值
 function _plTailOptionsFor(type, current) {
   var opts = [''];
-  (_pl.aircraft || []).forEach(function(a) {
-    if (!a.tail_no) return;
-    if (!type || a.type_code === type) opts.push(a.tail_no);
-  });
-  if (opts.length <= 1) opts = opts.concat(_pl.suggest.tail_nos || []);  // 該型沒機尾 / 無機型 → 退回常用清單，不要變空
-  if (current && opts.indexOf(current) < 0) opts.push(current);
+  var all = (_pl.aircraft || []);
+  if (type) {
+    // 選了機型 → 只列機尾庫裡 type_code 相符的，不混入其他型 / suggest（V1.3.03 修：之前會倒入全部）
+    all.forEach(function(a) { if (a.tail_no && a.type_code === type) opts.push(a.tail_no); });
+    // 該機型在機尾庫完全沒有相符機尾 → 退回「整個機尾庫」避免空 select 卡住手動新增（codex P2）；
+    // 仍不退回 suggest（那才是之前「亂七八糟混進去」的來源）。正常情況有相符 → 維持嚴格只列該型。
+    if (opts.length <= 1) all.forEach(function(a) { if (a.tail_no) opts.push(a.tail_no); });
+  } else {
+    // 沒選機型 → 全部機尾庫 + 常用 suggest
+    all.forEach(function(a) { if (a.tail_no) opts.push(a.tail_no); });
+    opts = opts.concat(_pl.suggest.tail_nos || []);
+  }
+  if (current && opts.indexOf(current) < 0) opts.push(current);  // 目前值一定保留（即使不符目前機型）
   return Array.from(new Set(opts));
 }
 function _plRefilterTails() {
@@ -1869,8 +1876,16 @@ async function _plOpenCrew() {
 // 從 entry.crew JSONB 內所有欄位收集名字（pic/sic/fo1/fo2/purser/observer 都算）
 function _plEntryCrewNames(e) {
   if (!e || !e.crew || typeof e.crew !== 'object') return [];
-  var names = [];
+  // V1.3.03：固定角色順序，PIC 永遠排第一（user 要求），再 SIC / FO / purser / observer
+  var order = ['pic', 'sic', 'fo1', 'fo2', 'purser', 'observer1', 'observer2'];
+  var names = [], seen = {};
+  order.forEach(function(k) {
+    var v = e.crew[k];
+    if (typeof v === 'string' && v.trim()) { names.push(v.trim()); seen[k] = 1; }
+  });
+  // 其他未列在 order 的 key 也補在後面（保險，不漏人）
   Object.keys(e.crew).forEach(function(k) {
+    if (seen[k]) return;
     var v = e.crew[k];
     if (typeof v === 'string' && v.trim()) names.push(v.trim());
   });

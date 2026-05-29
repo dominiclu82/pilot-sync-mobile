@@ -45,8 +45,8 @@ import { getSpaPilotLogJs } from '../spa/js-pilot-log.js';
 
 // ── 版本（比照 CrewSync / Morning：每次推版必更新；SW cache 名稱跟著走） ────
 // 本機 preview build 會暫時加 -tNN 後綴方便對版；推正式版前拿掉只留乾淨版號。
-export const PILOT_LOG_VERSION = 'V1.3.02';
-const PILOT_LOG_CACHE = 'pilotlog-v1-3-02';
+export const PILOT_LOG_VERSION = 'V1.3.03';
+const PILOT_LOG_CACHE = 'pilotlog-v1-3-03';
 
 export const pilotLogRouter = express.Router();
 
@@ -329,6 +329,11 @@ if (document.readyState !== 'loading') pilotLogInit();
 function _renderPilotLogChangelog(): string {
   return `
     <div class="pl-cl-v">${PILOT_LOG_VERSION}</div>
+    <div class="pl-cl-txt">
+      <b>起降只算你當 Pilot Flying 的、Crew PIC 排第一、機型篩機尾修正。</b><b>(1) 匯入起降修正：</b>過去匯入會把 LogTen 某些欄位的錯值（例如某段顯示「97 個落地」）原封帶進來，而且你不是操作的那班也記了起降。改成<b>讀 LogTen 的「Pilot Flying」欄 — 只有你是操作飛行員（PF）那段才算起降</b>，非 PF 一律 0，並 clamp 掉爆值。新增儲存 <code>pilot_flying</code>。<b>套用既有資料：</b>因為重匯會跳過已 confirmed 的，要修正歷史請用 📥 Import → ⚠️ Wipe 後重匯一次。<b>(2) Crew PIC 排第一：</b>航班列的組員名單固定 PIC → SIC → FO… 順序，PIC 永遠在最前。<b>(3) 機型篩機尾：</b>選了 Aircraft Type 後 Tail # 真的只剩該機型的機尾（V1.3.02 還會混入其他，已修）。<br>
+      <b>Takeoffs/landings only when you were Pilot Flying; PIC listed first; tail filter fixed.</b> (1) Import now reads LogTen's "Pilot Flying" column — takeoffs/landings count only for sectors you actually flew (0 otherwise), with bad values clamped (fixes the "97 landings" + landings logged when you weren't flying). Stores <code>pilot_flying</code>. To fix already-imported flights, Wipe + re-import (re-import skips confirmed entries). (2) Crew list always shows PIC first (PIC → SIC → FO…). (3) Selecting an Aircraft Type now strictly filters the Tail # dropdown to that type (V1.3.02 still leaked other tails).
+    </div>
+    <div class="pl-cl-v old">V1.3.02</div>
     <div class="pl-cl-txt">
       <b>智慧編輯器：自動帶時數 / 起降 / 依機型篩機尾。</b>編輯航班時不用再手算：<b>(1)</b> 填 OOOI（Out/In、Off/On）→ 自動算 <b>Block（In−Out）</b>與 <b>Air（Off−On）</b>，跨午夜也對。<b>(2)</b> Position 選 <b>PIC → 自動帶 PIC 時間</b>、SIC → 帶 SIC 時間（= block）。<b>(3)</b> 勾「I was the Pilot Flying」→ 自動帶 <b>1 起飛 + 1 落地</b>（起降欄都還沒填時才帶，不蓋手填）。<b>(4)</b> 選了 <b>Aircraft Type → Tail # 只跳出該機型的機尾</b>，不再全部混在一起。自動帶的值都還能手改。<br>
       <b>Smart editor: auto times / landings / tail filtered by type.</b> (1) Enter OOOI → Block (In−Out) and Air (Off−On) auto-compute (midnight-safe). (2) Position PIC → PIC time auto-fills (= block), SIC → SIC time. (3) "I was the Pilot Flying" → auto 1 takeoff + 1 landing (only when none entered yet). (4) Picking an Aircraft Type filters the Tail # dropdown to that type's tails. All auto-filled values stay editable. <i>(Day/night for takeoff/landing defaults to day for now — automatic day/night by location needs an airport coordinate table, coming next.)</i>
