@@ -45,8 +45,8 @@ import { getSpaPilotLogJs } from '../spa/js-pilot-log.js';
 
 // ── 版本（比照 CrewSync / Morning：每次推版必更新；SW cache 名稱跟著走） ────
 // 本機 preview build 會暫時加 -tNN 後綴方便對版；推正式版前拿掉只留乾淨版號。
-export const PILOT_LOG_VERSION = 'V1.3.04';
-const PILOT_LOG_CACHE = 'pilotlog-v1-3-04';
+export const PILOT_LOG_VERSION = 'V1.3.05';
+const PILOT_LOG_CACHE = 'pilotlog-v1-3-05';
 
 export const pilotLogRouter = express.Router();
 
@@ -329,6 +329,11 @@ if (document.readyState !== 'loading') pilotLogInit();
 function _renderPilotLogChangelog(): string {
   return `
     <div class="pl-cl-v">${PILOT_LOG_VERSION}</div>
+    <div class="pl-cl-txt">
+      <b>手動新增航班：自動算夜航時數 + 自動判斷日 / 夜起降。</b>填好 Off / On + Origin / Dest，編輯器會用<b>機場座標 + 太陽角度（民用曙暮光）</b>沿大圓航路取樣，自動帶出 <b>Night Time</b>；勾 Pilot Flying 時 <b>day vs night 起降</b>也用「起飛看 origin@Off、落地看 dest@On」判斷,不再一律日間。內建你常飛的 76 個機場（RCTP/KLAX/RJAA/VHHH/WSSS/EGLL… 及兩岸日韓東南亞常見場），<b>座標查不到的機場 → 留空讓你手填，不誤判</b>。太陽公式已用 RCTP 正午（夏至 88° / 冬至 41°）與 KLAX 正午（79°）已知值驗證。手動改過的 Night 不被後續覆寫。<br>
+      <b>Manual entry: auto-computed Night Time + day/night classification for takeoffs/landings.</b> Once Off/On + Origin/Dest are filled, the editor uses airport coordinates + solar altitude (civil twilight) sampled along the great-circle route to populate <b>Night Time</b>. With Pilot Flying checked, day-vs-night TO/landings are derived from origin@Off and dest@On (instead of defaulting to day). Built-in coordinates cover your 76 most-flown airports (RCTP/KLAX/RJAA/VHHH/WSSS/EGLL and major Asia/Europe/US hubs); airports without coords stay blank for you to enter manually (no wrong guesses). Solar formula validated against known RCTP solstice noon (88°/41°) and KLAX noon (79°). Manually edited Night Time is preserved.
+    </div>
+    <div class="pl-cl-v old">V1.3.04</div>
     <div class="pl-cl-txt">
       <b>新增飛機：廠商 / 機型可下拉選，選機型自動帶機型代碼。</b>Add Aircraft 不用再全部手打：<b>Manufacturer 廠商</b>、<b>Model 機型</b>、<b>Type Code 代碼</b>都改成可下拉（內建 Airbus / Boeing / Embraer / ATR / Bombardier 常見機型目錄，也納入你既有的機型目錄）——也可以直接打自訂值。<b>選了廠商 → 機型清單跟著換；選了機型 → 自動帶出 Type Code</b>（例：選 A-350-900 自動填 A359）。<br>
       <b>Add Aircraft: pick Manufacturer / Model from dropdowns, type code auto-fills.</b> Manufacturer, Model and Type Code are now searchable dropdowns (built-in Airbus/Boeing/Embraer/ATR/Bombardier catalog plus your existing type catalog) — you can still type custom values. Selecting a manufacturer filters the model list; selecting a model auto-fills the Type Code (e.g. A-350-900 → A359).

@@ -1042,6 +1042,107 @@ function _plCrewField(label, key, e) {
     '<input id="ple-crew-' + key + '" style="width:100%;background:var(--bg,#0a0e1a);color:var(--text);border:1px solid var(--border,#334155);border-radius:6px;padding:6px 8px;font-size:.78em" value="' + _plEsc(v) + '"></div>';
 }
 
+// ── V1.3.05：機場座標 + 太陽角度，給手動新增航班自動算 night time / 日夜起降 ─────────
+// day/night 判斷對座標 ±0.5° 已綽綽有餘（民用曙暮光：sun alt 過 -6° 才算夜）。
+// 太陽公式已用 RCTP/KLAX 已知值驗證（誤差 < 0.5°）。查不到的機場 → 留空讓使用者手填，不會亂判。
+var _PL_APT = {
+  // Taiwan
+  RCTP: [25.08, 121.23], RCSS: [25.07, 121.55], RCKH: [22.58, 120.35], RCMQ: [24.27, 120.62], RCBS: [24.43, 118.36],
+  // Japan
+  RJAA: [35.76, 140.39], RJBB: [34.43, 135.23], RJCC: [42.78, 141.69], RJSS: [38.14, 140.92], RJFF: [33.59, 130.45],
+  RJGG: [34.86, 136.81], RJSN: [37.95, 139.12], RJEC: [43.67, 142.45], RJSA: [40.73, 140.69], RJCH: [41.77, 140.82],
+  RJNK: [36.39, 136.41], ROAH: [26.20, 127.65],
+  // Korea
+  RKSI: [37.46, 126.44], RKSS: [37.56, 126.79],
+  // HK / Macau
+  VHHH: [22.31, 113.91], VMMC: [22.16, 113.59],
+  // China
+  ZBAA: [40.08, 116.58], ZBHH: [40.85, 111.82], ZBSJ: [38.28, 114.70], ZBTJ: [39.12, 117.35], ZBYN: [37.75, 112.63],
+  ZGGG: [23.39, 113.30], ZGHA: [28.19, 113.22], ZGKL: [25.22, 110.04], ZGSZ: [22.64, 113.81], ZHCC: [34.52, 113.84],
+  ZLXY: [34.45, 108.75], ZPPP: [25.10, 102.93], ZSAM: [24.54, 118.13], ZSHC: [30.23, 120.43], ZSJN: [36.86, 117.22],
+  ZSNB: [29.83, 121.46], ZSNJ: [31.74, 118.86], ZSPD: [31.14, 121.81], ZSQD: [36.37, 120.10], ZSWX: [31.49, 120.43],
+  ZSYN: [33.43, 120.20], ZSTX: [29.73, 118.26], ZUUU: [30.58, 103.95], ZUCK: [29.72, 106.64], ZYHB: [45.62, 126.25],
+  // SE Asia
+  VTBS: [13.69, 100.75], VDPP: [11.55, 104.84], VVTS: [10.82, 106.65], VVNB: [21.22, 105.81],
+  WMKK: [2.75, 101.71], WMKP: [5.30, 100.27], WIII: [-6.13, 106.66], WARR: [-7.38, 112.78], WSSS: [1.36, 103.99],
+  // Philippines
+  RPLL: [14.51, 121.02], RPVM: [10.31, 123.98],
+  // US
+  KATL: [33.64, -84.43], KDFW: [32.90, -97.04], KEWR: [40.69, -74.17], KIAH: [29.98, -95.34], KJFK: [40.64, -73.78],
+  KLAX: [33.94, -118.41], KONT: [34.06, -117.60], KORD: [41.98, -87.90], KPHX: [33.43, -112.01], KSEA: [47.45, -122.31],
+  KSFO: [37.62, -122.38], PANC: [61.17, -149.99],
+  // Canada
+  CYYZ: [43.68, -79.61], CYVR: [49.19, -123.18],
+  // Europe
+  EGLL: [51.47, -0.46], LFPG: [49.01, 2.55], EHAM: [52.31, 4.76], LOWW: [48.11, 16.57],
+  // Australia
+  YBBN: [-27.38, 153.12],
+};
+
+// 太陽高度角（degrees）；driven by Julian day → ecliptic longitude → declination → hour angle
+function _plSunAlt(lat, lon, d) {
+  var rad = Math.PI / 180;
+  var J = d.getTime() / 86400000 + 2440587.5, n = J - 2451545.0;
+  var L = (280.460 + 0.9856474 * n) % 360;
+  var g = ((357.528 + 0.9856003 * n) % 360) * rad;
+  var lam = (L + 1.915 * Math.sin(g) + 0.020 * Math.sin(2 * g)) * rad;
+  var eps = 23.439 * rad;
+  var decl = Math.asin(Math.sin(eps) * Math.sin(lam));
+  var GMST = (280.46061837 + 360.98564736629 * n) % 360;
+  var LST = (GMST + lon) % 360;
+  var RA = Math.atan2(Math.cos(eps) * Math.sin(lam), Math.cos(lam)) / rad;
+  var HA = (((LST - RA) % 360 + 360) % 360) * rad;
+  var la = lat * rad;
+  return Math.asin(Math.sin(la) * Math.sin(decl) + Math.cos(la) * Math.cos(decl) * Math.cos(HA)) / rad;
+}
+function _plIsNight(lat, lon, d) { return _plSunAlt(lat, lon, d) < -6; }   // 民用曙暮光：太陽低於 -6° 算夜
+
+// 大圓內插（球面 slerp）：fraction f∈[0,1] 從 A 到 B
+function _plGcInterp(A, B, f) {
+  var rad = Math.PI / 180, deg = 180 / Math.PI;
+  var la1 = A[0] * rad, lo1 = A[1] * rad, la2 = B[0] * rad, lo2 = B[1] * rad;
+  var d = 2 * Math.asin(Math.sqrt(Math.pow(Math.sin((la2 - la1) / 2), 2) +
+    Math.cos(la1) * Math.cos(la2) * Math.pow(Math.sin((lo2 - lo1) / 2), 2)));
+  if (d === 0 || isNaN(d)) return [A[0], A[1]];
+  var sA = Math.sin((1 - f) * d) / Math.sin(d), sB = Math.sin(f * d) / Math.sin(d);
+  var x = sA * Math.cos(la1) * Math.cos(lo1) + sB * Math.cos(la2) * Math.cos(lo2);
+  var y = sA * Math.cos(la1) * Math.sin(lo1) + sB * Math.cos(la2) * Math.sin(lo2);
+  var z = sA * Math.sin(la1) + sB * Math.sin(la2);
+  return [Math.atan2(z, Math.sqrt(x * x + y * y)) * deg, Math.atan2(y, x) * deg];
+}
+
+// 沿大圓取樣，算航路夜航分鐘；null = 無法算（缺座標 / 時間）
+function _plRouteNightMin(origin, dest, offD, onD) {
+  var A = _PL_APT[origin], B = _PL_APT[dest];
+  if (!A || !B || !offD || !onD) return null;
+  var ms = onD.getTime() - offD.getTime();
+  if (ms <= 0) return 0;
+  var totalMin = ms / 60000;
+  var steps = Math.max(6, Math.min(120, Math.round(totalMin / 5)));   // ~5 分一點，最少 6 點
+  var nights = 0;
+  for (var i = 0; i <= steps; i++) {
+    var f = i / steps, p = _plGcInterp(A, B, f), t = new Date(offD.getTime() + f * ms);
+    if (_plIsNight(p[0], p[1], t)) nights++;
+  }
+  return Math.round(totalMin * nights / (steps + 1));
+}
+function _plLegDayNight(apt, dt) {
+  var A = _PL_APT[apt]; if (!A || !dt) return null;
+  return _plIsNight(A[0], A[1], dt) ? 'night' : 'day';
+}
+// 從 editor 欄位組出 Off/On 的 UTC Date（含跨午夜修正）
+function _plEditorOffOn() {
+  var dt = _plGetVal('ple-flight_date');
+  var off = _plGetVal('ple-off_utc'), on = _plGetVal('ple-on_utc');
+  if (!dt || !off || !on) return null;
+  var offIso = _plMakeUtcIso(dt, String(off).trim());
+  var onIso = _plMakeUtcIso(dt, String(on).trim());
+  if (!offIso || !onIso) return null;
+  var offD = new Date(offIso), onD = new Date(onIso);
+  if (onD.getTime() < offD.getTime()) onD = new Date(onD.getTime() + 24 * 3600 * 1000);
+  return [offD, onD];
+}
+
 // ── V1.3.02：智慧編輯器自動計算 ──────────────────────────────────────────────
 // block/air 由 OOOI 帶、PIC/SIC 由 position 帶、pilot flying 帶起降、機型篩 tail。
 // 只改 input.value，存檔仍走 _plReadField（不另存狀態）。
@@ -1069,6 +1170,19 @@ function _plAutoCalcTimes() {
   if (off != null && on != null) _plSetVal('ple-air_minutes', _plMinToHHMM(_plDurDiff(off, on)));
   else if (offRaw || onRaw) _plSetVal('ple-air_minutes', '');
   _plAutoCalcRole();                              // block 變了 → PIC/SIC 跟著（含清空）
+
+  // V1.3.05：航路 night 分鐘 — 手動改過的不覆寫；座標 / 時間不完整 → 清掉 stale auto（codex P2）
+  var oo = _plEditorOffOn();
+  var origin = (_plGetVal('ple-origin') || '').toUpperCase().trim();
+  var dest = (_plGetVal('ple-dest') || '').toUpperCase().trim();
+  var nEl = document.getElementById('ple-night_minutes');
+  if (nEl && nEl.dataset.manual !== '1') {
+    var nm = (oo && origin && dest) ? _plRouteNightMin(origin, dest, oo[0], oo[1]) : null;
+    if (nm != null) nEl.value = _plMinToHHMM(nm);
+    else if (offRaw || onRaw || origin || dest) nEl.value = '';   // 不完整 / 查無座標 → 清舊值；完全空才不碰
+  }
+  // 路線變化時也順手讓 day/night 起降 re-evaluate（解 codex P1：先勾 PF 後填路線的情境）
+  _plAutoCalcLandings();
 }
 // 只在「沒被手動改過」時才覆寫 PIC/SIC（dataset.manual 由 _plWireEditor 標記）— 自動帶但保留手填
 function _plSetRoleField(id, val) {
@@ -1086,13 +1200,20 @@ function _plAutoCalcRole() {
 function _plAutoCalcLandings() {
   var pf = document.getElementById('ple-pilot_flying');
   if (!pf || !pf.checked) return;
-  // 只在四個起降欄都還沒填時帶入，避免蓋掉手填（含夜間）
+  // codex P1：路線/時間還不完整時，「不要先塞 1 day」— 否則 any-guard 會擋掉之後正確的日/夜重算。
+  // 之後 origin/dest/OOOI 補齊時，_plAutoCalcTimes 末尾會再呼叫一次本函式（這次有資料就算對）。
+  var oo = _plEditorOffOn();
+  var origin = (_plGetVal('ple-origin') || '').toUpperCase().trim();
+  var dest = (_plGetVal('ple-dest') || '').toUpperCase().trim();
+  if (!oo || !origin || !dest) return;
   var ids = ['ple-day_takeoffs', 'ple-night_takeoffs', 'ple-day_landings', 'ple-night_landings'];
   var any = ids.some(function(id) { var el = document.getElementById(id); return el && Number(el.value) > 0; });
   if (any) return;
-  // day/night 需機場座標（下一步補）→ 暫帶日間 1 T/O + 1 Ldg，使用者可改夜間
-  _plSetVal('ple-day_takeoffs', '1');
-  _plSetVal('ple-day_landings', '1');
+  // 起飛看 origin@Off、落地看 dest@On；座標查不到的機場 → 預設日間（使用者可手改）
+  var toNight = (_plLegDayNight(origin, oo[0]) === 'night');
+  var ldgNight = (_plLegDayNight(dest, oo[1]) === 'night');
+  _plSetVal(toNight ? 'ple-night_takeoffs' : 'ple-day_takeoffs', '1');
+  _plSetVal(ldgNight ? 'ple-night_landings' : 'ple-day_landings', '1');
 }
 // 依目前選的機型回傳 tail 清單；永遠含目前值
 function _plTailOptionsFor(type, current) {
@@ -1133,10 +1254,15 @@ function _plWireEditor() {
   if (pf) pf.addEventListener('change', _plAutoCalcLandings);
   var ty = document.getElementById('ple-aircraft_type');
   if (ty) ty.addEventListener('change', _plRefilterTails);
-  // 標記 PIC/SIC 是否被手動改過 → _plSetRoleField 之後就不覆寫（codex fast P1）
-  ['pic_minutes', 'sic_minutes'].forEach(function(n) {
+  // 標記 PIC/SIC/Night 是否被手動改過 → 之後就不覆寫（codex fast P1 + V1.3.05 night）
+  ['pic_minutes', 'sic_minutes', 'night_minutes'].forEach(function(n) {
     var el = document.getElementById('ple-' + n);
     if (el) el.addEventListener('input', function() { el.dataset.manual = '1'; });
+  });
+  // V1.3.05：origin / dest / flight_date 變更也觸發夜航計算（不只 OOOI）
+  ['origin', 'dest', 'flight_date'].forEach(function(n) {
+    var el = document.getElementById('ple-' + n);
+    if (el) el.addEventListener('input', _plAutoCalcTimes);
   });
 }
 
