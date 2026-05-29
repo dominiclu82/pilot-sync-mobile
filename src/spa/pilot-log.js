@@ -1777,6 +1777,13 @@ async function _plFetchAircraftEntries() {
   }
 }
 
+// V1.3.06：切換機型分組的收合狀態，重畫 Aircraft 列表
+function _plToggleAircraftType(tc) {
+  _pl.aircraftCollapsed = _pl.aircraftCollapsed || {};
+  _pl.aircraftCollapsed[tc] = !_pl.aircraftCollapsed[tc];
+  _plRenderAircraftList();
+}
+
 async function _plOpenAircraft() {
   var c = document.getElementById('pilotlog-content');
   if (!c) return;
@@ -1803,6 +1810,8 @@ function _plLookupTypeFullName(typeCode) {
 function _plRenderAircraftList() {
   var c = document.getElementById('pilotlog-content');
   if (!c) return;
+  // V1.3.06：機型分組可收合（state 保存在 _pl，跨 render 維持）
+  _pl.aircraftCollapsed = _pl.aircraftCollapsed || {};
   // 用完整快照算 count（不受主頁 filter 跟 200 limit 影響）
   var sourceEntries = _pl.aircraftEntries || [];
   var tailCount = {};
@@ -1830,12 +1839,18 @@ function _plRenderAircraftList() {
       var gtc = order[gi];
       var list = groups[gtc];
       var full = _plLookupTypeFullName(gtc);
-      rows += '<div style="margin:14px 0 6px;display:flex;align-items:baseline;gap:8px">' +
+      // V1.3.06：點 header 收合/展開該機型；箭頭顯示狀態
+      var collapsed = !!_pl.aircraftCollapsed[gtc];
+      var arrow = collapsed ? '▶' : '▼';
+      rows += '<div onclick="_plToggleAircraftType(\'' + _plEsc(gtc) + '\')" ' +
+        'style="margin:14px 0 6px;display:flex;align-items:baseline;gap:8px;cursor:pointer;user-select:none">' +
+        '<span style="font-size:.7em;color:var(--muted);width:14px;display:inline-block;text-align:center">' + arrow + '</span>' +
         '<span style="font-size:.95em;font-weight:800">' + _plEsc(gtc) + '</span>' +
         (full ? '<span style="font-size:.66em;color:var(--muted)">' + _plEsc(full) + '</span>' : '') +
         '<span style="flex:1"></span>' +
         '<span style="font-size:.62em;color:var(--muted)">' + list.length + ' tail · ' + typeFlights(gtc) + ' flights</span>' +
       '</div>';
+      rows += '<div style="display:' + (collapsed ? 'none' : 'block') + '">';
       list.sort(function(a, b) { return (tailCount[b.tail_no] || 0) - (tailCount[a.tail_no] || 0); });
       for (var ti = 0; ti < list.length; ti++) {
         var ac = list[ti];
@@ -1847,6 +1862,7 @@ function _plRenderAircraftList() {
           '<div style="font-size:.72em;color:var(--text);text-align:right;white-space:nowrap">' + count + ' flights</div>' +
           '</div>';
       }
+      rows += '</div>';   // close per-type collapsible wrapper (V1.3.06)
     }
   }
   c.innerHTML =
@@ -1971,16 +1987,44 @@ function _plAcDatalists() {
     '<datalist id="pl-dl-models">' + _plAcModelOptions('') + '</datalist>' +
     '<datalist id="pl-dl-types">' + typeOpts + '</datalist>';
 }
-// 選廠商 → 主要機型清單跟著換；選機型 → 自動帶 type code（+ 沒填廠商就補上）
-function _plAddAcOnMake() {
-  var dl = document.getElementById('pl-dl-models');
-  if (dl) dl.innerHTML = _plAcModelOptions((document.getElementById('pl-add-make') || {}).value || '');
+// V1.3.06：Manufacturer select 換值時 — 依新廠商重建 Model select；廠商=Other 切換成自由打。
+function _plAddAcMakeChange() {
+  var v = (document.getElementById('pl-add-make') || {}).value;
+  var customMk = document.getElementById('pl-add-make-custom');
+  var modelWrap = document.getElementById('pl-add-model-wrap');
+  var modelSel = document.getElementById('pl-add-model');
+  var modelCustom = document.getElementById('pl-add-model-custom');
+  var typeWrap = document.getElementById('pl-add-type-wrap');
+  if (!customMk || !modelWrap || !modelSel || !modelCustom || !typeWrap) return;
+  if (v === '__other__') {
+    // 自訂廠商 → 機型也只能自己打 + Type Code 需要使用者輸入
+    customMk.style.display = ''; customMk.focus();
+    modelWrap.style.display = '';
+    modelSel.style.display = 'none';
+    modelCustom.style.display = '';
+    typeWrap.style.display = '';
+    return;
+  }
+  customMk.style.display = 'none'; customMk.value = '';
+  if (!v) { modelWrap.style.display = 'none'; typeWrap.style.display = 'none'; return; }
+  // 已選廠商 → Model select 重填該廠商的機型（含「其他」），Type Code 暫隱（catalog → auto-derive）
+  var rows = (_plAcMergedCatalog()[v] || []);
+  modelSel.style.display = '';
+  modelSel.innerHTML = '<option value="">— 選 —</option>' +
+    rows.map(function(r) { return '<option value="' + _plEsc(r[1]) + '" data-code="' + _plEsc(r[0]) + '">' + _plEsc(r[1]) + ' (' + _plEsc(r[0]) + ')</option>'; }).join('') +
+    '<option value="__other__">其他 / Other</option>';
+  modelWrap.style.display = '';
+  modelCustom.style.display = 'none'; modelCustom.value = '';
+  typeWrap.style.display = 'none';
 }
-function _plAddAcOnModel() {
-  var hit = _plAcFindByModel((document.getElementById('pl-add-model') || {}).value || '');
-  if (!hit) return;
-  var t = document.getElementById('pl-add-type'); if (t) t.value = hit.code;
-  var mk = document.getElementById('pl-add-make'); if (mk && !mk.value.trim()) mk.value = hit.make;
+// Model select 換值時 — 選了「其他」就露出 Model+TypeCode 自由欄；catalog 的機型則 type code 隱藏由 submit 時 derive
+function _plAddAcModelChange() {
+  var v = (document.getElementById('pl-add-model') || {}).value;
+  var modelCustom = document.getElementById('pl-add-model-custom');
+  var typeWrap = document.getElementById('pl-add-type-wrap');
+  if (!modelCustom || !typeWrap) return;
+  if (v === '__other__') { modelCustom.style.display = ''; modelCustom.focus(); typeWrap.style.display = ''; }
+  else { modelCustom.style.display = 'none'; modelCustom.value = ''; typeWrap.style.display = 'none'; }
 }
 
 function _plOpenAddAircraft() {
@@ -2010,12 +2054,32 @@ function _plOpenAddAircraft() {
       '</div>' +
       '<div style="background:var(--card);border-radius:10px;padding:14px">' +
         field('Tail # *（機號，例：B-58502）', 'pl-add-tail', 'B-58502') +
-        dlField('Manufacturer 廠商（可下拉選或自己打）', 'pl-add-make', '例：Airbus', 'pl-dl-makes', '_plAddAcOnMake()') +
-        dlField('Model 機型（選廠商後出現主要機型）', 'pl-add-model', '例：A-350-900', 'pl-dl-models', '_plAddAcOnModel()') +
-        dlField('Type Code 機型代碼（選機型後自動帶）', 'pl-add-type', '例：A359', 'pl-dl-types', '') +
+        // V1.3.06：Manufacturer 改回 <select>。原本的 datalist 在欄位已有值時會用值去濾建議，
+        //          導致使用者想重選廠商時下拉只剩當前那家（user：「會被底下機型限制住」），體驗壞掉。
+        '<div style="margin-bottom:10px">' +
+          '<div style="font-size:.7em;color:var(--muted);margin-bottom:3px">Manufacturer 廠商</div>' +
+          '<select id="pl-add-make" onchange="_plAddAcMakeChange()" style="width:100%;background:var(--bg,#0a0e1a);color:var(--text);border:1px solid var(--border,#334155);border-radius:6px;padding:8px 10px;font-size:.85em">' +
+            '<option value="">— 選 —</option>' +
+            Object.keys(_plAcMergedCatalog()).map(function(mk) { return '<option value="' + _plEsc(mk) + '">' + _plEsc(mk) + '</option>'; }).join('') +
+            '<option value="__other__">其他 / Other（自己打）</option>' +
+          '</select>' +
+          '<input id="pl-add-make-custom" placeholder="廠商名稱" style="display:none;width:100%;background:var(--bg,#0a0e1a);color:var(--text);border:1px solid var(--border,#334155);border-radius:6px;padding:8px 10px;font-size:.85em;margin-top:6px">' +
+        '</div>' +
+        // V1.3.06：Model select 由 _plAddAcMakeChange 動態填；預設整段隱藏（等選了廠商才出）
+        '<div id="pl-add-model-wrap" style="margin-bottom:10px;display:none">' +
+          '<div style="font-size:.7em;color:var(--muted);margin-bottom:3px">Model 機型</div>' +
+          '<select id="pl-add-model" onchange="_plAddAcModelChange()" style="width:100%;background:var(--bg,#0a0e1a);color:var(--text);border:1px solid var(--border,#334155);border-radius:6px;padding:8px 10px;font-size:.85em">' +
+            '<option value="">— 選 —</option>' +
+          '</select>' +
+          '<input id="pl-add-model-custom" placeholder="機型（例：A-350-900）" style="display:none;width:100%;background:var(--bg,#0a0e1a);color:var(--text);border:1px solid var(--border,#334155);border-radius:6px;padding:8px 10px;font-size:.85em;margin-top:6px">' +
+        '</div>' +
+        // V1.3.06：Type Code 只在自訂時出現（從目錄選的會自動 derive — user：「不需要再有機型代碼選擇」）
+        '<div id="pl-add-type-wrap" style="margin-bottom:10px;display:none">' +
+          '<div style="font-size:.7em;color:var(--muted);margin-bottom:3px">Type Code 機型代碼（自訂時填）</div>' +
+          '<input id="pl-add-type" placeholder="例：A359" style="width:100%;background:var(--bg,#0a0e1a);color:var(--text);border:1px solid var(--border,#334155);border-radius:6px;padding:8px 10px;font-size:.85em">' +
+        '</div>' +
         field('Operator（公司）', 'pl-add-operator', 'Starlux') +
         field('Notes（備註）', 'pl-add-notes', '') +
-        _plAcDatalists() +
         '<div style="display:flex;gap:8px;margin-top:6px">' +
           '<button onclick="_plSubmitAddAircraft()" style="background:#10b981;color:#fff;border:0;border-radius:6px;padding:8px 14px;font-size:.85em;font-weight:700;cursor:pointer">Save</button>' +
           '<button onclick="_plOpenAircraft()" style="background:transparent;border:1px solid var(--border,#334155);color:var(--text);border-radius:6px;padding:8px 14px;font-size:.85em;cursor:pointer">Cancel</button>' +
@@ -2034,11 +2098,27 @@ async function _plSubmitAddAircraft() {
     if (resBox) resBox.innerHTML = '<div style="background:#7f1d1d;color:#fff;padding:8px 10px;border-radius:6px;font-size:.78em">❌ Tail # 必填</div>';
     return;
   }
+  // V1.3.06：select 用 sentinel "__other__" 表示自訂，從 customs 讀；catalog 兩者皆選則 type code 從 model
+  // 的 data-code 屬性 derive（user：不需要再有 type code 選擇）
+  var makeSelV = val('pl-add-make');
+  var make = (makeSelV === '__other__') ? val('pl-add-make-custom') : makeSelV;
+  var modelSelV = val('pl-add-model');
+  var model;
+  if (makeSelV === '__other__' || modelSelV === '__other__') model = val('pl-add-model-custom');
+  else model = modelSelV;
+  var typeCode;
+  if (makeSelV && makeSelV !== '__other__' && modelSelV && modelSelV !== '__other__') {
+    var ms = document.getElementById('pl-add-model');
+    var opt = ms && ms.options[ms.selectedIndex];
+    typeCode = opt ? (opt.getAttribute('data-code') || '') : '';
+  } else {
+    typeCode = val('pl-add-type');
+  }
   var body = {
     tail_no: tail,
-    type_code: val('pl-add-type'),
-    make: val('pl-add-make'),
-    model: val('pl-add-model'),
+    type_code: typeCode,
+    make: make,
+    model: model,
     operator: val('pl-add-operator'),
     notes: val('pl-add-notes'),
   };

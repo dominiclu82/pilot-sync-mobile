@@ -45,8 +45,8 @@ import { getSpaPilotLogJs } from '../spa/js-pilot-log.js';
 
 // ── 版本（比照 CrewSync / Morning：每次推版必更新；SW cache 名稱跟著走） ────
 // 本機 preview build 會暫時加 -tNN 後綴方便對版；推正式版前拿掉只留乾淨版號。
-export const PILOT_LOG_VERSION = 'V1.3.05';
-const PILOT_LOG_CACHE = 'pilotlog-v1-3-05';
+export const PILOT_LOG_VERSION = 'V1.3.06';
+const PILOT_LOG_CACHE = 'pilotlog-v1-3-06';
 
 export const pilotLogRouter = express.Router();
 
@@ -329,6 +329,11 @@ if (document.readyState !== 'loading') pilotLogInit();
 function _renderPilotLogChangelog(): string {
   return `
     <div class="pl-cl-v">${PILOT_LOG_VERSION}</div>
+    <div class="pl-cl-txt">
+      <b>Add Aircraft 重做：廠商不再被卡住、Type Code 自動省略；Aircraft 列表機型可收合。</b><b>(1) 廠商不會被綁住：</b>原本廠商用 datalist 在欄位有值時會用值過濾建議，導致想重選廠商時下拉只剩當前那家。改回正常 <code>&lt;select&gt;</code>,點 Manufacturer 就重出全部廠商。<b>(2) Type Code 自動省略：</b>從目錄選了 Manufacturer + Model 就<b>不再多一個 Type Code 給你選</b>，存檔時自動從 Model 帶出代碼（A-350-900 → A359）。只有選「其他/Other」自訂時才會出現 Type Code 欄位。<b>(3) 機型分組可收合：</b>Aircraft 列表每個機型 header 點一下收合，箭頭 ▼/▶ 顯示狀態；機尾多了不用一路滑到底，看哪型展開哪型。<br>
+      <b>Add Aircraft redo: Manufacturer no longer "stuck", Type Code auto-elided; Aircraft list groups collapsible.</b> (1) Manufacturer reverted to a proper <code>&lt;select&gt;</code> so re-picking shows all options again (the previous datalist filtered suggestions by the current value, which made re-selection awkward). (2) Type Code is no longer a separate picker when both Manufacturer and Model come from the catalog — it's derived automatically from the chosen model (e.g. A-350-900 → A359); the Type Code input appears only when "Other" is selected. (3) Each aircraft-type group header in the Aircraft list is now click-to-collapse with a ▼/▶ chevron, so a long tail list doesn't force you to scroll past every type.
+    </div>
+    <div class="pl-cl-v old">V1.3.05</div>
     <div class="pl-cl-txt">
       <b>手動新增航班：自動算夜航時數 + 自動判斷日 / 夜起降。</b>填好 Off / On + Origin / Dest，編輯器會用<b>機場座標 + 太陽角度（民用曙暮光）</b>沿大圓航路取樣，自動帶出 <b>Night Time</b>；勾 Pilot Flying 時 <b>day vs night 起降</b>也用「起飛看 origin@Off、落地看 dest@On」判斷,不再一律日間。內建你常飛的 76 個機場（RCTP/KLAX/RJAA/VHHH/WSSS/EGLL… 及兩岸日韓東南亞常見場），<b>座標查不到的機場 → 留空讓你手填，不誤判</b>。太陽公式已用 RCTP 正午（夏至 88° / 冬至 41°）與 KLAX 正午（79°）已知值驗證。手動改過的 Night 不被後續覆寫。<br>
       <b>Manual entry: auto-computed Night Time + day/night classification for takeoffs/landings.</b> Once Off/On + Origin/Dest are filled, the editor uses airport coordinates + solar altitude (civil twilight) sampled along the great-circle route to populate <b>Night Time</b>. With Pilot Flying checked, day-vs-night TO/landings are derived from origin@Off and dest@On (instead of defaulting to day). Built-in coordinates cover your 76 most-flown airports (RCTP/KLAX/RJAA/VHHH/WSSS/EGLL and major Asia/Europe/US hubs); airports without coords stay blank for you to enter manually (no wrong guesses). Solar formula validated against known RCTP solstice noon (88°/41°) and KLAX noon (79°). Manually edited Night Time is preserved.
