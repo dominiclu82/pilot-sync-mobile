@@ -45,8 +45,8 @@ import { getSpaPilotLogJs } from '../spa/js-pilot-log.js';
 
 // ── 版本（比照 CrewSync / Morning：每次推版必更新；SW cache 名稱跟著走） ────
 // 本機 preview build 會暫時加 -tNN 後綴方便對版；推正式版前拿掉只留乾淨版號。
-export const PILOT_LOG_VERSION = 'V1.2.07';
-const PILOT_LOG_CACHE = 'pilotlog-v1-2-07';
+export const PILOT_LOG_VERSION = 'V1.3.01';
+const PILOT_LOG_CACHE = 'pilotlog-v1-3-01';
 
 export const pilotLogRouter = express.Router();
 
@@ -329,6 +329,11 @@ if (document.readyState !== 'loading') pilotLogInit();
 function _renderPilotLogChangelog(): string {
   return `
     <div class="pl-cl-v">${PILOT_LOG_VERSION}</div>
+    <div class="pl-cl-txt">
+      <b>離線優先：飛機上也能看 + 改，回連自動上傳。</b>過去離線打開會被踢回登入畫面（即使手機裡有資料）——因為它每次開都堅持跟伺服器重新確認登入，離線必然失敗。改成 <b>CrewSync 那種離線優先</b>：<b>(1) 離線能看：</b>手機裡有快取就直接顯示上次的 logbook，登入鈕只在有網路時出現（Google 登入本來就需要網路）。<b>(2) 離線能改：</b>離線時新增 / 編輯 / 刪除航班，<b>立刻寫進手機本機、畫面馬上更新</b>，完全不等網路。<b>(3) 待上傳佇列：</b>每筆改動排進本機佇列，該筆標 <b>⏳</b>、上方顯示「待上傳 N 筆」，看得到哪些還沒同步。<b>(4) 回連自動上傳：</b>一偵測到有網路（或切回 App）自動依序送出，送完跟伺服器對帳。新航班先給臨時編號，上傳成功換成正式編號。所有改動「先寫本機、再背景同步」，飛機上斷續網路不掉資料。提醒：第一次一定要連網登入一次，手機才有資料可離線用。<b>另外：</b>DB 用量後台 <code>/pilot-log/admin</code> 拿掉密碼（網址未對外連結、且不再顯示任何 email），直接開就看得到用量。<br>
+      <b>Offline-first: view + edit in flight, auto-upload on reconnect.</b> Previously opening offline kicked you to a login screen even with cached data, because it insisted on re-validating the session with the server on every open. Now it works like CrewSync: (1) offline view from cache; the sign-in button only appears online (Google sign-in needs network). (2) Offline create/edit/delete writes to the phone instantly — no waiting on network. (3) An outbox queue marks each pending change with ⏳ and shows "N pending"; (4) on reconnect (or app foreground) it auto-uploads in order and reconciles with the server (temp IDs swapped for real ones). Every change is local-first then background-synced, so flaky in-flight connectivity never loses data. Note: sign in online once first so the phone has data to use offline.
+    </div>
+    <div class="pl-cl-v old">V1.2.07</div>
     <div class="pl-cl-txt">
       <b>[Admin/Ops] 用量成長追蹤 + 多久滿 1 GB 推估。</b>後台新增<b>「成長速度 / 多久滿 1 GB」</b>卡片：<b>伺服器每天自動記一筆</b>整庫 / 餐廳+其他 / pilot-log 的大小快照（啟動 + 每 6h 檢查，<b>不靠任何人開後台</b>），用今天比過去算出<b>每天 +X MB、每月 +Y MB</b>（其中餐廳吃多少），並推估照現況<b>約幾個月後、哪天會到 1 GB 上限</b>。剛上線會顯示「累積中」，約 2-3 天有足夠快照後就會出現速度與滿載日。新增 <code>pilot_db_size_history</code> 表。<br>
       <b>[Admin/Ops] Usage-growth tracking + time-to-full (1 GB) estimate.</b> The admin page gains a <b>"growth speed / time to 1 GB"</b> card: the <b>server auto-records a daily snapshot</b> of whole-DB / restaurant+other / pilot-log sizes (on startup + a 6-hourly check, <b>no need for anyone to open the dashboard</b>) and derives <b>+X MB/day, +Y MB/month</b> (with the restaurant share), plus a projection of <b>how many months until — and roughly which date — the 1 GB plan limit is hit</b>. Right after launch it shows "accumulating"; after ~2-3 days of snapshots the speed and full date appear. New <code>pilot_db_size_history</code> table.
@@ -981,14 +986,15 @@ pilotLogRouter.get('/api/pilot-log/stats', requireAuth, async (req: AuthedReques
   res.json({ totals, rolling, by_type: byType });
 });
 
-// ── Admin stats（V1.0.05；server-side admin secret，60s cache） ──────────────
-// GET /api/pilot-log/admin/stats?pw=<env PILOT_LOG_ADMIN_PW>&limit=10
-// 不掛 requireAuth：這是 ops 監控 endpoint，不走 user JWT。
-// 認證走 timing-safe compare，避免泄漏密碼長度資訊。
+// ── Admin stats（V1.0.05；60s cache） ────────────────────────────────────────
+// GET /api/pilot-log/admin/stats?limit=10
+// 不掛 requireAuth：這是 ops 監控 endpoint。V1.3 拿掉密碼門檻（網址未對外連結，且不再回 email）。
 const PL_STATS_TTL_MS = 60 * 1000;
 let _plStatsCache: { at: number; data: any } | null = null;
 
 import { timingSafeEqual as _tse, createHash as _ch } from 'crypto';
+// TODO(V1.3)：密碼門檻已移除（user 反映 64 字密碼無法記、且要先進 Render 找密碼很多餘）。
+// 保留此函式不刪 — 若日後要改用「擁有者 Google 登入」門檻可重用比對邏輯。目前未被呼叫。
 function _plAdminPwMatch(provided: string): boolean {
   const expected = process.env.PILOT_LOG_ADMIN_PW || '';
   // server config 檢查（不是 user-controlled，沒 leak issue）
@@ -1022,9 +1028,8 @@ function _plBuildResponse(cached: any, limit: number, isCached: boolean, cacheAg
 }
 
 pilotLogRouter.get('/api/pilot-log/admin/stats', async (req, res) => {
-  const pw = String(req.query.pw || '');
-  if (!_plAdminPwMatch(pw)) return res.status(403).json({ error: 'forbidden' });
-
+  // V1.3：拿掉密碼門檻。網址 /pilot-log/admin 未對外連結（security-by-obscurity），
+  // 且本頁只給「DB 用量 / 成長」這類非機密數字 — 不再回傳任何使用者 email（避免無密碼下外洩 PII）。
   const limit = Math.min(Math.max(parseInt(String(req.query.limit || '10'), 10) || 10, 1), PL_TOP_USERS_MAX);
 
   // 60s in-memory cache（admin 用、低頻；不做事件型主動失效）
@@ -1167,11 +1172,9 @@ pilotLogRouter.get('/api/pilot-log/admin/stats', async (req, res) => {
       restaurant_mb: Math.round(r.rest / MB * 10) / 10,
     }));
 
-    // ── Top users by entry count（永遠抓 max 50 進 cache，response 再 slice）────
+    // ── Top users by entry count（V1.3：不回 email，僅匿名 rank + 筆數，無密碼也不外洩 PII）────
     const topUsers = await pool.query(`
       SELECT
-        u.id                                                                          AS user_id,
-        (SELECT email FROM pilot_user_emails WHERE user_id = u.id ORDER BY is_primary DESC, linked_at LIMIT 1) AS primary_email,
         u.created_at, u.last_seen_at, u.last_import_at, u.last_login_at,
         (SELECT COUNT(*) FROM pilot_log_entries WHERE user_id = u.id)::int            AS entry_count,
         (SELECT COUNT(*) FROM pilot_aircraft WHERE user_id = u.id)::int               AS aircraft_count
@@ -1219,9 +1222,9 @@ pilotLogRouter.get('/api/pilot-log/admin/stats', async (req, res) => {
   }
 });
 
-// ── Admin dashboard 頁面（V1.2.06）─────────────────────────────────────────────
-// 可查詢的後台 UI：輸入 admin pw → 顯示 DB 用量 / 各表 size / users。
-// 頁面本身不含機密（pw 由 user 輸入、存 sessionStorage），資料 fetch 仍走 pw-gated 的 stats endpoint。
+// ── Admin dashboard 頁面（V1.2.06；V1.3 拿掉密碼）─────────────────────────────
+// 可查詢的後台 UI：一開頁就顯示 DB 用量 / 成長 / 各表 size / 匿名 user 統計。
+// 不需密碼（網址未對外連結 + 不回任何 email）；meta robots=noindex 不被搜尋。
 pilotLogRouter.get('/pilot-log/admin', (_req, res) => {
   res.setHeader('Content-Type', 'text/html; charset=utf-8');
   res.setHeader('Cache-Control', 'no-store');
@@ -1254,29 +1257,17 @@ tr+tr td { border-top:1px solid #283449; }
 </style></head>
 <body>
 <h1>📊 Pilot Log · DB Admin</h1>
-<div class="card" id="pwcard">
-  <div class="lbl">Admin password</div>
-  <div style="display:flex;gap:8px">
-    <input id="pw" type="password" placeholder="PILOT_LOG_ADMIN_PW" onkeydown="if(event.key==='Enter')load()">
-    <button onclick="load()">查詢</button>
-  </div>
-  <div id="msg" class="muted" style="font-size:.72em;margin-top:6px"></div>
-</div>
+<div id="msg" class="muted" style="font-size:.72em;margin-bottom:10px"></div>
 <div id="out"></div>
 <script>
-var PW_KEY = 'pl_admin_pw';
 function fmtMB(v){ return (v==null?'—':v) + ' MB'; }
 function el(id){ return document.getElementById(id); }
 async function load(){
-  var pw = el('pw').value.trim();
-  if(!pw){ el('msg').textContent='請輸入密碼'; return; }
   el('msg').textContent='查詢中…';
   try{
-    var r = await fetch('/api/pilot-log/admin/stats?pw=' + encodeURIComponent(pw) + '&limit=50');
-    if(r.status===403){ el('msg').innerHTML='<span class="err">密碼錯誤</span>'; return; }
+    var r = await fetch('/api/pilot-log/admin/stats?limit=50');
     if(!r.ok){ el('msg').innerHTML='<span class="err">查詢失敗 '+r.status+'</span>'; return; }
     var j = await r.json();
-    try{ sessionStorage.setItem(PW_KEY, pw); }catch(e){}
     el('msg').textContent='更新於 ' + new Date(j.generated_at).toLocaleString('zh-TW') + (j.cached?'（快取）':'');
     render(j);
   }catch(e){ el('msg').innerHTML='<span class="err">'+(e&&e.message||'error')+'</span>'; }
@@ -1331,18 +1322,18 @@ function render(j){
   out += '<div class="card"><div class="lbl">使用者 / 紀錄</div>' +
     '<div class="muted" style="font-size:.82em;line-height:1.8">使用者 '+ (u.total||0) +'（有資料 '+(u.with_entries||0)+'、近 7 天活躍 '+(u.active_7d||0)+'）<br>' +
     '航班總筆數 '+ (en.total||0) +'（confirmed '+((en.by_status||{}).confirmed||0)+' / draft '+((en.by_status||{}).draft||0)+'）</div></div>';
-  // top users
+  // top users（匿名：只排名 + 筆數，不顯示 email / id，避免無密碼下外洩）
   var tu = b.top_users_by_entries || [];
   if(tu.length){
-    var urows = tu.map(function(x){ return '<tr><td>'+esc(x.primary_email||x.user_id)+'</td><td>'+x.entry_count+'</td><td>'+x.aircraft_count+'</td></tr>'; }).join('');
-    out += '<div class="card"><div class="lbl">Top users</div><table><tr><th>User</th><th>Flights</th><th>Aircraft</th></tr>'+urows+'</table></div>';
+    var urows = tu.map(function(x, i){ return '<tr><td>#'+(i+1)+'</td><td>'+x.entry_count+'</td><td>'+x.aircraft_count+'</td></tr>'; }).join('');
+    out += '<div class="card"><div class="lbl">Top users（匿名排名）</div><table><tr><th>#</th><th>Flights</th><th>Aircraft</th></tr>'+urows+'</table></div>';
   }
   out += '<div style="text-align:center;margin:6px 0 20px"><button onclick="load()">↻ 重新整理</button></div>';
   el('out').innerHTML = out;
 }
 function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
-// 自動帶上次密碼
-(function(){ try{ var p=sessionStorage.getItem(PW_KEY); if(p){ el('pw').value=p; load(); } }catch(e){} })();
+// 一開頁就自動查詢（無密碼）
+load();
 </script>
 </body></html>`);
 });

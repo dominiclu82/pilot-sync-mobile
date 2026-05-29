@@ -27,6 +27,8 @@ var _pl = {
   reportFrom: null,              // Report 區間總表的起日（YYYY-MM-DD），null = 今年初
   reportTo: null,                // Report 區間總表的迄日，null = 今天
   selectedId: null,              // iPad 分割視窗：目前在 detail pane 開的那筆 entry id
+  outbox: [],                    // V1.3：離線改動佇列（create/update/delete），回連自動上傳
+  syncing: false,                // V1.3：同步進行中旗標（單例保護）
 };
 
 var _PL_LS_AT = 'pilotlog_at';
@@ -54,6 +56,8 @@ function _plSaveSession(s) {
   _pl.accessToken = s.accessToken;
   _pl.refreshToken = s.refreshToken;
   _pl.user = { id: s.userId, primaryEmail: s.primaryEmail };
+  // codex P1：剛確立身分 → 立刻清掉「屬於別人」的待上傳佇列（換帳號情境），不灌錯帳號
+  if (typeof _plPurgeForeignOutbox === 'function') _plPurgeForeignOutbox();
 }
 
 function _plClearSession() {
@@ -219,10 +223,173 @@ function _plCacheSaveAll() {
 function _plCacheSaveAircraftEntries() {
   if (_pl.aircraftEntries) _plIDBSet('aircraftEntries', _pl.aircraftEntries);
 }
+// V1.3：只存 entries（樂觀更新後快速落地，不必整批重寫）
+function _plCacheSaveEntries() { _plIDBSet('entries', _pl.entries); }
+
+// === SECTION: offline outbox + sync ═════════════════════════════════════════
+// 離線優先：所有 entry 改動先寫本機（_pl.entries 樂觀更新 + IDB），同時排進 outbox 佇列，
+// 再背景同步到 server。有網路就立刻送、離線就排隊，回連自動補送。新航班先給 'local-' 臨時 id，
+// 上傳成功後換成 server 正式 id。沿用 CrewSync briefing「server 存、身分當 key = 跨裝置」模型，
+// 補上 pilot-log 缺的離線那一半。
+function _plUuid() {
+  try { if (window.crypto && crypto.randomUUID) return crypto.randomUUID(); } catch (e) {}
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    var r = Math.random() * 16 | 0; return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
+  });
+}
+function _plIsLocalId(id) { return typeof id === 'string' && id.indexOf('local-') === 0; }
+function _plOutboxPersist() { _plIDBSet('outbox', _pl.outbox); }
+function _plHasPending(id) {
+  for (var i = 0; i < _pl.outbox.length; i++) if (_pl.outbox[i].id === id) return true;
+  return false;
+}
+// codex P1：丟掉「屬於別的使用者」的待上傳 op（換 Google 帳號 / 共用裝置），
+// 避免拿目前的 token 把前一個人的離線改動灌進現在登入的人。uid=null（離線期間建立、
+// 當時 session 物件還沒解出）的視為本機這位、保留。
+function _plPurgeForeignOutbox() {
+  var uid = _pl.user && _pl.user.id;
+  if (!uid || !_pl.outbox.length) return;
+  var before = _pl.outbox.length;
+  _pl.outbox = _pl.outbox.filter(function(op) { return op.uid == null || op.uid === uid; });
+  if (_pl.outbox.length !== before) _plOutboxPersist();
+}
+// V1.3：離線優先的判斷 — 「現在有網路嗎」「手機裡有沒有可用身分」
+function _plOnline() { return typeof navigator === 'undefined' || navigator.onLine !== false; }
+function _plHasSession() {
+  if (_pl.refreshToken || _pl.accessToken || _pl.user) return true;
+  try { return !!(localStorage.getItem(_PL_LS_RT) || localStorage.getItem(_PL_LS_UID)); } catch (e) { return false; }
+}
+
+// 把一筆 entry 改動排進佇列（含 collapse 合併，避免同一筆堆一堆 op）
+function _plEnqueue(type, id, body) {
+  var uid = (_pl.user && _pl.user.id) || null;     // codex P1：op 綁住建立當下的使用者，避免換帳號後灌錯人
+  if (type === 'delete') {
+    var wasLocal = _plIsLocalId(id);
+    // 移除該 id 既有的 create/update（被刪了就不必先建/改）
+    _pl.outbox = _pl.outbox.filter(function(op) { return op.id !== id; });
+    // 還沒上傳過的 local 新增 → 連 server 都不用碰；真實 id 才排 delete
+    if (!wasLocal) _pl.outbox.push({ opId: _plUuid(), type: 'delete', id: id, uid: uid, ts: Date.now(), rev: 1 });
+    _plOutboxPersist();
+    return;
+  }
+  // create / update：該 id 已有 pending op 就就地更新 body（合併成最新版），不堆多筆。
+  // rev++ 讓同步引擎能偵測「送出後又被改過」→ 不會把較新的編輯誤刪（codex P1）。
+  for (var i = 0; i < _pl.outbox.length; i++) {
+    if (_pl.outbox[i].id === id && (_pl.outbox[i].type === 'create' || _pl.outbox[i].type === 'update')) {
+      _pl.outbox[i].body = body; _pl.outbox[i].ts = Date.now();
+      _pl.outbox[i].rev = (_pl.outbox[i].rev || 1) + 1;
+      _plOutboxPersist();
+      return;
+    }
+  }
+  _pl.outbox.push({ opId: _plUuid(), type: type, id: id, body: body, uid: uid, ts: Date.now(), rev: 1 });
+  _plOutboxPersist();
+}
+
+// local 臨時 id → server 正式 id（entries 快取 + outbox 其他 op + 選取狀態一起換）
+function _plReconcileId(localId, realId) {
+  for (var i = 0; i < _pl.entries.length; i++) if (_pl.entries[i].id === localId) _pl.entries[i].id = realId;
+  for (var k = 0; k < _pl.outbox.length; k++) if (_pl.outbox[k].id === localId) _pl.outbox[k].id = realId;
+  if (_pl.selectedId === localId) _pl.selectedId = realId;
+  _plCacheSaveEntries(); _plOutboxPersist();
+}
+
+// 同步引擎：依序把 outbox 送 server。單例；離線直接 return（回連再觸發）。
+async function _plSync() {
+  if (_pl.syncing) return;
+  _plRenderSyncStatus();
+  if (!_pl.outbox.length) return;
+  if (typeof navigator !== 'undefined' && navigator.onLine === false) return;
+  _pl.syncing = true;
+  _plRenderSyncStatus();
+  try {
+    // 確保有 token：沒有就試 refresh（離線會失敗 → 保留佇列下次再送）
+    if (!_pl.accessToken) { var ok = await _plTryRefresh(); if (!ok) return; }
+    _plPurgeForeignOutbox();          // codex P1：只送屬於「目前登入者」的 op，別人的丟掉不灌錯帳號
+    while (_pl.outbox.length) {
+      var op = _pl.outbox[0];
+      var sendingRev = op.rev;                          // 送出當下的版本；回來時若已變 = 期間又被編輯
+      var res, done = false, isCreate = (op.type === 'create'), createdId = null;
+      try {
+        if (op.type === 'create') {
+          res = await _plApi('/api/pilot-log/entries', { method: 'POST', body: op.body });
+          if (res.ok) {
+            var j = await res.json().catch(function() { return {}; });
+            createdId = (j && j.entry && j.entry.id != null) ? j.entry.id : (j && j.id);
+            done = true;
+          }
+        } else if (op.type === 'update') {
+          res = await _plApi('/api/pilot-log/entries/' + op.id, { method: 'PUT', body: op.body });
+          done = res.ok || res.status === 404;        // 404 = server 端已不在，視同處理完
+        } else if (op.type === 'delete') {
+          res = await _plApi('/api/pilot-log/entries/' + op.id, { method: 'DELETE' });
+          done = res.ok || res.status === 404;
+        } else { done = true; }                        // 未知 op 丟掉
+      } catch (netErr) {
+        _plSetOffline(true);                            // 網路斷 → 停止排空，保留佇列回連再送
+        break;
+      }
+
+      // op 可能在 await 期間被並發的 delete 從佇列移除了（刪掉正在上傳的那筆）→ 用 identity 判斷，不盲目 shift
+      var stillQueued = _pl.outbox.indexOf(op) !== -1;
+
+      if (done) {
+        if (isCreate && createdId != null) {
+          if (stillQueued) {
+            _plReconcileId(op.id, createdId);            // temp id → 正式 id（op.id 也一起換）
+          } else {
+            // 建立成功但上傳途中被刪了 → server 留了孤兒，補一個 delete 清掉，不留髒資料
+            _plEnqueue('delete', createdId);
+            continue;
+          }
+        }
+        if (!stillQueued) continue;                       // 已被並發移除，這筆無事可做
+        // codex P1：送出期間又被編輯（rev 變了）→ 別把較新的編輯誤刪。
+        // create 已建好 → 轉成 update（用剛換到的正式 id）重送最新 body；update → 留著重送。
+        if (op.rev !== sendingRev && op.type !== 'delete') {
+          if (isCreate) op.type = 'update';
+          _plOutboxPersist();
+          continue;                                       // 不移除，下一圈用最新 body 再送一次
+        }
+        var di = _pl.outbox.indexOf(op);
+        if (di !== -1) { _pl.outbox.splice(di, 1); _plOutboxPersist(); }
+      } else {
+        var st = res ? res.status : 0;
+        // codex P1：暫時性 / 授權問題（5xx / 429 / 408 / 401 / 403）→ 保留佇列，停止本輪回連或重登後再送，
+        //           不可丟掉使用者的改動。只有明確的資料錯誤 4xx（400/409/422…）重試也不會過才略過。
+        if (st >= 500 || st === 429 || st === 408 || st === 401 || st === 403) break;
+        if (stillQueued) {
+          var fi = _pl.outbox.indexOf(op);
+          if (fi !== -1) { _pl.outbox.splice(fi, 1); _plOutboxPersist(); }
+          _plToast('一筆改動被伺服器拒絕（資料問題），已略過', 'error');
+        }
+      }
+    }
+  } finally {
+    _pl.syncing = false;
+  }
+  // 排空後跟 server 對帳一次（顯示 server 真實資料）
+  if (!_pl.outbox.length && (typeof navigator === 'undefined' || navigator.onLine !== false)) {
+    try { await _plFetchAll(); } catch (e) {}
+    if (_pl.tab === 'logbook' && !_pl.editing) _plRenderList();
+  }
+  _plRenderSyncStatus();
+}
+
+// 同步狀態小列（待上傳幾筆 / 同步中），填進 logbook header 的 #pl-sync-status
+function _plRenderSyncStatus() {
+  var el = document.getElementById('pl-sync-status');
+  if (!el) return;
+  if (_pl.syncing) { el.innerHTML = '<span style="color:#3b82f6">🔄 同步中…</span>'; return; }
+  var n = _pl.outbox.length;
+  el.innerHTML = n
+    ? '<span style="color:#f59e0b">⏳ ' + n + ' 筆待上傳' + ((typeof navigator!=='undefined'&&navigator.onLine===false)?'（離線）':'') + '</span>'
+    : '';
+}
 
 // 從 IDB 撈回填 _pl；回傳是否有任何快取（用來判斷「曾經登入過」）
 async function _plCacheLoadAll() {
-  var keys = ['entries', 'stats', 'aircraft', 'aircraftTypes', 'crew', 'suggest', 'aircraftEntries', 'user', 'filter'];
+  var keys = ['entries', 'stats', 'aircraft', 'aircraftTypes', 'crew', 'suggest', 'aircraftEntries', 'user', 'filter', 'outbox'];
   var vals = await Promise.all(keys.map(_plIDBGet));
   var any = false;
   if (vals[0]) { _pl.entries = vals[0]; any = true; }
@@ -234,6 +401,7 @@ async function _plCacheLoadAll() {
   if (vals[6]) { _pl.aircraftEntries = vals[6]; any = true; }
   if (vals[7] && !_pl.user) { _pl.user = vals[7]; any = true; }
   if (vals[8]) { _pl.filter = vals[8]; }    // 把 filter 還原成跟快取 entries 配對的值（codex P3）
+  if (vals[9] && vals[9].length) { _pl.outbox = vals[9]; any = true; }  // V1.3：未上傳的離線改動
   return any;
 }
 
@@ -595,7 +763,9 @@ function _plRenderEntryRow(e) {
   var acIcon = e.is_deadhead ? '🧳' : ((e.out_utc && e.in_utc) ? '✈' : '🛠');
   var acMeta = acIcon + ' ' + _plEsc(e.tail_no || '') + (e.aircraft_type ? ', ' + _plEsc(e.aircraft_type) : '');
   var dhBadge = e.is_deadhead ? '<span style="background:#a855f7;color:#fff;border-radius:4px;padding:0 5px;font-size:.85em;margin-right:5px;font-weight:700">DH</span>' : '';
-  var fltNo = dhBadge + (e.flight_no ? 'Flt ' + _plEsc(e.flight_no) : '');
+  // V1.3：尚未上傳的離線改動標 ⏳，讓使用者看得到哪些還沒同步
+  var pendBadge = _plHasPending(e.id) ? '<span title="待上傳 pending sync" style="background:#f59e0b;color:#fff;border-radius:4px;padding:0 5px;font-size:.85em;margin-right:5px;font-weight:700">⏳</span>' : '';
+  var fltNo = pendBadge + dhBadge + (e.flight_no ? 'Flt ' + _plEsc(e.flight_no) : '');
 
   // line 4 組員
   var crewNames = '';
@@ -693,14 +863,18 @@ async function _plConfirmAllDrafts() {
 function _plRenderMain() {
   var c = document.getElementById('pilotlog-content');
   if (!c) return;
-  if (!_pl.user) { _plRenderLogin(); return; }
+  // V1.3 離線優先：只有「有網路且手機裡沒有可用身分」才跳登入（Google 登入本來就要網路）。
+  // 離線時即使 _pl.user 物件還沒建好，也照樣顯示快取的 logbook，不卡登入。
+  if (!_pl.user && _plOnline() && !_plHasSession()) { _plRenderLogin(); return; }
   _plShowTabBar(true);
   _plHighlightTab('logbook');
+  var email = (_pl.user && _pl.user.primaryEmail) || '';
   c.innerHTML =
     '<div style="padding:10px 14px">' +
-      '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">' +
-        '<div style="font-size:1em;font-weight:700">📒 Logbook</div>' +
-        '<div style="font-size:.65em;color:var(--muted)">' + _plEsc(_pl.user.primaryEmail || '') + '</div>' +
+      '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;gap:8px">' +
+        '<div style="font-size:1em;font-weight:700;white-space:nowrap">📒 Logbook</div>' +
+        '<div id="pl-sync-status" style="font-size:.65em;flex:1;text-align:center"></div>' +
+        '<div style="font-size:.65em;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:45%">' + _plEsc(email) + '</div>' +
       '</div>' +
       '<div id="pl-toolbar">' + _plRenderToolbar() + '</div>' +
       '<div class="pl-split">' +
@@ -709,12 +883,26 @@ function _plRenderMain() {
       '</div>' +
     '</div>';
   _plRenderList();
+  _plRenderSyncStatus();
 }
 
 function _plRenderLogin() {
   var c = document.getElementById('pilotlog-content');
   if (!c) return;
   _plShowTabBar(false);
+  // V1.3：離線時別顯示按不動的 Google 鈕（OAuth 第一次一定要網路），改提示連網一次
+  if (!_plOnline()) {
+    c.innerHTML =
+      '<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:60px 20px;text-align:center;gap:14px">' +
+        '<div style="font-size:2.5em">📡</div>' +
+        '<div style="font-size:1.1em;font-weight:700">目前離線</div>' +
+        '<div style="font-size:.8em;color:var(--muted);max-width:340px;line-height:1.6">' +
+          '這台裝置還沒有快取你的 logbook。<br>請先連一次網路登入，之後就能離線使用。<br>' +
+          '<span style="opacity:.7">Offline — connect once to sign in and load your logbook, then it works offline.</span>' +
+        '</div>' +
+      '</div>';
+    return;
+  }
   c.innerHTML =
     '<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:60px 20px;text-align:center;gap:14px">' +
       '<div style="font-size:2.5em">📒</div>' +
@@ -1013,34 +1201,62 @@ async function _plSaveEntry(confirm) {
 
   if (confirm) body.status = 'confirmed';
 
-  var r;
-  if (e.id) {
-    r = await _plApi('/api/pilot-log/entries/' + e.id, { method: 'PUT', body: body });
-  } else {
-    if (confirm) body.status = 'confirmed';
-    r = await _plApi('/api/pilot-log/entries', { method: 'POST', body: body });
+  // V1.3：離線優先 — 先寫本機（_pl.entries 樂觀更新 + IDB）+ 排進 outbox，再背景同步。
+  // 線上也走這條：飛機上斷斷續續的網路不會掉資料，回連自動補送。
+  var isNew = !e.id;
+  var id = e.id || ('local-' + _plUuid());
+  var statusForCache = confirm ? 'confirmed' : (isNew ? 'draft' : (e.status || 'draft'));
+  var cached = {};
+  for (var kk in body) { if (Object.prototype.hasOwnProperty.call(body, kk)) cached[kk] = body[kk]; }
+  cached.id = id;
+  cached.status = statusForCache;
+  cached.source = e.source || 'manual';
+
+  // codex P2：只在符合目前篩選時才留在視圖（在 confirmed 檢視新增 draft 不該出現；
+  // 把已顯示的一筆改成不符篩選的狀態 → 從目前視圖移出，跟 server 端篩選後結果一致）
+  var matchesFilter = (_pl.filter === 'all') || (cached.status === _pl.filter);
+  var fidx = -1;
+  for (var i = 0; i < _pl.entries.length; i++) { if (_pl.entries[i].id === id) { fidx = i; break; } }
+  if (fidx >= 0) {
+    if (matchesFilter) _pl.entries[fidx] = cached; else _pl.entries.splice(fidx, 1);
+  } else if (matchesFilter) {
+    _pl.entries.unshift(cached);
   }
-  if (!r.ok) {
-    var err = await r.json().catch(function() { return {}; });
-    _plToast('Save failed: ' + (err.error || r.status), 'error');
-    return;
+  // Aircraft/Crew 頁的完整快照若已載入，也同步更新，避免顯示舊資料
+  if (_pl.aircraftEntries) {
+    var hit = false;
+    for (var ai = 0; ai < _pl.aircraftEntries.length; ai++) {
+      if (_pl.aircraftEntries[ai].id === id) { _pl.aircraftEntries[ai] = cached; hit = true; break; }
+    }
+    if (!hit) _pl.aircraftEntries.unshift(cached);
+    _plCacheSaveAircraftEntries();
   }
-  _plToast(confirm ? 'Confirmed' : 'Saved');
+  _plCacheSaveEntries();
+  _plEnqueue(isNew ? 'create' : 'update', id, body);
+
   _pl.editing = null;
   _pl.selectedId = null;          // iPad detail pane 的選取也清掉，_plRenderMain 會重建成 placeholder
-  await _plRefreshMain();
+  _plToast(confirm ? 'Confirmed' : 'Saved');
+  _plRenderMain();
+  _plSync();                       // 背景同步，不 await（離線會排隊，回連自動補送）
 }
 
 async function _plDeleteEntry() {
   var e = _pl.editing;
   if (!e || !e.id) return;
   if (!window.confirm('Delete this entry?')) return;
-  var r = await _plApi('/api/pilot-log/entries/' + e.id, { method: 'DELETE' });
-  if (!r.ok) { _plToast('Delete failed', 'error'); return; }
-  _plToast('Deleted');
+  var id = e.id;
+  // V1.3：離線優先 — 先從本機移除 + 排 delete。還沒上傳過的 local 新增，_plEnqueue 會直接丟掉不碰 server。
+  _pl.entries = _pl.entries.filter(function(x) { return x.id !== id; });
+  if (_pl.aircraftEntries) _pl.aircraftEntries = _pl.aircraftEntries.filter(function(x) { return x.id !== id; });
+  _plCacheSaveEntries();
+  if (_pl.aircraftEntries) _plCacheSaveAircraftEntries();
+  _plEnqueue('delete', id);
   _pl.editing = null;
   _pl.selectedId = null;
-  await _plRefreshMain();
+  _plToast('Deleted');
+  _plRenderMain();
+  _plSync();
 }
 
 // === SECTION: import ════════════════════════════════════════════════════════
@@ -2099,34 +2315,53 @@ async function pilotLogInit() {
   if (!_pl.initialized) {
     _plLoadSession();
     _pl.initialized = true;
-    _plRequestPersist();           // V1.2：請瀏覽器把儲存標 persistent，iOS 7 天清除延緩
+    _plRequestPersist();           // V1.2：請瀏覽器把儲存標 persistent
+    _plRegisterSyncTriggers();     // V1.3：online / 切回前景時自動補送 outbox
   }
   if (_pl.editing) { _plRenderEditor(); return; }
 
-  // V1.2：cache-first 啟動流程
-  // 1) 先把 IDB 快取塞回 _pl（離線時這就是唯一資料來源）
+  // cache-first 啟動：先把 IDB 快取塞回 _pl（離線時這就是唯一資料來源）
   var hadCache = await _plCacheLoadAll();
 
-  // 2) 只要 accessToken 不在記憶體就試 cookie resurrection（codex deep P1）—
-  //    不能只看 _pl.user，因為 cache 會把 user 撈回來、看起來「像登入」但其實 token 已被 iOS 清掉，
-  //    跳過 refresh 的話 _plApi 全部送出 Bearer undefined 永遠 401。
+  // accessToken 不在記憶體就試 cookie resurrection（線上才有意義；離線會失敗但不清 session）
   if (!_pl.accessToken) {
     var ok = await _plTryRefresh();
-    if (!ok && !_pl.user) {
+    // V1.3 離線優先：只有「有網路且手機裡完全沒有可用身分」才跳登入。
+    // 離線 / 有快取 / 有 localStorage 身分 → 一律往下走顯示快取，不卡登入（這就是 CrewSync 的行為）。
+    if (!ok && _plOnline() && !_plHasSession()) {
       _plRenderLogin();
       return;
     }
-    // refresh 失敗但 _pl.user 還在（cache 撈到的）→ 用快取資料顯示，OFFLINE 條會亮，
-    // user 連回網就會自然恢復；若 refresh 回 401 _plTryRefresh 內部已清 session 把 user 也清掉。
   }
 
-  // 3) 用快取（或剛拿到的新 session）立刻 render，不等網路
+  // 用快取（或剛拿到的新 session）立刻 render，不等網路
   if (_pl.tab === 'analyze') { _plRenderAnalyze(); }
   else if (_pl.tab === 'report') { _plRenderReport(); }
-  else { _plRenderMain(); _plFetchAll().then(function(ok) {
-    // 背景刷新後若 session 已被清（token+cookie 都失效）→ 送回登入，不顯示 stale UI（codex fast P1）
-    if (!_pl.user) { _plRenderLogin(); return; }
-    // 成功 → 重畫 list 反映新資料（保留 user 互動，不重建整個 split）
-    if (ok && _pl.tab === 'logbook' && !_pl.editing) _plRenderList();
-  }); }
+  else {
+    _plRenderMain();
+    // codex P1：有待上傳的離線改動時，別先用 server 舊資料蓋掉本機未同步的編輯
+    // （否則一回連重開 App 會看到剛離線存的航班「消失」幾秒）。改由 _plSync 排空後自己對帳。
+    if (!(_pl.outbox.length && _plOnline())) {
+      _plFetchAll().then(function(ok) {
+        // 線上且 session 確實失效（token+cookie 都 401、本機身分也被清）→ 送回登入；離線絕不踢
+        if (_plOnline() && !_plHasSession()) { _plRenderLogin(); return; }
+        if (ok && _pl.tab === 'logbook' && !_pl.editing) _plRenderList();
+        _plRenderSyncStatus();
+      });
+    }
+  }
+
+  // 有待上傳就先同步（_plSync 排空後內部會 _plFetchAll 對帳）；無待上傳則為 no-op
+  _plSync();
+}
+
+// V1.3：同步觸發點 — 一回連 / 切回前景就自動補送 outbox（只註冊一次）
+function _plRegisterSyncTriggers() {
+  try {
+    window.addEventListener('online', function() { _plSetOffline(false); _plSync(); });
+    window.addEventListener('offline', function() { _plSetOffline(true); _plRenderSyncStatus(); });
+    document.addEventListener('visibilitychange', function() {
+      if (document.visibilityState === 'visible' && _plOnline() && _pl.outbox.length) _plSync();
+    });
+  } catch (e) {}
 }
