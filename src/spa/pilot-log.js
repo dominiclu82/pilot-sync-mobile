@@ -1042,6 +1042,97 @@ function _plCrewField(label, key, e) {
     '<input id="ple-crew-' + key + '" style="width:100%;background:var(--bg,#0a0e1a);color:var(--text);border:1px solid var(--border,#334155);border-radius:6px;padding:6px 8px;font-size:.78em" value="' + _plEsc(v) + '"></div>';
 }
 
+// ── V1.3.02：智慧編輯器自動計算 ──────────────────────────────────────────────
+// block/air 由 OOOI 帶、PIC/SIC 由 position 帶、pilot flying 帶起降、機型篩 tail。
+// 只改 input.value，存檔仍走 _plReadField（不另存狀態）。
+function _plHHMMtoMin(v) {                        // 解析 OOOI 的 4 位 HHMM（無冒號）
+  var s = String(v == null ? '' : v).trim().replace(':', '');
+  if (!/^\d{3,4}$/.test(s)) return null;
+  while (s.length < 4) s = '0' + s;
+  var h = parseInt(s.slice(0, 2), 10), m = parseInt(s.slice(2), 10);
+  if (h > 23 || m > 59) return null;
+  return h * 60 + m;
+}
+function _plDurDiff(a, b) { if (a == null || b == null) return null; var d = b - a; if (d < 0) d += 1440; return d; }  // 跨午夜 +24h
+function _plSetVal(id, v) { var el = document.getElementById(id); if (el) el.value = v; }
+function _plGetVal(id) { var el = document.getElementById(id); return el ? el.value : ''; }
+
+function _plAutoCalcTimes() {
+  var out = _plHHMMtoMin(_plGetVal('ple-out_utc')), inn = _plHHMMtoMin(_plGetVal('ple-in_utc'));
+  var off = _plHHMMtoMin(_plGetVal('ple-off_utc')), on = _plHHMMtoMin(_plGetVal('ple-on_utc'));
+  var outRaw = _plGetVal('ple-out_utc').trim(), inRaw = _plGetVal('ple-in_utc').trim();
+  var offRaw = _plGetVal('ple-off_utc').trim(), onRaw = _plGetVal('ple-on_utc').trim();
+  // 兩端都有效 → 算；OOOI 區動過（任一端有字）但算不出 → 清掉舊值避免與畫面不符（codex P2）。
+  // 兩端都空 → 完全不碰 block（保留純手填 block 的工作流）。
+  if (out != null && inn != null) _plSetVal('ple-block_minutes', _plMinToHHMM(_plDurDiff(out, inn)));
+  else if (outRaw || inRaw) _plSetVal('ple-block_minutes', '');
+  if (off != null && on != null) _plSetVal('ple-air_minutes', _plMinToHHMM(_plDurDiff(off, on)));
+  else if (offRaw || onRaw) _plSetVal('ple-air_minutes', '');
+  _plAutoCalcRole();                              // block 變了 → PIC/SIC 跟著（含清空）
+}
+// 只在「沒被手動改過」時才覆寫 PIC/SIC（dataset.manual 由 _plWireEditor 標記）— 自動帶但保留手填
+function _plSetRoleField(id, val) {
+  var el = document.getElementById(id);
+  if (el && el.dataset.manual !== '1') el.value = val;
+}
+function _plAutoCalcRole() {
+  var pos = _plGetVal('ple-position');
+  var blockStr = _plGetVal('ple-block_minutes').trim();      // 直接沿用 block 欄目前值（可能為空）
+  // 角色互斥（codex P1）：目前角色 = block、另一個清空；blank / OBSERVER 兩者都清，避免雙重計算。
+  // 但手動改過的欄位不覆寫（codex fast P1：自動帶之後改 OOOI 不該把手填的 PIC/SIC 蓋掉）。
+  _plSetRoleField('ple-pic_minutes', pos === 'PIC' ? blockStr : '');
+  _plSetRoleField('ple-sic_minutes', pos === 'SIC' ? blockStr : '');
+}
+function _plAutoCalcLandings() {
+  var pf = document.getElementById('ple-pilot_flying');
+  if (!pf || !pf.checked) return;
+  // 只在四個起降欄都還沒填時帶入，避免蓋掉手填（含夜間）
+  var ids = ['ple-day_takeoffs', 'ple-night_takeoffs', 'ple-day_landings', 'ple-night_landings'];
+  var any = ids.some(function(id) { var el = document.getElementById(id); return el && Number(el.value) > 0; });
+  if (any) return;
+  // day/night 需機場座標（下一步補）→ 暫帶日間 1 T/O + 1 Ldg，使用者可改夜間
+  _plSetVal('ple-day_takeoffs', '1');
+  _plSetVal('ple-day_landings', '1');
+}
+// 依目前選的機型回傳該機型的 tail 清單（無機型 = 全部）；永遠含目前值
+function _plTailOptionsFor(type, current) {
+  var opts = [''];
+  (_pl.aircraft || []).forEach(function(a) {
+    if (!a.tail_no) return;
+    if (!type || a.type_code === type) opts.push(a.tail_no);
+  });
+  if (opts.length <= 1) opts = opts.concat(_pl.suggest.tail_nos || []);  // 該型沒機尾 / 無機型 → 退回常用清單，不要變空
+  if (current && opts.indexOf(current) < 0) opts.push(current);
+  return Array.from(new Set(opts));
+}
+function _plRefilterTails() {
+  var sel = document.getElementById('ple-tail_no');
+  if (!sel) return;
+  var cur = sel.value;
+  var opts = _plTailOptionsFor(_plGetVal('ple-aircraft_type'), cur);
+  sel.innerHTML = opts.map(function(o) {
+    return '<option value="' + _plEsc(o) + '"' + (o === cur ? ' selected' : '') + '>' + _plEsc(o || '—') + '</option>';
+  }).join('');
+}
+// 每次 _plRenderEditor 重畫後重掛 input/change 監聽（DOM 換新）
+function _plWireEditor() {
+  ['out_utc', 'off_utc', 'on_utc', 'in_utc'].forEach(function(n) {
+    var el = document.getElementById('ple-' + n);
+    if (el) el.addEventListener('input', _plAutoCalcTimes);
+  });
+  var pos = document.getElementById('ple-position');
+  if (pos) pos.addEventListener('change', _plAutoCalcRole);
+  var pf = document.getElementById('ple-pilot_flying');
+  if (pf) pf.addEventListener('change', _plAutoCalcLandings);
+  var ty = document.getElementById('ple-aircraft_type');
+  if (ty) ty.addEventListener('change', _plRefilterTails);
+  // 標記 PIC/SIC 是否被手動改過 → _plSetRoleField 之後就不覆寫（codex fast P1）
+  ['pic_minutes', 'sic_minutes'].forEach(function(n) {
+    var el = document.getElementById('ple-' + n);
+    if (el) el.addEventListener('input', function() { el.dataset.manual = '1'; });
+  });
+}
+
 // target：'pilotlog-content'（預設，全螢幕）或 'pl-detail-pane'（iPad 右側明細面板）。
 // 兩個目標差別只在 header 的關閉鈕標籤（← 回列表 / ✕ 關閉明細）。
 function _plRenderEditor(target) {
@@ -1059,12 +1150,9 @@ function _plRenderEditor(target) {
 
   var typeOptions = ['', 'A321', 'A359', 'A35K', 'B777-300ER', 'B789', 'B78X'].concat(_pl.suggest.aircraft_types || []);
   typeOptions = Array.from(new Set(typeOptions));
-  // V1.2.05：Tail # 改下拉，選項來自機尾庫（_pl.aircraft）+ 常用 suggest + 目前值。
+  // V1.3.02：Tail # 依目前機型篩選（選了機型只跳該型機尾，不再全部顯示）。
   // 要新增機尾到清單 → 去 ✈️ Aircraft 頁的 + Add Aircraft（或匯入 LogTen Aircraft）。
-  var tailOptions = [''].concat((_pl.aircraft || []).map(function(a) { return a.tail_no; }).filter(Boolean))
-    .concat(_pl.suggest.tail_nos || []);
-  if (e.tail_no && tailOptions.indexOf(e.tail_no) < 0) tailOptions.push(e.tail_no);
-  tailOptions = Array.from(new Set(tailOptions));
+  var tailOptions = _plTailOptionsFor(e.aircraft_type, e.tail_no);
 
   c.innerHTML =
     '<div style="padding:10px 14px">' +
@@ -1136,6 +1224,8 @@ function _plRenderEditor(target) {
 
     '<div style="height:30px"></div>' +
     '</div>';
+
+  _plWireEditor();   // V1.3.02：掛上 OOOI→block/air、position→PIC/SIC、pilot flying→起降、機型→篩 tail 的自動計算
 }
 
 function _plReadField(name, type) {

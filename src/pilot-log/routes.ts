@@ -45,8 +45,8 @@ import { getSpaPilotLogJs } from '../spa/js-pilot-log.js';
 
 // ── 版本（比照 CrewSync / Morning：每次推版必更新；SW cache 名稱跟著走） ────
 // 本機 preview build 會暫時加 -tNN 後綴方便對版；推正式版前拿掉只留乾淨版號。
-export const PILOT_LOG_VERSION = 'V1.3.01';
-const PILOT_LOG_CACHE = 'pilotlog-v1-3-01';
+export const PILOT_LOG_VERSION = 'V1.3.02';
+const PILOT_LOG_CACHE = 'pilotlog-v1-3-02';
 
 export const pilotLogRouter = express.Router();
 
@@ -329,6 +329,11 @@ if (document.readyState !== 'loading') pilotLogInit();
 function _renderPilotLogChangelog(): string {
   return `
     <div class="pl-cl-v">${PILOT_LOG_VERSION}</div>
+    <div class="pl-cl-txt">
+      <b>智慧編輯器：自動帶時數 / 起降 / 依機型篩機尾。</b>編輯航班時不用再手算：<b>(1)</b> 填 OOOI（Out/In、Off/On）→ 自動算 <b>Block（In−Out）</b>與 <b>Air（Off−On）</b>，跨午夜也對。<b>(2)</b> Position 選 <b>PIC → 自動帶 PIC 時間</b>、SIC → 帶 SIC 時間（= block）。<b>(3)</b> 勾「I was the Pilot Flying」→ 自動帶 <b>1 起飛 + 1 落地</b>（起降欄都還沒填時才帶，不蓋手填）。<b>(4)</b> 選了 <b>Aircraft Type → Tail # 只跳出該機型的機尾</b>，不再全部混在一起。自動帶的值都還能手改。<br>
+      <b>Smart editor: auto times / landings / tail filtered by type.</b> (1) Enter OOOI → Block (In−Out) and Air (Off−On) auto-compute (midnight-safe). (2) Position PIC → PIC time auto-fills (= block), SIC → SIC time. (3) "I was the Pilot Flying" → auto 1 takeoff + 1 landing (only when none entered yet). (4) Picking an Aircraft Type filters the Tail # dropdown to that type's tails. All auto-filled values stay editable. <i>(Day/night for takeoff/landing defaults to day for now — automatic day/night by location needs an airport coordinate table, coming next.)</i>
+    </div>
+    <div class="pl-cl-v old">V1.3.01</div>
     <div class="pl-cl-txt">
       <b>離線優先：飛機上也能看 + 改，回連自動上傳。</b>過去離線打開會被踢回登入畫面（即使手機裡有資料）——因為它每次開都堅持跟伺服器重新確認登入，離線必然失敗。改成 <b>CrewSync 那種離線優先</b>：<b>(1) 離線能看：</b>手機裡有快取就直接顯示上次的 logbook，登入鈕只在有網路時出現（Google 登入本來就需要網路）。<b>(2) 離線能改：</b>離線時新增 / 編輯 / 刪除航班，<b>立刻寫進手機本機、畫面馬上更新</b>，完全不等網路。<b>(3) 待上傳佇列：</b>每筆改動排進本機佇列，該筆標 <b>⏳</b>、上方顯示「待上傳 N 筆」，看得到哪些還沒同步。<b>(4) 回連自動上傳：</b>一偵測到有網路（或切回 App）自動依序送出，送完跟伺服器對帳。新航班先給臨時編號，上傳成功換成正式編號。所有改動「先寫本機、再背景同步」，飛機上斷續網路不掉資料。提醒：第一次一定要連網登入一次，手機才有資料可離線用。<b>另外：</b>DB 用量後台 <code>/pilot-log/admin</code> 拿掉密碼（網址未對外連結、且不再顯示任何 email），直接開就看得到用量。<br>
       <b>Offline-first: view + edit in flight, auto-upload on reconnect.</b> Previously opening offline kicked you to a login screen even with cached data, because it insisted on re-validating the session with the server on every open. Now it works like CrewSync: (1) offline view from cache; the sign-in button only appears online (Google sign-in needs network). (2) Offline create/edit/delete writes to the phone instantly — no waiting on network. (3) An outbox queue marks each pending change with ⏳ and shows "N pending"; (4) on reconnect (or app foreground) it auto-uploads in order and reconciles with the server (temp IDs swapped for real ones). Every change is local-first then background-synced, so flaky in-flight connectivity never loses data. Note: sign in online once first so the phone has data to use offline.
