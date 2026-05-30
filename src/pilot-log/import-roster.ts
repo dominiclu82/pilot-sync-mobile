@@ -1,5 +1,13 @@
 // Pilot Log v1 — Import from Roster
 // 把 roster sync 抓到的 duties[] 變成 draft entries。
+//
+// TODO(V1.3.07+ / codex P1)：跨來源 draft→confirmed 自動接合還沒做。
+// 目前 roster 寫入 source='roster' + ref `roster:flightNo:date:from:to:dutyIdx`；
+// 而 import-logten.ts 找既有只查 source='logten' + `logten:date:flightNo:from:to`。
+// 兩邊查不到 → LogTen 重匯時不會把 roster draft 接成 confirmed，會多一筆，目前要手動處理。
+// 修法：import-logten.ts 的 existingMap lookup 多查一份 source='roster' 同 (date,flightNo,from,to)，
+// 命中時 UPDATE 該 row 改 source='logten'+新 ref+confirmed 蓋過去，避免 dup。
+//
 // status 邏輯：
 //   - 同 source_ref 已是 confirmed → skip（使用者已 finalize，不可覆蓋）
 //   - 同 source_ref 已是 draft / roster_removed → 更新欄位，重設 status=draft
@@ -103,7 +111,8 @@ function extractCrew(crew?: RosterCrewMember[]): Record<string, string> | null {
 export async function importRoster(
   userId: string,
   duties: RosterDuty[],
-  dateRange?: { start: string; end: string }
+  dateRange?: { start: string; end: string },
+  months?: string[],          // V1.3.07 codex P2：實際同步的月份清單；給 → 只在這些月份做 roster_removed sweep，避免把沒同步的空檔月份（5/7 同步、6 沒同步）的舊 draft 誤殺
 ): Promise<ImportRosterResult> {
   const pool = getPool();
   if (!pool || !(await ensureTables())) {
@@ -158,15 +167,17 @@ export async function importRoster(
         result.skipped_confirmed++;
       } else {
         // draft 或 roster_removed → 更新並重設 draft
+        // codex P2：原本用 COALESCE 會卡住已 non-null 的欄位（gate 改了/duty 改了/組員換了
+        // 都不會反映）。改成直接覆寫 — 班表是新鮮的就該蓋舊的。
         await pool.query(
           `UPDATE pilot_log_entries SET
              status = 'draft',
              flight_date = $2, flight_no = $3, origin = $4, dest = $5,
-             position = COALESCE(position, $6),
+             position = $6,
              std_utc = $7, sta_utc = $8,
-             on_duty_utc = COALESCE(on_duty_utc, $9),
-             off_duty_utc = COALESCE(off_duty_utc, $10),
-             crew = COALESCE(crew, $11::jsonb),
+             on_duty_utc = $9,
+             off_duty_utc = $10,
+             crew = $11::jsonb,
              updated_at = NOW()
            WHERE id = $1`,
           [
@@ -180,8 +191,24 @@ export async function importRoster(
     }
   }
 
-  // 範圍內 draft 沒看到的 → roster_removed
-  if (dateRange && seenRefs.length >= 0) {
+  // 範圍內 draft 沒看到的 → roster_removed。
+  // codex P2：必須「per-month」sweep — 若同步了 5/7 但沒同步 6，連續 dateRange 會把 6 月舊
+  // draft 全部誤標 removed。優先用 months（每月各自掃），沒給才退回單一 dateRange（舊行為）。
+  const sweepRanges: Array<{ start: string; end: string }> = [];
+  if (months && months.length) {
+    for (const ym of months) {
+      const parts = ym.split('-');
+      if (parts.length !== 2) continue;
+      const y = parseInt(parts[0], 10), m = parseInt(parts[1], 10);
+      if (!y || !m) continue;
+      const nextMonth1st = new Date(Date.UTC(y, m, 1));                  // m 為 1-base：等同下個月 1 號
+      const lastDay = new Date(nextMonth1st.getTime() - 24 * 3600 * 1000);
+      sweepRanges.push({ start: ym + '-01', end: lastDay.toISOString().slice(0, 10) });
+    }
+  } else if (dateRange) {
+    sweepRanges.push(dateRange);
+  }
+  for (const rg of sweepRanges) {
     const r = await pool.query(
       `UPDATE pilot_log_entries SET status = 'roster_removed', updated_at = NOW()
        WHERE user_id = $1
@@ -189,9 +216,9 @@ export async function importRoster(
          AND status = 'draft'
          AND flight_date >= $2 AND flight_date <= $3
          AND NOT (source_ref = ANY($4::text[]))`,
-      [userId, dateRange.start, dateRange.end, seenRefs]
+      [userId, rg.start, rg.end, seenRefs]
     );
-    result.marked_removed = r.rowCount || 0;
+    result.marked_removed += r.rowCount || 0;
   }
 
   return result;

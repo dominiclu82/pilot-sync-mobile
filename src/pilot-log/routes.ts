@@ -39,14 +39,15 @@ import { getPool, ensureTables, PILOT_LOG_TABLES, insertDbSizeSnapshotIfDue } fr
 import { importLogtenFlights, importLogtenAircraft } from './import-logten.js';
 import { importLogtenAddressBook } from './import-addressbook.js';
 import { importLogtenAircraftTypes } from './import-aircraft-types.js';
+import { importRoster } from './import-roster.js';
 import { getTotals, getRollingTotals, getByAircraftType } from './stats.js';
 import { loadCredentials } from '../config.js';
 import { getSpaPilotLogJs } from '../spa/js-pilot-log.js';
 
 // ── 版本（比照 CrewSync / Morning：每次推版必更新；SW cache 名稱跟著走） ────
 // 本機 preview build 會暫時加 -tNN 後綴方便對版；推正式版前拿掉只留乾淨版號。
-export const PILOT_LOG_VERSION = 'V1.3.06';
-const PILOT_LOG_CACHE = 'pilotlog-v1-3-06';
+export const PILOT_LOG_VERSION = 'V1.3.07';
+const PILOT_LOG_CACHE = 'pilotlog-v1-3-07';
 
 export const pilotLogRouter = express.Router();
 
@@ -329,6 +330,11 @@ if (document.readyState !== 'loading') pilotLogInit();
 function _renderPilotLogChangelog(): string {
   return `
     <div class="pl-cl-v">${PILOT_LOG_VERSION}</div>
+    <div class="pl-cl-txt">
+      <b>班表匯入：從 CrewSync 一鍵帶進來當 draft，不用上傳檔案。</b>Import 頁新增 <b>📅 Roster · 從 CrewSync 帶班表</b>。CrewSync 同步過的班表（同瀏覽器 localStorage）直接讀進來：未飛的班全部建成 <b>draft</b>，飛完了你再 ✓ Confirm。<b>(規則)</b> 已 confirmed 的航班不會被覆蓋；只有<b>實際同步到的月份</b>裡舊 draft 沒在這次班表才標 <b>roster_removed</b>（沒同步的空檔月份不誤殺）；班表欄位重整會直接覆寫（gate / duty / 組員變更會反映）。<b>(目前限制)</b> 之後匯入 LogTen 飛行紀錄不會自動把 roster draft 接成 confirmed（兩邊 source / sourceRef 格式不同），會多一筆——你飛完了點該 draft → ✓ Confirm，或匯完 LogTen 後手動刪 roster draft。跨來源自動接合是下一輪的事。<br>
+      <b>Roster import: pull from CrewSync in one tap — no file upload.</b> The Import page gains a <b>📅 Roster · from CrewSync</b> card. Whatever roster CrewSync has synced (same-browser localStorage) is pulled in as draft entries; mark each confirmed after you fly it. Confirmed entries are never overwritten; only drafts in <b>months actually re-synced this time</b> get flagged <b>roster_removed</b> (gap months are not touched); refreshed roster fields overwrite (gate/duty/crew changes apply). <b>(Known limitation)</b> A later LogTen flight import does <i>not</i> auto-promote the matching roster draft to confirmed (source mismatch — duplicates appear); confirm the draft manually after you fly, or delete the roster draft after re-importing LogTen. Cross-source matching is queued for the next round.
+    </div>
+    <div class="pl-cl-v old">V1.3.06</div>
     <div class="pl-cl-txt">
       <b>Add Aircraft 重做：廠商不再被卡住、Type Code 自動省略；Aircraft 列表機型可收合。</b><b>(1) 廠商不會被綁住：</b>原本廠商用 datalist 在欄位有值時會用值過濾建議，導致想重選廠商時下拉只剩當前那家。改回正常 <code>&lt;select&gt;</code>,點 Manufacturer 就重出全部廠商。<b>(2) Type Code 自動省略：</b>從目錄選了 Manufacturer + Model 就<b>不再多一個 Type Code 給你選</b>，存檔時自動從 Model 帶出代碼（A-350-900 → A359）。只有選「其他/Other」自訂時才會出現 Type Code 欄位。<b>(3) 機型分組可收合：</b>Aircraft 列表每個機型 header 點一下收合，箭頭 ▼/▶ 顯示狀態；機尾多了不用一路滑到底，看哪型展開哪型。<br>
       <b>Add Aircraft redo: Manufacturer no longer "stuck", Type Code auto-elided; Aircraft list groups collapsible.</b> (1) Manufacturer reverted to a proper <code>&lt;select&gt;</code> so re-picking shows all options again (the previous datalist filtered suggestions by the current value, which made re-selection awkward). (2) Type Code is no longer a separate picker when both Manufacturer and Model come from the catalog — it's derived automatically from the chosen model (e.g. A-350-900 → A359); the Type Code input appears only when "Other" is selected. (3) Each aircraft-type group header in the Aircraft list is now click-to-collapse with a ▼/▶ chevron, so a long tail list doesn't force you to scroll past every type.
@@ -898,6 +904,30 @@ pilotLogRouter.post('/api/pilot-log/import/logten-aircraft', requireAuth, async 
   if (!text) return res.status(400).json({ error: 'empty_body' });
   const r = await importLogtenAircraft(req.pilotUserId!, text);
   res.json(r);
+});
+
+// V1.3.07：班表匯入 — 從 CrewSync localStorage 抓 duties[] 進來，建 draft entries。
+// body：JSON { duties: RosterDuty[], dateRange?: { start, end } }（mount 用 express.text 故先 JSON.parse）
+pilotLogRouter.post('/api/pilot-log/import/roster', requireAuth, async (req: AuthedRequest, res) => {
+  let body: any;
+  try { body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body; }
+  catch { return res.status(400).json({ error: 'invalid_json' }); }
+  const duties = Array.isArray(body && body.duties) ? body.duties : null;
+  if (!duties) return res.status(400).json({ error: 'missing_duties' });
+  const dr = body && body.dateRange;
+  const dateRange = (dr && typeof dr.start === 'string' && typeof dr.end === 'string') ? dr : undefined;
+  // V1.3.07 codex P2：優先用 months 做 per-month sweep（避免沒同步的空檔月份被誤標 roster_removed）
+  const monthsRaw = body && body.months;
+  const months: string[] | undefined = Array.isArray(monthsRaw)
+    ? monthsRaw.filter((x: any) => typeof x === 'string' && /^\d{4}-\d{2}$/.test(x))
+    : undefined;
+  try {
+    const r = await importRoster(req.pilotUserId!, duties, dateRange, months);
+    res.json(r);
+  } catch (e: any) {
+    console.error('[pilot-log] roster import error:', e.message);
+    res.status(500).json({ error: 'internal', detail: e.message });
+  }
 });
 
 // V1.0.09：LogTen Address Book → crew + crew_employee_ids

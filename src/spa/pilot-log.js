@@ -1490,7 +1490,7 @@ function _plOpenImport() {
     '<div style="padding:20px;max-width:600px;margin:0 auto">' +
     '<div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">' +
       '<button onclick="_plRenderMain()" style="background:transparent;border:0;color:var(--text);font-size:1.2em;cursor:pointer">←</button>' +
-      '<div style="font-size:1em;font-weight:700">Import LogTen Pro</div>' +
+      '<div style="font-size:1em;font-weight:700">Import 匯入</div>' +
     '</div>' +
     '<div style="background:var(--card);border-radius:10px;padding:14px;margin-bottom:12px">' +
       '<div style="font-size:.85em;font-weight:700;margin-bottom:6px">✈️ Flights · Tab 動態匯出 / Dynamic Export</div>' +
@@ -1504,6 +1504,16 @@ function _plOpenImport() {
         '<button onclick="_plUploadFlights(false)" style="background:#10b981;color:#fff;border:0;border-radius:6px;padding:6px 12px;font-size:.78em;font-weight:700;cursor:pointer">Import</button>' +
       '</div>' +
       '<div style="font-size:.65em;color:var(--muted);margin-top:6px">建議先 Preview 確認每筆都解析正常，再按 Import。<br>Run Preview first to confirm every row parses, then Import.</div>' +
+    '</div>' +
+    // V1.3.07：班表 — 從 CrewSync localStorage 直接帶進來當 draft（同 origin 共用儲存，不用上傳檔案）
+    '<div style="background:var(--card);border-radius:10px;padding:14px;margin-bottom:12px">' +
+      '<div style="font-size:.85em;font-weight:700;margin-bottom:6px">📅 Roster · 從 CrewSync 帶班表（不用上傳檔）</div>' +
+      '<div style="font-size:.7em;color:var(--muted);margin-bottom:8px;line-height:1.5">' +
+        'CrewSync 同步過的班表（存在同一個瀏覽器的 localStorage）<b>直接帶進來當 draft</b>，飛了再 confirm。<br>' +
+        'Imports the roster CrewSync has already synced (same browser localStorage) as draft entries; mark each confirmed after you fly it.<br>' +
+        '<b>用前提示：</b>先去 CrewSync 同步當月（與想要的其他月份）班表，再回來按下面這顆。' +
+      '</div>' +
+      '<button onclick="_plImportRoster()" style="background:#10b981;color:#fff;border:0;border-radius:6px;padding:6px 12px;font-size:.78em;font-weight:700;cursor:pointer">📥 Import Roster</button>' +
     '</div>' +
     '<div style="background:var(--card);border-radius:10px;padding:14px;margin-bottom:12px">' +
       '<div style="font-size:.85em;font-weight:700;margin-bottom:6px">🛩️ Aircraft · 機尾庫 / Tail registry（LogTen Aircraft）</div>' +
@@ -1618,6 +1628,50 @@ function _plRenderPreviewRows(rows) {
   }
   html += '</div>';
   return html;
+}
+
+// V1.3.07：班表匯入 — 從同 origin 的 CrewSync localStorage 撈 duties[]，POST 到 server 由
+// importRoster() 處理（建 draft / 既有更新 / 範圍內舊 draft 沒看到改 roster_removed）。
+async function _plImportRoster() {
+  var allDuties = [], months = [];
+  try {
+    for (var i = 0; i < localStorage.length; i++) {
+      var k = localStorage.key(i);
+      if (!k || !/^crewsync_roster_.+_\d{4}-\d{2}$/.test(k)) continue;
+      try {
+        var cache = JSON.parse(localStorage.getItem(k) || '{}');
+        if (cache && Array.isArray(cache.duties) && cache.duties.length) {
+          allDuties = allDuties.concat(cache.duties);
+          var m = k.match(/_(\d{4}-\d{2})$/); if (m) months.push(m[1]);
+        }
+      } catch (e) {}
+    }
+  } catch (e) {}
+  if (!allDuties.length) {
+    _plToast('CrewSync localStorage 找不到班表 — 先去 CrewSync 同步當月', 'error');
+    return;
+  }
+  // codex P2：傳 months[]（實際同步到的月份），server 才能 per-month sweep；
+  // 不傳連續 dateRange — 否則本機快取了 5/7 但沒 6，會把 6 月舊 draft 全部誤標 removed
+  try {
+    var r = await _plApi('/api/pilot-log/import/roster', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: { duties: allDuties, months: Array.from(new Set(months)) },
+    });
+    if (!r.ok) {
+      var ej = await r.json().catch(function() { return {}; });
+      _plToast('班表匯入失敗 ' + (ej.error || r.status), 'error');
+      return;
+    }
+    var j = await r.json();
+    _plToast('班表匯入：新增 ' + (j.inserted || 0) + ' / 更新 ' + (j.updated || 0) +
+      ' / 已 confirmed 略過 ' + (j.skipped_confirmed || 0) +
+      ' / 標 removed ' + (j.marked_removed || 0));
+    await _plRefreshMain();
+  } catch (e) {
+    _plToast('班表匯入失敗：' + (e && e.message ? e.message : 'unknown'), 'error');
+  }
 }
 
 function _plRenderBadRows(badRows) {
