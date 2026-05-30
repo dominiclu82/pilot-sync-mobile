@@ -46,8 +46,8 @@ import { getSpaPilotLogJs } from '../spa/js-pilot-log.js';
 
 // ── 版本（比照 CrewSync / Morning：每次推版必更新；SW cache 名稱跟著走） ────
 // 本機 preview build 會暫時加 -tNN 後綴方便對版；推正式版前拿掉只留乾淨版號。
-export const PILOT_LOG_VERSION = 'V1.3.07';
-const PILOT_LOG_CACHE = 'pilotlog-v1-3-07';
+export const PILOT_LOG_VERSION = 'V1.3.08';
+const PILOT_LOG_CACHE = 'pilotlog-v1-3-08';
 
 export const pilotLogRouter = express.Router();
 
@@ -330,6 +330,11 @@ if (document.readyState !== 'loading') pilotLogInit();
 function _renderPilotLogChangelog(): string {
   return `
     <div class="pl-cl-v">${PILOT_LOG_VERSION}</div>
+    <div class="pl-cl-txt">
+      <b>LogTen 模型：拿掉 draft / confirmed，加 Lock / Unlock 防誤改。</b>過去要按 Confirm / Confirm All 才算「飛了」這套是多此一舉。改成 LogTen 風格：<b>(1)</b> Save 就是 Save，沒有 Confirm 按鈕、沒有 ✓ Confirm All。<b>(2)</b>「飛了沒」全部用航班日期隱含判斷——過去日期(≤ 今天)直接算進<b>時數 / Analyze / Report / Currency</b>，未來日期(roster 帶的計畫航班)會顯示在 Logbook 但不算進統計。後端 stats 同步改成 <code>flight_date &lt;= CURRENT_DATE</code>。<b>(3)</b> Logbook 色條改成事實：<b>過去 = 綠（flown）/ 未來 = 橘（upcoming）/ 已移除 = 灰</b>。篩選器改 All / 過去 / 未來 / 已移除。<b>(4) Lock / Unlock：</b>編輯器右上 🔓 Lock 按一下鎖起來,鎖了所有欄位 disabled、無法 Save、無法 Delete（後端也擋）—— 防自己不小心手滑改到已飛紀錄；要改就先 🔒 Unlock。<br>
+      <b>LogTen model: drop draft/confirmed, add Lock/Unlock.</b> The Confirm / Confirm All workflow was unnecessary friction. Now LogTen-style: (1) Save is just Save — no Confirm button. (2) "Did you fly it?" is implied by <code>flight_date</code>: past-dated flights are counted in stats / Analyze / Report / currency; future-dated (roster-imported plans) show in the Logbook but aren't counted. Backend stats use <code>flight_date &lt;= CURRENT_DATE</code> instead of <code>status='confirmed'</code>. (3) Logbook status bar reflects fact: past = green (flown), future = amber (upcoming), removed = grey. Filters change to All / Past / Future / Removed. (4) Lock / Unlock: top-right 🔓 Lock toggle in the editor; locked entries disable all inputs, refuse Save and Delete (server enforces) — prevents accidental edits to a flown record. Unlock anytime.
+    </div>
+    <div class="pl-cl-v old">V1.3.07</div>
     <div class="pl-cl-txt">
       <b>班表匯入：從 CrewSync 一鍵帶進來當 draft，不用上傳檔案。</b>Import 頁新增 <b>📅 Roster · 從 CrewSync 帶班表</b>。CrewSync 同步過的班表（同瀏覽器 localStorage）直接讀進來：未飛的班全部建成 <b>draft</b>，飛完了你再 ✓ Confirm。<b>(規則)</b> 已 confirmed 的航班不會被覆蓋；只有<b>實際同步到的月份</b>裡舊 draft 沒在這次班表才標 <b>roster_removed</b>（沒同步的空檔月份不誤殺）；班表欄位重整會直接覆寫（gate / duty / 組員變更會反映）。<b>(目前限制)</b> 之後匯入 LogTen 飛行紀錄不會自動把 roster draft 接成 confirmed（兩邊 source / sourceRef 格式不同），會多一筆——你飛完了點該 draft → ✓ Confirm，或匯完 LogTen 後手動刪 roster draft。跨來源自動接合是下一輪的事。<br>
       <b>Roster import: pull from CrewSync in one tap — no file upload.</b> The Import page gains a <b>📅 Roster · from CrewSync</b> card. Whatever roster CrewSync has synced (same-browser localStorage) is pulled in as draft entries; mark each confirmed after you fly it. Confirmed entries are never overwritten; only drafts in <b>months actually re-synced this time</b> get flagged <b>roster_removed</b> (gap months are not touched); refreshed roster fields overwrite (gate/duty/crew changes apply). <b>(Known limitation)</b> A later LogTen flight import does <i>not</i> auto-promote the matching roster draft to confirmed (source mismatch — duplicates appear); confirm the draft manually after you fly, or delete the roster draft after re-importing LogTen. Cross-source matching is queued for the next round.
@@ -753,6 +758,7 @@ const EDITABLE_FIELDS = [
   'block_minutes', 'air_minutes', 'night_minutes', 'distance_nm',
   'pic_minutes', 'sic_minutes',                    // V1.2.04：實際 PIC/SIC 時數（可手動編輯）
   'is_deadhead',                                   // V1.2.05：deadhead/positioning（手動標）
+  'is_locked',                                     // V1.3.08：上鎖（LogTen 風格防誤改；鎖了不能編輯/刪除）
   'on_duty_utc', 'off_duty_utc', 'total_duty_minutes',
   'crew', 'approaches',
   'day_takeoffs', 'night_takeoffs', 'day_landings', 'night_landings', 'autolands',
@@ -804,6 +810,17 @@ pilotLogRouter.put('/api/pilot-log/entries/:id', requireAuth, async (req: Authed
   if (!pool) return res.status(503).json({ error: 'database_unavailable' });
 
   const body = req.body || {};
+
+  // V1.3.08：上鎖檢查 — 已鎖的航班拒絕任何編輯，除非該次 PUT 同時把 is_locked 設為 false（解鎖+存）
+  const cur = await pool.query(
+    `SELECT is_locked FROM pilot_log_entries WHERE id = $1 AND user_id = $2`,
+    [req.params.id, req.pilotUserId]
+  );
+  if (cur.rows.length === 0) return res.status(404).json({ error: 'not_found' });
+  if (cur.rows[0].is_locked && body.is_locked !== false) {
+    return res.status(423).json({ error: 'locked', detail: 'Unlock first to edit' });
+  }
+
   const sets: string[] = [];
   const vals: any[] = [];
   let p = 1;
@@ -856,6 +873,13 @@ pilotLogRouter.post('/api/pilot-log/entries/confirm-drafts', requireAuth, async 
 pilotLogRouter.delete('/api/pilot-log/entries/:id', requireAuth, async (req: AuthedRequest, res) => {
   const pool = getPool();
   if (!pool) return res.status(503).json({ error: 'database_unavailable' });
+  // V1.3.08：上鎖的拒絕刪除
+  const cur = await pool.query(
+    `SELECT is_locked FROM pilot_log_entries WHERE id = $1 AND user_id = $2`,
+    [req.params.id, req.pilotUserId]
+  );
+  if (cur.rows.length === 0) return res.status(404).json({ error: 'not_found' });
+  if (cur.rows[0].is_locked) return res.status(423).json({ error: 'locked', detail: 'Unlock first to delete' });
   const r = await pool.query(
     'DELETE FROM pilot_log_entries WHERE id = $1 AND user_id = $2',
     [req.params.id, req.pilotUserId]

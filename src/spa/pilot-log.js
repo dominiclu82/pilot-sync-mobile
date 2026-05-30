@@ -640,7 +640,8 @@ async function _plDeleteAccount() {
 // 不讓網路掛掉的 throw 把 caller 炸掉。成功時順手寫一份進 IDB。
 async function _plFetchAll() {
   var q = '';
-  if (_pl.filter !== 'all') q = '?status=' + _pl.filter;
+  // V1.3.08：filter 改成 client-side（all/past/future/removed 不對應 server status）— fetch 抓全部
+  // q stays ''
   try {
     var [eRes, sRes, aRes, qRes, atRes, cRes] = await Promise.all([
       _plApi('/api/pilot-log/entries' + q),
@@ -719,10 +720,10 @@ function _plRenderToolbar() {
     '<button onclick="_plOpenImport()" style="background:#6366f1;color:#fff;border:0;border-radius:6px;padding:6px 12px;font-size:.8em;font-weight:700;cursor:pointer">📥 Import</button>' +
     '<button onclick="_plOpenAircraft()" style="background:#0ea5e9;color:#fff;border:0;border-radius:6px;padding:6px 12px;font-size:.8em;font-weight:700;cursor:pointer">✈️ Aircraft</button>' +
     '<button onclick="_plOpenCrew()" style="background:#a855f7;color:#fff;border:0;border-radius:6px;padding:6px 12px;font-size:.8em;font-weight:700;cursor:pointer">👥 Crew</button>' +
-    '<button onclick="_plConfirmAllDrafts()" style="background:transparent;color:#10b981;border:1px solid #10b981;border-radius:6px;padding:6px 10px;font-size:.78em;font-weight:700;cursor:pointer" title="把所有過去日期的 draft 標成已飛 confirmed（未來計畫航班不動）">✓ Confirm All</button>' +
+    // V1.3.08：拿掉 ✓ Confirm All — LogTen 模型沒有 confirm 概念
     '<div style="flex:1"></div>' +
-    filterBtn('all', 'All') + filterBtn('draft', 'Draft') +
-    filterBtn('confirmed', 'Confirmed') + filterBtn('roster_removed', 'Removed') +
+    filterBtn('all', 'All') + filterBtn('past', '過去 Past') +
+    filterBtn('future', '未來 Future') + filterBtn('removed', '已移除 Removed') +
     '<button onclick="_plLogout()" style="background:transparent;color:var(--muted);border:0;font-size:.7em;cursor:pointer;margin-left:8px">Logout</button>' +
     '</div>';
 }
@@ -736,7 +737,13 @@ function _plRenderToolbar() {
 // 被選中（iPad detail pane 開著的那筆）會套 .pl-row-sel 描邊。
 var _PL_MON = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
 function _plRenderEntryRow(e) {
-  var statusColor = { draft: '#f59e0b', confirmed: '#10b981', roster_removed: '#94a3b8' }[e.status] || '#94a3b8';
+  // V1.3.08：色條改成日期+移除事實判斷（roster_removed 灰、未來橘、過去綠 = flown）
+  var statusColor;
+  if (e.status === 'roster_removed') statusColor = '#94a3b8';
+  else {
+    var _tdy = new Date().toISOString().slice(0, 10);
+    statusColor = (String(e.flight_date || '').slice(0, 10) > _tdy) ? '#f59e0b' : '#10b981';
+  }
 
   // 日期：拆 day / MON 'YY
   var ds = String(e.flight_date || '').slice(0, 10);
@@ -765,7 +772,8 @@ function _plRenderEntryRow(e) {
   var dhBadge = e.is_deadhead ? '<span style="background:#a855f7;color:#fff;border-radius:4px;padding:0 5px;font-size:.85em;margin-right:5px;font-weight:700">DH</span>' : '';
   // V1.3：尚未上傳的離線改動標 ⏳，讓使用者看得到哪些還沒同步
   var pendBadge = _plHasPending(e.id) ? '<span title="待上傳 pending sync" style="background:#f59e0b;color:#fff;border-radius:4px;padding:0 5px;font-size:.85em;margin-right:5px;font-weight:700">⏳</span>' : '';
-  var fltNo = pendBadge + dhBadge + (e.flight_no ? 'Flt ' + _plEsc(e.flight_no) : '');
+  var lockBadge = e.is_locked ? '<span title="Locked" style="font-size:.95em;margin-right:4px">🔒</span>' : '';
+  var fltNo = pendBadge + lockBadge + dhBadge + (e.flight_no ? 'Flt ' + _plEsc(e.flight_no) : '');
 
   // line 4 組員
   var crewNames = '';
@@ -812,7 +820,9 @@ function _plRenderEntryRow(e) {
 function _plRenderList() {
   var c = document.getElementById('pl-list');
   if (!c) return;
-  if (_pl.entries.length === 0) {
+  // V1.3.08：filter 改成 client-side（all / past / future / removed）
+  var shown = _pl.entries.filter(function(e) { return _plEntryMatchesFilter(e, _pl.filter); });
+  if (shown.length === 0) {
     c.innerHTML = '<div style="text-align:center;color:var(--muted);padding:30px;font-size:.85em">' +
       (_pl.filter === 'all'
         ? '尚無紀錄。點 <b>+ New Entry</b> 新增，或 <b>📥 Import</b> 匯入 LogTen Pro 資料。<br>No entries yet — tap <b>+ New Entry</b>, or <b>📥 Import</b> your LogTen Pro data.'
@@ -820,7 +830,7 @@ function _plRenderList() {
     '</div>';
     return;
   }
-  c.innerHTML = _pl.entries.map(_plRenderEntryRow).join('');
+  c.innerHTML = shown.map(_plRenderEntryRow).join('');
 }
 
 async function _plSetFilter(f) {
@@ -1244,6 +1254,17 @@ function _plRefilterTails() {
 }
 // 每次 _plRenderEditor 重畫後重掛 input/change 監聽（DOM 換新）
 function _plWireEditor() {
+  // V1.3.08：上鎖的航班 — 所有編輯欄位 disabled；Lock 按鈕仍可用以解鎖
+  if (_pl.editing && _pl.editing.is_locked) {
+    ['input', 'select', 'textarea'].forEach(function(tag) {
+      var els = document.querySelectorAll(tag);
+      for (var i = 0; i < els.length; i++) {
+        var id = els[i].id || '';
+        if (id.indexOf('ple-') === 0 || id.indexOf('ple-crew-') === 0) els[i].disabled = true;
+      }
+    });
+    return;   // 鎖了就不掛 auto-calc 監聽（沒意義 — 改不動）
+  }
   ['out_utc', 'off_utc', 'on_utc', 'in_utc'].forEach(function(n) {
     var el = document.getElementById('ple-' + n);
     if (el) el.addEventListener('input', _plAutoCalcTimes);
@@ -1275,11 +1296,20 @@ function _plRenderEditor(target) {
   var e = _pl.editing;
   var inDetail = (target === 'pl-detail-pane');
   var closeLabel = inDetail ? '✕' : '←';
-  var statusBadge = e.id ? (
-    '<span style="background:' +
-    ({ draft:'#f59e0b', confirmed:'#10b981', roster_removed:'#94a3b8' }[e.status] || '#666') +
-    ';color:#fff;border-radius:10px;padding:2px 8px;font-size:.62em;margin-left:8px">' + e.status + '</span>'
-  ) : '';
+  // V1.3.08：badge 改成「日期 + 鎖」事實判斷，不再 draft/confirmed（LogTen 模型）
+  var statusBadge = '';
+  if (e.id) {
+    if (e.status === 'roster_removed') {
+      statusBadge = '<span style="background:#94a3b8;color:#fff;border-radius:10px;padding:2px 8px;font-size:.62em;margin-left:8px">removed</span>';
+    } else {
+      var today = new Date().toISOString().slice(0, 10);
+      var fd = String(e.flight_date || '').slice(0, 10);
+      var isFuture = fd > today;
+      statusBadge = '<span style="background:' + (isFuture ? '#f59e0b' : '#10b981') +
+        ';color:#fff;border-radius:10px;padding:2px 8px;font-size:.62em;margin-left:8px">' + (isFuture ? 'upcoming' : 'flown') + '</span>';
+    }
+    if (e.is_locked) statusBadge += '<span style="margin-left:6px;font-size:.85em" title="Locked">🔒</span>';
+  }
 
   var typeOptions = ['', 'A321', 'A359', 'A35K', 'B777-300ER', 'B789', 'B78X'].concat(_pl.suggest.aircraft_types || []);
   typeOptions = Array.from(new Set(typeOptions));
@@ -1293,9 +1323,10 @@ function _plRenderEditor(target) {
       '<button onclick="_plCloseEditor()" style="background:transparent;border:0;color:var(--text);font-size:1.2em;cursor:pointer">' + closeLabel + '</button>' +
       '<div style="font-size:1em;font-weight:700">' + (e.id ? 'Edit Entry' : 'New Entry') + '</div>' + statusBadge +
       '<div style="flex:1"></div>' +
-      (e.id && e.status !== 'confirmed' ? '<button onclick="_plSaveEntry(true)" style="background:#10b981;color:#fff;border:0;border-radius:6px;padding:6px 12px;font-size:.78em;font-weight:700;cursor:pointer">Confirm</button>' : '') +
-      '<button onclick="_plSaveEntry(false)" style="background:#3b82f6;color:#fff;border:0;border-radius:6px;padding:6px 12px;font-size:.78em;font-weight:700;cursor:pointer">Save</button>' +
-      (e.id ? '<button onclick="_plDeleteEntry()" style="background:transparent;color:#ef4444;border:1px solid #ef4444;border-radius:6px;padding:6px 10px;font-size:.74em;cursor:pointer">Delete</button>' : '') +
+      // V1.3.08：拿掉 Confirm — Save 就是 Save。Lock 鈕（LogTen 風格）：鎖了不能改/不能刪；點一下解鎖
+      (e.id ? '<button onclick="_plToggleLock()" style="background:transparent;color:' + (e.is_locked ? '#10b981' : 'var(--muted)') + ';border:1px solid ' + (e.is_locked ? '#10b981' : 'var(--border,#334155)') + ';border-radius:6px;padding:6px 10px;font-size:.74em;cursor:pointer">' + (e.is_locked ? '🔒 Locked' : '🔓 Lock') + '</button>' : '') +
+      (!e.is_locked ? '<button onclick="_plSaveEntry()" style="background:#3b82f6;color:#fff;border:0;border-radius:6px;padding:6px 12px;font-size:.78em;font-weight:700;cursor:pointer">Save</button>' : '') +
+      (e.id && !e.is_locked ? '<button onclick="_plDeleteEntry()" style="background:transparent;color:#ef4444;border:1px solid #ef4444;border-radius:6px;padding:6px 10px;font-size:.74em;cursor:pointer">Delete</button>' : '') +
     '</div>' +
 
     // ── Flight：Date+Flight# / From+To / Type+Tail+Position ──
@@ -1375,7 +1406,8 @@ function _plReadField(name, type) {
   return raw;
 }
 
-async function _plSaveEntry(confirm) {
+// V1.3.08：LogTen 模型 — Save 就是 Save，沒有 Confirm 步驟。是否「飛了」用 flight_date 隱含判斷。
+async function _plSaveEntry() {
   var e = _pl.editing;
   if (!e) return;
 
@@ -1422,22 +1454,24 @@ async function _plSaveEntry(confirm) {
   });
   body.crew = crew;
 
-  if (confirm) body.status = 'confirmed';
+  // V1.3.08：新 manual entry 直接 status='confirmed'（LogTen 模型 — 寫好就是寫好）；
+  //          編輯既有 entry 不動 status（用 flight_date 隱含「飛了沒」）
+  var isNew = !e.id;
+  if (isNew) body.status = 'confirmed';
 
   // V1.3：離線優先 — 先寫本機（_pl.entries 樂觀更新 + IDB）+ 排進 outbox，再背景同步。
   // 線上也走這條：飛機上斷斷續續的網路不會掉資料，回連自動補送。
-  var isNew = !e.id;
   var id = e.id || ('local-' + _plUuid());
-  var statusForCache = confirm ? 'confirmed' : (isNew ? 'draft' : (e.status || 'draft'));
+  var statusForCache = isNew ? 'confirmed' : (e.status || 'confirmed');
   var cached = {};
   for (var kk in body) { if (Object.prototype.hasOwnProperty.call(body, kk)) cached[kk] = body[kk]; }
   cached.id = id;
   cached.status = statusForCache;
+  cached.is_locked = !!e.is_locked;                       // 保留 lock 狀態（save 不會改變鎖定）
   cached.source = e.source || 'manual';
 
-  // codex P2：只在符合目前篩選時才留在視圖（在 confirmed 檢視新增 draft 不該出現；
-  // 把已顯示的一筆改成不符篩選的狀態 → 從目前視圖移出，跟 server 端篩選後結果一致）
-  var matchesFilter = (_pl.filter === 'all') || (cached.status === _pl.filter);
+  // V1.3.08：filter 改成日期 / status 為基底（all / past / future / removed），保留視圖一致
+  var matchesFilter = _plEntryMatchesFilter(cached, _pl.filter);
   var fidx = -1;
   for (var i = 0; i < _pl.entries.length; i++) { if (_pl.entries[i].id === id) { fidx = i; break; } }
   if (fidx >= 0) {
@@ -1459,9 +1493,51 @@ async function _plSaveEntry(confirm) {
 
   _pl.editing = null;
   _pl.selectedId = null;          // iPad detail pane 的選取也清掉，_plRenderMain 會重建成 placeholder
-  _plToast(confirm ? 'Confirmed' : 'Saved');
+  _plToast('Saved');
   _plRenderMain();
   _plSync();                       // 背景同步，不 await（離線會排隊，回連自動補送）
+}
+
+// V1.3.08：lock toggle — 直接 PUT（不走 outbox；lock 是管理操作，需連網）。鎖了就不能 edit/delete。
+async function _plToggleLock() {
+  var e = _pl.editing;
+  if (!e || !e.id) return;
+  if (_plIsLocalId(e.id)) { _plToast('先存檔再上鎖', 'error'); return; }
+  if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+    _plToast('🔒 鎖定切換需要連網路', 'error'); return;
+  }
+  var newLocked = !e.is_locked;
+  try {
+    var r = await _plApi('/api/pilot-log/entries/' + e.id, { method: 'PUT', body: { is_locked: newLocked } });
+    if (!r.ok) {
+      var ej = await r.json().catch(function() { return {}; });
+      _plToast('鎖定切換失敗 ' + (ej.error || r.status), 'error'); return;
+    }
+    e.is_locked = newLocked;
+    for (var i = 0; i < _pl.entries.length; i++) if (_pl.entries[i].id === e.id) _pl.entries[i].is_locked = newLocked;
+    if (_pl.aircraftEntries) for (var ai = 0; ai < _pl.aircraftEntries.length; ai++)
+      if (_pl.aircraftEntries[ai].id === e.id) _pl.aircraftEntries[ai].is_locked = newLocked;
+    _plCacheSaveEntries();
+    _plToast(newLocked ? '🔒 Locked' : '🔓 Unlocked');
+    // 重畫 editor 反映 lock 狀態（按鈕變、Delete 隱/現）
+    var inDetail = !!(document.getElementById('pl-detail-pane') && document.getElementById('pl-detail-pane').contains(document.getElementById('ple-flight_date')));
+    _plRenderEditor(inDetail ? 'pl-detail-pane' : 'pilotlog-content');
+    _plRenderList();
+  } catch (err) {
+    _plToast('鎖定切換失敗', 'error');
+  }
+}
+
+// V1.3.08：把 entry 依 _pl.filter 判斷是否該顯示（all / past / future / removed）
+function _plEntryMatchesFilter(e, filter) {
+  if (filter === 'all') return true;
+  if (filter === 'removed') return e.status === 'roster_removed';
+  if (e.status === 'roster_removed') return false;        // past/future filter 不顯示已移除
+  var today = new Date().toISOString().slice(0, 10);
+  var fd = String(e.flight_date || '').slice(0, 10);
+  if (filter === 'past') return fd <= today;
+  if (filter === 'future') return fd > today;
+  return true;
 }
 
 async function _plDeleteEntry() {
@@ -2548,7 +2624,12 @@ function _plRenderAnalyzeContent() {
   if (!c) return;
   if (_pl.tab !== 'analyze') return;   // 防 race：切走後過期的 async render 不可覆蓋新分頁
   // 只算已飛（confirmed）且非 deadhead（V1.2.05 codex P1/P2：deadhead 不算飛行分析）
-  var entries = (_pl.aircraftEntries || []).filter(function(e) { return e.status === 'confirmed' && !e.is_deadhead; });
+  // V1.3.08：LogTen 模型 — 用日期判斷「飛了沒」，不再看 status='confirmed'。只排除 roster_removed + deadhead。
+  var _todayStr = new Date().toISOString().slice(0, 10);
+  var entries = (_pl.aircraftEntries || []).filter(function(e) {
+    if (e.is_deadhead || e.status === 'roster_removed') return false;
+    return String(e.flight_date || '').slice(0, 10) <= _todayStr;
+  });
   var hasStats = _pl.stats && _pl.stats.totals;
   var body = hasStats
     ? _plRenderStats() + _plRenderTypeBreakdown(entries) + _plRenderCompanyBreakdown(entries) + _plRenderMonthlyChart(entries)
@@ -2616,7 +2697,12 @@ function _plRenderReportContent() {
   // 報表只看已飛（confirmed）— recency / 時數 / CSV 都不能把 draft（計畫中）跟
   // roster_removed 當成已飛，否則起降數、block 時數會灌水（codex P1）
   // 報表只看已飛 confirmed 且非 deadhead（deadhead 不算 PIC/SIC / 起降 currency / 時數）
-  var src = (_pl.aircraftEntries || []).filter(function(e) { return e.status === 'confirmed' && !e.is_deadhead; });
+  // V1.3.08：用日期判斷「飛了沒」，不再看 status
+  var _today2 = new Date().toISOString().slice(0, 10);
+  var src = (_pl.aircraftEntries || []).filter(function(e) {
+    if (e.is_deadhead || e.status === 'roster_removed') return false;
+    return String(e.flight_date || '').slice(0, 10) <= _today2;
+  });
 
   // ── 90 天 recency ──
   var now = new Date();
@@ -2710,10 +2796,14 @@ function _plCsvCell(v) {
 
 function _plExportCsv() {
   var r = _plReportRange();
+  // V1.3.08 codex P1：CSV 跟畫面 Report 同一套日期判斷（過去 + 非 roster_removed + 非 deadhead），
+  // 不要再看 status='confirmed'（draft/confirmed 已經沒意義了）
+  var _todayCsv = new Date().toISOString().slice(0, 10);
   var src = (_pl.aircraftEntries || []).filter(function(e) {
-    if (e.status !== 'confirmed' || e.is_deadhead) return false;   // 只匯出已飛、非 deadhead
+    if (e.is_deadhead || e.status === 'roster_removed') return false;
     var fd = String(e.flight_date || '').slice(0, 10);
-    return fd && (!r.from || fd >= r.from) && (!r.to || fd <= r.to);
+    if (!fd || fd > _todayCsv) return false;        // 未來日期 = 還沒飛，不放進 CSV
+    return (!r.from || fd >= r.from) && (!r.to || fd <= r.to);
   });
   src.sort(function(a, b) { return (a.flight_date || '').localeCompare(b.flight_date || ''); });
   var head = ['Date', 'Flight', 'From', 'To', 'Type', 'Tail', 'Position',

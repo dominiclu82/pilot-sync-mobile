@@ -117,6 +117,8 @@ export async function ensureTables(): Promise<boolean> {
     // V1.2.05：deadhead / positioning 標記。LogTen 多數匯出不帶此欄，主要靠 editor 手動標，
     // 讓「飛行」跟「deadhead」能區分（deadhead 不算 PIC/SIC、不算起降 currency）。
     await pool.query(`ALTER TABLE pilot_log_entries ADD COLUMN IF NOT EXISTS is_deadhead BOOLEAN DEFAULT FALSE`).catch(() => {});
+    // V1.3.08：LogTen 風格的「上鎖」— 鎖了不能編輯/刪除（防誤改），UI 上可隨時 unlock
+    await pool.query(`ALTER TABLE pilot_log_entries ADD COLUMN IF NOT EXISTS is_locked BOOLEAN DEFAULT FALSE`).catch(() => {});
 
     await pool.query(`
       CREATE TABLE IF NOT EXISTS pilot_aircraft (
