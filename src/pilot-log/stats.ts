@@ -23,7 +23,7 @@ export async function getTotals(userId: string): Promise<Totals> {
        COALESCE(SUM(night_minutes), 0)::int                                                AS night_minutes,
        COUNT(*)::int                                                                       AS entry_count
      FROM pilot_log_entries
-     WHERE user_id = $1 AND flight_date <= CURRENT_DATE AND status <> 'roster_removed' AND is_deadhead IS NOT TRUE`,
+     WHERE user_id = $1 AND in_utc IS NOT NULL AND status <> 'roster_removed' AND is_deadhead IS NOT TRUE`,
     [userId]
   );
   const row = r.rows[0] || {};
@@ -58,7 +58,7 @@ async function rolling(userId: string, days: number): Promise<Totals> {
        COALESCE(SUM(night_minutes), 0)::int                                                AS night_minutes,
        COUNT(*)::int                                                                       AS entry_count
      FROM pilot_log_entries
-     WHERE user_id = $1 AND flight_date <= CURRENT_DATE AND status <> 'roster_removed' AND is_deadhead IS NOT TRUE
+     WHERE user_id = $1 AND in_utc IS NOT NULL AND status <> 'roster_removed' AND is_deadhead IS NOT TRUE
        AND flight_date >= CURRENT_DATE - ($2::int - 1)`,
     [userId, days]
   );
@@ -86,7 +86,7 @@ export async function getByAircraftType(userId: string): Promise<ByTypeRow[]> {
             COALESCE(SUM(block_minutes), 0)::int AS total_minutes,
             COUNT(*)::int                         AS entry_count
      FROM pilot_log_entries
-     WHERE user_id = $1 AND flight_date <= CURRENT_DATE AND status <> 'roster_removed' AND aircraft_type IS NOT NULL AND is_deadhead IS NOT TRUE
+     WHERE user_id = $1 AND in_utc IS NOT NULL AND status <> 'roster_removed' AND aircraft_type IS NOT NULL AND is_deadhead IS NOT TRUE
      GROUP BY aircraft_type
      ORDER BY total_minutes DESC`,
     [userId]

@@ -46,8 +46,8 @@ import { getSpaPilotLogJs } from '../spa/js-pilot-log.js';
 
 // ── 版本（比照 CrewSync / Morning：每次推版必更新；SW cache 名稱跟著走） ────
 // 本機 preview build 會暫時加 -tNN 後綴方便對版；推正式版前拿掉只留乾淨版號。
-export const PILOT_LOG_VERSION = 'V1.3.08';
-const PILOT_LOG_CACHE = 'pilotlog-v1-3-08';
+export const PILOT_LOG_VERSION = 'V1.3.09';
+const PILOT_LOG_CACHE = 'pilotlog-v1-3-09';
 
 export const pilotLogRouter = express.Router();
 
@@ -330,6 +330,11 @@ if (document.readyState !== 'loading') pilotLogInit();
 function _renderPilotLogChangelog(): string {
   return `
     <div class="pl-cl-v">${PILOT_LOG_VERSION}</div>
+    <div class="pl-cl-txt">
+      <b>顏色重做 + 「已完成」改用 in_utc 判斷。</b>user 反映「兩種顏色就好,已完成綠、未完成藍;未來的跟未完成都是藍色」。改成：<b>(1)</b> 色條與 badge：<b>已完成（有實際抵達時間 in_utc）= 綠 / 未完成（沒填 in_utc，含未來計畫）= 藍 / 已移除 = 灰</b>。<b>(2) 篩選器</b>改成 <b>All / 已完成 Done / 未完成 Open / 已移除 Removed</b>，門檻一律看 in_utc，不再看 flight_date。<b>(3)</b> 後端 stats / 前端 Analyze / Report / CSV 全部對齊新規則：要算進統計必須有 in_utc — 沒填實際抵達時間（roster 帶進來還沒飛或忘了補的）<b>不算飛行時數</b>。這樣畫面藍色 = 不計入,綠色 = 已計入,跟你看到的顏色一致。<br>
+      <b>Color redesign + "done" now defined by in_utc.</b> Per user: "just two colors — done green, open blue; future and incomplete are both blue." (1) Color bar / badge: <b>done (has actual in_utc arrival) = green / open (no in_utc, includes future) = blue / removed = gray</b>. (2) Filters: <b>All / Done 已完成 / Open 未完成 / Removed</b>, gated by in_utc, not by flight_date. (3) Backend stats + frontend Analyze / Report / CSV all aligned: an entry must have <code>in_utc</code> to count in flight stats — past-date entries without actual arrival times (roster-imported or forgotten OOOI) <b>don't add to hours</b>. So blue = not counted, green = counted, matching what you see.
+    </div>
+    <div class="pl-cl-v old">V1.3.08</div>
     <div class="pl-cl-txt">
       <b>LogTen 模型：拿掉 draft / confirmed，加 Lock / Unlock 防誤改。</b>過去要按 Confirm / Confirm All 才算「飛了」這套是多此一舉。改成 LogTen 風格：<b>(1)</b> Save 就是 Save，沒有 Confirm 按鈕、沒有 ✓ Confirm All。<b>(2)</b>「飛了沒」全部用航班日期隱含判斷——過去日期(≤ 今天)直接算進<b>時數 / Analyze / Report / Currency</b>，未來日期(roster 帶的計畫航班)會顯示在 Logbook 但不算進統計。後端 stats 同步改成 <code>flight_date &lt;= CURRENT_DATE</code>。<b>(3)</b> Logbook 色條改成事實：<b>過去 = 綠（flown）/ 未來 = 橘（upcoming）/ 已移除 = 灰</b>。篩選器改 All / 過去 / 未來 / 已移除。<b>(4) Lock / Unlock：</b>編輯器右上 🔓 Lock 按一下鎖起來,鎖了所有欄位 disabled、無法 Save、無法 Delete（後端也擋）—— 防自己不小心手滑改到已飛紀錄；要改就先 🔒 Unlock。<br>
       <b>LogTen model: drop draft/confirmed, add Lock/Unlock.</b> The Confirm / Confirm All workflow was unnecessary friction. Now LogTen-style: (1) Save is just Save — no Confirm button. (2) "Did you fly it?" is implied by <code>flight_date</code>: past-dated flights are counted in stats / Analyze / Report / currency; future-dated (roster-imported plans) show in the Logbook but aren't counted. Backend stats use <code>flight_date &lt;= CURRENT_DATE</code> instead of <code>status='confirmed'</code>. (3) Logbook status bar reflects fact: past = green (flown), future = amber (upcoming), removed = grey. Filters change to All / Past / Future / Removed. (4) Lock / Unlock: top-right 🔓 Lock toggle in the editor; locked entries disable all inputs, refuse Save and Delete (server enforces) — prevents accidental edits to a flown record. Unlock anytime.

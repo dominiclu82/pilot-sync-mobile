@@ -722,8 +722,8 @@ function _plRenderToolbar() {
     '<button onclick="_plOpenCrew()" style="background:#a855f7;color:#fff;border:0;border-radius:6px;padding:6px 12px;font-size:.8em;font-weight:700;cursor:pointer">👥 Crew</button>' +
     // V1.3.08：拿掉 ✓ Confirm All — LogTen 模型沒有 confirm 概念
     '<div style="flex:1"></div>' +
-    filterBtn('all', 'All') + filterBtn('past', '過去 Past') +
-    filterBtn('future', '未來 Future') + filterBtn('removed', '已移除 Removed') +
+    filterBtn('all', 'All') + filterBtn('done', '已完成 Done') +
+    filterBtn('open', '未完成 Open') + filterBtn('removed', '已移除 Removed') +
     '<button onclick="_plLogout()" style="background:transparent;color:var(--muted);border:0;font-size:.7em;cursor:pointer;margin-left:8px">Logout</button>' +
     '</div>';
 }
@@ -737,13 +737,11 @@ function _plRenderToolbar() {
 // 被選中（iPad detail pane 開著的那筆）會套 .pl-row-sel 描邊。
 var _PL_MON = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
 function _plRenderEntryRow(e) {
-  // V1.3.08：色條改成日期+移除事實判斷（roster_removed 灰、未來橘、過去綠 = flown）
+  // V1.3.09：色條改用 in_utc 判斷已完成（user：「已完成綠、未完成藍；未來的跟未完成都是藍色」）
   var statusColor;
-  if (e.status === 'roster_removed') statusColor = '#94a3b8';
-  else {
-    var _tdy = new Date().toISOString().slice(0, 10);
-    statusColor = (String(e.flight_date || '').slice(0, 10) > _tdy) ? '#f59e0b' : '#10b981';
-  }
+  if (e.status === 'roster_removed') statusColor = '#94a3b8';        // gray - removed
+  else if (e.in_utc) statusColor = '#10b981';                         // green - done (has actual arrival)
+  else statusColor = '#3b82f6';                                       // blue - open (future or past-but-not-logged)
 
   // 日期：拆 day / MON 'YY
   var ds = String(e.flight_date || '').slice(0, 10);
@@ -1296,17 +1294,15 @@ function _plRenderEditor(target) {
   var e = _pl.editing;
   var inDetail = (target === 'pl-detail-pane');
   var closeLabel = inDetail ? '✕' : '←';
-  // V1.3.08：badge 改成「日期 + 鎖」事實判斷，不再 draft/confirmed（LogTen 模型）
+  // V1.3.09：badge 改用 in_utc 判斷已完成（roster_removed → 灰；in_utc 有 → 綠 done；其餘 → 藍 open）
   var statusBadge = '';
   if (e.id) {
     if (e.status === 'roster_removed') {
       statusBadge = '<span style="background:#94a3b8;color:#fff;border-radius:10px;padding:2px 8px;font-size:.62em;margin-left:8px">removed</span>';
+    } else if (e.in_utc) {
+      statusBadge = '<span style="background:#10b981;color:#fff;border-radius:10px;padding:2px 8px;font-size:.62em;margin-left:8px">flown 已完成</span>';
     } else {
-      var today = new Date().toISOString().slice(0, 10);
-      var fd = String(e.flight_date || '').slice(0, 10);
-      var isFuture = fd > today;
-      statusBadge = '<span style="background:' + (isFuture ? '#f59e0b' : '#10b981') +
-        ';color:#fff;border-radius:10px;padding:2px 8px;font-size:.62em;margin-left:8px">' + (isFuture ? 'upcoming' : 'flown') + '</span>';
+      statusBadge = '<span style="background:#3b82f6;color:#fff;border-radius:10px;padding:2px 8px;font-size:.62em;margin-left:8px">open 未完成</span>';
     }
     if (e.is_locked) statusBadge += '<span style="margin-left:6px;font-size:.85em" title="Locked">🔒</span>';
   }
@@ -1528,15 +1524,14 @@ async function _plToggleLock() {
   }
 }
 
-// V1.3.08：把 entry 依 _pl.filter 判斷是否該顯示（all / past / future / removed）
+// V1.3.09：done / open 改用 in_utc 判斷（user：「未來的跟未完成都是藍色」）。
+// 沒填 in_utc = 未完成（未來計畫的、或飛了還沒補實際時間的）；有 in_utc = 已完成（已抵達、已記錄）。
 function _plEntryMatchesFilter(e, filter) {
   if (filter === 'all') return true;
   if (filter === 'removed') return e.status === 'roster_removed';
-  if (e.status === 'roster_removed') return false;        // past/future filter 不顯示已移除
-  var today = new Date().toISOString().slice(0, 10);
-  var fd = String(e.flight_date || '').slice(0, 10);
-  if (filter === 'past') return fd <= today;
-  if (filter === 'future') return fd > today;
+  if (e.status === 'roster_removed') return false;
+  if (filter === 'done') return !!e.in_utc;
+  if (filter === 'open') return !e.in_utc;
   return true;
 }
 
@@ -2623,12 +2618,10 @@ function _plRenderAnalyzeContent() {
   var c = document.getElementById('pilotlog-content');
   if (!c) return;
   if (_pl.tab !== 'analyze') return;   // 防 race：切走後過期的 async render 不可覆蓋新分頁
-  // 只算已飛（confirmed）且非 deadhead（V1.2.05 codex P1/P2：deadhead 不算飛行分析）
-  // V1.3.08：LogTen 模型 — 用日期判斷「飛了沒」，不再看 status='confirmed'。只排除 roster_removed + deadhead。
-  var _todayStr = new Date().toISOString().slice(0, 10);
+  // V1.3.09：「已完成」改用 in_utc 判斷（跟後端 stats 一致）— 沒填實際抵達時間的不算飛行統計
   var entries = (_pl.aircraftEntries || []).filter(function(e) {
     if (e.is_deadhead || e.status === 'roster_removed') return false;
-    return String(e.flight_date || '').slice(0, 10) <= _todayStr;
+    return !!e.in_utc;
   });
   var hasStats = _pl.stats && _pl.stats.totals;
   var body = hasStats
@@ -2697,11 +2690,10 @@ function _plRenderReportContent() {
   // 報表只看已飛（confirmed）— recency / 時數 / CSV 都不能把 draft（計畫中）跟
   // roster_removed 當成已飛，否則起降數、block 時數會灌水（codex P1）
   // 報表只看已飛 confirmed 且非 deadhead（deadhead 不算 PIC/SIC / 起降 currency / 時數）
-  // V1.3.08：用日期判斷「飛了沒」，不再看 status
-  var _today2 = new Date().toISOString().slice(0, 10);
+  // V1.3.09：跟 Analyze / 後端 stats 一致 — 用 in_utc 判斷已完成（user：未完成的不算）
   var src = (_pl.aircraftEntries || []).filter(function(e) {
     if (e.is_deadhead || e.status === 'roster_removed') return false;
-    return String(e.flight_date || '').slice(0, 10) <= _today2;
+    return !!e.in_utc;
   });
 
   // ── 90 天 recency ──
@@ -2796,13 +2788,11 @@ function _plCsvCell(v) {
 
 function _plExportCsv() {
   var r = _plReportRange();
-  // V1.3.08 codex P1：CSV 跟畫面 Report 同一套日期判斷（過去 + 非 roster_removed + 非 deadhead），
-  // 不要再看 status='confirmed'（draft/confirmed 已經沒意義了）
-  var _todayCsv = new Date().toISOString().slice(0, 10);
+  // V1.3.09：CSV 跟 Analyze / Report / 後端 stats 一致 — 用 in_utc 判斷已完成（未完成不匯出）
   var src = (_pl.aircraftEntries || []).filter(function(e) {
     if (e.is_deadhead || e.status === 'roster_removed') return false;
+    if (!e.in_utc) return false;
     var fd = String(e.flight_date || '').slice(0, 10);
-    if (!fd || fd > _todayCsv) return false;        // 未來日期 = 還沒飛，不放進 CSV
     return (!r.from || fd >= r.from) && (!r.to || fd <= r.to);
   });
   src.sort(function(a, b) { return (a.flight_date || '').localeCompare(b.flight_date || ''); });

@@ -83,6 +83,21 @@ async function ensurePgTables() {
     // Migration: 加上 last_seen_at 追蹤使用者實際開 app 的時間
     await pool.query(`ALTER TABLE morning_prefs ADD COLUMN IF NOT EXISTS last_seen_at TIMESTAMPTZ`).catch(() => {});
 
+    // V2.0.03 一次性清理：晨報不再保留歷史，每位使用者只留最新一筆。
+    // self-join 刪除「同 user 有更新一筆 b 比 a 新」的 a；已只剩 1 筆者不受影響（idempotent）。
+    // morning_prefs（使用者天氣 / 選股設定）是另一張表，完全不動。
+    try {
+      const cleanup = await pool.query(`
+        DELETE FROM morning_reports a USING morning_reports b
+         WHERE a.user_id = b.user_id AND a.date < b.date
+      `);
+      if (cleanup.rowCount && cleanup.rowCount > 0) {
+        console.log('[morning] history cleanup: deleted ' + cleanup.rowCount + ' old report rows (kept latest per user)');
+      }
+    } catch (e) {
+      console.warn('[morning] history cleanup failed:', e instanceof Error ? e.message : String(e));
+    }
+
     _pgReady = true;
     return true;
   } catch (e) {
@@ -141,6 +156,8 @@ async function saveReport(userId: string, date: string, data: any) {
   const pool = getPool();
   if (pool && await ensurePgTables()) {
     try {
+      // V2.0.03：晨報不再保留歷史 — 每位使用者最多 1 筆（最新那份）。
+      // upsert 完之後把同 user 其他日期的舊報告刪掉，避免無限累積（DB 第一名肥大來源）。
       await pool.query(
         `INSERT INTO morning_reports (user_id, date, data, generated_at)
          VALUES ($1, $2, $3, NOW())
@@ -148,7 +165,8 @@ async function saveReport(userId: string, date: string, data: any) {
          DO UPDATE SET data = EXCLUDED.data, generated_at = NOW()`,
         [userId, date, JSON.stringify(data)]
       );
-      console.log('[morning] saved to Postgres:', userId, date);
+      await pool.query(`DELETE FROM morning_reports WHERE user_id = $1 AND date <> $2`, [userId, date]);
+      console.log('[morning] saved to Postgres (kept latest only):', userId, date);
       return true;
     } catch (e) {
       console.warn('[morning] saveReport db error:', e instanceof Error ? e.message : String(e));
@@ -591,17 +609,10 @@ morningRouter.get('/api/morning-report', async (req, res) => {
   }
 });
 
-// ─── /api/morning-report/dates — 歷史日期列表 ─────────────────────────
-morningRouter.get('/api/morning-report/dates', async (req, res) => {
-  try {
-    const userId = reqUserId(req);
-    if (!userId) return res.status(400).json({ error: 'missing_or_invalid_user_id' });
-    const dates = await getAllDates(userId);
-    res.json({ dates });
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e);
-    res.status(500).json({ error: msg, dates: [] });
-  }
+// ─── /api/morning-report/dates — V2.0.03：歷史功能已移除（每位 user 只留最新一份）
+// 端點保留向後相容，永遠回空陣列，避免舊版前端撞 404。
+morningRouter.get('/api/morning-report/dates', async (_req, res) => {
+  res.json({ dates: [] });
 });
 
 // ─── POST /api/morning-prefs — 使用者儲存/更新自己的設定（merge 模式，只更新 body 裡有的欄位） ────────────
@@ -1985,7 +1996,11 @@ body { padding-bottom: calc(64px + env(safe-area-inset-bottom, 0px)); }
       <div class="hdr-date" id="hdr-date">—</div>
     </div>
     <div class="hdr-actions-top">
-      <button class="hdr-btn" id="btn-date" title="歷史">📅</button>
+      <!-- V2.0.03：歷史功能已移除（每位 user 只留最新一份晨報），日曆按鈕拿掉 — DOM 移除，
+           date-picker modal / 相關 JS 留著是 dead code，標 TODO 不刪以免動到其他綁定的 listener；
+           openDatePicker() / 日期清單 fetch 仍可運行但永遠回空。 -->
+      <!-- TODO(V2.0.03)：date-picker modal + JS（openDatePicker / 月曆渲染）目前未綁，可安全清除 -->
+      <button class="hdr-btn" id="btn-date" title="歷史" style="display:none">📅</button>
       <button class="hdr-btn" id="btn-refresh" title="重新整理">↻</button>
     </div>
   </div>
@@ -2034,6 +2049,15 @@ body { padding-bottom: calc(64px + env(safe-area-inset-bottom, 0px)); }
     </div>
     <hr style="border:none;border-top:1px solid var(--border);margin:12px 0">
     <div class="changelog-v">${MORNING_VERSION}</div>
+    <div class="changelog-txt">
+      <strong>[晨報] 不再保留歷史紀錄。</strong>晨報原本每天每人各存一份完整 JSON（全台天氣 +
+      新聞 + 農民曆 + ...），從不清理 → 已變 DB 第一名肥大來源。user 反映「歷史沒用、
+      日曆按鈕可拿掉」。改成<b>每位 user 只保留最新一份</b>：每次重新整理會把同 user 的舊報告刪掉；
+      上線時一次性把既有歷史清理（self-join 刪每位 user 較舊的 row）。日曆按鈕 📅 從 header
+      拿掉。<b>使用者偏好（天氣 / 選股 / 暱稱）存在 morning_prefs 另一張表，完全不動。</b>
+      歷史端點 <code>/api/morning-report/dates</code> 永遠回空陣列（向後相容舊版前端）。
+    </div>
+    <div class="changelog-v old">V2.0.01</div>
     <div class="changelog-txt">
       <strong>統一版號 milestone</strong>: 晨報 + 投資組合從此共用一個版號
       (V2.0.01 起跳)，user 看 ver chip 兩邊永遠同步。
