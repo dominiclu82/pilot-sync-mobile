@@ -46,8 +46,8 @@ import { getSpaPilotLogJs } from '../spa/js-pilot-log.js';
 
 // ── 版本（比照 CrewSync / Morning：每次推版必更新；SW cache 名稱跟著走） ────
 // 本機 preview build 會暫時加 -tNN 後綴方便對版；推正式版前拿掉只留乾淨版號。
-export const PILOT_LOG_VERSION = 'V1.3.09';
-const PILOT_LOG_CACHE = 'pilotlog-v1-3-09';
+export const PILOT_LOG_VERSION = 'V1.3.10';
+const PILOT_LOG_CACHE = 'pilotlog-v1-3-10';
 
 export const pilotLogRouter = express.Router();
 
@@ -330,6 +330,11 @@ if (document.readyState !== 'loading') pilotLogInit();
 function _renderPilotLogChangelog(): string {
   return `
     <div class="pl-cl-v">${PILOT_LOG_VERSION}</div>
+    <div class="pl-cl-txt">
+      <b>Crew 搜尋焦點修正。</b>之前 Crew 頁的搜尋框每打一個字游標就跳離開、無法連續輸入 — oninput 把整個頁面（含 input element 本身）重畫，焦點就掉了。改成「shell + rows 容器」兩段渲染：搜尋只重畫 rows 區段，input element 不再被砍掉重建。<br>
+      <b>Crew search focus fix.</b> The Crew page search box used to lose focus after every keystroke — oninput re-rendered the whole page (including the input itself), nuking focus. Split into shell + rows container; search only repaints the rows, the input stays put.
+    </div>
+    <div class="pl-cl-v old">V1.3.09</div>
     <div class="pl-cl-txt">
       <b>顏色重做 + 「已完成」改用 in_utc 判斷。</b>user 反映「兩種顏色就好,已完成綠、未完成藍;未來的跟未完成都是藍色」。改成：<b>(1)</b> 色條與 badge：<b>已完成（有實際抵達時間 in_utc）= 綠 / 未完成（沒填 in_utc，含未來計畫）= 藍 / 已移除 = 灰</b>。<b>(2) 篩選器</b>改成 <b>All / 已完成 Done / 未完成 Open / 已移除 Removed</b>，門檻一律看 in_utc，不再看 flight_date。<b>(3)</b> 後端 stats / 前端 Analyze / Report / CSV 全部對齊新規則：要算進統計必須有 in_utc — 沒填實際抵達時間（roster 帶進來還沒飛或忘了補的）<b>不算飛行時數</b>。這樣畫面藍色 = 不計入,綠色 = 已計入,跟你看到的顏色一致。<br>
       <b>Color redesign + "done" now defined by in_utc.</b> Per user: "just two colors — done green, open blue; future and incomplete are both blue." (1) Color bar / badge: <b>done (has actual in_utc arrival) = green / open (no in_utc, includes future) = blue / removed = gray</b>. (2) Filters: <b>All / Done 已完成 / Open 未完成 / Removed</b>, gated by in_utc, not by flight_date. (3) Backend stats + frontend Analyze / Report / CSV all aligned: an entry must have <code>in_utc</code> to count in flight stats — past-date entries without actual arrival times (roster-imported or forgotten OOOI) <b>don't add to hours</b>. So blue = not counted, green = counted, matching what you see.

@@ -2316,23 +2316,47 @@ function _plCrewAmbiguousNames() {
   return amb;
 }
 
+// V1.3.10：拆成「shell（含 input）」+「rows 容器」兩段 — oninput 只重畫 rows，input element 不被砍掉，
+// 焦點與游標位置自然保留（user：「每打一字游標就跳離開」）。
 function _plRenderCrewList() {
   var c = document.getElementById('pilotlog-content');
   if (!c) return;
-  // 用完整快照算「跟某 crew 一起飛過幾班」
+  var ambNames = _plCrewAmbiguousNames();
+  var hasAmb = false;
+  for (var ak in ambNames) { if (ambNames.hasOwnProperty(ak)) { hasAmb = true; break; } }
+  var ambNotice = hasAmb
+    ? '<div style="background:#3b2f0a;border:1px solid #f59e0b;color:#fbbf24;border-radius:6px;padding:8px 10px;margin-bottom:8px;font-size:.7em">⚠ 有同名 crew（標記 <b>SAME-NAME</b>）：因為 entry.crew 只記名字、沒帶 employee_id，無法判斷某筆航班屬於哪一位，所以不顯示 flight count、drill-down 也不列航班。建議在 Address Book 內把同名的人加註 organization 或 comment 區分。<br>Some crew share a display name (<b>SAME-NAME</b>): since entries store only the name (no employee_id), we cannot tell which person a flight belongs to, so flight counts and drill-down are suppressed. Differentiate them with organization / comment in your Address Book.</div>'
+    : '';
+  var term = (_plCrewSearchTerm || '');
+  c.innerHTML =
+    '<div style="padding:10px 14px">' +
+      '<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">' +
+        '<button onclick="_plRenderMain()" style="background:transparent;border:0;color:var(--text);font-size:1.2em;cursor:pointer">←</button>' +
+        '<div style="font-size:1em;font-weight:700">👥 Crew</div>' +
+        '<div style="flex:1"></div>' +
+        '<div style="font-size:.7em;color:var(--muted)">共 ' + _pl.crew.length + ' 人</div>' +
+      '</div>' +
+      '<input id="pl-crew-search" type="search" placeholder="搜尋名字 / ID..." value="' + _plEsc(term) + '" ' +
+        'oninput="_plCrewSearchInput(this.value)" ' +
+        'style="width:100%;background:var(--bg,#0a0e1a);color:var(--text);border:1px solid var(--border,#334155);border-radius:6px;padding:8px 10px;font-size:.85em;margin-bottom:10px;box-sizing:border-box">' +
+      ambNotice +
+      '<div style="font-size:.65em;color:var(--muted);margin-bottom:8px">flight count 用完整資料計算（不受 Logbook 篩選影響）。點任一筆查看一起飛過的航班。<br>Flight counts use all data (ignores the Logbook filter). Tap anyone to see flights flown together.</div>' +
+      '<div id="pl-crew-rows"></div>' +
+    '</div>';
+  _plRenderCrewRows();   // 列出符合 _plCrewSearchTerm 的 rows
+}
+
+// 只重畫 rows 區段（不動 input），給搜尋每次 oninput 用 — 焦點不會跳掉
+function _plRenderCrewRows() {
+  var el = document.getElementById('pl-crew-rows');
+  if (!el) return;
   var sourceEntries = _pl.aircraftEntries || [];
   var nameCount = {};
   for (var i = 0; i < sourceEntries.length; i++) {
     var ns = _plEntryCrewNames(sourceEntries[i]);
-    for (var j = 0; j < ns.length; j++) {
-      nameCount[ns[j]] = (nameCount[ns[j]] || 0) + 1;
-    }
+    for (var j = 0; j < ns.length; j++) nameCount[ns[j]] = (nameCount[ns[j]] || 0) + 1;
   }
   var ambNames = _plCrewAmbiguousNames();
-  var hasAmb = false;
-  for (var ak in ambNames) { if (ambNames.hasOwnProperty(ak)) { hasAmb = true; break; } }
-
-  // 套搜尋條件（display_name / employee_id 都比對）
   var term = (_plCrewSearchTerm || '').toLowerCase().trim();
   var filtered = _pl.crew.filter(function(p) {
     if (!term) return true;
@@ -2369,31 +2393,12 @@ function _plRenderCrewList() {
         '</div>';
     }
   }
-
-  var ambNotice = hasAmb
-    ? '<div style="background:#3b2f0a;border:1px solid #f59e0b;color:#fbbf24;border-radius:6px;padding:8px 10px;margin-bottom:8px;font-size:.7em">⚠ 有同名 crew（標記 <b>SAME-NAME</b>）：因為 entry.crew 只記名字、沒帶 employee_id，無法判斷某筆航班屬於哪一位，所以不顯示 flight count、drill-down 也不列航班。建議在 Address Book 內把同名的人加註 organization 或 comment 區分。<br>Some crew share a display name (<b>SAME-NAME</b>): since entries store only the name (no employee_id), we cannot tell which person a flight belongs to, so flight counts and drill-down are suppressed. Differentiate them with organization / comment in your Address Book.</div>'
-    : '';
-
-  c.innerHTML =
-    '<div style="padding:10px 14px">' +
-      '<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">' +
-        '<button onclick="_plRenderMain()" style="background:transparent;border:0;color:var(--text);font-size:1.2em;cursor:pointer">←</button>' +
-        '<div style="font-size:1em;font-weight:700">👥 Crew</div>' +
-        '<div style="flex:1"></div>' +
-        '<div style="font-size:.7em;color:var(--muted)">共 ' + _pl.crew.length + ' 人</div>' +
-      '</div>' +
-      '<input id="pl-crew-search" type="search" placeholder="搜尋名字 / ID..." value="' + _plEsc(term) + '" ' +
-        'oninput="_plCrewSearchInput(this.value)" ' +
-        'style="width:100%;background:var(--bg,#0a0e1a);color:var(--text);border:1px solid var(--border,#334155);border-radius:6px;padding:8px 10px;font-size:.85em;margin-bottom:10px;box-sizing:border-box">' +
-      ambNotice +
-      '<div style="font-size:.65em;color:var(--muted);margin-bottom:8px">flight count 用完整資料計算（不受 Logbook 篩選影響）。點任一筆查看一起飛過的航班。<br>Flight counts use all data (ignores the Logbook filter). Tap anyone to see flights flown together.</div>' +
-      rows +
-    '</div>';
+  el.innerHTML = rows;
 }
 
 function _plCrewSearchInput(v) {
   _plCrewSearchTerm = v;
-  _plRenderCrewList();
+  _plRenderCrewRows();   // 只重畫 rows 容器，input 與焦點保留
 }
 
 function _plOpenCrewDetail(crewId) {
