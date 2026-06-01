@@ -46,8 +46,8 @@ import { getSpaPilotLogJs } from '../spa/js-pilot-log.js';
 
 // ── 版本（比照 CrewSync / Morning：每次推版必更新；SW cache 名稱跟著走） ────
 // 本機 preview build 會暫時加 -tNN 後綴方便對版；推正式版前拿掉只留乾淨版號。
-export const PILOT_LOG_VERSION = 'V1.3.12';
-const PILOT_LOG_CACHE = 'pilotlog-v1-3-12';
+export const PILOT_LOG_VERSION = 'V1.3.13';
+const PILOT_LOG_CACHE = 'pilotlog-v1-3-13';
 
 export const pilotLogRouter = express.Router();
 
@@ -330,6 +330,11 @@ if (document.readyState !== 'loading') pilotLogInit();
 function _renderPilotLogChangelog(): string {
   return `
     <div class="pl-cl-v">${PILOT_LOG_VERSION}</div>
+    <div class="pl-cl-txt">
+      <b>同名同事用員編拆開 + 班表匯入可挑月份。</b><b>(同名)</b> 公司有同名同事時，Crew 頁的航班數 / drill-down 改成<b>員編優先比對</b>：只要航班帶員編（V1.3.12 起的新紀錄、班表匯入的都有），同名的兩個人就能各自精準歸戶，不再一律標 SAME-NAME。只有「同名<b>又完全沒員編</b>」的人仍無法歸戶（補員編、或編輯航班時從通訊錄點選即可拆開）。<b>(挑月份)</b> Import Roster 改成兩段：先「列出可匯入月份」→ 勾選你要的（預設全選、可全選/全不選）→「匯入選取月份」，不再一次全帶。<br>
+      <b>Same-name crew separated by employee id + pick months on roster import.</b> <b>(Same-name)</b> When colleagues share a name, the Crew page now matches flights by <b>employee id first</b>: any flight carrying an id (new V1.3.12+ entries and roster imports) is attributed precisely, so same-name people are no longer blanket-marked SAME-NAME. Only people who share a name <b>and have no employee id at all</b> stay unattributable (add an id, or pick them from the address book when editing a flight). <b>(Pick months)</b> Import Roster is now two-step: list available months → tick the ones you want (all selected by default) → import only those.
+    </div>
+    <div class="pl-cl-v old">V1.3.12</div>
     <div class="pl-cl-txt">
       <b>Crew 欄位重做 + 從通訊錄點選 + 班表組員自動進通訊錄。</b>航班的組員欄改成 <b>PIC / Crew 2 / Crew 3 / Crew 4 / CIC / OBS</b> 六格（取代舊的 PIC/SIC/FO1/FO2），每格除了名字還記 <b>rank</b>（CAP/SFO/FO/TFO/TCAP/PR…，是「那班的快照」，完訓後新班會帶新 rank）跟 <b>員編</b>。打字會跳出<b>通訊錄</b>建議直接點選。<b>(欄位名稱可改)</b> 👥 Crew 頁有「⚙ 欄位名稱」設定，改成你公司的稱呼（JX 用 CIC、EVA 用 CP…），跨裝置同步。<b>(班表自動建通訊錄)</b> 匯班表時會把駕駛艙(PIC/P1~P4/IS)+CIC 用<b>員編</b>自動加進通訊錄——飛過誰自動長出來，不用再手動匯。<b>(DHD)</b> 搭便機(DHD/positioning)的航段標成 deadhead：logbook 看得到、但飛時/PIC/night 全不計；別人在你這班 DHD 也不會被當成操作組員。<br>
       <b>Crew fields redesigned + pick from Address Book + roster crew auto-added.</b> Flight crew fields are now <b>PIC / Crew 2 / Crew 3 / Crew 4 / CIC / OBS</b> (replacing PIC/SIC/FO1/FO2); each stores name + <b>rank</b> (a per-flight snapshot) + <b>employee id</b>. Typing shows <b>Address Book</b> suggestions to tap. <b>(Editable labels)</b> the 👥 Crew page has a "⚙ field labels" setting to rename for your airline (JX=CIC, EVA=CP…), synced across devices. <b>(Auto address book)</b> importing a roster auto-adds cockpit (PIC/P1–P4/IS) + CIC to your Address Book by employee id. <b>(DHD)</b> deadhead/positioning legs are flagged deadhead — shown in the logbook but excluded from flight/PIC/night totals; someone deadheading on your flight is not counted as operating crew.
@@ -999,11 +1004,19 @@ pilotLogRouter.post('/api/pilot-log/import/roster', requireAuth, async (req: Aut
 // V1.3.11：從 server 私有表帶班表 — 解 iOS 把 CrewSync 與 Pilot Log 各自加主畫面後、
 // 兩個獨立 PWA 不共用 localStorage 的問題。流程：登入 email → cs_users.employee_id
 // → cs_rosters_full 撈完整班表（含組員）→ 丟給既有的 importRoster()。
+// V1.3.13：body 支援 { list:true }（只回可匯入月份、不匯入）與 { months:[...] }（只匯選取月份）。
 // 回傳 error：no_database / no_email / not_linked（email 對不到員編）/ no_roster（員編下沒班表）。
 pilotLogRouter.post('/api/pilot-log/import/roster-from-server', requireAuth, async (req: AuthedRequest, res) => {
   const userId = req.pilotUserId!;
   const pool = getPool();
   if (!pool) return res.status(503).json({ error: 'no_database' });
+  let body: any = {};
+  try { body = (typeof req.body === 'string' && req.body) ? JSON.parse(req.body) : (req.body || {}); } catch { body = {}; }
+  const listOnly = !!(body && body.list);
+  const monthFilterRaw = body && body.months;
+  const monthFilter: string[] | null = Array.isArray(monthFilterRaw)
+    ? monthFilterRaw.filter((x: any) => typeof x === 'string' && /^\d{4}-\d{2}$/.test(x))
+    : null;
   try {
     // 1) 拿這個 pilot 的所有 email（可能多筆）
     const emailQ = await pool.query('SELECT email FROM pilot_user_emails WHERE user_id = $1', [userId]);
@@ -1021,16 +1034,27 @@ pilotLogRouter.post('/api/pilot-log/import/roster-from-server', requireAuth, asy
       'SELECT month, roster_data FROM cs_rosters_full WHERE employee_id = ANY($1) ORDER BY month',
       [eids]
     );
+    const availMonths = rosterQ.rows.map((r: any) => r.month);
+    // list 模式：只回可匯入月份，不匯入
+    if (listOnly) return res.json({ months: availMonths });
+    // 4) codex P1：傳「完整 duties（所有月份、ORDER BY month）」讓 importRoster 的全域 dutyIdx
+    //    維持穩定；要匯入哪幾月改用 selMonths 過濾「處理」，不靠刪減 duties 陣列（否則 subset 重匯
+    //    會換 source_ref → 重複 + 誤標 removed）。subset 與全匯產出完全相同的 ref。
     let allDuties: any[] = [];
-    const months: string[] = [];
     for (const row of rosterQ.rows) {
       const d = row.roster_data; // JSONB → 已是 array
-      if (Array.isArray(d) && d.length) { allDuties = allDuties.concat(d); months.push(row.month); }
+      if (Array.isArray(d) && d.length) {
+        for (const duty of d) { if (duty && typeof duty === 'object') duty._rmonth = row.month; } // codex P1：標 roster 月份，過濾用它（不用航班 UTC 日期）
+        allDuties = allDuties.concat(d);
+      }
     }
-    if (!allDuties.length) return res.json({ error: 'no_roster' });
-    // 4) 丟給既有 importRoster（per-month sweep、不誤標沒同步的月份）
-    const r = await importRoster(userId, allDuties, undefined, months);
-    res.json({ ...r, months });
+    const selMonths = (monthFilter && monthFilter.length)
+      ? monthFilter.filter((m) => availMonths.indexOf(m) >= 0)
+      : availMonths;
+    if (!allDuties.length || !selMonths.length) return res.json({ error: 'no_roster', months: availMonths });
+    // importRoster 用 selMonths 過濾處理 + per-month sweep（只掃選取月份、不誤標沒選的）
+    const r = await importRoster(userId, allDuties, undefined, selMonths);
+    res.json({ ...r, months: selMonths });
   } catch (e: any) {
     console.error('[pilot-log] roster-from-server error:', e.message);
     res.status(500).json({ error: 'internal', detail: e.message });

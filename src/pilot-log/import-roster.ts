@@ -230,10 +230,18 @@ export async function importRoster(
     for (const f of flights) {
       const sourceRef = buildSourceRef(f, dutyIdx);
       if (!sourceRef) continue;
-      seenRefs.push(sourceRef);
 
       const fDate = flightDate(f);
       if (!fDate) continue;
+
+      // V1.3.13：月份篩選 —— 只處理 months 內的航班，但**仍迭代整份 duties**讓 dutyIdx 維持全域。
+      // source_ref 含全域 dutyIdx：subset 重匯若改變陣列就會換 ref → 重複 + 誤標 removed（codex P1）。
+      // 傳完整 duties + 用 months 過濾處理，subset 與全匯產出完全相同的 ref。
+      // codex P1（boundary）：用 duty 標記的「roster 月份」(_rmonth) 比對，不用航班 UTC 日期 ——
+      // 6 月班表裡 UTC 落在 5/31 的 leg 仍屬 6 月，用 UTC 日期會誤漏。沒標 _rmonth 才退回 fDate。
+      const rosterMonth = (duty as any)._rmonth || fDate.slice(0, 7);
+      if (months && months.length && months.indexOf(rosterMonth) < 0) continue;
+      seenRefs.push(sourceRef);
 
       const stdUtc = parseUtc(f.depTimeUtc);
       const staUtc = parseUtc(f.arrTimeUtc);

@@ -1703,15 +1703,16 @@ function _plOpenImport() {
       '</div>' +
       '<div style="font-size:.65em;color:var(--muted);margin-top:6px">建議先 Preview 確認每筆都解析正常，再按 Import。<br>Run Preview first to confirm every row parses, then Import.</div>' +
     '</div>' +
-    // V1.3.07：班表 — 從 CrewSync localStorage 直接帶進來當 draft（同 origin 共用儲存，不用上傳檔案）
+    // V1.3.07：班表匯入；V1.3.11 改走雲端；V1.3.13 先列月份讓你勾選要匯入哪幾月
     '<div style="background:var(--card);border-radius:10px;padding:14px;margin-bottom:12px">' +
       '<div style="font-size:.85em;font-weight:700;margin-bottom:6px">📅 Roster · 從 CrewSync 帶班表（不用上傳檔）</div>' +
       '<div style="font-size:.7em;color:var(--muted);margin-bottom:8px;line-height:1.5">' +
-        'CrewSync 同步過的班表（存在同一個瀏覽器的 localStorage）<b>直接帶進來當 draft</b>，飛了再 confirm。<br>' +
-        'Imports the roster CrewSync has already synced (same browser localStorage) as draft entries; mark each confirmed after you fly it.<br>' +
-        '<b>用前提示：</b>先去 CrewSync 同步當月（與想要的其他月份）班表，再回來按下面這顆。' +
+        'CrewSync 同步過的班表<b>直接帶進來當 draft</b>，飛了再 confirm。按下面先<b>列出可匯入的月份</b>，勾選你要的再匯入。<br>' +
+        'Pulls the roster CrewSync has synced as draft entries. Tap below to <b>list available months</b>, tick the ones you want, then import.<br>' +
+        '<b>用前提示：</b>先去 CrewSync 用<b>同一個 Google 帳號</b>同步當月（與想要的其他月份），再回來。' +
       '</div>' +
-      '<button onclick="_plImportRoster()" style="background:#10b981;color:#fff;border:0;border-radius:6px;padding:6px 12px;font-size:.78em;font-weight:700;cursor:pointer">📥 Import Roster</button>' +
+      '<button onclick="_plRosterListMonths()" style="background:#10b981;color:#fff;border:0;border-radius:6px;padding:6px 12px;font-size:.78em;font-weight:700;cursor:pointer">📅 列出可匯入月份 / List months</button>' +
+      '<div id="pl-roster-months" style="margin-top:10px"></div>' +
     '</div>' +
     '<div style="background:var(--card);border-radius:10px;padding:14px;margin-bottom:12px">' +
       '<div style="font-size:.85em;font-weight:700;margin-bottom:6px">🛩️ Aircraft · 機尾庫 / Tail registry（LogTen Aircraft）</div>' +
@@ -1828,23 +1829,91 @@ function _plRenderPreviewRows(rows) {
   return html;
 }
 
+// V1.3.13：列出可匯入月份（雲端 + 本機 localStorage 合併），渲染勾選清單讓使用者挑要匯入哪幾月。
+async function _plRosterListMonths() {
+  var box = document.getElementById('pl-roster-months');
+  if (box) box.innerHTML = '<div style="font-size:.72em;color:var(--muted)">查詢可匯入月份中…</div>';
+  var serverErr = '';
+  var cloudMonths = [];
+  try {
+    var sr = await _plApi('/api/pilot-log/import/roster-from-server', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: { list: true },
+    });
+    if (sr.ok) {
+      var sj = await sr.json().catch(function() { return {}; });
+      if (sj && Array.isArray(sj.months)) cloudMonths = sj.months;
+      if (sj && sj.error) serverErr = sj.error;
+    }
+  } catch (e) {}
+  // 本機 localStorage 的月份（瀏覽器分頁 / fallback）
+  var localMonths = [];
+  try {
+    for (var i = 0; i < localStorage.length; i++) {
+      var k = localStorage.key(i);
+      if (!k || !/^crewsync_roster_.+_\d{4}-\d{2}$/.test(k)) continue;
+      var m = k.match(/_(\d{4}-\d{2})$/);
+      if (m) localMonths.push(m[1]);
+    }
+  } catch (e) {}
+  // 合併去重、由新到舊排序
+  var seen = {}, months = [];
+  cloudMonths.concat(localMonths).forEach(function(mo) { if (mo && !seen[mo]) { seen[mo] = 1; months.push(mo); } });
+  months.sort(function(a, b) { return a < b ? 1 : (a > b ? -1 : 0); });
+  if (!box) return;
+  if (!months.length) {
+    var hint = serverErr === 'not_linked'
+      ? '雲端對不到你的員編 — Pilot Log 跟 CrewSync 要用同一個 Google 帳號，並在 CrewSync 重新同步一次。'
+      : '還沒有可匯入的月份 — 先到 CrewSync 用同一個 Google 帳號同步當月（及想補的月份），再回來。';
+    box.innerHTML = '<div style="background:#3b2f0a;border:1px solid #f59e0b;color:#fbbf24;border-radius:6px;padding:8px 10px;font-size:.72em">' + _plEsc(hint) + '</div>';
+    return;
+  }
+  var checks = months.map(function(mo) {
+    return '<label style="display:flex;align-items:center;gap:8px;padding:5px 6px;font-size:.8em;cursor:pointer">' +
+      '<input type="checkbox" class="pl-rmonth" value="' + _plEsc(mo) + '" checked style="width:16px;height:16px">' +
+      '<span>' + _plEsc(mo) + '</span></label>';
+  }).join('');
+  box.innerHTML =
+    '<div style="font-size:.68em;color:var(--muted);margin-bottom:4px">勾選要匯入的月份（預設全選）：</div>' +
+    '<div style="display:flex;gap:8px;margin-bottom:4px">' +
+      '<button onclick="_plRosterMonthsAll(true)" style="background:transparent;border:1px solid var(--border,#334155);color:var(--muted);border-radius:6px;padding:3px 8px;font-size:.68em;cursor:pointer">全選</button>' +
+      '<button onclick="_plRosterMonthsAll(false)" style="background:transparent;border:1px solid var(--border,#334155);color:var(--muted);border-radius:6px;padding:3px 8px;font-size:.68em;cursor:pointer">全不選</button>' +
+    '</div>' +
+    '<div style="max-height:200px;overflow-y:auto;border:1px solid var(--border,#334155);border-radius:6px;padding:4px;margin-bottom:8px">' + checks + '</div>' +
+    '<button onclick="_plRosterImportSelected()" style="background:#10b981;color:#fff;border:0;border-radius:6px;padding:6px 12px;font-size:.78em;font-weight:700;cursor:pointer">📥 匯入選取月份 / Import selected</button>';
+}
+function _plRosterMonthsAll(on) {
+  var els = document.querySelectorAll('.pl-rmonth');
+  for (var i = 0; i < els.length; i++) els[i].checked = !!on;
+}
+function _plRosterImportSelected() {
+  var els = document.querySelectorAll('.pl-rmonth');
+  var sel = [];
+  for (var i = 0; i < els.length; i++) if (els[i].checked) sel.push(els[i].value);
+  if (!sel.length) { _plToast('至少勾一個月份', 'warn'); return; }
+  _plImportRoster(sel);
+}
+
 // V1.3.07：班表匯入 — 撈 CrewSync 同步的班表，POST 到 server 由 importRoster() 處理
 // （建 draft / 既有更新 / 範圍內舊 draft 沒看到改 roster_removed）。
 // V1.3.11：先試 server 私有表（雲端帶班表，跨獨立 PWA 也行），撈不到才退回掃本機 localStorage
 // （同瀏覽器分頁情境仍可用）。解 iOS 把 CrewSync / Pilot Log 各自加主畫面後兩個 app 不共用儲存。
-async function _plImportRoster() {
+// V1.3.13：selectedMonths 給 → 只匯這幾個月。
+async function _plImportRoster(selectedMonths) {
+  // V1.3.13：selectedMonths 給 → 只匯這幾個月（雲端傳 months 篩、本機過濾 byMonth）；沒給 → 全部。
+  var hasSel = Array.isArray(selectedMonths) && selectedMonths.length > 0;
   // 1) 先試 server 私有表
   var serverErr = '';
   try {
     var sr = await _plApi('/api/pilot-log/import/roster-from-server', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: {},
+      body: hasSel ? { months: selectedMonths } : {},
     });
     if (sr.ok) {
       var sj = await sr.json().catch(function() { return {}; });
       if (sj && !sj.error) {
-        _plToast('班表匯入（雲端）：新增 ' + (sj.inserted || 0) + ' / 更新 ' + (sj.updated || 0) +
+        _plToast('班表匯入（雲端）' + (Array.isArray(sj.months) && sj.months.length ? '〔' + sj.months.join(',') + '〕' : '') +
+          '：新增 ' + (sj.inserted || 0) + ' / 更新 ' + (sj.updated || 0) +
           ' / 已 confirmed 略過 ' + (sj.skipped_confirmed || 0) +
           ' / 標 removed ' + (sj.marked_removed || 0) +
           (sj.crew_added ? ' / 通訊錄 +' + sj.crew_added : ''));
@@ -1874,9 +1943,14 @@ async function _plImportRoster() {
     }
   } catch (e) {}
   byMonth.sort(function(a, b) { return a.month < b.month ? -1 : (a.month > b.month ? 1 : 0); });
-  var allDuties = [], months = [];
-  byMonth.forEach(function(e) { allDuties = allDuties.concat(e.duties); months.push(e.month); });
-  if (!allDuties.length) {
+  // codex P1：傳「完整 duties」讓 server 的全域 dutyIdx 穩定，要匯哪幾月改用 months 過濾，不刪陣列
+  var allDuties = [], allMonths = [];
+  byMonth.forEach(function(e) {
+    e.duties.forEach(function(d) { if (d && typeof d === 'object') d._rmonth = e.month; });  // codex P1：標 roster 月份供過濾
+    allDuties = allDuties.concat(e.duties); allMonths.push(e.month);
+  });
+  var months = hasSel ? selectedMonths.filter(function(m) { return allMonths.indexOf(m) >= 0; }) : allMonths;
+  if (!allDuties.length || (hasSel && !months.length)) {
     if (serverErr === 'not_linked') {
       _plToast('找不到班表：Pilot Log 的 Google email 跟 CrewSync 對不起來。請用同一個 email 登入，並到 CrewSync 重新同步一次班表', 'error');
     } else {
@@ -2482,16 +2556,65 @@ function _plCrewAmbiguousNames() {
   return amb;
 }
 
+// V1.3.13：取 entry 所有 crew 槽的 {name, eid}（含舊 key、字串/物件相容）。
+function _plEntryCrewSlots(e) {
+  if (!e || !e.crew || typeof e.crew !== 'object') return [];
+  var out = [];
+  Object.keys(e.crew).forEach(function(k) {
+    var v = _plCrewVal(e.crew[k]);
+    var nm = (v.name || '').trim();
+    if (nm) out.push({ name: nm, eid: (v.eid || '').trim() });
+  });
+  return out;
+}
+
+// V1.3.13：用「員編優先」把航班歸給通訊錄聯絡人，解同名問題（公司真的有同名同事）。
+// 規則：槽有員編 → 對到擁有該員編的聯絡人（精準，同名也拆得開）；槽沒員編 → 只在「名字不同名」
+// 時才用名字 fallback（同名又沒員編 → 歸不了，不亂猜）。回傳每位聯絡人的航班數與航班清單。
+function _plCrewFlightIndex() {
+  var entries = _pl.aircraftEntries || [];
+  var ambNames = _plCrewAmbiguousNames();
+  var eidToId = {}, nameToId = {};
+  (_pl.crew || []).forEach(function(c) {
+    var nm = (c.display_name || '').trim();
+    if (nm && !ambNames[nm]) nameToId[nm] = c.id;            // 只索引「不同名」的名字
+    (c.employee_ids || []).forEach(function(eid) { if (eid) eidToId[String(eid).trim()] = c.id; });
+  });
+  var countById = {}, entriesById = {};
+  for (var i = 0; i < entries.length; i++) {
+    var e = entries[i];
+    var slots = _plEntryCrewSlots(e);
+    var matched = {};                                        // 這筆航班命中的聯絡人（去重，一筆只算一次）
+    for (var s = 0; s < slots.length; s++) {
+      var sl = slots[s], cid = null;
+      if (sl.eid && eidToId[sl.eid]) cid = eidToId[sl.eid];  // 員編精準
+      else if (!sl.eid && nameToId[sl.name]) cid = nameToId[sl.name]; // 名字 fallback（僅不同名）
+      if (cid) matched[cid] = 1;
+    }
+    Object.keys(matched).forEach(function(cid) {
+      countById[cid] = (countById[cid] || 0) + 1;
+      (entriesById[cid] = entriesById[cid] || []).push(e);
+    });
+  }
+  return { countById: countById, entriesById: entriesById, ambNames: ambNames };
+}
+// 聯絡人是否「完全歸不了航班」：沒有任何員編、且名字同名 → 員編對不了、名字又不敢猜 → suppress。
+function _plCrewUnattributable(c, ambNames) {
+  var hasEid = Array.isArray(c.employee_ids) && c.employee_ids.length > 0;
+  var nameAmb = !!ambNames[(c.display_name || '').trim()];
+  return !hasEid && nameAmb;
+}
+
 // V1.3.10：拆成「shell（含 input）」+「rows 容器」兩段 — oninput 只重畫 rows，input element 不被砍掉，
 // 焦點與游標位置自然保留（user：「每打一字游標就跳離開」）。
 function _plRenderCrewList() {
   var c = document.getElementById('pilotlog-content');
   if (!c) return;
+  // V1.3.13：同名只要「有員編」就靠員編拆得開；只有「同名 + 完全沒員編」才仍 suppress。
   var ambNames = _plCrewAmbiguousNames();
-  var hasAmb = false;
-  for (var ak in ambNames) { if (ambNames.hasOwnProperty(ak)) { hasAmb = true; break; } }
+  var hasAmb = (_pl.crew || []).some(function(c) { return _plCrewUnattributable(c, ambNames); });
   var ambNotice = hasAmb
-    ? '<div style="background:#3b2f0a;border:1px solid #f59e0b;color:#fbbf24;border-radius:6px;padding:8px 10px;margin-bottom:8px;font-size:.7em">⚠ 有同名 crew（標記 <b>SAME-NAME</b>）：因為 entry.crew 只記名字、沒帶 employee_id，無法判斷某筆航班屬於哪一位，所以不顯示 flight count、drill-down 也不列航班。建議在 Address Book 內把同名的人加註 organization 或 comment 區分。<br>Some crew share a display name (<b>SAME-NAME</b>): since entries store only the name (no employee_id), we cannot tell which person a flight belongs to, so flight counts and drill-down are suppressed. Differentiate them with organization / comment in your Address Book.</div>'
+    ? '<div style="background:#3b2f0a;border:1px solid #f59e0b;color:#fbbf24;border-radius:6px;padding:8px 10px;margin-bottom:8px;font-size:.7em">⚠ 有同名 crew 且<b>沒有員編</b>（標記 <b>SAME-NAME</b>）：員編對得到的同名同事已能自動拆開；但這幾位連員編都沒有，無法判斷航班屬於哪一位，先不計數 / 不列航班。補上員編（Address Book 加 ID，或編輯航班時從通訊錄點選）就會拆開。<br>Some crew share a name and have <b>no employee id</b> (<b>SAME-NAME</b>): same-name colleagues that carry an employee id are now separated automatically; these have none, so their flights cannot be attributed. Add an employee id (in the Address Book, or pick from the address book when editing a flight) to resolve them.</div>'
     : '';
   var term = (_plCrewSearchTerm || '');
   c.innerHTML =
@@ -2517,13 +2640,10 @@ function _plRenderCrewList() {
 function _plRenderCrewRows() {
   var el = document.getElementById('pl-crew-rows');
   if (!el) return;
-  var sourceEntries = _pl.aircraftEntries || [];
-  var nameCount = {};
-  for (var i = 0; i < sourceEntries.length; i++) {
-    var ns = _plEntryCrewNames(sourceEntries[i]);
-    for (var j = 0; j < ns.length; j++) nameCount[ns[j]] = (nameCount[ns[j]] || 0) + 1;
-  }
-  var ambNames = _plCrewAmbiguousNames();
+  // V1.3.13：員編優先索引（同名靠員編拆開）。countById 以聯絡人 id 為 key，不再以名字。
+  var idx = _plCrewFlightIndex();
+  var countById = idx.countById;
+  var ambNames = idx.ambNames;
   var term = (_plCrewSearchTerm || '').toLowerCase().trim();
   var filtered = _pl.crew.filter(function(p) {
     if (!term) return true;
@@ -2544,13 +2664,14 @@ function _plRenderCrewRows() {
   } else {
     for (var ri = 0; ri < filtered.length; ri++) {
       var p = filtered[ri];
-      var ambiguous = !!ambNames[(p.display_name || '').trim()];
+      // V1.3.13：只有「沒員編 + 同名」才真的歸不了 → suppress；有員編的同名照樣算得出來。
+      var unattrib = _plCrewUnattributable(p, ambNames);
       var idStr = Array.isArray(p.employee_ids) && p.employee_ids.length ? p.employee_ids.join(' / ') : '';
       var selfMark = p.is_self ? '<span style="background:#0ea5e9;color:#fff;border-radius:4px;padding:1px 6px;font-size:.6em;margin-left:6px">YOU</span>' : '';
-      var ambMark = ambiguous ? '<span style="background:#f59e0b;color:#000;border-radius:4px;padding:1px 6px;font-size:.6em;margin-left:6px" title="Address Book 內有多筆同名 crew，無法判斷哪些航班屬於誰">SAME-NAME</span>' : '';
-      var countCell = ambiguous
-        ? '<div style="font-size:.72em;color:var(--muted);text-align:right" title="同名 crew 無法計數">—</div>'
-        : '<div style="font-size:.72em;color:var(--text);text-align:right">' + (nameCount[p.display_name] || 0) + ' flights</div>';
+      var ambMark = unattrib ? '<span style="background:#f59e0b;color:#000;border-radius:4px;padding:1px 6px;font-size:.6em;margin-left:6px" title="同名且沒有員編，無法判斷哪些航班屬於誰。在 Address Book 給該員編、或之後從通訊錄點選即可拆開">SAME-NAME</span>' : '';
+      var countCell = unattrib
+        ? '<div style="font-size:.72em;color:var(--muted);text-align:right" title="同名且無員編，無法計數">—</div>'
+        : '<div style="font-size:.72em;color:var(--text);text-align:right">' + (countById[p.id] || 0) + ' flights</div>';
       rows += '<div onclick="_plOpenCrewDetail(\'' + _plEsc(p.id) + '\')" ' +
         'style="background:var(--card);border-radius:8px;padding:10px 12px;margin-bottom:6px;cursor:pointer;display:flex;gap:10px;align-items:center">' +
         '<div style="flex:1"><div style="font-size:.85em;font-weight:700">' + _plEsc(p.display_name) + selfMark + ambMark + '</div>' +
@@ -2582,7 +2703,8 @@ function _plOpenCrewDetail(crewId) {
   }
   var name = (person.display_name || '').trim();
   var ambNames = _plCrewAmbiguousNames();
-  var ambiguous = !!ambNames[name];
+  // V1.3.13：只有「沒員編 + 同名」才歸不了；有員編的同名靠員編列得出航班。
+  var ambiguous = _plCrewUnattributable(person, ambNames);
 
   var idStr = Array.isArray(person.employee_ids) && person.employee_ids.length ? person.employee_ids.join(' / ') : '';
   var head = '<div style="background:var(--card);border-radius:8px;padding:12px;margin-bottom:10px;font-size:.78em">' +
@@ -2600,23 +2722,19 @@ function _plOpenCrewDetail(crewId) {
   if (ambiguous) {
     bodyHtml = '<div style="background:#3b2f0a;border:1px solid #f59e0b;color:#fbbf24;border-radius:6px;padding:12px;font-size:.78em;line-height:1.5">' +
       '⚠ <b>無法列出航班 / Cannot list flights</b><br>' +
-      'Address Book 內有多位 crew 叫「' + _plEsc(name) + '」，但 entry 只記名字、沒帶 employee_id，' +
-      '所以無法判斷某筆航班是跟哪一位同名 crew 飛。為避免錯誤歸屬，先不顯示。<br>' +
-      'Multiple crew are named “' + _plEsc(name) + '”, but entries store only the name (no employee_id), so we cannot tell which one a flight was with. Suppressed to avoid misattribution.<br><br>' +
-      '建議到 Address Book（LogTen 端）給同名的人加上不同的 organization 或備註後重新匯入。<br>' +
-      'Tip: give same-named crew distinct organization / comments in LogTen, then re-import.' +
+      '有多位 crew 叫「' + _plEsc(name) + '」，而<b>這一位沒有員編</b>，所以航班無法靠員編歸戶、' +
+      '名字又同名不敢亂猜。為避免錯誤歸屬，先不顯示。<br>' +
+      'Several crew are named “' + _plEsc(name) + '” and <b>this one has no employee id</b>, so flights cannot be attributed by id and the shared name is unsafe to guess.<br><br>' +
+      '解法：在 Address Book 給這位加上員編；或編輯該航班時從通訊錄點選這個人（會自動帶員編），就能拆開。<br>' +
+      'Fix: add an employee id to this person in the Address Book, or pick them from the address book when editing the flight (auto-links the id).' +
     '</div>';
     countLabel = '—';
   } else {
-    var sourceEntries = _pl.aircraftEntries || [];
-    var flights = sourceEntries.filter(function(e) {
-      var ns = _plEntryCrewNames(e);
-      for (var k = 0; k < ns.length; k++) if (ns[k] === name) return true;
-      return false;
-    });
+    // V1.3.13：用員編優先索引拿這位的航班（同名靠員編拆開；沒員編的槽只在名字不同名時才算）
+    var flights = (_plCrewFlightIndex().entriesById[crewId] || []).slice();
     flights.sort(function(a, b) { return (b.flight_date || '').localeCompare(a.flight_date || ''); });
     bodyHtml = flights.length === 0
-      ? '<div style="text-align:center;color:var(--muted);padding:30px;font-size:.85em">沒有跟這位 crew 一起飛過的紀錄。比對方式是 entry.crew 內姓名是否完全一致，不同 export 的拼法可能對不到。<br>No flights flown with this crew. Matching is by exact name in entry.crew — spelling differences across exports may not match.</div>'
+      ? '<div style="text-align:center;color:var(--muted);padding:30px;font-size:.85em">沒有跟這位 crew 一起飛過的紀錄。員編對得到的會精準歸戶；舊紀錄或手打沒帶員編的同名航班可能對不到。<br>No flights flown with this crew. Flights carrying an employee id are matched precisely; older or hand-typed same-name flights without an id may not match.</div>'
       : flights.map(_plRenderEntryRow).join('');
     countLabel = flights.length + ' flights';
   }
