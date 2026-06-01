@@ -243,19 +243,22 @@ async function run() {
     assert(r.status === 401, `status ${r.status}`);
   });
 
-  // ── Admin stats endpoint（V1.0.05）─────────────────────────────────────
-  console.log('\n📊 Admin stats endpoint:');
-  await check('GET /api/pilot-log/admin/stats（無 pw）→ 403', async () => {
+  // ── Admin/ops stats endpoint ─────────────────────────────────────────
+  // V1.3：刻意無密碼（只給非機密 DB 用量數字、不回 email），security-by-obscurity。
+  // V1.3.11：網址由 /admin 改為 /oops（admin 太好猜）。舊路徑應已不存在。
+  console.log('\n📊 Ops stats endpoint (no-password by design, obscure URL):');
+  await check('舊路徑 GET /api/pilot-log/admin/stats → 404（已改名）', async () => {
     const r = await fetch(`${BASE}/api/pilot-log/admin/stats`);
-    assert(r.status === 403, `status ${r.status}`);
+    assert(r.status === 404, `status ${r.status}`);
   });
-  await check('GET /api/pilot-log/admin/stats?pw=wrong → 403', async () => {
-    const r = await fetch(`${BASE}/api/pilot-log/admin/stats?pw=wrong-secret-xx`);
-    assert(r.status === 403, `status ${r.status}`);
+  await check('新路徑 GET /api/pilot-log/oops/stats → 200（刻意無密碼）', async () => {
+    const r = await fetch(`${BASE}/api/pilot-log/oops/stats`);
+    assert(r.status === 200, `status ${r.status}`);
   });
-  await check('GET /api/pilot-log/admin/stats?pw=（空字串）→ 403', async () => {
-    const r = await fetch(`${BASE}/api/pilot-log/admin/stats?pw=`);
-    assert(r.status === 403, `status ${r.status}`);
+  await check('ops stats 不外洩 email（無密碼下不可回 PII）', async () => {
+    const r = await fetch(`${BASE}/api/pilot-log/oops/stats`);
+    const body = await r.text();
+    assert(!/@/.test(body), 'response leaked an email-like string');
   });
 
   // ── Bearer with bogus token → 401 ─────────────────────────────────────

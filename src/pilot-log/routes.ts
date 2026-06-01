@@ -46,8 +46,8 @@ import { getSpaPilotLogJs } from '../spa/js-pilot-log.js';
 
 // ── 版本（比照 CrewSync / Morning：每次推版必更新；SW cache 名稱跟著走） ────
 // 本機 preview build 會暫時加 -tNN 後綴方便對版；推正式版前拿掉只留乾淨版號。
-export const PILOT_LOG_VERSION = 'V1.3.10';
-const PILOT_LOG_CACHE = 'pilotlog-v1-3-10';
+export const PILOT_LOG_VERSION = 'V1.3.11';
+const PILOT_LOG_CACHE = 'pilotlog-v1-3-11';
 
 export const pilotLogRouter = express.Router();
 
@@ -330,6 +330,11 @@ if (document.readyState !== 'loading') pilotLogInit();
 function _renderPilotLogChangelog(): string {
   return `
     <div class="pl-cl-v">${PILOT_LOG_VERSION}</div>
+    <div class="pl-cl-txt">
+      <b>Import Roster 改走雲端 — 兩個獨立 App 也能帶班表。</b>之前「Import Roster」是讀同一個瀏覽器的 localStorage 抓 CrewSync 同步的班表。但把 CrewSync 跟 Pilot Log <b>各自加到 iPad 主畫面變成兩個獨立 App</b> 後，iOS 給每個 App 各自獨立的儲存沙箱、互不相通，所以這邊永遠「找不到班表」。改成<b>從雲端帶</b>：CrewSync 同步時會把完整班表（含組員）私下存一份到伺服器，Pilot Log 按 Import 時用<b>你的 Google email 對到員編</b>直接撈回來，跟兩個 App 共不共用儲存無關。<b>(前提)</b> CrewSync 同步用的 Google 帳號要跟 Pilot Log 登入用的<b>同一個</b>；上線後第一次請先到 CrewSync <b>重新同步一次</b>當月（及想補登的月份），班表才會進雲端。撈不到雲端時仍會退回讀本機 localStorage（瀏覽器分頁情境）。這份雲端班表是<b>你自己的、不會分享給朋友/群組</b>（跟「分享班表」完全分開、不剃組員）。<br>
+      <b>Import Roster now pulls from the cloud — works across two separate apps.</b> Import Roster used to read the roster CrewSync synced from the same browser's localStorage. But once CrewSync and Pilot Log are added to the iPad home screen as <b>two separate apps</b>, iOS sandboxes each app's storage separately, so Pilot Log could never see the roster. Now it pulls from the cloud: CrewSync saves a full private copy (incl. crew) on each sync, and Import resolves <b>your Google email → employee id</b> to fetch it directly — independent of cross-app storage. <b>(Requires)</b> the Google account used for CrewSync sync must match the one you sign into Pilot Log with; after this update, re-sync the month(s) in CrewSync once so the cloud copy exists. Falls back to local localStorage when the cloud has nothing (browser-tab case). This cloud copy is <b>yours only, never shared</b> (separate from the Share feature, crew not stripped). <b>[Ops]</b> 用量後台網址由 <code>/pilot-log/admin</code> 改為 <code>/pilot-log/oops</code>（admin 太好猜，仍無密碼）。<b>[Ops]</b> usage dashboard moved from <code>/pilot-log/admin</code> to <code>/pilot-log/oops</code>.
+    </div>
+    <div class="pl-cl-v old">V1.3.10</div>
     <div class="pl-cl-txt">
       <b>Crew 搜尋焦點修正。</b>之前 Crew 頁的搜尋框每打一個字游標就跳離開、無法連續輸入 — oninput 把整個頁面（含 input element 本身）重畫，焦點就掉了。改成「shell + rows 容器」兩段渲染：搜尋只重畫 rows 區段，input element 不再被砍掉重建。<br>
       <b>Crew search focus fix.</b> The Crew page search box used to lose focus after every keystroke — oninput re-rendered the whole page (including the input itself), nuking focus. Split into shell + rows container; search only repaints the rows, the input stays put.
@@ -964,6 +969,47 @@ pilotLogRouter.post('/api/pilot-log/import/roster', requireAuth, async (req: Aut
   }
 });
 
+// V1.3.11：從 server 私有表帶班表 — 解 iOS 把 CrewSync 與 Pilot Log 各自加主畫面後、
+// 兩個獨立 PWA 不共用 localStorage 的問題。流程：登入 email → cs_users.employee_id
+// → cs_rosters_full 撈完整班表（含組員）→ 丟給既有的 importRoster()。
+// 回傳 error：no_database / no_email / not_linked（email 對不到員編）/ no_roster（員編下沒班表）。
+pilotLogRouter.post('/api/pilot-log/import/roster-from-server', requireAuth, async (req: AuthedRequest, res) => {
+  const userId = req.pilotUserId!;
+  const pool = getPool();
+  if (!pool) return res.status(503).json({ error: 'no_database' });
+  try {
+    // 1) 拿這個 pilot 的所有 email（可能多筆）
+    const emailQ = await pool.query('SELECT email FROM pilot_user_emails WHERE user_id = $1', [userId]);
+    const emails = emailQ.rows.map((r: any) => r.email).filter(Boolean);
+    if (!emails.length) return res.json({ error: 'no_email' });
+    // 2) email → CrewSync 員編（同步時用 Google email 連結過）
+    const eidQ = await pool.query(
+      'SELECT DISTINCT employee_id FROM cs_users WHERE email = ANY($1) AND employee_id IS NOT NULL',
+      [emails]
+    );
+    const eids = eidQ.rows.map((r: any) => r.employee_id).filter(Boolean);
+    if (!eids.length) return res.json({ error: 'not_linked' });
+    // 3) 員編 → 私有表撈所有月份的完整班表
+    const rosterQ = await pool.query(
+      'SELECT month, roster_data FROM cs_rosters_full WHERE employee_id = ANY($1) ORDER BY month',
+      [eids]
+    );
+    let allDuties: any[] = [];
+    const months: string[] = [];
+    for (const row of rosterQ.rows) {
+      const d = row.roster_data; // JSONB → 已是 array
+      if (Array.isArray(d) && d.length) { allDuties = allDuties.concat(d); months.push(row.month); }
+    }
+    if (!allDuties.length) return res.json({ error: 'no_roster' });
+    // 4) 丟給既有 importRoster（per-month sweep、不誤標沒同步的月份）
+    const r = await importRoster(userId, allDuties, undefined, months);
+    res.json({ ...r, months });
+  } catch (e: any) {
+    console.error('[pilot-log] roster-from-server error:', e.message);
+    res.status(500).json({ error: 'internal', detail: e.message });
+  }
+});
+
 // V1.0.09：LogTen Address Book → crew + crew_employee_ids
 pilotLogRouter.post('/api/pilot-log/import/logten-addressbook', requireAuth, async (req: AuthedRequest, res) => {
   const text = typeof req.body === 'string' ? req.body : '';
@@ -1116,9 +1162,10 @@ function _plBuildResponse(cached: any, limit: number, isCached: boolean, cacheAg
   };
 }
 
-pilotLogRouter.get('/api/pilot-log/admin/stats', async (req, res) => {
-  // V1.3：拿掉密碼門檻。網址 /pilot-log/admin 未對外連結（security-by-obscurity），
-  // 且本頁只給「DB 用量 / 成長」這類非機密數字 — 不再回傳任何使用者 email（避免無密碼下外洩 PII）。
+pilotLogRouter.get('/api/pilot-log/oops/stats', async (req, res) => {
+  // V1.3：拿掉密碼門檻。網址 /pilot-log/oops 未對外連結（security-by-obscurity），
+  // V1.3.11：路徑由 /admin 改為 /oops（admin 太好猜）。仍無密碼、仍只給非機密用量數字。
+  // 本頁只給「DB 用量 / 成長」這類非機密數字 — 不回傳任何使用者 email（避免無密碼下外洩 PII）。
   const limit = Math.min(Math.max(parseInt(String(req.query.limit || '10'), 10) || 10, 1), PL_TOP_USERS_MAX);
 
   // 60s in-memory cache（admin 用、低頻；不做事件型主動失效）
@@ -1314,7 +1361,7 @@ pilotLogRouter.get('/api/pilot-log/admin/stats', async (req, res) => {
 // ── Admin dashboard 頁面（V1.2.06；V1.3 拿掉密碼）─────────────────────────────
 // 可查詢的後台 UI：一開頁就顯示 DB 用量 / 成長 / 各表 size / 匿名 user 統計。
 // 不需密碼（網址未對外連結 + 不回任何 email）；meta robots=noindex 不被搜尋。
-pilotLogRouter.get('/pilot-log/admin', (_req, res) => {
+pilotLogRouter.get('/pilot-log/oops', (_req, res) => {
   res.setHeader('Content-Type', 'text/html; charset=utf-8');
   res.setHeader('Cache-Control', 'no-store');
   res.send(`<!DOCTYPE html>
@@ -1354,7 +1401,7 @@ function el(id){ return document.getElementById(id); }
 async function load(){
   el('msg').textContent='查詢中…';
   try{
-    var r = await fetch('/api/pilot-log/admin/stats?limit=50');
+    var r = await fetch('/api/pilot-log/oops/stats?limit=50');
     if(!r.ok){ el('msg').innerHTML='<span class="err">查詢失敗 '+r.status+'</span>'; return; }
     var j = await r.json();
     el('msg').textContent='更新於 ' + new Date(j.generated_at).toLocaleString('zh-TW') + (j.cached?'（快取）':'');

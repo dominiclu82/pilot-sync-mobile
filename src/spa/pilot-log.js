@@ -1701,25 +1701,59 @@ function _plRenderPreviewRows(rows) {
   return html;
 }
 
-// V1.3.07：班表匯入 — 從同 origin 的 CrewSync localStorage 撈 duties[]，POST 到 server 由
-// importRoster() 處理（建 draft / 既有更新 / 範圍內舊 draft 沒看到改 roster_removed）。
+// V1.3.07：班表匯入 — 撈 CrewSync 同步的班表，POST 到 server 由 importRoster() 處理
+// （建 draft / 既有更新 / 範圍內舊 draft 沒看到改 roster_removed）。
+// V1.3.11：先試 server 私有表（雲端帶班表，跨獨立 PWA 也行），撈不到才退回掃本機 localStorage
+// （同瀏覽器分頁情境仍可用）。解 iOS 把 CrewSync / Pilot Log 各自加主畫面後兩個 app 不共用儲存。
 async function _plImportRoster() {
-  var allDuties = [], months = [];
+  // 1) 先試 server 私有表
+  var serverErr = '';
+  try {
+    var sr = await _plApi('/api/pilot-log/import/roster-from-server', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: {},
+    });
+    if (sr.ok) {
+      var sj = await sr.json().catch(function() { return {}; });
+      if (sj && !sj.error) {
+        _plToast('班表匯入（雲端）：新增 ' + (sj.inserted || 0) + ' / 更新 ' + (sj.updated || 0) +
+          ' / 已 confirmed 略過 ' + (sj.skipped_confirmed || 0) +
+          ' / 標 removed ' + (sj.marked_removed || 0));
+        await _plRefreshMain();
+        return;
+      }
+      serverErr = (sj && sj.error) || '';
+    }
+  } catch (e) {}
+
+  // 2) server 撈不到 → 退回掃本機 localStorage（瀏覽器分頁、同一個 app context 才有）
+  // V1.3.11（codex P2）：先收 {month, duties} 再「按月份排序」才攤平 —— 跟 server path 的
+  // ORDER BY month 一致。importRoster() 的 source_ref 含全域 dutyIdx，兩條路排序若不同會產生
+  // 不同 ref → 重複 + 誤標 removed；統一排序後兩路產出完全相同的 ref，互換不會出事。
+  var byMonth = [];
   try {
     for (var i = 0; i < localStorage.length; i++) {
       var k = localStorage.key(i);
       if (!k || !/^crewsync_roster_.+_\d{4}-\d{2}$/.test(k)) continue;
       try {
         var cache = JSON.parse(localStorage.getItem(k) || '{}');
-        if (cache && Array.isArray(cache.duties) && cache.duties.length) {
-          allDuties = allDuties.concat(cache.duties);
-          var m = k.match(/_(\d{4}-\d{2})$/); if (m) months.push(m[1]);
+        var m = k.match(/_(\d{4}-\d{2})$/);
+        if (m && cache && Array.isArray(cache.duties) && cache.duties.length) {
+          byMonth.push({ month: m[1], duties: cache.duties });
         }
       } catch (e) {}
     }
   } catch (e) {}
+  byMonth.sort(function(a, b) { return a.month < b.month ? -1 : (a.month > b.month ? 1 : 0); });
+  var allDuties = [], months = [];
+  byMonth.forEach(function(e) { allDuties = allDuties.concat(e.duties); months.push(e.month); });
   if (!allDuties.length) {
-    _plToast('CrewSync localStorage 找不到班表 — 先去 CrewSync 同步當月', 'error');
+    if (serverErr === 'not_linked') {
+      _plToast('找不到班表：Pilot Log 的 Google email 跟 CrewSync 對不起來。請用同一個 email 登入，並到 CrewSync 重新同步一次班表', 'error');
+    } else {
+      _plToast('找不到班表 — 請先到 CrewSync 重新同步當月（雲端帶班表需要重新同步一次）', 'error');
+    }
     return;
   }
   // codex P2：傳 months[]（實際同步到的月份），server 才能 per-month sweep；

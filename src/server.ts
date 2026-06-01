@@ -64,6 +64,16 @@ async function _dbInit() {
         updated_at TIMESTAMPTZ DEFAULT NOW(),
         UNIQUE(employee_id, month)
       );
+      -- V8.0.41：完整班表（含組員）私有表，給 Pilot Log app 直接帶班表用。
+      -- 跟 cs_rosters（分享用、剃組員）刻意分開：這份不分享、不剃組員、只給本人 import。
+      CREATE TABLE IF NOT EXISTS cs_rosters_full (
+        id SERIAL PRIMARY KEY,
+        employee_id TEXT NOT NULL,
+        month TEXT NOT NULL,
+        roster_data JSONB NOT NULL,
+        updated_at TIMESTAMPTZ DEFAULT NOW(),
+        UNIQUE(employee_id, month)
+      );
     `);
     // Add columns if not exist (for existing tables)
     await _pool.query(`ALTER TABLE cs_users ADD COLUMN IF NOT EXISTS employee_id TEXT`).catch(() => {});
@@ -1633,6 +1643,14 @@ function _syncNext() {
             );
             onLog('📤 班表已自動分享至 Friends');
           }
+          // V8.0.41：無條件把「完整班表（含組員）」存一份到私有表 cs_rosters_full。
+          // 跟分享無關（不看 sharing 旗標、不剃組員、不會出現在 Friends/群組）；
+          // 純給本人在 Pilot Log app 按 Import Roster 時直接撈 —— 解 iOS 兩個獨立 PWA 不共用 localStorage。
+          await _pool.query(
+            `INSERT INTO cs_rosters_full (employee_id, month, roster_data, updated_at) VALUES ($1, $2, $3, NOW())
+             ON CONFLICT (employee_id, month) DO UPDATE SET roster_data = $3, updated_at = NOW()`,
+            [eid, monthKey, JSON.stringify(rosterResult.duties || [])]
+          );
         } catch (dbErr: any) {
           onLog(`⚠️ 資料庫儲存失敗: ${dbErr.message}`);
         }

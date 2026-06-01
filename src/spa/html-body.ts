@@ -1509,7 +1509,7 @@ export function getSpaHtmlBody(): string {
       <button class="tab-util-btn tab-install-btn" id="tab-install-btn" onclick="showInstallGuide()" style="display:none">
         <span>📲</span>安裝
       </button>
-      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer;text-decoration:underline" onclick="showAbout()">V8.0.40</span>
+      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer;text-decoration:underline" onclick="showAbout()">V8.0.41</span>
     </div>
   </div>
 </div>
@@ -1540,7 +1540,12 @@ export function getSpaHtmlBody(): string {
       <div style="color:var(--muted)">Best experience on iPad in landscape mode. Android devices may not display correctly.</div>
     </div>
     <div style="max-height:50vh;overflow-y:auto;-webkit-overflow-scrolling:touch;margin-bottom:10px">
-    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V8.0.40</div>
+    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V8.0.41</div>
+    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
+      <div>🗂️ 同步班表時，多存一份<b>完整班表（含組員）</b>到雲端私有表，給 <b>Pilot Log</b> app 直接帶班表用。解決把 CrewSync 與 Pilot Log 各自加到 iPad 主畫面後、變成兩個獨立 App 不共用瀏覽器儲存、Pilot Log 抓不到班表的問題。這份是<b>你自己的、不會分享給朋友/群組</b>（跟「分享班表」功能完全分開、不剃組員）。沿用方式：在 Pilot Log 按 Import Roster 前，先在這裡<b>重新同步一次</b>當月（及想補登的月份），且兩邊用<b>同一個 Google 帳號</b>。</div>
+      <div>🗂️ On each roster sync, a full copy (incl. crew) is now saved to a private cloud table for the <b>Pilot Log</b> app to import directly — fixing the case where CrewSync and Pilot Log are added to the iPad home screen as two separate apps that don't share browser storage, so Pilot Log couldn't find the roster. This copy is <b>yours only, never shared</b> to friends/groups (entirely separate from the Share feature, crew not stripped). To use it: re-sync the month(s) here once before pressing Import Roster in Pilot Log, and use the <b>same Google account</b> on both.</div>
+    </div>
+    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V8.0.40</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
       <div>⛅ Airport WX 機場分組更新至 Ops Spec. C-6 Amdt 070（MAY 11 2026 生效）+ Amdt 071（MAY 29 2026 生效）：(1) A321-252NX：移除 RCFN（台東）— Amdt 071。(2) A350-1041：RJFF（福岡）新增 Special 標、VMMC（澳門）拿掉 Special 標 — Amdt 070。順手把 <code>cls</code> 編碼規則寫進 <code>airport-data.js</code> 註解 header（A / S 為主類別，RF / P 等視為附加屬性、不另開新代碼），未來 amend 時不會走偏。</div>
       <div>⛅ Airport WX fleet groupings updated to Ops Spec. C-6 Amdt 070 (effective MAY 11 2026) + Amdt 071 (effective MAY 29 2026): (1) A321-252NX — removed RCFN (Taitung) per Amdt 071. (2) A350-1041 — RJFF (Fukuoka) added Special tag, VMMC (Macao) removed Special tag per Amdt 070. Also codified the <code>cls</code> encoding rule in <code>airport-data.js</code> header comment (A / S as primary class; RF / P treated as supplementary attributes, no new codes added) to prevent future amendments from drifting.</div>
