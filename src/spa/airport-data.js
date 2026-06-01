@@ -1,18 +1,24 @@
 // ── 機隊機場分類資料 ─────────────────────────────────────────────────
 // 依據 Operations Specifications C-6 Authorized Airport List
-// Base: JAN 30 2026 + Amendment 069 (Effective APR 01 2026)
-// Amendment 069 changes:
-//   1. A350-1041: 新增 RJBB 為定期機場、新增 RJFF 為備用機場
-//   2. A330-941:  RJCH / RJOT / RPVM 改為備用機場
-//   3. A350-941:  新增 RJCH 為備用機場、RJSS / RPLC / RPVM 改為備用機場
-//   4. A321-252NX / A330-941 / A350-941: 移除 VDPP（金邊）為備用機場
-//   5. A321-252NX: WADD（峇里島）改為備用機場
-//   6. A330-941:  WIII（雅加達）改為備用機場
-//   7. A350-941:  VVPQ（富國）及 WIII（雅加達）改為備用機場
-//   8. A330-941:  移除 WADD 為定期機場；A350-941: 移除 WADD 為備用機場
+// Base: JAN 30 2026 + Amdt 069 (APR 01 2026) + Amdt 070 (MAY 11 2026) + Amdt 071 (MAY 29 2026)
+//
+// Amendment 069（APR 01 2026）— SE Asia / Vietnam（page C-6-5）:
+//   1. A321-252NX: WADD（峇里島）改為備用機場
+//   2. A330-941:  WIII（雅加達）改為備用機場
+//   3. A350-941:  VVPQ（富國）及 WIII（雅加達）改為備用機場
+//   4. A330-941:  移除 WADD 為定期機場；A350-941 移除 WADD 為備用機場
+//
+// Amendment 070（MAY 11 2026）— Taiwan / Japan / Korea / Phil / HK（page C-6-4）:
+//   1. A350-1041: 新增 RJFF 為特殊機場（A → A,S）
+//   2. A350-1041: 移除 VMMC 特殊機場標註（A,S → A）
+//
+// Amendment 071（MAY 29 2026）— Canada / USA / Pacific / Europe（page C-6-3）:
+//   1. A321-252NX: 移除 RCFN 為臨時機場及特殊機場（整筆刪除）
 //
 // cls: 'r'=Regular, 'a'=Alternate, 'rs'=Regular+Special, 'as'=Alternate+Special
-// P → 視為 A；P,S → 視為 A,S（RCKH/RCFN 等）
+// 主類別永遠是 A 或 S；其他類別（RF Refueling 等）視為附加、不另開 cls 代碼
+// 例如 KPDX (A,RF) 仍記為 'a'，RF 屬性不另外編碼
+// P → 視為 A；P,S → 視為 A,S（RCKH 等）
 
 var _wxFleetData = {
 
@@ -20,7 +26,7 @@ var _wxFleetData = {
 // A321-252NX
 // ════════════════════════════════════════════════════════════════════
 'A321': {
-  taiwan:      [{icao:'RCTP',name:'桃園',cls:'r'},{icao:'RCMQ',name:'台中',cls:'r'},{icao:'RCKH',name:'高雄',cls:'as'},{icao:'RCSS',name:'松山',cls:'as'},{icao:'RCFN',name:'台東',cls:'as'},{icao:'RCNN',name:'台南',cls:'a'}],
+  taiwan:      [{icao:'RCTP',name:'桃園',cls:'r'},{icao:'RCMQ',name:'台中',cls:'r'},{icao:'RCKH',name:'高雄',cls:'as'},{icao:'RCSS',name:'松山',cls:'as'},{icao:'RCNN',name:'台南',cls:'a'}],
   hkmacao:     [{icao:'VHHH',name:'香港',cls:'rs'},{icao:'VMMC',name:'澳門',cls:'r'}],
   japan:       [{icao:'RJAA',name:'成田',cls:'r'},{icao:'RJBB',name:'關西',cls:'r'},{icao:'RJBE',name:'神戶',cls:'r'},{icao:'RJCC',name:'新千歲',cls:'r'},{icao:'RJCH',name:'函館',cls:'r'},{icao:'RJFF',name:'福岡',cls:'rs'},{icao:'RJFK',name:'鹿兒島',cls:'a'},{icao:'RJFT',name:'熊本',cls:'r'},{icao:'RJFU',name:'長崎',cls:'a'},{icao:'RJGG',name:'名古屋',cls:'r'},{icao:'RJNK',name:'小松',cls:'a'},{icao:'RJOS',name:'德島',cls:'a'},{icao:'RJOT',name:'高松',cls:'r'},{icao:'RJSN',name:'新潟',cls:'a'},{icao:'RJSS',name:'仙台',cls:'r'},{icao:'RJTT',name:'羽田',cls:'a'},{icao:'ROAH',name:'那霸',cls:'r'},{icao:'ROIG',name:'石垣',cls:'a'},{icao:'RORS',name:'下地島',cls:'r'}],
   korea:       [{icao:'RKPC',name:'濟州',cls:'a'},{icao:'RKPK',name:'釜山',cls:'rs'},{icao:'RKSI',name:'仁川',cls:'a'},{icao:'RKSS',name:'金浦',cls:'a'},{icao:'RKTN',name:'大邱',cls:'a'}],
@@ -75,8 +81,8 @@ var _wxFleetData = {
 // ════════════════════════════════════════════════════════════════════
 'A350-1000': {
   taiwan:      [{icao:'RCTP',name:'桃園',cls:'r'},{icao:'RCKH',name:'高雄',cls:'as'}],
-  hkmacao:     [{icao:'VHHH',name:'香港',cls:'as'},{icao:'VMMC',name:'澳門',cls:'as'}],
-  japan:       [{icao:'RJAA',name:'成田',cls:'r'},{icao:'RJBB',name:'關西',cls:'r'},{icao:'RJCC',name:'新千歲',cls:'a'},{icao:'RJFF',name:'福岡',cls:'a'},{icao:'RJGG',name:'名古屋',cls:'a'},{icao:'RJSS',name:'仙台',cls:'a'},{icao:'ROAH',name:'那霸',cls:'a'},{icao:'RJTT',name:'羽田',cls:'a'}],
+  hkmacao:     [{icao:'VHHH',name:'香港',cls:'as'},{icao:'VMMC',name:'澳門',cls:'a'}],
+  japan:       [{icao:'RJAA',name:'成田',cls:'r'},{icao:'RJBB',name:'關西',cls:'r'},{icao:'RJCC',name:'新千歲',cls:'a'},{icao:'RJFF',name:'福岡',cls:'as'},{icao:'RJGG',name:'名古屋',cls:'a'},{icao:'RJSS',name:'仙台',cls:'a'},{icao:'ROAH',name:'那霸',cls:'a'},{icao:'RJTT',name:'羽田',cls:'a'}],
   korea:       [],
   philippines: [{icao:'RPLC',name:'克拉克',cls:'a'},{icao:'RPLL',name:'馬尼拉',cls:'a'}],
   thailand:    [{icao:'VTBS',name:'素萬那普',cls:'r'},{icao:'VTBD',name:'廊曼',cls:'a'},{icao:'VTBU',name:'芭達雅',cls:'a'},{icao:'VTCC',name:'清邁',cls:'a'}],

@@ -1509,7 +1509,7 @@ export function getSpaHtmlBody(): string {
       <button class="tab-util-btn tab-install-btn" id="tab-install-btn" onclick="showInstallGuide()" style="display:none">
         <span>📲</span>安裝
       </button>
-      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer;text-decoration:underline" onclick="showAbout()">V8.0.39</span>
+      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer;text-decoration:underline" onclick="showAbout()">V8.0.40</span>
     </div>
   </div>
 </div>
@@ -1540,7 +1540,12 @@ export function getSpaHtmlBody(): string {
       <div style="color:var(--muted)">Best experience on iPad in landscape mode. Android devices may not display correctly.</div>
     </div>
     <div style="max-height:50vh;overflow-y:auto;-webkit-overflow-scrolling:touch;margin-bottom:10px">
-    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V8.0.39</div>
+    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V8.0.40</div>
+    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
+      <div>⛅ Airport WX 機場分組更新至 Ops Spec. C-6 Amdt 070（MAY 11 2026 生效）+ Amdt 071（MAY 29 2026 生效）：(1) A321-252NX：移除 RCFN（台東）— Amdt 071。(2) A350-1041：RJFF（福岡）新增 Special 標、VMMC（澳門）拿掉 Special 標 — Amdt 070。順手把 <code>cls</code> 編碼規則寫進 <code>airport-data.js</code> 註解 header（A / S 為主類別，RF / P 等視為附加屬性、不另開新代碼），未來 amend 時不會走偏。</div>
+      <div>⛅ Airport WX fleet groupings updated to Ops Spec. C-6 Amdt 070 (effective MAY 11 2026) + Amdt 071 (effective MAY 29 2026): (1) A321-252NX — removed RCFN (Taitung) per Amdt 071. (2) A350-1041 — RJFF (Fukuoka) added Special tag, VMMC (Macao) removed Special tag per Amdt 070. Also codified the <code>cls</code> encoding rule in <code>airport-data.js</code> header comment (A / S as primary class; RF / P treated as supplementary attributes, no new codes added) to prevent future amendments from drifting.</div>
+    </div>
+    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V8.0.39</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
       <div>Portfolio V1.0.6: 1) 資產變化圖加 range — 日 30/60/90、月 12/24/36、年 5/10/20。2) 加「📥 補歷史」按鈕從 Yahoo Finance 拉 daily close 回填 portfolio_snapshots，跑 backfill 後就能看到趨勢（V1.0.5 只 snapshot 今天無歷史 user 抱怨「只給我當下我怎麼知道變化」）。3) 主畫面持股 row 加 ＋ 按鈕，點開 pre-fill symbol/market 不用再輸入。4) Detail 頁加「均價（原始）」/「未實現損益（原始）」雙派同時顯示 — 扣息派 vs 原始派並列，差額 × qty = 累計領股利。</div>
       <div>Portfolio V1.0.6: 1) Asset chart range selector — daily 30/60/90, monthly 12/24/36, yearly 5/10/20. 2) 「📥 Backfill」button pulls daily close from Yahoo Finance and replays transactions to fill portfolio_snapshots (V1.0.5 only had today's snapshot). 3) Quick-add ＋ button on each holding row, pre-fills symbol/market. 4) Detail page shows both cost-basis methods side-by-side: dividend-adjusted avgCost vs raw avgCost (and corresponding unrealized PnL); the diff × qty = total cash dividend received.</div>
