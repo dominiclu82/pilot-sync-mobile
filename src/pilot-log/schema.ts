@@ -35,6 +35,8 @@ export async function ensureTables(): Promise<boolean> {
     await pool.query(`ALTER TABLE pilot_users ADD COLUMN IF NOT EXISTS last_seen_at TIMESTAMPTZ`).catch(() => {});
     await pool.query(`ALTER TABLE pilot_users ADD COLUMN IF NOT EXISTS last_import_at TIMESTAMPTZ`).catch(() => {});
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_pilot_users_last_seen ON pilot_users(last_seen_at DESC NULLS LAST)`).catch(() => {});
+    // V1.3.12：crew 欄位顯示名稱自訂（CIC=JX、EVA=CP…）。JSONB {pic,crew2,crew3,crew4,cic,obs}
+    await pool.query(`ALTER TABLE pilot_users ADD COLUMN IF NOT EXISTS crew_labels JSONB`).catch(() => {});
 
     await pool.query(`
       CREATE TABLE IF NOT EXISTS pilot_user_emails (

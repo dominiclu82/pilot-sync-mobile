@@ -17,6 +17,7 @@ var _pl = {
   aircraft: [],                  // pilot_aircraft（tail 為主）
   aircraftTypes: [],              // pilot_aircraft_types（V1.0.11；type 為主，含 make/model）
   crew: [],                       // V1.0.11 crew 名單（含 pilots + cabin crew）
+  crewLabels: null,               // V1.3.12 crew 欄位自訂顯示名稱 {pic,crew2,crew3,crew4,cic,obs}；null=用預設
   // Aircraft / Crew 頁共用的完整 entries 快照：不過 _pl.filter、不分頁，撈到所有 user 的 flights
   // 用 null 區別「還沒拉過」和「拉過但是空陣列」，進 Aircraft 或 Crew 頁第一次才 fetch
   aircraftEntries: null,
@@ -643,13 +644,14 @@ async function _plFetchAll() {
   // V1.3.08：filter 改成 client-side（all/past/future/removed 不對應 server status）— fetch 抓全部
   // q stays ''
   try {
-    var [eRes, sRes, aRes, qRes, atRes, cRes] = await Promise.all([
+    var [eRes, sRes, aRes, qRes, atRes, cRes, mRes] = await Promise.all([
       _plApi('/api/pilot-log/entries' + q),
       _plApi('/api/pilot-log/stats'),
       _plApi('/api/pilot-log/aircraft'),
       _plApi('/api/pilot-log/quick-suggest'),
       _plApi('/api/pilot-log/aircraft-types'),  // V1.0.11
       _plApi('/api/pilot-log/crew'),            // V1.0.11
+      _plApi('/api/pilot-log/me'),              // V1.3.12：順便載 crew_labels
     ]);
     if (eRes.ok) { var ej = await eRes.json(); _pl.entries = ej.entries || []; }
     if (sRes.ok) { _pl.stats = await sRes.json(); }
@@ -657,6 +659,11 @@ async function _plFetchAll() {
     if (qRes.ok) { _pl.suggest = await qRes.json(); }
     if (atRes.ok) { var atj = await atRes.json(); _pl.aircraftTypes = atj.aircraft_types || []; }
     if (cRes.ok) { var cj = await cRes.json(); _pl.crew = cj.crew || []; }
+    if (mRes.ok) {
+      var mj = await mRes.json();
+      _pl.crewLabels = (mj && mj.crew_labels) || null;
+      try { localStorage.setItem('pilotlog_crew_labels', JSON.stringify(_pl.crewLabels || {})); } catch (e) {}
+    }
     // codex fast P1：fetch 過程中如果 token 過期 + refresh/cookie 真的失效，_plApi 內部會清
     // session（_pl.user=null）。此時不能假裝成功，否則 caller 會繼續顯示「沒授權但有快取」的 stale UI。
     if (!_pl.user) {
@@ -953,6 +960,7 @@ function _plOpenEditor(id) {
     if (!e) return;
     _pl.editing = JSON.parse(JSON.stringify(e));
     if (!_pl.editing.crew) _pl.editing.crew = {};
+    _plMigrateLegacyCrew(_pl.editing.crew);   // V1.3.12：舊 crew schema → 新 6 槽（看得到、可編）
     if (!_pl.editing.approaches) _pl.editing.approaches = [];
   } else {
     _pl.editing = _plBlankEntry();
@@ -1042,12 +1050,109 @@ function _plFieldRow(cols, fieldsHtml) {
 function _plFieldSub(label) {
   return '<div style="font-size:.58em;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;font-weight:700;margin:10px 0 3px">' + _plEsc(label) + '</div>';
 }
-// crew.X 是 JSONB 巢狀欄位（不是 top-level），用專屬 input id ple-crew-X，跟 _plSaveEntry 讀法對齊
-function _plCrewField(label, key, e) {
-  var v = (e.crew && e.crew[key]) || '';
+// V1.3.12：6 個固定 crew 槽 + 預設顯示名稱（使用者可自訂，存 server）。
+var PL_CREW_KEYS = ['pic', 'crew2', 'crew3', 'crew4', 'cic', 'obs'];
+var PL_CREW_LABEL_DEFAULT = { pic: 'PIC', crew2: 'Crew 2', crew3: 'Crew 3', crew4: 'Crew 4', cic: 'CIC', obs: 'OBS' };
+function _plCrewLabel(key) {
+  if (_pl.crewLabels == null) {
+    try { var s = localStorage.getItem('pilotlog_crew_labels'); if (s) _pl.crewLabels = JSON.parse(s); } catch (e) {}
+  }
+  var lbl = _pl.crewLabels && _pl.crewLabels[key];
+  return (typeof lbl === 'string' && lbl.trim()) ? lbl.trim() : (PL_CREW_LABEL_DEFAULT[key] || key);
+}
+// V1.3.12：crew 槽值相容 — 舊資料是純名字字串，新資料是 {name, rank, eid}。一律 normalize。
+function _plCrewVal(raw) {
+  if (raw == null) return { name: '', rank: '', eid: '' };
+  if (typeof raw === 'string') return { name: raw, rank: '', eid: '' };
+  return { name: raw.name || '', rank: raw.rank || '', eid: raw.eid || '' };
+}
+// V1.3.12（codex P1）：把舊 schema 的 crew key 對映到新 6 槽，讓編輯舊紀錄時看得到、可編、不掉資料。
+// 只在新槽是空的時候搬；observer2 無對應槽 → 留在物件裡（存檔時 _plSaveEntry 會保留，不丟）。
+function _plMigrateLegacyCrew(crew) {
+  if (!crew || typeof crew !== 'object') return crew || {};
+  var map = { sic: 'crew2', fo1: 'crew3', fo2: 'crew4', purser: 'cic', observer1: 'obs' };
+  Object.keys(map).forEach(function(oldK) {
+    var newK = map[oldK];
+    var hasOld = crew[oldK] != null && crew[oldK] !== '';
+    var emptyNew = crew[newK] == null || crew[newK] === '';
+    if (hasOld && emptyNew) { crew[newK] = crew[oldK]; delete crew[oldK]; }
+  });
+  return crew;
+}
+// 給編輯器 crew 欄位用的通訊錄 datalist（一份，所有 crew input 共用 list=ple-crew-dl）
+function _plCrewDatalist() {
+  var opts = (_pl.crew || []).map(function(c) {
+    var org = c.organization ? (' — ' + c.organization) : '';
+    return '<option value="' + _plEsc(c.display_name || '') + '">' + _plEsc((c.display_name || '') + org) + '</option>';
+  }).join('');
+  return '<datalist id="ple-crew-dl">' + opts + '</datalist>';
+}
+// 用顯示名字回查員編：通訊錄剛好 1 筆同名且有員編 → 回該員編，否則空（不猜）
+function _plResolveEid(name) {
+  if (!name) return '';
+  var hit = (_pl.crew || []).filter(function(c) { return (c.display_name || '') === name; });
+  if (hit.length === 1 && hit[0].employee_ids && hit[0].employee_ids.length) return hit[0].employee_ids[0];
+  return '';
+}
+// V1.3.12：Crew 頁的「欄位名稱」設定（折疊）。static input，存檔才送 server，不踩搜尋的 focus bug。
+function _plCrewLabelsEditor() {
+  var inputCss = 'flex:1;background:var(--bg,#0a0e1a);color:var(--text);border:1px solid var(--border,#334155);border-radius:6px;padding:5px 8px;font-size:.78em;box-sizing:border-box';
+  var rows = PL_CREW_KEYS.map(function(k) {
+    return '<div style="display:flex;align-items:center;gap:6px;margin-bottom:5px">' +
+      '<span style="font-size:.6em;color:var(--muted);width:46px;flex-shrink:0">' + k + '</span>' +
+      '<input id="pl-cl-' + k + '" value="' + _plEsc(_plCrewLabel(k)) + '" placeholder="' + _plEsc(PL_CREW_LABEL_DEFAULT[k]) + '" maxlength="24" style="' + inputCss + '">' +
+    '</div>';
+  }).join('');
+  var btnCss = 'border:0;border-radius:6px;padding:6px 12px;font-size:.75em;font-weight:700;cursor:pointer';
+  return '<details style="margin-bottom:10px;background:var(--card);border-radius:8px;padding:8px 10px">' +
+    '<summary style="font-size:.72em;font-weight:700;color:var(--muted);cursor:pointer">⚙ 欄位名稱 / Crew field labels</summary>' +
+    '<div style="font-size:.62em;color:var(--muted);margin:6px 0 8px">改成你公司的稱呼（JX=CIC、EVA=CP…），套用到航班編輯器的 crew 欄位、跨裝置同步。<br>Rename to your airline\'s terms; applies to the flight editor, synced across devices.</div>' +
+    rows +
+    '<div style="display:flex;gap:8px;margin-top:6px">' +
+      '<button onclick="_plSaveCrewLabels()" style="background:#10b981;color:#fff;' + btnCss + '">儲存 Save</button>' +
+      '<button onclick="_plResetCrewLabels()" style="background:transparent;color:var(--muted);border:1px solid var(--border,#334155)!important;' + btnCss + '">恢復預設 Reset</button>' +
+    '</div>' +
+  '</details>';
+}
+async function _plSaveCrewLabels() {
+  var body = {};
+  PL_CREW_KEYS.forEach(function(k) {
+    var el = document.getElementById('pl-cl-' + k);
+    if (el && el.value.trim()) body[k] = el.value.trim().slice(0, 24);
+  });
+  try {
+    var r = await _plApi('/api/pilot-log/crew-labels', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: body,
+    });
+    if (!r.ok) { _plToast('儲存失敗 ' + r.status, 'error'); return; }
+    var j = await r.json();
+    _pl.crewLabels = (j && j.crew_labels) || {};
+    try { localStorage.setItem('pilotlog_crew_labels', JSON.stringify(_pl.crewLabels)); } catch (e) {}
+    _plToast('欄位名稱已儲存');
+  } catch (e) {
+    _plToast('儲存失敗：' + (e && e.message ? e.message : 'unknown'), 'error');
+  }
+}
+async function _plResetCrewLabels() {
+  PL_CREW_KEYS.forEach(function(k) {
+    var el = document.getElementById('pl-cl-' + k);
+    if (el) el.value = PL_CREW_LABEL_DEFAULT[k];
+  });
+  await _plSaveCrewLabels();
+}
+// crew.X 是 JSONB 巢狀欄位，用專屬 input id ple-crew-X（名字）/ ple-crewrank-X（rank）/ ple-crewid-X（員編 hidden），跟 _plSaveEntry 讀法對齊
+function _plCrewField(key, e) {
+  var val = _plCrewVal(e.crew && e.crew[key]);
+  var label = _plCrewLabel(key);
+  var inputCss = 'background:var(--bg,#0a0e1a);color:var(--text);border:1px solid var(--border,#334155);border-radius:6px;padding:6px 8px;font-size:.78em';
   return '<div style="margin-bottom:8px">' +
     '<div style="font-size:.62em;color:var(--muted);margin-bottom:2px">' + _plEsc(label) + '</div>' +
-    '<input id="ple-crew-' + key + '" style="width:100%;background:var(--bg,#0a0e1a);color:var(--text);border:1px solid var(--border,#334155);border-radius:6px;padding:6px 8px;font-size:.78em" value="' + _plEsc(v) + '"></div>';
+    '<div style="display:flex;gap:4px">' +
+      '<input id="ple-crew-' + key + '" list="ple-crew-dl" placeholder="name" style="flex:1;' + inputCss + '" value="' + _plEsc(val.name) + '">' +
+      '<input id="ple-crewrank-' + key + '" placeholder="rank" style="width:62px;text-transform:uppercase;' + inputCss + '" value="' + _plEsc(val.rank) + '">' +
+    '</div>' +
+    '<input type="hidden" id="ple-crewid-' + key + '" value="' + _plEsc(val.eid) + '">' +
+    '<input type="hidden" id="ple-crewname0-' + key + '" value="' + _plEsc(val.name) + '"></div>';  // 原始名字：判斷名字有沒有被改過，改過就不沿用舊員編
 }
 
 // ── V1.3.05：機場座標 + 太陽角度，給手動新增航班自動算 night time / 日夜起降 ─────────
@@ -1368,11 +1473,13 @@ function _plRenderEditor(target) {
       _plFieldRow(2, _plEditorField('Autolands', 'autolands', 'number') + _plEditorField('Pax', 'pax_count', 'number')) +
     '</div>' +
 
-    // ── Crew：PIC+SIC / FO1+FO2 ──
+    // ── Crew：駕駛艙 PIC / Crew2-4，客艙 CIC / OBS（V1.3.12；欄位名可在 Crew 頁自訂）──
     '<div style="margin-top:12px;background:var(--card);border-radius:10px;padding:12px">' +
       '<div style="font-size:.7em;font-weight:700;color:var(--muted);text-transform:uppercase;margin-bottom:8px">Crew</div>' +
-      _plFieldRow(2, _plCrewField('PIC', 'pic', e) + _plCrewField('SIC', 'sic', e)) +
-      _plFieldRow(2, _plCrewField('FO 1', 'fo1', e) + _plCrewField('FO 2', 'fo2', e)) +
+      _plCrewDatalist() +
+      _plFieldRow(2, _plCrewField('pic', e) + _plCrewField('crew2', e)) +
+      _plFieldRow(2, _plCrewField('crew3', e) + _plCrewField('crew4', e)) +
+      _plFieldRow(2, _plCrewField('cic', e) + _plCrewField('obs', e)) +
     '</div>' +
 
     // ── Other：SID+STAR / Remarks ──
@@ -1443,10 +1550,30 @@ async function _plSaveEntry() {
     remarks: _plReadField('remarks'),
   };
 
+  // V1.3.12：6 槽，每槽存 {name, rank, eid}。員編優先用 hidden（roster 帶的/原本的），
+  // 名字若對得到通訊錄唯一同名聯絡人就用那個員編（手動選了已知聯絡人 → 自動連結）。
+  // codex P1：先保留「沒被新 UI 渲染的舊 key」（如 observer2），避免編輯舊紀錄存檔時掉資料。
   var crew = {};
-  ['pic', 'sic', 'fo1', 'fo2'].forEach(function(k) {
-    var el = document.getElementById('ple-crew-' + k);
-    if (el && el.value.trim()) crew[k] = el.value.trim();
+  var prevCrew = (_pl.editing && _pl.editing.crew) || {};
+  Object.keys(prevCrew).forEach(function(k) {
+    if (PL_CREW_KEYS.indexOf(k) < 0 && prevCrew[k] != null && prevCrew[k] !== '') crew[k] = prevCrew[k];
+  });
+  PL_CREW_KEYS.forEach(function(k) {
+    var nameEl = document.getElementById('ple-crew-' + k);
+    var name = nameEl ? nameEl.value.trim() : '';
+    if (!name) return;
+    var rankEl = document.getElementById('ple-crewrank-' + k);
+    var idEl = document.getElementById('ple-crewid-' + k);
+    var name0El = document.getElementById('ple-crewname0-' + k);
+    var rank = rankEl ? rankEl.value.trim().toUpperCase() : '';
+    // codex P1：名字改過就不准沿用舊員編（避免新名字揹到前一個人的員編）。
+    // 先用通訊錄唯一同名回查；查不到才在「名字沒被改過」時沿用原本員編。
+    var eid = _plResolveEid(name);
+    if (!eid && name0El && name === name0El.value.trim() && idEl) eid = idEl.value.trim();
+    var slot = { name: name };
+    if (rank) slot.rank = rank;
+    if (eid) slot.eid = eid;
+    crew[k] = slot;
   });
   body.crew = crew;
 
@@ -1719,7 +1846,8 @@ async function _plImportRoster() {
       if (sj && !sj.error) {
         _plToast('班表匯入（雲端）：新增 ' + (sj.inserted || 0) + ' / 更新 ' + (sj.updated || 0) +
           ' / 已 confirmed 略過 ' + (sj.skipped_confirmed || 0) +
-          ' / 標 removed ' + (sj.marked_removed || 0));
+          ' / 標 removed ' + (sj.marked_removed || 0) +
+          (sj.crew_added ? ' / 通訊錄 +' + sj.crew_added : ''));
         await _plRefreshMain();
         return;
       }
@@ -1772,7 +1900,8 @@ async function _plImportRoster() {
     var j = await r.json();
     _plToast('班表匯入：新增 ' + (j.inserted || 0) + ' / 更新 ' + (j.updated || 0) +
       ' / 已 confirmed 略過 ' + (j.skipped_confirmed || 0) +
-      ' / 標 removed ' + (j.marked_removed || 0));
+      ' / 標 removed ' + (j.marked_removed || 0) +
+      (j.crew_added ? ' / 通訊錄 +' + j.crew_added : ''));
     await _plRefreshMain();
   } catch (e) {
     _plToast('班表匯入失敗：' + (e && e.message ? e.message : 'unknown'), 'error');
@@ -2317,18 +2446,21 @@ async function _plOpenCrew() {
 // 從 entry.crew JSONB 內所有欄位收集名字（pic/sic/fo1/fo2/purser/observer 都算）
 function _plEntryCrewNames(e) {
   if (!e || !e.crew || typeof e.crew !== 'object') return [];
-  // V1.3.03：固定角色順序，PIC 永遠排第一（user 要求），再 SIC / FO / purser / observer
-  var order = ['pic', 'sic', 'fo1', 'fo2', 'purser', 'observer1', 'observer2'];
+  // V1.3.12：新 6 槽 PIC 先，再 Crew2-4 / CIC / OBS；後面接舊 key（相容已匯入的舊資料）。
+  // 槽值相容字串(舊)與 {name,...}(新)。
+  var order = ['pic', 'crew2', 'crew3', 'crew4', 'cic', 'obs',
+               'sic', 'fo1', 'fo2', 'purser', 'observer1', 'observer2'];
   var names = [], seen = {};
+  function nm(v) { var o = _plCrewVal(v); return o.name ? o.name.trim() : ''; }
   order.forEach(function(k) {
-    var v = e.crew[k];
-    if (typeof v === 'string' && v.trim()) { names.push(v.trim()); seen[k] = 1; }
+    var n = nm(e.crew[k]);
+    if (n) { names.push(n); seen[k] = 1; }
   });
   // 其他未列在 order 的 key 也補在後面（保險，不漏人）
   Object.keys(e.crew).forEach(function(k) {
     if (seen[k]) return;
-    var v = e.crew[k];
-    if (typeof v === 'string' && v.trim()) names.push(v.trim());
+    var n = nm(e.crew[k]);
+    if (n) names.push(n);
   });
   return names;
 }
@@ -2370,6 +2502,7 @@ function _plRenderCrewList() {
         '<div style="flex:1"></div>' +
         '<div style="font-size:.7em;color:var(--muted)">共 ' + _pl.crew.length + ' 人</div>' +
       '</div>' +
+      _plCrewLabelsEditor() +
       '<input id="pl-crew-search" type="search" placeholder="搜尋名字 / ID..." value="' + _plEsc(term) + '" ' +
         'oninput="_plCrewSearchInput(this.value)" ' +
         'style="width:100%;background:var(--bg,#0a0e1a);color:var(--text);border:1px solid var(--border,#334155);border-radius:6px;padding:8px 10px;font-size:.85em;margin-bottom:10px;box-sizing:border-box">' +
@@ -2836,17 +2969,20 @@ function _plExportCsv() {
   });
   src.sort(function(a, b) { return (a.flight_date || '').localeCompare(b.flight_date || ''); });
   var head = ['Date', 'Flight', 'From', 'To', 'Type', 'Tail', 'Position',
-              'Block', 'Night', 'DayTO', 'NightTO', 'DayLdg', 'NightLdg', 'PIC', 'SIC'];
+              'Block', 'Night', 'DayTO', 'NightTO', 'DayLdg', 'NightLdg', 'PIC', 'Crew'];
   var lines = [head.join(',')];
   for (var i = 0; i < src.length; i++) {
     var e = src[i];
     var crew = e.crew || {};
+    // V1.3.12：crew 槽值已物件化（{name,rank,eid}），相容舊字串。PIC 一欄、其餘合併一欄。
+    var picName = _plCrewVal(crew.pic).name;
+    var otherNames = _plEntryCrewNames(e).filter(function(n) { return n !== picName; }).join('; ');
     var cells = [
       String(e.flight_date || '').slice(0, 10), e.flight_no, e.origin, e.dest,
       e.aircraft_type, e.tail_no, e.position,
       _plMinToHHMM(e.block_minutes), _plMinToHHMM(e.night_minutes),
       e.day_takeoffs || 0, e.night_takeoffs || 0, e.day_landings || 0, e.night_landings || 0,
-      crew.pic || '', crew.sic || '',
+      picName, otherNames,
     ];
     lines.push(cells.map(_plCsvCell).join(','));
   }

@@ -46,8 +46,8 @@ import { getSpaPilotLogJs } from '../spa/js-pilot-log.js';
 
 // ── 版本（比照 CrewSync / Morning：每次推版必更新；SW cache 名稱跟著走） ────
 // 本機 preview build 會暫時加 -tNN 後綴方便對版；推正式版前拿掉只留乾淨版號。
-export const PILOT_LOG_VERSION = 'V1.3.11';
-const PILOT_LOG_CACHE = 'pilotlog-v1-3-11';
+export const PILOT_LOG_VERSION = 'V1.3.12';
+const PILOT_LOG_CACHE = 'pilotlog-v1-3-12';
 
 export const pilotLogRouter = express.Router();
 
@@ -330,6 +330,11 @@ if (document.readyState !== 'loading') pilotLogInit();
 function _renderPilotLogChangelog(): string {
   return `
     <div class="pl-cl-v">${PILOT_LOG_VERSION}</div>
+    <div class="pl-cl-txt">
+      <b>Crew 欄位重做 + 從通訊錄點選 + 班表組員自動進通訊錄。</b>航班的組員欄改成 <b>PIC / Crew 2 / Crew 3 / Crew 4 / CIC / OBS</b> 六格（取代舊的 PIC/SIC/FO1/FO2），每格除了名字還記 <b>rank</b>（CAP/SFO/FO/TFO/TCAP/PR…，是「那班的快照」，完訓後新班會帶新 rank）跟 <b>員編</b>。打字會跳出<b>通訊錄</b>建議直接點選。<b>(欄位名稱可改)</b> 👥 Crew 頁有「⚙ 欄位名稱」設定，改成你公司的稱呼（JX 用 CIC、EVA 用 CP…），跨裝置同步。<b>(班表自動建通訊錄)</b> 匯班表時會把駕駛艙(PIC/P1~P4/IS)+CIC 用<b>員編</b>自動加進通訊錄——飛過誰自動長出來，不用再手動匯。<b>(DHD)</b> 搭便機(DHD/positioning)的航段標成 deadhead：logbook 看得到、但飛時/PIC/night 全不計；別人在你這班 DHD 也不會被當成操作組員。<br>
+      <b>Crew fields redesigned + pick from Address Book + roster crew auto-added.</b> Flight crew fields are now <b>PIC / Crew 2 / Crew 3 / Crew 4 / CIC / OBS</b> (replacing PIC/SIC/FO1/FO2); each stores name + <b>rank</b> (a per-flight snapshot) + <b>employee id</b>. Typing shows <b>Address Book</b> suggestions to tap. <b>(Editable labels)</b> the 👥 Crew page has a "⚙ field labels" setting to rename for your airline (JX=CIC, EVA=CP…), synced across devices. <b>(Auto address book)</b> importing a roster auto-adds cockpit (PIC/P1–P4/IS) + CIC to your Address Book by employee id. <b>(DHD)</b> deadhead/positioning legs are flagged deadhead — shown in the logbook but excluded from flight/PIC/night totals; someone deadheading on your flight is not counted as operating crew.
+    </div>
+    <div class="pl-cl-v old">V1.3.11</div>
     <div class="pl-cl-txt">
       <b>Import Roster 改走雲端 — 兩個獨立 App 也能帶班表。</b>之前「Import Roster」是讀同一個瀏覽器的 localStorage 抓 CrewSync 同步的班表。但把 CrewSync 跟 Pilot Log <b>各自加到 iPad 主畫面變成兩個獨立 App</b> 後，iOS 給每個 App 各自獨立的儲存沙箱、互不相通，所以這邊永遠「找不到班表」。改成<b>從雲端帶</b>：CrewSync 同步時會把完整班表（含組員）私下存一份到伺服器，Pilot Log 按 Import 時用<b>你的 Google email 對到員編</b>直接撈回來，跟兩個 App 共不共用儲存無關。<b>(前提)</b> CrewSync 同步用的 Google 帳號要跟 Pilot Log 登入用的<b>同一個</b>；上線後第一次請先到 CrewSync <b>重新同步一次</b>當月（及想補登的月份），班表才會進雲端。撈不到雲端時仍會退回讀本機 localStorage（瀏覽器分頁情境）。這份雲端班表是<b>你自己的、不會分享給朋友/群組</b>（跟「分享班表」完全分開、不剃組員）。<br>
       <b>Import Roster now pulls from the cloud — works across two separate apps.</b> Import Roster used to read the roster CrewSync synced from the same browser's localStorage. But once CrewSync and Pilot Log are added to the iPad home screen as <b>two separate apps</b>, iOS sandboxes each app's storage separately, so Pilot Log could never see the roster. Now it pulls from the cloud: CrewSync saves a full private copy (incl. crew) on each sync, and Import resolves <b>your Google email → employee id</b> to fetch it directly — independent of cross-app storage. <b>(Requires)</b> the Google account used for CrewSync sync must match the one you sign into Pilot Log with; after this update, re-sync the month(s) in CrewSync once so the cloud copy exists. Falls back to local localStorage when the cloud has nothing (browser-tab case). This cloud copy is <b>yours only, never shared</b> (separate from the Share feature, crew not stripped). <b>[Ops]</b> 用量後台網址由 <code>/pilot-log/admin</code> 改為 <code>/pilot-log/oops</code>（admin 太好猜，仍無密碼）。<b>[Ops]</b> usage dashboard moved from <code>/pilot-log/admin</code> to <code>/pilot-log/oops</code>.
@@ -687,13 +692,35 @@ pilotLogRouter.get('/api/pilot-log/me', requireAuth, async (req: AuthedRequest, 
   const pool = getPool();
   if (!pool || !(await ensureTables())) return res.status(503).json({ error: 'database_unavailable' });
   const userId = req.pilotUserId!;
-  const u = await pool.query('SELECT id, created_at, last_login_at FROM pilot_users WHERE id = $1', [userId]);
+  const u = await pool.query('SELECT id, created_at, last_login_at, crew_labels FROM pilot_users WHERE id = $1', [userId]);
   const emails = await pool.query(
     'SELECT email, is_primary FROM pilot_user_emails WHERE user_id = $1 ORDER BY is_primary DESC, linked_at',
     [userId]
   );
   if (u.rows.length === 0) return res.status(404).json({ error: 'user_not_found' });
-  res.json({ user: u.rows[0], emails: emails.rows });
+  res.json({ user: u.rows[0], emails: emails.rows, crew_labels: u.rows[0].crew_labels || null });
+});
+
+// V1.3.12：crew 欄位顯示名稱自訂（CIC=JX、EVA=CP…）。只收 6 個白名單 key、每個 ≤ 24 字。
+pilotLogRouter.post('/api/pilot-log/crew-labels', requireAuth, async (req: AuthedRequest, res) => {
+  const pool = getPool();
+  if (!pool) return res.status(503).json({ error: 'database_unavailable' });
+  let body: any;
+  try { body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body; }
+  catch { return res.status(400).json({ error: 'invalid_json' }); }
+  const allow = ['pic', 'crew2', 'crew3', 'crew4', 'cic', 'obs'];
+  const labels: Record<string, string> = {};
+  for (const k of allow) {
+    const v = body && body[k];
+    if (typeof v === 'string' && v.trim()) labels[k] = v.trim().slice(0, 24);
+  }
+  try {
+    await pool.query('UPDATE pilot_users SET crew_labels = $2, updated_at = NOW() WHERE id = $1',
+      [req.pilotUserId, JSON.stringify(labels)]);
+    res.json({ ok: true, crew_labels: labels });
+  } catch (e: any) {
+    res.status(500).json({ error: 'internal', detail: e.message });
+  }
 });
 
 // ── Account delete（V1.0.08；Apple App Store 5.1.1(v) compliance）─────────────

@@ -21,6 +21,9 @@ import { getPool, ensureTables } from './schema.js';
 interface RosterCrewMember {
   position?: string;
   name?: string;
+  staffId?: string;   // V1.3.12：CrewSync 班表組員帶的員編（generate-ics-headless 解析的 staffId）
+  rank?: string;
+  workCode?: string;
 }
 
 interface RosterFlight {
@@ -50,6 +53,7 @@ export interface ImportRosterResult {
   updated: number;
   skipped_confirmed: number;
   marked_removed: number;
+  crew_added?: number;   // V1.3.12：自動加進通訊錄的組員數
 }
 
 function normalizePosition(raw?: string): 'PIC' | 'SIC' | 'OBSERVER' | null {
@@ -82,24 +86,113 @@ function buildSourceRef(f: RosterFlight, dutyIdx: number): string | null {
   return `roster:${f.flightNo}:${date}:${f.origin || ''}:${f.dest || ''}:${dutyIdx}`;
 }
 
-function extractCrew(crew?: RosterCrewMember[]): Record<string, string> | null {
+// V1.3.12：每個 crew 槽存 {名字, rank, 員編}（rank 是「那班的快照」，完訓後新班會帶新 rank；
+// 員編是穩定身分、串通訊錄用）。舊資料是純名字字串，前端讀取時相容。
+interface CrewSlotVal { name: string; rank?: string; eid?: string; }
+function crewVal(m: RosterCrewMember): CrewSlotVal {
+  const rank = (m.rank || '').toUpperCase().trim();
+  const eid = (m.staffId || '').trim();
+  const v: CrewSlotVal = { name: m.name! };
+  if (rank) v.rank = rank;
+  if (eid) v.eid = eid;
+  return v;
+}
+
+// V1.3.12：班表 position → 6 個固定槽。PIC→pic、OBS→obs、CIC→cic、
+// 其餘駕駛艙（P1~P4/IS 會亂跳，不照號碼）→ 依出現順序填 crew2/crew3/crew4。
+// 其他客艙（SC/CC/PC 等非 CIC）不進槽。內部 key 固定，前端顯示 label 可由使用者自訂。
+function extractCrew(crew?: RosterCrewMember[]): Record<string, CrewSlotVal> | null {
   if (!crew || !crew.length) return null;
-  const out: Record<string, string> = {};
+  const out: Record<string, CrewSlotVal> = {};
+  const otherSlots = ['crew2', 'crew3', 'crew4'];
+  let otherIdx = 0;
   for (const m of crew) {
     if (!m.name || !m.position) continue;
     const pos = m.position.toUpperCase();
-    if (/CAP|CMD|PIC/i.test(pos) && !out.pic) out.pic = m.name;
-    else if (/SFO|FIRST OFFICER|SIC/i.test(pos) && !out.sic) out.sic = m.name;
-    else if (/^FO$|^FO\d|^FO /i.test(pos)) {
-      if (!out.fo1) out.fo1 = m.name;
-      else if (!out.fo2) out.fo2 = m.name;
-    } else if (/PURSER|SP|PR/i.test(pos) && !out.purser) out.purser = m.name;
-    else if (/OBS/i.test(pos)) {
-      if (!out.observer1) out.observer1 = m.name;
-      else if (!out.observer2) out.observer2 = m.name;
+    const rank = (m.rank || '').toUpperCase();
+    if (/DHD|DEADHEAD/.test(pos)) continue;   // V1.3.12：搭便機的人沒操作這班，不進槽
+    if (/CIC/.test(pos)) { if (!out.cic) out.cic = crewVal(m); }
+    else if (/OBS/.test(pos)) { if (!out.obs) out.obs = crewVal(m); }
+    else if (/CAP|CMD|PIC/.test(pos)) { if (!out.pic) out.pic = crewVal(m); }
+    else if (/^P\d|^IS|SFO|FIRST OFFICER|^FO|SIC/.test(pos) || /CAP|SFO|FO|TFO|TCAP/.test(rank)) {
+      if (otherIdx < otherSlots.length) out[otherSlots[otherIdx++]] = crewVal(m);
     }
+    // else：其他客艙（SC/CC/PC…非 CIC）→ 不記
   }
   return Object.keys(out).length ? out : null;
+}
+
+// V1.3.12：哪些 roster 組員要自動進通訊錄 —— 跟 extractCrew 會進槽的角色一致：
+// 駕駛艙（PIC/P1~P4/IS）+ OBS + CIC，不灌整批客艙（SC/CC/PC）。
+function isLoggedCrew(m: RosterCrewMember): boolean {
+  const pos = (m.position || '').toUpperCase();
+  const rank = (m.rank || '').toUpperCase();
+  if (!pos) return false;
+  if (/DHD|DEADHEAD/.test(pos)) return false;   // V1.3.12：搭便機的人不進通訊錄
+  if (/CIC|OBS|CAP|CMD|PIC/.test(pos)) return true;
+  if (/^P\d|^IS|SFO|FIRST OFFICER|^FO|SIC/.test(pos)) return true;
+  if (/CAP|SFO|FO|TFO|TCAP/.test(rank)) return true;
+  return false;
+}
+
+// V1.3.12：把單一 roster 組員（以員編為主識別）upsert 進通訊錄。
+// 純「加人不改人」：員編命中既有 → 不動使用者的聯絡人；員編沒命中但同名無員編剛好 1 筆
+// → 補掛員編（避免重複）；都沒有 → 新建。回傳是否真的新增了一筆。
+async function upsertCrewContact(
+  pool: NonNullable<ReturnType<typeof getPool>>,
+  userId: string,
+  staffId: string | undefined,
+  name: string,
+): Promise<boolean> {
+  const sid = (staffId || '').trim();
+  if (sid) {
+    const idMatch = await pool.query(
+      `SELECT DISTINCT crew_id FROM crew_employee_ids WHERE user_id = $1 AND employee_id = $2`,
+      [userId, sid]
+    );
+    if (idMatch.rows.length >= 1) return false;            // 員編已掛在某聯絡人 → 不動
+    // 員編沒命中 → 試同名、且「沒掛任何員編」的聯絡人
+    const nameMatch = await pool.query(
+      `SELECT c.id FROM crew c
+       WHERE c.user_id = $1 AND c.display_name = $2
+         AND NOT EXISTS (SELECT 1 FROM crew_employee_ids e WHERE e.crew_id = c.id)`,
+      [userId, name]
+    );
+    if (nameMatch.rows.length === 1) {
+      // 把員編補掛上去（不改名）
+      await pool.query(
+        `INSERT INTO crew_employee_ids (crew_id, user_id, employee_id)
+         VALUES ($1, $2, $3) ON CONFLICT (user_id, employee_id) DO NOTHING`,
+        [nameMatch.rows[0].id, userId, sid]
+      );
+      return false;
+    }
+    if (nameMatch.rows.length > 1) return false;           // 多筆同名無員編 → 不猜
+    // 都沒有 → 新建
+    const crewId = randomUUID();
+    await pool.query(`INSERT INTO crew (id, user_id, display_name) VALUES ($1, $2, $3)`, [crewId, userId, name]);
+    // codex P2（並發）：員編有 UNIQUE(user_id, employee_id)。若同時另一個 import 已搶先掛了這個
+    // 員編，這裡 ON CONFLICT 會 rowCount=0 → 我們剛建的 crew 就是孤兒，刪掉避免留重複聯絡人。
+    const link = await pool.query(
+      `INSERT INTO crew_employee_ids (crew_id, user_id, employee_id)
+       VALUES ($1, $2, $3) ON CONFLICT (user_id, employee_id) DO NOTHING`,
+      [crewId, userId, sid]
+    );
+    if (!link.rowCount) {
+      await pool.query(`DELETE FROM crew WHERE id = $1`, [crewId]);
+      return false;
+    }
+    return true;
+  }
+  // 沒員編 → 只靠名字；已存在（任意筆）就不重複建
+  const exists = await pool.query(
+    `SELECT 1 FROM crew WHERE user_id = $1 AND display_name = $2 LIMIT 1`,
+    [userId, name]
+  );
+  if (exists.rows.length) return false;
+  const crewId = randomUUID();
+  await pool.query(`INSERT INTO crew (id, user_id, display_name) VALUES ($1, $2, $3)`, [crewId, userId, name]);
+  return true;
 }
 
 /**
@@ -120,10 +213,13 @@ export async function importRoster(
   }
 
   const result: ImportRosterResult = {
-    inserted: 0, updated: 0, skipped_confirmed: 0, marked_removed: 0,
+    inserted: 0, updated: 0, skipped_confirmed: 0, marked_removed: 0, crew_added: 0,
   };
 
   const seenRefs: string[] = [];
+  // V1.3.12：跨整份班表蒐集「要進通訊錄」的組員，去重後再 upsert（一個人會出現在很多班）。
+  // key：員編優先（穩定），沒員編退回 name:名字。
+  const contacts = new Map<string, { staffId?: string; name: string }>();
 
   for (let dutyIdx = 0; dutyIdx < duties.length; dutyIdx++) {
     const duty = duties[dutyIdx];
@@ -143,6 +239,15 @@ export async function importRoster(
       const staUtc = parseUtc(f.arrTimeUtc);
       const position = normalizePosition(f.position || f.workCode);
       const crewJson = extractCrew(f.crew);
+      // V1.3.12：DHD（搭便機 positioning）→ 標 deadhead，照建 entry 但飛時/PIC/night 全不計
+      const isDeadhead = /DHD|DEADHEAD|POSITIONING/i.test((f.position || '') + ' ' + (f.workCode || ''));
+      // V1.3.12：蒐集要進通訊錄的組員（去重）
+      for (const m of (f.crew || [])) {
+        if (!m.name || !isLoggedCrew(m)) continue;
+        const sid = (m.staffId || '').trim();
+        const key = sid ? 'id:' + sid : 'name:' + m.name;
+        if (!contacts.has(key)) contacts.set(key, { staffId: sid || undefined, name: m.name });
+      }
 
       // 查現有
       const existing = await pool.query(
@@ -155,11 +260,11 @@ export async function importRoster(
         await pool.query(
           `INSERT INTO pilot_log_entries
            (id, user_id, source, source_ref, status, flight_date, flight_no, origin, dest,
-            position, std_utc, sta_utc, on_duty_utc, off_duty_utc, crew)
-           VALUES ($1, $2, 'roster', $3, 'draft', $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
+            position, std_utc, sta_utc, on_duty_utc, off_duty_utc, crew, is_deadhead)
+           VALUES ($1, $2, 'roster', $3, 'draft', $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)`,
           [
             randomUUID(), userId, sourceRef, fDate, f.flightNo, f.origin, f.dest,
-            position, stdUtc, staUtc, onDuty, offDuty, crewJson ? JSON.stringify(crewJson) : null,
+            position, stdUtc, staUtc, onDuty, offDuty, crewJson ? JSON.stringify(crewJson) : null, isDeadhead,
           ]
         );
         result.inserted++;
@@ -178,17 +283,26 @@ export async function importRoster(
              on_duty_utc = $9,
              off_duty_utc = $10,
              crew = $11::jsonb,
+             is_deadhead = $12,
              updated_at = NOW()
            WHERE id = $1`,
           [
             existing.rows[0].id, fDate, f.flightNo, f.origin, f.dest,
             position, stdUtc, staUtc, onDuty, offDuty,
-            crewJson ? JSON.stringify(crewJson) : null,
+            crewJson ? JSON.stringify(crewJson) : null, isDeadhead,
           ]
         );
         result.updated++;
       }
     }
+  }
+
+  // V1.3.12：把蒐集到的組員 upsert 進通訊錄（員編優先、純加人不改人）。
+  // 包 try/catch：通訊錄寫失敗不該讓整個班表匯入炸掉。
+  for (const c of contacts.values()) {
+    try {
+      if (await upsertCrewContact(pool, userId, c.staffId, c.name)) result.crew_added = (result.crew_added || 0) + 1;
+    } catch (e) { /* 個別組員寫入失敗略過 */ }
   }
 
   // 範圍內 draft 沒看到的 → roster_removed。
