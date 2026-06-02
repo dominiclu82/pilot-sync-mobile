@@ -51,8 +51,8 @@ import { getSpaPilotLogJs } from '../spa/js-pilot-log.js';
 
 // ── 版本（比照 CrewSync / Morning：每次推版必更新；SW cache 名稱跟著走） ────
 // 本機 preview build 會暫時加 -tNN 後綴方便對版；推正式版前拿掉只留乾淨版號。
-export const PILOT_LOG_VERSION = 'V1.3.27';
-const PILOT_LOG_CACHE = 'pilotlog-v1-3-27';
+export const PILOT_LOG_VERSION = 'V1.3.28';
+const PILOT_LOG_CACHE = 'pilotlog-v1-3-28';
 
 export const pilotLogRouter = express.Router();
 
@@ -335,6 +335,11 @@ if (document.readyState !== 'loading') pilotLogInit();
 function _renderPilotLogChangelog(): string {
   return `
     <div class="pl-cl-v">${PILOT_LOG_VERSION}</div>
+    <div class="pl-cl-txt">
+      <b>修好 Aircraft 全變「no operator」+ Position 下拉新增 SFO / FO。</b><b>(1) Aircraft 分類修正：</b>上一版改成「依公司分組」時，誤用了機尾庫的 operator 欄位 —— 但你那個欄位大多是空的，結果全部掉進「no operator」、根本沒分到公司，抱歉。現在改成<b>跟 Analyze「依公司」同一套：operator 空就用台灣機籍的 tail 範圍推</b>（B-16xxx → EVA Air、B-58xxx → Starlux…），公司就分對了；每架的機型也一樣推得出來。<b>(2) Position 多 SFO / FO：</b>航班的「Position」下拉除了 PIC / SIC / OBSERVER，<b>新增 SFO、FO 可選</b>；兩者都當 SIC 計時數（co-pilot 記 SIC）。<br>
+      <b>Fixed Aircraft all showing "no operator" + added SFO / FO to Position.</b> (1) Last version's "group by company" mistakenly read the registry's operator field, which is mostly empty for you, so everything fell into "no operator" — sorry. It now derives the company the same way Analyze does: when operator is blank, it's inferred from the Taiwan registration ranges (B-16xxx → EVA Air, B-58xxx → Starlux…); type is inferred too. (2) The flight Position dropdown gains SFO and FO (both counted as SIC, since co-pilots log SIC time).
+    </div>
+    <div class="pl-cl-v old">V1.3.27</div>
     <div class="pl-cl-txt">
       <b>資料管理三件套：crew 編輯一致 + Aircraft 列表按公司分類收合 + Aircraft 可編輯。</b><b>(1) 兩個 crew 編輯入口統一：</b>以前在「通訊錄」改聯絡人有 公司 / 註記 可填，但在「航班裡點 ✏️」只給 名字 / 員編 —— 兩邊不一樣。現在<b>航班裡的 ✏️ 也補上 公司 / 註記</b>，跟通訊錄一致。<b>(2) Aircraft 列表改按公司分類 + 預設全收合：</b>以前一打開全部機尾攤開、又是按機型分。現在<b>依公司（operator）分組、預設全部收合</b>，點公司才展開；每架底下標機型。<b>(3) Aircraft 可編輯：</b>以前機尾新增後打錯只能刪掉重建。現在 Aircraft 明細頁右上有 <b>✏️ Edit</b>，可改公司 / 機型 / 廠商 / Model / 備註（機號不可改，要改請刪重建）。<br>
       <b>Data-management trio: consistent crew edit + Aircraft list grouped by company &amp; collapsed + editable Aircraft.</b> (1) The crew ✏️ inside a flight now also has Organization / Comment, matching the Address Book editor. (2) The Aircraft list is now grouped by company (operator) and collapsed by default (tap a company to expand; each tail shows its type). (3) Aircraft are now editable — an ✏️ Edit on the aircraft detail page lets you fix operator / type / make / model / notes (tail # is fixed; delete &amp; re-add to change it).

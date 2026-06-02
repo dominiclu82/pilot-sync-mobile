@@ -1436,13 +1436,15 @@ function _plSetRoleField(id, val) {
   var el = document.getElementById(id);
   if (el && el.dataset.manual !== '1') el.value = val;
 }
+// V1.3.28：SFO / FO 都算 SIC（co-pilot 記 SIC 時數）—— position 下拉新增這兩個可選
+function _plIsSicPos(p) { return p === 'SIC' || p === 'SFO' || p === 'FO'; }
 function _plAutoCalcRole() {
   var pos = _plGetVal('ple-position');
   var blockStr = _plGetVal('ple-block_minutes').trim();      // 直接沿用 block 欄目前值（可能為空）
   // 角色互斥（codex P1）：目前角色 = block、另一個清空；blank / OBSERVER 兩者都清，避免雙重計算。
   // 但手動改過的欄位不覆寫（codex fast P1：自動帶之後改 OOOI 不該把手填的 PIC/SIC 蓋掉）。
   _plSetRoleField('ple-pic_minutes', pos === 'PIC' ? blockStr : '');
-  _plSetRoleField('ple-sic_minutes', pos === 'SIC' ? blockStr : '');
+  _plSetRoleField('ple-sic_minutes', _plIsSicPos(pos) ? blockStr : '');
 }
 function _plAutoCalcLandings() {
   var pf = document.getElementById('ple-pilot_flying');
@@ -1616,7 +1618,7 @@ function _plRenderEditor(target) {
       '<div id="ple-route-row" style="display:' + (_plEntryType(e) === 'sim' ? 'none' : '') + '">' + _plFieldRow(2, _plEditorField('From (' + (_plAptFmtCur() === 'iata' ? 'IATA' : 'ICAO') + ')', 'origin', 'text', { fmt: _plAptFmt }) + _plEditorField('To (' + (_plAptFmtCur() === 'iata' ? 'IATA' : 'ICAO') + ')', 'dest', 'text', { fmt: _plAptFmt })) + '</div>' +
       _plFieldRow(3, _plEditorField('Aircraft Type', 'aircraft_type', 'select', { options: typeOptions }) +
         _plEditorField('Tail #（清單來自 ✈️ Aircraft）', 'tail_no', 'select', { options: tailOptions }) +
-        _plEditorField('Position', 'position', 'select', { options: ['', 'PIC', 'SIC', 'OBSERVER'] })) +
+        _plEditorField('Position', 'position', 'select', { options: ['', 'PIC', 'SIC', 'SFO', 'FO', 'OBSERVER'] })) +
     '</div>' +
 
     // ── Times：Scheduled 一行 / OOOI 一行 / Duty 一行 ──
@@ -2516,6 +2518,21 @@ function _plLookupTypeFullName(typeCode) {
   return '';
 }
 
+// V1.3.28（修 V1.3.27 分組）：機尾 → 公司 / 機型代碼。機尾庫欄位優先；空的用台灣機籍 tail 範圍推
+// （跟 Analyze「依公司」同一套 _plTailLookup）。user 的機尾庫 operator 大多是空的，不推就全部變 no operator。
+function _plAircraftCompany(a) {
+  var op = (a && a.operator ? String(a.operator) : '').trim();
+  if (op) return op;
+  var look = _plTailLookup(a ? a.tail_no : '');
+  return (look && look.operator) ? look.operator : '（未分類 No operator）';
+}
+function _plAircraftTypeLabel(a) {
+  var tc = (a && a.type_code ? String(a.type_code) : '').trim();
+  if (tc) return tc;
+  var look = _plTailLookup(a ? a.tail_no : '');
+  return (look && look.code) ? look.code : '';
+}
+
 function _plRenderAircraftList() {
   var c = document.getElementById('pilotlog-content');
   if (!c) return;
@@ -2536,7 +2553,7 @@ function _plRenderAircraftList() {
     var groups = {}, order = [];
     for (var ai = 0; ai < _pl.aircraft.length; ai++) {
       var a = _pl.aircraft[ai];
-      var op = (a.operator || '').trim() || '（未分類 No operator）';
+      var op = _plAircraftCompany(a);   // V1.3.28：operator 空就用 tail 推公司（不再全部 no operator）
       if (!groups[op]) { groups[op] = []; order.push(op); }
       groups[op].push(a);
     }
@@ -2562,10 +2579,11 @@ function _plRenderAircraftList() {
       for (var ti = 0; ti < list.length; ti++) {
         var ac = list[ti];
         var count = tailCount[ac.tail_no] || 0;
+        var tlbl = _plAircraftTypeLabel(ac);   // V1.3.28：type_code 空就用 tail 推
         rows += '<div onclick="_plOpenAircraftDetail(\'' + _plEsc(ac.tail_no) + '\')" ' +
           'style="background:var(--card);border-radius:8px;padding:9px 12px;margin-bottom:5px;cursor:pointer;display:flex;gap:10px;align-items:center">' +
           '<div style="flex:1;min-width:0"><span style="font-size:.85em;font-weight:700">' + _plEsc(ac.tail_no) + '</span>' +
-          (ac.type_code ? '<span style="font-size:.62em;color:var(--muted)"> · ' + _plEsc(ac.type_code) + '</span>' : '') + '</div>' +
+          (tlbl ? '<span style="font-size:.62em;color:var(--muted)"> · ' + _plEsc(tlbl) + '</span>' : '') + '</div>' +
           '<div style="font-size:.72em;color:var(--text);text-align:right;white-space:nowrap">' + count + ' flights</div>' +
           '</div>';
       }
@@ -3481,7 +3499,7 @@ function _plBreakdownAgg(entries, keyFn) {
     m.block += e.block_minutes || 0;
     m.pic += picMin;
     if (isPicSector) m.picSec++;
-    m.sic += (e.sic_minutes != null) ? e.sic_minutes : (e.position === 'SIC' ? (e.block_minutes || 0) : 0);
+    m.sic += (e.sic_minutes != null) ? e.sic_minutes : (_plIsSicPos(e.position) ? (e.block_minutes || 0) : 0);
     m.night += e.night_minutes || 0;
     m.to += (e.day_takeoffs || 0) + (e.night_takeoffs || 0);
     m.ldg += (e.day_landings || 0) + (e.night_landings || 0);
@@ -3799,7 +3817,7 @@ function _plAggregate(entries, from, to) {
     a.block += e.block_minutes || 0;
     a.night += e.night_minutes || 0;
     if (e.position === 'PIC') a.pic += e.block_minutes || 0;
-    else if (e.position === 'SIC') a.sic += e.block_minutes || 0;
+    else if (_plIsSicPos(e.position)) a.sic += e.block_minutes || 0;
     a.dayLdg += e.day_landings || 0; a.nightLdg += e.night_landings || 0;
     a.dayTO += e.day_takeoffs || 0; a.nightTO += e.night_takeoffs || 0;
   }

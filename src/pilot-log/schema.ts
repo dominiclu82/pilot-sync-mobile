@@ -77,7 +77,7 @@ export async function ensureTables(): Promise<boolean> {
         dest TEXT,
         aircraft_type TEXT,
         tail_no TEXT,
-        position TEXT CHECK (position IN ('PIC','SIC','OBSERVER')),
+        position TEXT CHECK (position IN ('PIC','SIC','SFO','FO','OBSERVER')),
         pilot_flying BOOLEAN,
         std_utc TIMESTAMPTZ,
         sta_utc TIMESTAMPTZ,
@@ -133,6 +133,9 @@ export async function ensureTables(): Promise<boolean> {
     // V1.3.17：source 加 'wader'。inline CHECK 只對新表生效，既有 prod 表用 ALTER 換 constraint。
     await pool.query(`ALTER TABLE pilot_log_entries DROP CONSTRAINT IF EXISTS pilot_log_entries_source_check`).catch(() => {});
     await pool.query(`ALTER TABLE pilot_log_entries ADD CONSTRAINT pilot_log_entries_source_check CHECK (source IN ('roster','logten','manual','wader'))`).catch(() => {});
+    // V1.3.28：position 加 SFO / FO（co-pilot 細分，都當 SIC 計）。inline CHECK 只對新表生效，既有 prod 表用 ALTER 換 constraint。
+    await pool.query(`ALTER TABLE pilot_log_entries DROP CONSTRAINT IF EXISTS pilot_log_entries_position_check`).catch(() => {});
+    await pool.query(`ALTER TABLE pilot_log_entries ADD CONSTRAINT pilot_log_entries_position_check CHECK (position IN ('PIC','SIC','SFO','FO','OBSERVER'))`).catch(() => {});
 
     await pool.query(`
       CREATE TABLE IF NOT EXISTS pilot_aircraft (
