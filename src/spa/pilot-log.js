@@ -1299,10 +1299,8 @@ function _plGcInterp(A, B, f) {
   return [Math.atan2(z, Math.sqrt(x * x + y * y)) * deg, Math.atan2(y, x) * deg];
 }
 
-// 沿大圓取樣，算航路夜航分鐘；null = 無法算（缺座標 / 時間）
-function _plRouteNightMin(origin, dest, offD, onD) {
-  var A = _plApt(origin), B = _plApt(dest);   // V1.3.20：IATA/ICAO 都查得到
-  if (!A || !B || !offD || !onD) return null;
+// 沿大圓取樣，算「空中段」（Off→On）夜航分鐘（float）
+function _plRouteNightMinF(A, B, offD, onD) {
   var ms = onD.getTime() - offD.getTime();
   if (ms <= 0) return 0;
   var totalMin = ms / 60000;
@@ -1312,7 +1310,37 @@ function _plRouteNightMin(origin, dest, offD, onD) {
     var f = i / steps, p = _plGcInterp(A, B, f), t = new Date(offD.getTime() + f * ms);
     if (_plIsNight(p[0], p[1], t)) nights++;
   }
-  return Math.round(totalMin * nights / (steps + 1));
+  return totalMin * nights / (steps + 1);
+}
+// 固定點（滑行時飛機停在機場）取樣夜航分鐘（float）
+function _plPointNightMinF(A, startD, endD) {
+  var ms = endD.getTime() - startD.getTime();
+  if (ms <= 0) return 0;
+  var totalMin = ms / 60000;
+  var steps = Math.max(2, Math.min(60, Math.round(totalMin / 5)));
+  var nights = 0;
+  for (var i = 0; i <= steps; i++) {
+    var t = new Date(startD.getTime() + (i / steps) * ms);
+    if (_plIsNight(A[0], A[1], t)) nights++;
+  }
+  return totalMin * nights / (steps + 1);
+}
+// 空中段 night（Off→On）；保留作為缺 OOOI 時的退路。null = 無法算
+function _plRouteNightMin(origin, dest, offD, onD) {
+  var A = _plApt(origin), B = _plApt(dest);   // V1.3.20：IATA/ICAO 都查得到
+  if (!A || !B || !offD || !onD) return null;
+  return Math.round(_plRouteNightMinF(A, B, offD, onD));
+}
+// V1.3.22：依法規（FAA 14 CFR 1.1 / EASA FCL.050）夜航算 block（Out→In，含滑行）。
+// = 起點滑行（Out→Off，停在起點）+ 空中（Off→On，沿大圓）+ 終點滑行（On→In，停在終點）的夜航和。
+// 缺 Out/In 時自動退化為只算空中段。null = 連空中段都算不出（缺座標 / 缺 Off-On）。
+function _plBlockNightMin(origin, dest, outD, offD, onD, inD) {
+  var A = _plApt(origin), B = _plApt(dest);
+  if (!A || !B || !offD || !onD) return null;       // 至少要有空中段
+  var total = _plRouteNightMinF(A, B, offD, onD);
+  if (outD && outD.getTime() < offD.getTime()) total += _plPointNightMinF(A, outD, offD);  // 起點滑行
+  if (inD && inD.getTime() > onD.getTime())   total += _plPointNightMinF(B, onD, inD);     // 終點滑行
+  return Math.round(total);
 }
 function _plLegDayNight(apt, dt) {
   var A = _plApt(apt); if (!A || !dt) return null;   // V1.3.20：IATA/ICAO 都查得到
@@ -1329,6 +1357,25 @@ function _plEditorOffOn() {
   var offD = new Date(offIso), onD = new Date(onIso);
   if (onD.getTime() < offD.getTime()) onD = new Date(onD.getTime() + 24 * 3600 * 1000);
   return [offD, onD];
+}
+// V1.3.22：組出 OOOI 四個 UTC Date（Out/Off/On/In），單調遞增（每段比前一個非空時間早就 +24h）。
+// 中間某段空 → 該段 null，但仍以「上一個非空時間」當錨保持後續單調。
+function _plEditorOOOI() {
+  var dt = _plGetVal('ple-flight_date');
+  if (!dt) return null;
+  var raw = { out: _plGetVal('ple-out_utc'), off: _plGetVal('ple-off_utc'),
+              on: _plGetVal('ple-on_utc'), inn: _plGetVal('ple-in_utc') };
+  var keys = ['out', 'off', 'on', 'inn'], res = {}, prev = null;
+  for (var i = 0; i < keys.length; i++) {
+    var v = String(raw[keys[i]] || '').trim();
+    if (!v) { res[keys[i]] = null; continue; }
+    var iso = _plMakeUtcIso(dt, v);
+    if (!iso) { res[keys[i]] = null; continue; }
+    var d = new Date(iso);
+    while (prev && d.getTime() < prev.getTime()) d = new Date(d.getTime() + 24 * 3600 * 1000);
+    res[keys[i]] = d; prev = d;
+  }
+  return res;
 }
 
 // ── V1.3.02：智慧編輯器自動計算 ──────────────────────────────────────────────
@@ -1359,15 +1406,16 @@ function _plAutoCalcTimes() {
   else if (offRaw || onRaw) _plSetVal('ple-air_minutes', '');
   _plAutoCalcRole();                              // block 變了 → PIC/SIC 跟著（含清空）
 
-  // V1.3.05：航路 night 分鐘 — 手動改過的不覆寫；座標 / 時間不完整 → 清掉 stale auto（codex P2）
-  var oo = _plEditorOffOn();
+  // V1.3.05/1.3.22：夜航分鐘 — 依法規算 block（Out→In，含滑行），缺 OOOI 退化為空中段。
+  // 手動改過的不覆寫；座標 / 時間不完整 → 清掉 stale auto（codex P2）
+  var q = _plEditorOOOI();
   var origin = (_plGetVal('ple-origin') || '').toUpperCase().trim();
   var dest = (_plGetVal('ple-dest') || '').toUpperCase().trim();
   var nEl = document.getElementById('ple-night_minutes');
   if (nEl && nEl.dataset.manual !== '1') {
-    var nm = (oo && origin && dest) ? _plRouteNightMin(origin, dest, oo[0], oo[1]) : null;
+    var nm = (q && origin && dest) ? _plBlockNightMin(origin, dest, q.out, q.off, q.on, q.inn) : null;
     if (nm != null) nEl.value = _plMinToHHMM(nm);
-    else if (offRaw || onRaw || origin || dest) nEl.value = '';   // 不完整 / 查無座標 → 清舊值；完全空才不碰
+    else if (offRaw || onRaw || outRaw || inRaw || origin || dest) nEl.value = '';   // 不完整 / 查無座標 → 清舊值；完全空才不碰
   }
   // 路線變化時也順手讓 day/night 起降 re-evaluate（解 codex P1：先勾 PF 後填路線的情境）
   _plAutoCalcLandings();

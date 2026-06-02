@@ -51,8 +51,8 @@ import { getSpaPilotLogJs } from '../spa/js-pilot-log.js';
 
 // ── 版本（比照 CrewSync / Morning：每次推版必更新；SW cache 名稱跟著走） ────
 // 本機 preview build 會暫時加 -tNN 後綴方便對版；推正式版前拿掉只留乾淨版號。
-export const PILOT_LOG_VERSION = 'V1.3.21';
-const PILOT_LOG_CACHE = 'pilotlog-v1-3-21';
+export const PILOT_LOG_VERSION = 'V1.3.22';
+const PILOT_LOG_CACHE = 'pilotlog-v1-3-22';
 
 export const pilotLogRouter = express.Router();
 
@@ -335,6 +335,11 @@ if (document.readyState !== 'loading') pilotLogInit();
 function _renderPilotLogChangelog(): string {
   return `
     <div class="pl-cl-v">${PILOT_LOG_VERSION}</div>
+    <div class="pl-cl-txt">
+      <b>夜航時間改用法規標準的 block 算法（Out→In，含滑行）。</b>之前 night 只算「空中段」（起飛→落地），所以你改推離時間（Out）night 不會動。現在依 <b>FAA 14 CFR 1.1 / EASA FCL.050</b> 改成算整段 block：<b>起點滑行（Out→Off）＋ 空中（Off→On）＋ 終點滑行（On→In）</b>，落在夜間的部分都算進去——滑行的夜航終於不再漏。缺 Out / In 時自動退化為只算空中段。<br>
+      <b>Night time now uses the regulatory block-based method (Out→In, incl. taxi).</b> Night was previously airborne-only (takeoff→landing), so changing your out-time didn't move it. Per <b>FAA 14 CFR 1.1 / EASA FCL.050</b>, night is now computed across the whole block: <b>taxi-out (Out→Off) + airborne (Off→On) + taxi-in (On→In)</b>, counting any portion that falls in darkness — taxi night is no longer dropped. Falls back to airborne-only when Out/In are missing.
+    </div>
+    <div class="pl-cl-v old">V1.3.21</div>
     <div class="pl-cl-txt">
       <b>Analyze 可點選鑽取：點公司看各機型 PIC/SIC + 該批航班，點機型看各公司。</b>Analyze 的「依公司」「依機型」每一列現在<b>可以點</b>：點「EVA Air」→ 看它<b>各機型的 PIC / SIC 時數</b>（B777 PIC 多少、B787 PIC 多少…）<b>＋那些航班的列表</b>（再點一筆可開進去看 / 編）；點機型 → 看各公司的 PIC / SIC + 航班。終於能查「我在某公司某機型飛了多少 PIC」。<br>
       <b>Analyze rows are now drill-down.</b> Each row in "By Company" and "By Type" is tappable: tap "EVA Air" → see PIC / SIC hours <b>per type</b> (e.g. B777 PIC, B787 PIC) <b>plus the list of those flights</b> (tap one to open it); tap a type → per-company breakdown + flights. You can finally check "how many PIC hours on this type at this airline".
