@@ -801,8 +801,10 @@ function _plRenderEntryRow(e) {
         '<span style="font-size:1.05em;font-weight:700">' + _plEsc(e.sim_type || 'Simulator') + '</span>' +
         (e.sim_minutes ? '<span style="font-size:.72em;color:var(--muted)">' + _plMinToHHMM(e.sim_minutes) + '</span>' : '') +
       '</div>'
-    : '<div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px">' +
-        '<span style="font-size:1.35em;font-weight:800;letter-spacing:.5px">' + _plEsc(e.origin || '???') + '</span>' +
+    : '<div style="display:flex;justify-content:space-between;align-items:center;gap:10px">' +
+        '<span style="font-size:1.35em;font-weight:800;letter-spacing:.5px">' +
+          (e.is_deadhead ? '<span style="background:#475569;color:#cbd5e1;font-size:.42em;font-weight:800;padding:2px 6px;border-radius:4px;letter-spacing:.5px;vertical-align:middle;margin-right:6px">DHD</span>' : '') +
+          _plEsc(e.origin || '???') + '</span>' +
         '<span style="font-size:1.35em;font-weight:800;letter-spacing:.5px">' + _plEsc(e.dest || '???') + '</span>' +
       '</div>';
 
@@ -1801,27 +1803,31 @@ function _plOpenImport() {
     '<div style="background:rgba(127,29,29,.2);border:1px solid #7f1d1d;border-radius:10px;padding:14px;margin-top:24px">' +
       '<div style="font-size:.85em;font-weight:700;margin-bottom:6px;color:#fca5a5">⚠️ Danger Zone</div>' +
       '<div style="font-size:.7em;color:var(--muted);margin-bottom:8px;line-height:1.5">' +
-        '一鍵砍掉你<b>所有 LogTen 來源</b>的 entries（manual / roster 來源不動、機尾庫不動）。匯入失敗或想完全重來時用。<br>' +
-        'Deletes <b>all LogTen-sourced</b> entries (manual / roster entries and the tail registry are untouched). Use after a botched import or to start over. <strong style="color:#fca5a5">不可復原 / Cannot be undone.</strong>' +
+        '一鍵砍掉某個<b>匯入來源</b>的所有 entries（manual / roster 來源不動、機尾庫不動）。Wader 會連起始累計一起清。<br>' +
+        'Wipes all entries from one import source (manual / roster and the tail registry are untouched; Wader also clears the opening balance). <strong style="color:#fca5a5">不可復原 / Cannot be undone.</strong>' +
       '</div>' +
-      '<button onclick="_plWipeLogten()" style="background:#dc2626;color:#fff;border:0;border-radius:6px;padding:6px 12px;font-size:.78em;font-weight:700;cursor:pointer">🗑️ Wipe all my LogTen entries</button>' +
+      '<div style="display:flex;gap:6px;flex-wrap:wrap">' +
+        '<button onclick="_plWipeSource(\'logten\')" style="background:#dc2626;color:#fff;border:0;border-radius:6px;padding:6px 12px;font-size:.78em;font-weight:700;cursor:pointer">🗑️ Wipe LogTen</button>' +
+        '<button onclick="_plWipeSource(\'wader\')" style="background:#dc2626;color:#fff;border:0;border-radius:6px;padding:6px 12px;font-size:.78em;font-weight:700;cursor:pointer">🗑️ Wipe Wader（含起始累計）</button>' +
+      '</div>' +
     '</div>' +
     '</div>';
 }
 
-async function _plWipeLogten() {
-  // 兩段 confirm
-  if (!window.confirm('真的要砍掉所有 LogTen 來源的 entries 嗎？\n（manual / roster 來源不會動）')) return;
+// V1.3.18：通用 wipe（logten / wader）。Wader 後端會一併清起始累計。
+async function _plWipeSource(source) {
+  var label = source === 'wader' ? 'Wader' : 'LogTen';
+  if (!window.confirm('真的要砍掉所有 ' + label + ' 來源的 entries 嗎？\n（manual / roster 來源不會動' + (source === 'wader' ? '；Wader 的起始累計也會一起清' : '') + '）')) return;
   if (!window.confirm('再確認一次。這個動作不可復原。\n按 OK 才會真的執行。')) return;
 
-  var r = await _plApi('/api/pilot-log/entries?source=logten&confirm=true', { method: 'DELETE' });
+  var r = await _plApi('/api/pilot-log/entries?source=' + encodeURIComponent(source) + '&confirm=true', { method: 'DELETE' });
   if (!r.ok) {
     var err = await r.json().catch(function() { return {}; });
     _plToast('砍除失敗：' + (err.error || r.status), 'error');
     return;
   }
   var j = await r.json();
-  _plToast('已砍除 ' + (j.deleted || 0) + ' 筆 LogTen entries');
+  _plToast('已砍除 ' + (j.deleted || 0) + ' 筆 ' + label + ' entries' + (j.opening_deleted ? '（+ 起始累計 ' + j.opening_deleted + ' 型）' : ''));
   // 清掉 import 介面殘留的結果，並回 main view 讓 list 重新 fetch
   var resBox = document.getElementById('pl-import-result');
   if (resBox) resBox.innerHTML = '';

@@ -51,8 +51,8 @@ import { getSpaPilotLogJs } from '../spa/js-pilot-log.js';
 
 // ── 版本（比照 CrewSync / Morning：每次推版必更新；SW cache 名稱跟著走） ────
 // 本機 preview build 會暫時加 -tNN 後綴方便對版；推正式版前拿掉只留乾淨版號。
-export const PILOT_LOG_VERSION = 'V1.3.17';
-const PILOT_LOG_CACHE = 'pilotlog-v1-3-17';
+export const PILOT_LOG_VERSION = 'V1.3.18';
+const PILOT_LOG_CACHE = 'pilotlog-v1-3-18';
 
 export const pilotLogRouter = express.Router();
 
@@ -335,6 +335,11 @@ if (document.readyState !== 'loading') pilotLogInit();
 function _renderPilotLogChangelog(): string {
   return `
     <div class="pl-cl-v">${PILOT_LOG_VERSION}</div>
+    <div class="pl-cl-txt">
+      <b>Wader 匯入可整批刪除（含起始累計）+ 匯入把本人帶進組員 + deadhead 列表加標示。</b><b>(刪除)</b> Import 頁 Danger Zone 現在 LogTen / Wader <b>各有一顆 Wipe</b>；Wader 的 Wipe 會連<b>起始累計</b>一起清。<b>(組員)</b> Wader 匯入會把你自己也放進組員（你那趟的 PIC/SIC 格，先顯示「SELF」，可到通訊錄改成你的名字）。<b>(標示)</b> deadhead（搭便機）航班在 Logbook 列表加上「<b>DHD</b>」標示，跟模擬機的「SIM」一樣一眼認出。<br>
+      <b>Wader bulk-wipe (incl. opening balance) + import puts you in the crew + DHD badge on deadhead rows.</b> <b>(Wipe)</b> The Import page Danger Zone now has separate Wipe buttons for LogTen / Wader; wiping Wader also clears the opening balance. <b>(Crew)</b> Wader import now includes you in the crew (your PIC/SIC slot, shown as "SELF" for now — rename in the Address Book). <b>(Badge)</b> Deadhead flights get a "DHD" badge in the Logbook list, like the "SIM" badge.
+    </div>
+    <div class="pl-cl-v old">V1.3.17</div>
     <div class="pl-cl-txt">
       <b>新增 Wader logbook CSV 匯入（真實航班 + 模擬機 + 起始累計）。</b>Import 頁多一顆「<b>📄 Wader · CSV</b>」按鈕，把 Wader 匯出的 CSV 帶進來：① <b>真實航班</b>（含 OOOI、PIC/SIC/night 時數、起降、跑道/SID/STAR、組員）② <b>模擬機</b> session（標 SIM、時數另計、不混進飛行時數）③ <b>過往結轉時數</b>做成「起始累計」（算進總時數 + By Type、分機型保留，但不是單筆航班）。Analyze 新增「起始累計」「模擬機」兩區塊。<br>
       <b>Add Wader logbook CSV import (flights + simulator + brought-forward totals).</b> The Import page gains a "📄 Wader · CSV" button: ① real flights (OOOI, PIC/SIC/night times, takeoffs/landings, runway/SID/STAR, crew) ② simulator sessions (flagged SIM, counted separately, not in flight hours) ③ pre-app experience as an opening balance (counts toward total + By Type, kept per type, not individual flights). Analyze gains "Brought Forward" and "Simulator" sections.
@@ -963,21 +968,23 @@ pilotLogRouter.delete('/api/pilot-log/entries/:id', requireAuth, async (req: Aut
   res.json({ deleted: r.rowCount });
 });
 
-// ── Entries: bulk delete by source (escape hatch；目前只開 source=logten） ────
-// DELETE /api/pilot-log/entries?source=logten&confirm=true
+// ── Entries: bulk delete by source (escape hatch) ────────────────────────────
+// DELETE /api/pilot-log/entries?source=logten|wader&confirm=true
 //   - auth 必須登入（自動 scope 到當前 user）
-//   - source 第一版只接受 'logten'（不開 'all' / 'manual' / 'roster'）
+//   - source 開放 'logten' / 'wader'（不開 'all' / 'manual' / 'roster'）
 //   - confirm 必須是 'true'，少傳就 reject
 //   - 不影響 pilot_aircraft 機尾庫
+//   - V1.3.18：source=wader 一併清掉起始累計（pilot_opening_balance），否則結轉時數殘留在總時數
+const _PL_WIPE_SOURCES = ['logten', 'wader'];
 pilotLogRouter.delete('/api/pilot-log/entries', requireAuth, async (req: AuthedRequest, res) => {
   const pool = getPool();
-  if (!pool) return res.status(503).json({ error: 'database_unavailable' });
+  if (!pool || !(await ensureTables())) return res.status(503).json({ error: 'database_unavailable' });
 
   const source = String(req.query.source || '');
   const confirm = String(req.query.confirm || '');
 
-  if (source !== 'logten') {
-    return res.status(400).json({ error: 'invalid_source', allowed: ['logten'] });
+  if (_PL_WIPE_SOURCES.indexOf(source) < 0) {
+    return res.status(400).json({ error: 'invalid_source', allowed: _PL_WIPE_SOURCES });
   }
   if (confirm !== 'true') {
     return res.status(400).json({ error: 'missing_confirm_true' });
@@ -987,7 +994,12 @@ pilotLogRouter.delete('/api/pilot-log/entries', requireAuth, async (req: AuthedR
     `DELETE FROM pilot_log_entries WHERE user_id = $1 AND source = $2`,
     [req.pilotUserId, source]
   );
-  res.json({ deleted: r.rowCount, source });
+  let openingDeleted = 0;
+  if (source === 'wader') {
+    const o = await pool.query(`DELETE FROM pilot_opening_balance WHERE user_id = $1`, [req.pilotUserId]);
+    openingDeleted = o.rowCount || 0;
+  }
+  res.json({ deleted: r.rowCount, source, opening_deleted: openingDeleted });
 });
 
 // ── Imports ──────────────────────────────────────────────────────────────────
@@ -2068,7 +2080,7 @@ async function onCred(resp){
   if(!r.ok){el('msg').innerHTML='<span class="err">登入失敗</span>';return;}
   var j=await r.json(); AD.token=j.accessToken; el('login').style.display='none'; load();
 }
-async function api(path,opt){ opt=opt||{}; opt.headers=opt.headers||{}; opt.headers['Authorization']='Bearer '+AD.token; return fetch(path,opt); }
+async function api(path,opt){ opt=opt||{}; opt.headers=opt.headers||{}; opt.headers['Authorization']='Bearer '+AD.token; var r=await fetch(path,opt); if(r.status===401){ AD.token=null; el('msg').innerHTML='<span class="err">登入已過期，請用下方按鈕重新登入</span>'; el('login').style.display=''; el('panel').style.display='none'; } return r; }
 async function load(){
   el('msg').textContent='查詢中…';
   var r=await api('/api/pilot-log/monkey/admin/list');
@@ -2093,13 +2105,13 @@ function render(j){
 async function addF(){
   var v=(el('fe').value||'').trim(); if(!v)return;
   var r=await api('/api/pilot-log/monkey/admin/friend',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:v})});
-  if(!r.ok){alert('加入失敗');return;} load();
+  if(!r.ok){ if(r.status!==401){ var e=await r.json().catch(function(){return{};}); alert('加入失敗：'+r.status+' '+(e.error||'')); } return; } load();
 }
 async function del(btn){
   var id=btn.getAttribute('data-id'), email=btn.getAttribute('data-email')||'';
   if(!confirm('刪除 '+email+' ？'))return;
   var r=await api('/api/pilot-log/monkey/admin/'+id,{method:'DELETE'});
-  if(!r.ok){alert('刪除失敗');return;} load();
+  if(!r.ok){ if(r.status!==401){ var e=await r.json().catch(function(){return{};}); alert('刪除失敗：'+r.status+' '+(e.error||'')); } return; } load();
 }
 initLogin();
 </script>

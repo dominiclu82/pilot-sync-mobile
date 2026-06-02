@@ -132,14 +132,28 @@ export async function importWader(
       }
       const acType = get(cols, 'aircraftType');
 
-      // 組員：pilotName1~4 去掉 'SELF'/空 → crew2/3/4
+      // 組員：含本人（先放字面 'SELF'，使用者之後自己改名）。
+      // codex P2：只有「真的 PIC」才放 pic 機長格 —— SIC→本人 crew2、同事機長進 pic；
+      // 其他角色（trainer/sim/observer…）不宣稱機長，本人 crew2、同事 crew3/4（避免被誤標 PIC）。
+      const fn0 = get(cols, 'function').toUpperCase();
+      const isPic = fn0.indexOf('PIC') === 0;
+      const isSic = fn0.indexOf('SIC') === 0;
       const crew: Record<string, any> = {};
+      const mkc = (n: string) => ({ name: n, rank: '', eid: '' });
       const others: string[] = [];
+      let hasSelf = false;
       for (const k of ['pilotName1', 'pilotName2', 'pilotName3', 'pilotName4']) {
         const nm = get(cols, k);
-        if (nm && nm.toUpperCase() !== 'SELF') others.push(nm);
+        if (!nm) continue;
+        if (nm.toUpperCase() === 'SELF') hasSelf = true;
+        else others.push(nm);
       }
-      ['crew2', 'crew3', 'crew4'].forEach((slot, i) => { if (others[i]) crew[slot] = { name: others[i], rank: '', eid: '' }; });
+      const selfSlot = isPic ? 'pic' : 'crew2';
+      if (hasSelf) crew[selfSlot] = mkc('SELF');
+      const restSlots = isPic ? ['crew2', 'crew3', 'crew4']
+        : isSic ? ['pic', 'crew3', 'crew4']
+          : ['crew3', 'crew4'];
+      others.forEach((n, i) => { if (restSlots[i]) crew[restSlots[i]] = mkc(n); });
       const crewJson = Object.keys(crew).length ? JSON.stringify(crew) : null;
       const remarks = get(cols, 'remarks') || null;
 
