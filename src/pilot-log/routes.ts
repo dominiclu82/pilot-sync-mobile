@@ -51,8 +51,8 @@ import { getSpaPilotLogJs } from '../spa/js-pilot-log.js';
 
 // ── 版本（比照 CrewSync / Morning：每次推版必更新；SW cache 名稱跟著走） ────
 // 本機 preview build 會暫時加 -tNN 後綴方便對版；推正式版前拿掉只留乾淨版號。
-export const PILOT_LOG_VERSION = 'V1.3.19';
-const PILOT_LOG_CACHE = 'pilotlog-v1-3-19';
+export const PILOT_LOG_VERSION = 'V1.3.20';
+const PILOT_LOG_CACHE = 'pilotlog-v1-3-20';
 
 export const pilotLogRouter = express.Router();
 
@@ -335,6 +335,11 @@ if (document.readyState !== 'loading') pilotLogInit();
 function _renderPilotLogChangelog(): string {
   return `
     <div class="pl-cl-v">${PILOT_LOG_VERSION}</div>
+    <div class="pl-cl-txt">
+      <b>機場碼 IATA / ICAO 自選顯示 + 修好班表航班的 night time 自動計算。</b><b>(顯示)</b> Logbook 工具列加 <b>🌐 切換鈕</b>，機場碼可選 ICAO（預設）或 IATA 顯示，列表與編輯器一致；班表帶 IATA、LogTen 帶 ICAO 不再混亂。<b>(Night)</b> 以前班表航班用 IATA 碼（TPE/LAX）查不到座標、night 一直空白；現在 IATA / ICAO 都查得到座標，而且<b>開啟編輯器就自動補算 night</b>（不用手動碰欄位）。<br>
+      <b>IATA / ICAO airport-code display toggle + fixed night-time auto-calc for roster flights.</b> <b>(Display)</b> A 🌐 toggle in the Logbook toolbar switches airport codes between ICAO (default) and IATA, consistent across the list and editor — no more mixed IATA/ICAO from different sources. <b>(Night)</b> Roster flights using IATA codes (TPE/LAX) previously couldn't resolve coordinates so night stayed blank; now both IATA and ICAO resolve, and night auto-computes when you open the editor.
+    </div>
+    <div class="pl-cl-v old">V1.3.19</div>
     <div class="pl-cl-txt">
       <b>匯入頁先選來源 logbook + 編輯器加「類型」下拉（Flight / DHD / SIM）。</b><b>(匯入)</b> Import 頁最上面多了「來源 logbook」下拉：選 <b>LogTen Pro</b> 顯示它的匯入選項、選 <b>Wader</b> 顯示 Wader CSV；<b>📅 Roster 班表獨立、不在此選單</b>。會記住上次選的。<b>(類型)</b> 航班編輯器 FLIGHT 區加「類型」下拉，預設 Flight，可改成 <b>DHD</b>（搭便機，不算 PIC/SIC 與起降）或 <b>SIM</b>（模擬機：露出 sim type + 時數欄、收起航線/OOOI）。取代原本的 Deadhead 勾選框，<b>現在可在編輯器直接建立 / 編輯模擬機紀錄</b>。<br>
       <b>Import starts with "select your source logbook" + the editor gets a "Type" dropdown (Flight / DHD / SIM).</b> <b>(Import)</b> A source dropdown at the top of Import: LogTen Pro shows its imports, Wader shows the Wader CSV; Roster is independent. Remembers your last choice. <b>(Type)</b> The flight editor's FLIGHT section gets a Type dropdown — default Flight, switch to DHD (deadhead) or SIM (simulator: shows sim type + time, hides route/OOOI). Replaces the old Deadhead checkbox; you can now create/edit simulator entries directly in the editor.
