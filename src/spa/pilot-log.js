@@ -1469,16 +1469,27 @@ function _plRenderEditor(target) {
     // ── Flight：Date+Flight# / From+To / Type+Tail+Position ──
     '<div style="background:var(--card);border-radius:10px;padding:12px">' +
       '<div style="font-size:.7em;font-weight:700;color:var(--muted);text-transform:uppercase;margin-bottom:8px">Flight</div>' +
+      // V1.3.19：類型下拉（取代原本的 Deadhead 勾選框）— Flight / DHD / SIM
+      '<div style="margin-bottom:8px">' +
+        '<div style="font-size:.62em;color:var(--muted);margin-bottom:3px">類型 / Type</div>' +
+        '<select id="ple-entry-type" onchange="_plEntryTypeChange()" style="width:100%;background:var(--bg,#0a0e1a);color:var(--text);border:1px solid var(--border,#334155);border-radius:6px;padding:8px 10px;font-size:.85em">' +
+          '<option value="flight"' + (_plEntryType(e) === 'flight' ? ' selected' : '') + '>✈️ Flight 一般航班</option>' +
+          '<option value="dhd"' + (_plEntryType(e) === 'dhd' ? ' selected' : '') + '>🧳 DHD 搭便機（乘客 — 不算 PIC/SIC 與起降）</option>' +
+          '<option value="sim"' + (_plEntryType(e) === 'sim' ? ' selected' : '') + '>🖥️ SIM 模擬機</option>' +
+        '</select>' +
+      '</div>' +
+      '<div id="ple-sim-fields" style="display:' + (_plEntryType(e) === 'sim' ? 'block' : 'none') + ';margin-bottom:8px">' +
+        _plFieldRow(2, _plEditorField('Sim Type（FFS/FTD）', 'sim_type', 'text') + _plEditorField('Sim Time', 'sim_minutes', 'hhmm-dur')) +
+      '</div>' +
       _plFieldRow(2, _plEditorField('Date', 'flight_date', 'date') + _plEditorField('Flight #', 'flight_no', 'text')) +
-      _plFieldRow(2, _plEditorField('From (ICAO)', 'origin', 'text') + _plEditorField('To (ICAO)', 'dest', 'text')) +
+      '<div id="ple-route-row" style="display:' + (_plEntryType(e) === 'sim' ? 'none' : '') + '">' + _plFieldRow(2, _plEditorField('From (ICAO)', 'origin', 'text') + _plEditorField('To (ICAO)', 'dest', 'text')) + '</div>' +
       _plFieldRow(3, _plEditorField('Aircraft Type', 'aircraft_type', 'select', { options: typeOptions }) +
         _plEditorField('Tail #（清單來自 ✈️ Aircraft）', 'tail_no', 'select', { options: tailOptions }) +
         _plEditorField('Position', 'position', 'select', { options: ['', 'PIC', 'SIC', 'OBSERVER'] })) +
-      _plEditorField('Deadhead', 'is_deadhead', 'check', { checkLabel: 'Deadhead / positioning（我是乘客、非操作 — 不算 PIC/SIC 與起降）' }) +
     '</div>' +
 
     // ── Times：Scheduled 一行 / OOOI 一行 / Duty 一行 ──
-    '<div style="margin-top:12px;background:var(--card);border-radius:10px;padding:12px">' +
+    '<div id="ple-times-sec" style="display:' + (_plEntryType(e) === 'sim' ? 'none' : 'block') + ';margin-top:12px;background:var(--card);border-radius:10px;padding:12px">' +
       '<div style="font-size:.7em;font-weight:700;color:var(--muted);text-transform:uppercase;margin-bottom:2px">Times (UTC HHMM)</div>' +
       _plFieldSub('Scheduled') +
       _plFieldRow(2, _plEditorField('Sched Out', 'std_utc', 'time-utc') + _plEditorField('Sched In', 'sta_utc', 'time-utc')) +
@@ -1546,9 +1557,25 @@ function _plReadField(name, type) {
 }
 
 // V1.3.08：LogTen 模型 — Save 就是 Save，沒有 Confirm 步驟。是否「飛了」用 flight_date 隱含判斷。
+// V1.3.19：entry 類型（flight/dhd/sim）。下拉切換時 show/hide sim 欄 + 收/展航線與 Times。
+function _plEntryType(e) { return (e && e.is_sim) ? 'sim' : ((e && e.is_deadhead) ? 'dhd' : 'flight'); }
+function _plEntryTypeChange() {
+  var v = (document.getElementById('ple-entry-type') || {}).value || 'flight';
+  var sf = document.getElementById('ple-sim-fields');
+  var route = document.getElementById('ple-route-row');
+  var times = document.getElementById('ple-times-sec');
+  if (sf) sf.style.display = (v === 'sim') ? 'block' : 'none';
+  if (route) route.style.display = (v === 'sim') ? 'none' : '';
+  if (times) times.style.display = (v === 'sim') ? 'none' : '';
+}
+
 async function _plSaveEntry() {
   var e = _pl.editing;
   if (!e) return;
+
+  // V1.3.19：類型下拉決定 flight / dhd / sim
+  var _etype = (document.getElementById('ple-entry-type') || {}).value || 'flight';
+  var _isSim = _etype === 'sim';
 
   var body = {
     flight_date: _plReadField('flight_date'),
@@ -1572,7 +1599,10 @@ async function _plSaveEntry() {
     night_minutes: _plReadField('night_minutes', 'hhmm-dur'),
     pic_minutes: _plReadField('pic_minutes', 'hhmm-dur'),
     sic_minutes: _plReadField('sic_minutes', 'hhmm-dur'),
-    is_deadhead: !!_plReadField('is_deadhead'),
+    is_deadhead: _etype === 'dhd',
+    is_sim: _isSim,
+    sim_type: _isSim ? (_plReadField('sim_type') || null) : null,
+    sim_minutes: _isSim ? _plReadField('sim_minutes', 'hhmm-dur') : null,
     total_duty_minutes: _plReadField('total_duty_minutes', 'hhmm-dur'),
     distance_nm: _plReadField('distance_nm', 'number'),
     day_takeoffs: _plReadField('day_takeoffs', 'number') || 0,
@@ -1585,6 +1615,13 @@ async function _plSaveEntry() {
     star: _plReadField('star'),
     remarks: _plReadField('remarks'),
   };
+
+  // V1.3.19：SIM 沒有航線 / OOOI → 即使隱藏欄位有殘值也清空
+  if (_isSim) {
+    body.origin = null; body.dest = null;
+    body.std_utc = null; body.sta_utc = null;
+    body.out_utc = null; body.off_utc = null; body.on_utc = null; body.in_utc = null;
+  }
 
   // V1.3.12：6 槽，每槽存 {name, rank, eid}。員編優先用 hidden（roster 帶的/原本的），
   // 名字若對得到通訊錄唯一同名聯絡人就用那個員編（手動選了已知聯絡人 → 自動連結）。
@@ -1726,7 +1763,15 @@ function _plOpenImport() {
       '<button onclick="_plRenderMain()" style="background:transparent;border:0;color:var(--text);font-size:1.2em;cursor:pointer">←</button>' +
       '<div style="font-size:1em;font-weight:700">Import 匯入</div>' +
     '</div>' +
-    '<div style="background:var(--card);border-radius:10px;padding:14px;margin-bottom:12px">' +
+    // V1.3.19：先選來源 logbook（Roster 班表獨立、不在此選）
+    '<div style="background:var(--card);border-radius:10px;padding:12px 14px;margin-bottom:12px">' +
+      '<div style="font-size:.78em;color:var(--muted);margin-bottom:6px">先選來源 logbook / Source logbook（📅 Roster 班表是獨立的、不在此選單）</div>' +
+      '<select id="pl-import-source" onchange="_plSwitchImportSource()" style="width:100%;background:var(--bg,#0a0e1a);color:var(--text);border:1px solid var(--border,#334155);border-radius:6px;padding:8px 10px;font-size:.85em">' +
+        '<option value="logten">LogTen Pro</option>' +
+        '<option value="wader">Wader</option>' +
+      '</select>' +
+    '</div>' +
+    '<div class="pl-imp-logten" style="background:var(--card);border-radius:10px;padding:14px;margin-bottom:12px">' +
       '<div style="font-size:.85em;font-weight:700;margin-bottom:6px">✈️ Flights · Tab 動態匯出 / Dynamic Export</div>' +
       '<div style="font-size:.7em;color:var(--muted);margin-bottom:8px;line-height:1.5">' +
         'LogTen Pro 6 → File → Export → Dynamic Export Flights (Tab)。<br>' +
@@ -1740,8 +1785,8 @@ function _plOpenImport() {
       '</div>' +
       '<div style="font-size:.65em;color:var(--muted);margin-top:6px">建議先 Preview 確認每筆都解析正常，再按 Import。<br>Run Preview first to confirm every row parses, then Import.</div>' +
     '</div>' +
-    // V1.3.17：Wader logbook CSV 匯入（真實航班 / 模擬機 / 起始累計）。未來會升級成「先選來源 logbook」。
-    '<div style="background:var(--card);border-radius:10px;padding:14px;margin-bottom:12px">' +
+    // V1.3.19：Wader 來源（選了 Wader 才顯示）
+    '<div class="pl-imp-wader" style="background:var(--card);border-radius:10px;padding:14px;margin-bottom:12px;display:none">' +
       '<div style="font-size:.85em;font-weight:700;margin-bottom:6px">📄 Wader · CSV 匯出 / export</div>' +
       '<div style="font-size:.7em;color:var(--muted);margin-bottom:8px;line-height:1.5">' +
         'Wader logbook → 匯出 CSV。真實航班、模擬機、過往結轉時數（起始累計）都會帶進來。<br>' +
@@ -1764,7 +1809,7 @@ function _plOpenImport() {
       '<button onclick="_plRosterListMonths()" style="background:#10b981;color:#fff;border:0;border-radius:6px;padding:6px 12px;font-size:.78em;font-weight:700;cursor:pointer">📅 列出可匯入月份 / List months</button>' +
       '<div id="pl-roster-months" style="margin-top:10px"></div>' +
     '</div>' +
-    '<div style="background:var(--card);border-radius:10px;padding:14px;margin-bottom:12px">' +
+    '<div class="pl-imp-logten" style="background:var(--card);border-radius:10px;padding:14px;margin-bottom:12px">' +
       '<div style="font-size:.85em;font-weight:700;margin-bottom:6px">🛩️ Aircraft · 機尾庫 / Tail registry（LogTen Aircraft）</div>' +
       '<div style="font-size:.7em;color:var(--muted);margin-bottom:8px;line-height:1.5">' +
         '⚠️ 是 LogTen 的 <b>Aircraft</b> export（每筆有機號），<b>不是 Aircraft Types</b>。<br>' +
@@ -1776,7 +1821,7 @@ function _plOpenImport() {
       '<input type="file" id="pl-aircraft-file" accept=".txt,.tab,.tsv,text/plain" style="font-size:.78em">' +
       '<button onclick="_plUploadAircraft()" style="margin-left:8px;background:#6366f1;color:#fff;border:0;border-radius:6px;padding:6px 12px;font-size:.78em;font-weight:700;cursor:pointer">Upload</button>' +
     '</div>' +
-    '<div style="background:var(--card);border-radius:10px;padding:14px;margin-bottom:12px">' +
+    '<div class="pl-imp-logten" style="background:var(--card);border-radius:10px;padding:14px;margin-bottom:12px">' +
       '<div style="font-size:.85em;font-weight:700;margin-bottom:6px">🧭 Aircraft Types · 機型目錄 / Type catalog（LogTen Aircraft Types）</div>' +
       '<div style="font-size:.7em;color:var(--muted);margin-bottom:8px;line-height:1.5">' +
         '⚠️ 是 LogTen 的 <b>Aircraft Types</b> export（type 為主、無機號），<b>跟上面 Aircraft 不同檔</b>。<br>' +
@@ -1788,7 +1833,7 @@ function _plOpenImport() {
       '<input type="file" id="pl-aircraft-types-file" accept=".txt,.tab,.tsv,text/plain" style="font-size:.78em">' +
       '<button onclick="_plUploadAircraftTypes()" style="margin-left:8px;background:#6366f1;color:#fff;border:0;border-radius:6px;padding:6px 12px;font-size:.78em;font-weight:700;cursor:pointer">Upload</button>' +
     '</div>' +
-    '<div style="background:var(--card);border-radius:10px;padding:14px">' +
+    '<div class="pl-imp-logten" style="background:var(--card);border-radius:10px;padding:14px;margin-bottom:12px">' +
       '<div style="font-size:.85em;font-weight:700;margin-bottom:6px">👥 Address Book · Tab 匯出 / export（選用 optional）</div>' +
       '<div style="font-size:.7em;color:var(--muted);margin-bottom:8px;line-height:1.5">' +
         'LogTen Pro → File → Export → Address Book Tab。匯入 crew 名單（含 pilots 與 cabin crew）供日後篩選 / 查同事飛過的航班。<br>' +
@@ -1812,6 +1857,20 @@ function _plOpenImport() {
       '</div>' +
     '</div>' +
     '</div>';
+  // V1.3.19：套用來源選擇（預設 logten；記住上次選的）
+  try { var _sv = localStorage.getItem('pilotlog_import_src'); var _sel = document.getElementById('pl-import-source'); if (_sv && _sel) _sel.value = _sv; } catch (e) {}
+  _plSwitchImportSource();
+}
+
+// V1.3.19：切換匯入來源（LogTen / Wader）→ 顯示對應卡片；Roster 沒標 class，永遠獨立顯示
+function _plSwitchImportSource() {
+  var sel = document.getElementById('pl-import-source');
+  var v = sel ? (sel.value || 'logten') : 'logten';
+  try { localStorage.setItem('pilotlog_import_src', v); } catch (e) {}
+  var lt = document.querySelectorAll('.pl-imp-logten');
+  var wd = document.querySelectorAll('.pl-imp-wader');
+  for (var i = 0; i < lt.length; i++) lt[i].style.display = (v === 'logten') ? '' : 'none';
+  for (var j = 0; j < wd.length; j++) wd[j].style.display = (v === 'wader') ? '' : 'none';
 }
 
 // V1.3.18：通用 wipe（logten / wader）。Wader 後端會一併清起始累計。

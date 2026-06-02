@@ -51,8 +51,8 @@ import { getSpaPilotLogJs } from '../spa/js-pilot-log.js';
 
 // ── 版本（比照 CrewSync / Morning：每次推版必更新；SW cache 名稱跟著走） ────
 // 本機 preview build 會暫時加 -tNN 後綴方便對版；推正式版前拿掉只留乾淨版號。
-export const PILOT_LOG_VERSION = 'V1.3.18';
-const PILOT_LOG_CACHE = 'pilotlog-v1-3-18';
+export const PILOT_LOG_VERSION = 'V1.3.19';
+const PILOT_LOG_CACHE = 'pilotlog-v1-3-19';
 
 export const pilotLogRouter = express.Router();
 
@@ -335,6 +335,11 @@ if (document.readyState !== 'loading') pilotLogInit();
 function _renderPilotLogChangelog(): string {
   return `
     <div class="pl-cl-v">${PILOT_LOG_VERSION}</div>
+    <div class="pl-cl-txt">
+      <b>匯入頁先選來源 logbook + 編輯器加「類型」下拉（Flight / DHD / SIM）。</b><b>(匯入)</b> Import 頁最上面多了「來源 logbook」下拉：選 <b>LogTen Pro</b> 顯示它的匯入選項、選 <b>Wader</b> 顯示 Wader CSV；<b>📅 Roster 班表獨立、不在此選單</b>。會記住上次選的。<b>(類型)</b> 航班編輯器 FLIGHT 區加「類型」下拉，預設 Flight，可改成 <b>DHD</b>（搭便機，不算 PIC/SIC 與起降）或 <b>SIM</b>（模擬機：露出 sim type + 時數欄、收起航線/OOOI）。取代原本的 Deadhead 勾選框，<b>現在可在編輯器直接建立 / 編輯模擬機紀錄</b>。<br>
+      <b>Import starts with "select your source logbook" + the editor gets a "Type" dropdown (Flight / DHD / SIM).</b> <b>(Import)</b> A source dropdown at the top of Import: LogTen Pro shows its imports, Wader shows the Wader CSV; Roster is independent. Remembers your last choice. <b>(Type)</b> The flight editor's FLIGHT section gets a Type dropdown — default Flight, switch to DHD (deadhead) or SIM (simulator: shows sim type + time, hides route/OOOI). Replaces the old Deadhead checkbox; you can now create/edit simulator entries directly in the editor.
+    </div>
+    <div class="pl-cl-v old">V1.3.18</div>
     <div class="pl-cl-txt">
       <b>Wader 匯入可整批刪除（含起始累計）+ 匯入把本人帶進組員 + deadhead 列表加標示。</b><b>(刪除)</b> Import 頁 Danger Zone 現在 LogTen / Wader <b>各有一顆 Wipe</b>；Wader 的 Wipe 會連<b>起始累計</b>一起清。<b>(組員)</b> Wader 匯入會把你自己也放進組員（你那趟的 PIC/SIC 格，先顯示「SELF」，可到通訊錄改成你的名字）。<b>(標示)</b> deadhead（搭便機）航班在 Logbook 列表加上「<b>DHD</b>」標示，跟模擬機的「SIM」一樣一眼認出。<br>
       <b>Wader bulk-wipe (incl. opening balance) + import puts you in the crew + DHD badge on deadhead rows.</b> <b>(Wipe)</b> The Import page Danger Zone now has separate Wipe buttons for LogTen / Wader; wiping Wader also clears the opening balance. <b>(Crew)</b> Wader import now includes you in the crew (your PIC/SIC slot, shown as "SELF" for now — rename in the Address Book). <b>(Badge)</b> Deadhead flights get a "DHD" badge in the Logbook list, like the "SIM" badge.
@@ -839,6 +844,7 @@ const EDITABLE_FIELDS = [
   'block_minutes', 'air_minutes', 'night_minutes', 'distance_nm',
   'pic_minutes', 'sic_minutes',                    // V1.2.04：實際 PIC/SIC 時數（可手動編輯）
   'is_deadhead',                                   // V1.2.05：deadhead/positioning（手動標）
+  'is_sim', 'sim_type', 'sim_minutes',             // V1.3.19：模擬機（編輯器類型下拉 Flight/SIM/DHD）
   'is_locked',                                     // V1.3.08：上鎖（LogTen 風格防誤改；鎖了不能編輯/刪除）
   'on_duty_utc', 'off_duty_utc', 'total_duty_minutes',
   'crew', 'approaches',
