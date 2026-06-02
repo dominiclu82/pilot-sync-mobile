@@ -1888,43 +1888,139 @@ async function _plDeleteEntry() {
 }
 
 // === SECTION: import ════════════════════════════════════════════════════════
+// V1.3.25：Import 改成左側直欄三分頁（📅 班表 / 📥 Logbook / 🗑️ Wipe）+ 右側內容，
+// 不再一次疊六張卡。Logbook 進去再子選 LogTen（4 格）/ Wader（1 格）；Wipe 用勾選類別。
 function _plOpenImport() {
   var c = document.getElementById('pilotlog-content');
   if (!c) return;
   c.innerHTML =
-    '<div style="padding:20px;max-width:600px;margin:0 auto">' +
-    '<div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">' +
+    '<style>' +
+      '.pl-imp-wrap{display:flex;gap:14px;max-width:780px;margin:0 auto;padding:0 20px 24px}' +
+      '.pl-imp-nav{display:flex;flex-direction:column;gap:6px;flex:0 0 124px}' +
+      '.pl-imp-nav button{text-align:left;background:var(--card);border:1px solid var(--border,#334155);border-radius:10px;padding:11px 12px;font-size:.8em;font-weight:700;color:var(--text);cursor:pointer;line-height:1.35}' +
+      '.pl-imp-nav button.active{background:#10b981;color:#fff;border-color:#10b981}' +
+      '.pl-imp-pane{flex:1;min-width:0}' +
+      '.pl-imp-card{background:var(--card);border-radius:10px;padding:14px;margin-bottom:12px}' +
+      '.pl-src-btn{flex:1;background:var(--bg,#0a0e1a);border:1px solid var(--border,#334155);border-radius:8px;padding:9px;font-size:.82em;font-weight:700;color:var(--text);cursor:pointer}' +
+      '.pl-src-btn.active{background:#6366f1;color:#fff;border-color:#6366f1}' +
+      '@media(max-width:640px){.pl-imp-wrap{flex-direction:column;padding:0 14px 18px;gap:10px}.pl-imp-nav{flex-direction:row;flex:none}.pl-imp-nav button{flex:1;text-align:center;padding:9px 4px;font-size:.72em}}' +
+    '</style>' +
+    '<div style="display:flex;align-items:center;gap:10px;padding:16px 20px 14px;max-width:780px;margin:0 auto">' +
       '<button onclick="_plRenderMain()" style="background:transparent;border:0;color:var(--text);font-size:1.2em;cursor:pointer">←</button>' +
       '<div style="font-size:1em;font-weight:700">Import 匯入</div>' +
     '</div>' +
-    // V1.3.19：先選來源 logbook（Roster 班表獨立、不在此選）
-    '<div style="background:var(--card);border-radius:10px;padding:12px 14px;margin-bottom:12px">' +
-      '<div style="font-size:.78em;color:var(--muted);margin-bottom:6px">先選來源 logbook / Source logbook（📅 Roster 班表是獨立的、不在此選單）</div>' +
-      '<select id="pl-import-source" onchange="_plSwitchImportSource()" style="width:100%;background:var(--bg,#0a0e1a);color:var(--text);border:1px solid var(--border,#334155);border-radius:6px;padding:8px 10px;font-size:.85em">' +
-        '<option value="logten">LogTen Pro</option>' +
-        '<option value="wader">Wader</option>' +
-      '</select>' +
+    '<div class="pl-imp-wrap">' +
+      '<div class="pl-imp-nav">' +
+        '<button id="pl-imp-nav-roster" onclick="_plImportTab(\'roster\')">📅 班表<br>Roster</button>' +
+        '<button id="pl-imp-nav-logbook" onclick="_plImportTab(\'logbook\')">📥 Logbook<br>來源</button>' +
+        '<button id="pl-imp-nav-wipe" onclick="_plImportTab(\'wipe\')">🗑️ Wipe<br>清除</button>' +
+      '</div>' +
+      '<div class="pl-imp-pane" id="pl-imp-pane"></div>' +
+    '</div>';
+  var saved = 'roster';
+  try { saved = localStorage.getItem('pilotlog_import_tab') || 'roster'; } catch (e) {}
+  _plImportTab(saved);
+}
+
+function _plImportTab(tab) {
+  if (['roster', 'logbook', 'wipe'].indexOf(tab) < 0) tab = 'roster';
+  try { localStorage.setItem('pilotlog_import_tab', tab); } catch (e) {}
+  ['roster', 'logbook', 'wipe'].forEach(function(t) {
+    var b = document.getElementById('pl-imp-nav-' + t);
+    if (b) b.className = (t === tab) ? 'active' : '';
+  });
+  var pane = document.getElementById('pl-imp-pane');
+  if (!pane) return;
+  if (tab === 'roster') pane.innerHTML = _plImportPaneRoster();
+  else if (tab === 'logbook') { pane.innerHTML = _plImportPaneLogbook(); _plImportLogbookSrc(_plImportSavedSrc()); }
+  else pane.innerHTML = _plImportPaneWipe();
+}
+
+// ① 班表 Roster pane
+function _plImportPaneRoster() {
+  return '<div class="pl-imp-card">' +
+      '<div style="font-size:.85em;font-weight:700;margin-bottom:6px">📅 Roster · 從 CrewSync 帶班表（不用上傳檔）</div>' +
+      '<div style="font-size:.7em;color:var(--muted);margin-bottom:8px;line-height:1.5">' +
+        'CrewSync 同步過的班表<b>直接帶進來</b>，先是<b>未完成（藍）</b>，飛完補上實際時間（In）就自動變<b>已完成（綠）</b>。按下面先<b>列出可匯入的月份</b>，勾選你要的再匯入。<br>' +
+        'Pulls the roster CrewSync has synced — they arrive as <b>open (blue)</b> and turn <b>done (green)</b> once you log the actual in-time after flying.<br>' +
+        '<b>用前提示：</b>先去 CrewSync 用<b>同一個 Google 帳號</b>同步當月（與想要的其他月份），再回來。' +
+      '</div>' +
+      '<button onclick="_plRosterListMonths()" style="background:#10b981;color:#fff;border:0;border-radius:6px;padding:6px 12px;font-size:.78em;font-weight:700;cursor:pointer">📅 列出可匯入月份 / List months</button>' +
+      '<div id="pl-roster-months" style="margin-top:10px"></div>' +
+    '</div>';
+}
+
+// ② Logbook pane：來源子選 + 內容容器 + 結果框
+function _plImportSavedSrc() { try { return localStorage.getItem('pilotlog_import_src') || 'logten'; } catch (e) { return 'logten'; } }
+function _plImportPaneLogbook() {
+  return '<div class="pl-imp-card" style="padding:12px 14px">' +
+      '<div style="font-size:.78em;color:var(--muted);margin-bottom:6px">來源 logbook / Source</div>' +
+      '<div style="display:flex;gap:6px">' +
+        '<button id="pl-src-logten" class="pl-src-btn" onclick="_plImportLogbookSrc(\'logten\')">LogTen Pro</button>' +
+        '<button id="pl-src-wader" class="pl-src-btn" onclick="_plImportLogbookSrc(\'wader\')">Wader</button>' +
+      '</div>' +
     '</div>' +
-    '<div class="pl-imp-logten" style="background:var(--card);border-radius:10px;padding:14px;margin-bottom:12px">' +
+    '<div id="pl-imp-src-content"></div>' +
+    '<div id="pl-import-result" style="margin-top:14px"></div>';
+}
+function _plImportLogbookSrc(src) {
+  src = (src === 'wader') ? 'wader' : 'logten';
+  try { localStorage.setItem('pilotlog_import_src', src); } catch (e) {}
+  var lt = document.getElementById('pl-src-logten'), wd = document.getElementById('pl-src-wader');
+  if (lt) lt.className = 'pl-src-btn' + (src === 'logten' ? ' active' : '');
+  if (wd) wd.className = 'pl-src-btn' + (src === 'wader' ? ' active' : '');
+  var box = document.getElementById('pl-imp-src-content');
+  if (box) box.innerHTML = (src === 'logten') ? _plImportCardsLogTen() : _plImportCardWader();
+}
+
+// LogTen 四格：Flights / Aircraft / Aircraft Types / Address Book
+function _plImportCardsLogTen() {
+  return '<div class="pl-imp-card">' +
       '<div style="font-size:.85em;font-weight:700;margin-bottom:6px">✈️ Flights · Tab 動態匯出 / Dynamic Export</div>' +
       '<div style="font-size:.7em;color:var(--muted);margin-bottom:8px;line-height:1.5">' +
         'LogTen Pro 6 → File → Export → Dynamic Export Flights (Tab)。<br>' +
-        '必填欄位 / Required：Date / Flight # / From / To / Aircraft Type / Aircraft ID / Out / In。<br>' +
-        '選填 / Optional：On Duty / Off Duty / PIC/P1 / SIC/P2（沒有也能匯入）。' +
+        '必填 / Required：Date / Flight # / From / To / Aircraft Type / Aircraft ID / Out / In。' +
       '</div>' +
       '<input type="file" id="pl-flights-file" accept=".txt,.tab,.tsv,text/plain" style="font-size:.78em">' +
       '<label style="display:flex;align-items:flex-start;gap:7px;margin-top:10px;font-size:.7em;color:var(--text);cursor:pointer;line-height:1.45">' +
         '<input type="checkbox" id="pl-flights-overwrite-crew" style="margin-top:2px;flex:0 0 auto">' +
-        '<span><b>覆蓋現有航班的組員</b>（補回 FO 等）· 已存在的航班預設會跳過保護你的編輯；勾這個，就<b>連已完成的航班也用檔案重填組員＋PIC/SIC 時數</b>（其他欄位不動）。第一次修好 FO 後勾一次補舊資料即可。<br><span style="color:var(--muted)">Overwrite crew on existing flights — re-fills crew + PIC/SIC time from the file even on done flights (other fields untouched).</span></span>' +
+        '<span><b>覆蓋現有航班的組員</b>（補回 FO 等）· 已存在的航班預設跳過保護你的編輯；勾這個就<b>連已完成的航班也用檔案重填組員＋PIC/SIC 時數</b>（其他欄位不動）。第一次修好 FO 後勾一次補舊資料即可。</span>' +
       '</label>' +
       '<div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap">' +
         '<button onclick="_plUploadFlights(true)" style="background:#475569;color:#fff;border:0;border-radius:6px;padding:6px 12px;font-size:.78em;font-weight:700;cursor:pointer">🔍 Preview (dry-run)</button>' +
         '<button onclick="_plUploadFlights(false)" style="background:#10b981;color:#fff;border:0;border-radius:6px;padding:6px 12px;font-size:.78em;font-weight:700;cursor:pointer">Import</button>' +
       '</div>' +
-      '<div style="font-size:.65em;color:var(--muted);margin-top:6px">建議先 Preview 確認每筆都解析正常，再按 Import。<br>Run Preview first to confirm every row parses, then Import.</div>' +
+      '<div style="font-size:.65em;color:var(--muted);margin-top:6px">建議先 Preview 確認解析正常再 Import。</div>' +
     '</div>' +
-    // V1.3.19：Wader 來源（選了 Wader 才顯示）
-    '<div class="pl-imp-wader" style="background:var(--card);border-radius:10px;padding:14px;margin-bottom:12px;display:none">' +
+    '<div class="pl-imp-card">' +
+      '<div style="font-size:.85em;font-weight:700;margin-bottom:6px">🛩️ Aircraft · 機尾庫 / Tail registry</div>' +
+      '<div style="font-size:.7em;color:var(--muted);margin-bottom:8px;line-height:1.5">' +
+        '⚠️ LogTen 的 <b>Aircraft</b> export（每筆有機號），<b>不是 Aircraft Types</b>。建機尾庫，新增 entry 時 tail # 自動帶 operator/type。<br>必填 / Required：Aircraft ID / Operator / Type。' +
+      '</div>' +
+      '<input type="file" id="pl-aircraft-file" accept=".txt,.tab,.tsv,text/plain" style="font-size:.78em">' +
+      '<button onclick="_plUploadAircraft()" style="margin-left:8px;background:#6366f1;color:#fff;border:0;border-radius:6px;padding:6px 12px;font-size:.78em;font-weight:700;cursor:pointer">Upload</button>' +
+    '</div>' +
+    '<div class="pl-imp-card">' +
+      '<div style="font-size:.85em;font-weight:700;margin-bottom:6px">🧭 Aircraft Types · 機型目錄 / Type catalog</div>' +
+      '<div style="font-size:.7em;color:var(--muted);margin-bottom:8px;line-height:1.5">' +
+        '⚠️ LogTen 的 <b>Aircraft Types</b> export（type 為主、無機號），<b>跟 Aircraft 不同檔</b>。讓 Aircraft 列表顯示完整廠商機型（A359 → Airbus A-350-900）。<br>必填 / Required：Type。' +
+      '</div>' +
+      '<input type="file" id="pl-aircraft-types-file" accept=".txt,.tab,.tsv,text/plain" style="font-size:.78em">' +
+      '<button onclick="_plUploadAircraftTypes()" style="margin-left:8px;background:#6366f1;color:#fff;border:0;border-radius:6px;padding:6px 12px;font-size:.78em;font-weight:700;cursor:pointer">Upload</button>' +
+    '</div>' +
+    '<div class="pl-imp-card">' +
+      '<div style="font-size:.85em;font-weight:700;margin-bottom:6px">👥 Address Book · Tab 匯出（選用）</div>' +
+      '<div style="font-size:.7em;color:var(--muted);margin-bottom:8px;line-height:1.5">' +
+        'LogTen → File → Export → Address Book Tab。匯入 crew 名單供篩選 / 查同事航班。<br>必填 / Required：Name / ID / This is Me（=1 標記本人，每人一筆 self）。' +
+      '</div>' +
+      '<input type="file" id="pl-addressbook-file" accept=".txt,.tab,.tsv,text/plain" style="font-size:.78em">' +
+      '<button onclick="_plUploadAddressBook()" style="margin-left:8px;background:#6366f1;color:#fff;border:0;border-radius:6px;padding:6px 12px;font-size:.78em;font-weight:700;cursor:pointer">Upload</button>' +
+    '</div>';
+}
+
+// Wader 一格
+function _plImportCardWader() {
+  return '<div class="pl-imp-card">' +
       '<div style="font-size:.85em;font-weight:700;margin-bottom:6px">📄 Wader · CSV 匯出 / export</div>' +
       '<div style="font-size:.7em;color:var(--muted);margin-bottom:8px;line-height:1.5">' +
         'Wader logbook → 匯出 CSV。真實航班、模擬機、過往結轉時數（起始累計）都會帶進來。<br>' +
@@ -1935,99 +2031,49 @@ function _plOpenImport() {
         '<button onclick="_plUploadWader(true)" style="background:#475569;color:#fff;border:0;border-radius:6px;padding:6px 12px;font-size:.78em;font-weight:700;cursor:pointer">🔍 Preview (dry-run)</button>' +
         '<button onclick="_plUploadWader(false)" style="background:#10b981;color:#fff;border:0;border-radius:6px;padding:6px 12px;font-size:.78em;font-weight:700;cursor:pointer">Import</button>' +
       '</div>' +
-    '</div>' +
-    // V1.3.07：班表匯入；V1.3.11 改走雲端；V1.3.13 先列月份讓你勾選要匯入哪幾月
-    '<div style="background:var(--card);border-radius:10px;padding:14px;margin-bottom:12px">' +
-      '<div style="font-size:.85em;font-weight:700;margin-bottom:6px">📅 Roster · 從 CrewSync 帶班表（不用上傳檔）</div>' +
-      '<div style="font-size:.7em;color:var(--muted);margin-bottom:8px;line-height:1.5">' +
-        'CrewSync 同步過的班表<b>直接帶進來</b>，先是<b>未完成（藍）</b>，飛完補上實際時間（In）就自動變<b>已完成（綠）</b>。按下面先<b>列出可匯入的月份</b>，勾選你要的再匯入。<br>' +
-        'Pulls the roster CrewSync has synced — they arrive as <b>open (blue)</b> and turn <b>done (green)</b> once you log the actual in-time after flying. Tap below to <b>list available months</b>, tick the ones you want, then import.<br>' +
-        '<b>用前提示：</b>先去 CrewSync 用<b>同一個 Google 帳號</b>同步當月（與想要的其他月份），再回來。' +
-      '</div>' +
-      '<button onclick="_plRosterListMonths()" style="background:#10b981;color:#fff;border:0;border-radius:6px;padding:6px 12px;font-size:.78em;font-weight:700;cursor:pointer">📅 列出可匯入月份 / List months</button>' +
-      '<div id="pl-roster-months" style="margin-top:10px"></div>' +
-    '</div>' +
-    '<div class="pl-imp-logten" style="background:var(--card);border-radius:10px;padding:14px;margin-bottom:12px">' +
-      '<div style="font-size:.85em;font-weight:700;margin-bottom:6px">🛩️ Aircraft · 機尾庫 / Tail registry（LogTen Aircraft）</div>' +
-      '<div style="font-size:.7em;color:var(--muted);margin-bottom:8px;line-height:1.5">' +
-        '⚠️ 是 LogTen 的 <b>Aircraft</b> export（每筆有機號），<b>不是 Aircraft Types</b>。<br>' +
-        'This is the LogTen <b>Aircraft</b> export (each row has a tail #), <b>not Aircraft Types</b>.<br>' +
-        '建你的機尾庫，新增 entry 時 tail # 可自動帶 operator/type/notes。<br>' +
-        'Builds your tail registry so new entries auto-fill operator/type/notes from the tail #.<br>' +
-        '必填欄位 / Required columns：Aircraft ID / Operator / Type。' +
-      '</div>' +
-      '<input type="file" id="pl-aircraft-file" accept=".txt,.tab,.tsv,text/plain" style="font-size:.78em">' +
-      '<button onclick="_plUploadAircraft()" style="margin-left:8px;background:#6366f1;color:#fff;border:0;border-radius:6px;padding:6px 12px;font-size:.78em;font-weight:700;cursor:pointer">Upload</button>' +
-    '</div>' +
-    '<div class="pl-imp-logten" style="background:var(--card);border-radius:10px;padding:14px;margin-bottom:12px">' +
-      '<div style="font-size:.85em;font-weight:700;margin-bottom:6px">🧭 Aircraft Types · 機型目錄 / Type catalog（LogTen Aircraft Types）</div>' +
-      '<div style="font-size:.7em;color:var(--muted);margin-bottom:8px;line-height:1.5">' +
-        '⚠️ 是 LogTen 的 <b>Aircraft Types</b> export（type 為主、無機號），<b>跟上面 Aircraft 不同檔</b>。<br>' +
-        'This is the LogTen <b>Aircraft Types</b> export (type-centric, no tail #), <b>a different file from Aircraft above</b>.<br>' +
-        '建你的機型目錄，Aircraft 列表 / drill-down 會顯示完整廠商機型（例：A359 → Airbus A-350-900）。<br>' +
-        'Builds your type catalog so the Aircraft list / drill-down shows full make/model (e.g. A359 → Airbus A-350-900).<br>' +
-        '必填欄位 / Required：Type。Make / Model / Engine Type / Category / Class / Notes 皆選填 / optional。' +
-      '</div>' +
-      '<input type="file" id="pl-aircraft-types-file" accept=".txt,.tab,.tsv,text/plain" style="font-size:.78em">' +
-      '<button onclick="_plUploadAircraftTypes()" style="margin-left:8px;background:#6366f1;color:#fff;border:0;border-radius:6px;padding:6px 12px;font-size:.78em;font-weight:700;cursor:pointer">Upload</button>' +
-    '</div>' +
-    '<div class="pl-imp-logten" style="background:var(--card);border-radius:10px;padding:14px;margin-bottom:12px">' +
-      '<div style="font-size:.85em;font-weight:700;margin-bottom:6px">👥 Address Book · Tab 匯出 / export（選用 optional）</div>' +
-      '<div style="font-size:.7em;color:var(--muted);margin-bottom:8px;line-height:1.5">' +
-        'LogTen Pro → File → Export → Address Book Tab。匯入 crew 名單（含 pilots 與 cabin crew）供日後篩選 / 查同事飛過的航班。<br>' +
-        'Imports the crew roster (pilots and cabin crew) for later filtering and shared-flight lookup.<br>' +
-        '必填欄位 / Required：Name / ID / This is Me。「This is Me=1」自動標記成你本人，每位 user 只能有一筆 self。<br>' +
-        '“This is Me=1” marks the row as yourself; only one self per user.' +
-      '</div>' +
-      '<input type="file" id="pl-addressbook-file" accept=".txt,.tab,.tsv,text/plain" style="font-size:.78em">' +
-      '<button onclick="_plUploadAddressBook()" style="margin-left:8px;background:#6366f1;color:#fff;border:0;border-radius:6px;padding:6px 12px;font-size:.78em;font-weight:700;cursor:pointer">Upload</button>' +
-    '</div>' +
-    '<div id="pl-import-result" style="margin-top:14px"></div>' +
-    '<div style="background:rgba(127,29,29,.2);border:1px solid #7f1d1d;border-radius:10px;padding:14px;margin-top:24px">' +
-      '<div style="font-size:.85em;font-weight:700;margin-bottom:6px;color:#fca5a5">⚠️ Danger Zone</div>' +
-      '<div style="font-size:.7em;color:var(--muted);margin-bottom:8px;line-height:1.5">' +
-        '一鍵砍掉某個<b>匯入來源</b>的所有 entries（manual / roster 來源不動、機尾庫不動）。Wader 會連起始累計一起清。<br>' +
-        'Wipes all entries from one import source (manual / roster and the tail registry are untouched; Wader also clears the opening balance). <strong style="color:#fca5a5">不可復原 / Cannot be undone.</strong>' +
-      '</div>' +
-      '<div style="display:flex;gap:6px;flex-wrap:wrap">' +
-        '<button onclick="_plWipeSource(\'logten\')" style="background:#dc2626;color:#fff;border:0;border-radius:6px;padding:6px 12px;font-size:.78em;font-weight:700;cursor:pointer">🗑️ Wipe LogTen</button>' +
-        '<button onclick="_plWipeSource(\'wader\')" style="background:#dc2626;color:#fff;border:0;border-radius:6px;padding:6px 12px;font-size:.78em;font-weight:700;cursor:pointer">🗑️ Wipe Wader（含起始累計）</button>' +
-      '</div>' +
-    '</div>' +
     '</div>';
-  // V1.3.19：套用來源選擇（預設 logten；記住上次選的）
-  try { var _sv = localStorage.getItem('pilotlog_import_src'); var _sel = document.getElementById('pl-import-source'); if (_sv && _sel) _sel.value = _sv; } catch (e) {}
-  _plSwitchImportSource();
 }
 
-// V1.3.19：切換匯入來源（LogTen / Wader）→ 顯示對應卡片；Roster 沒標 class，永遠獨立顯示
-function _plSwitchImportSource() {
-  var sel = document.getElementById('pl-import-source');
-  var v = sel ? (sel.value || 'logten') : 'logten';
-  try { localStorage.setItem('pilotlog_import_src', v); } catch (e) {}
-  var lt = document.querySelectorAll('.pl-imp-logten');
-  var wd = document.querySelectorAll('.pl-imp-wader');
-  for (var i = 0; i < lt.length; i++) lt[i].style.display = (v === 'logten') ? '' : 'none';
-  for (var j = 0; j < wd.length; j++) wd[j].style.display = (v === 'wader') ? '' : 'none';
+// ③ Wipe pane：勾選資料類別（不分來源）
+function _plImportPaneWipe() {
+  var cat = function(id, label, sub) {
+    return '<label style="display:flex;align-items:flex-start;gap:9px;padding:11px 12px;background:var(--card);border:1px solid var(--border,#334155);border-radius:8px;margin-bottom:8px;cursor:pointer">' +
+      '<input type="checkbox" id="pl-wipe-' + id + '" style="margin-top:2px;flex:0 0 auto">' +
+      '<span style="font-size:.8em"><b>' + label + '</b><br><span style="color:var(--muted);font-size:.9em">' + sub + '</span></span>' +
+    '</label>';
+  };
+  return '<div style="font-size:.85em;font-weight:700;margin-bottom:4px;color:#fca5a5">🗑️ Wipe · 清除資料</div>' +
+    '<div style="font-size:.7em;color:var(--muted);margin-bottom:10px;line-height:1.5">勾選要清除的資料類別（<b>不分匯入來源</b>）。<strong style="color:#fca5a5">不可復原。</strong><br>Tick categories to wipe (regardless of import source). Cannot be undone.</div>' +
+    cat('flights', '飛時 Flights', '所有航班紀錄 + 起始累計（含 LogTen / Wader / Roster / 手動）') +
+    cat('aircraft', '機籍 Aircraft', '機尾庫') +
+    cat('types', '機型 Aircraft Types', '機型目錄') +
+    cat('crew', '通訊錄 Address Book', '所有同事聯絡人（會保留你本人 YOU）') +
+    '<button onclick="_plWipeCategories()" style="background:#dc2626;color:#fff;border:0;border-radius:8px;padding:11px 16px;font-size:.82em;font-weight:700;cursor:pointer;margin-top:6px;width:100%">🔴 刪除勾選項目 / Delete selected</button>';
 }
 
-// V1.3.18：通用 wipe（logten / wader）。Wader 後端會一併清起始累計。
-async function _plWipeSource(source) {
-  var label = source === 'wader' ? 'Wader' : 'LogTen';
-  if (!window.confirm('真的要砍掉所有 ' + label + ' 來源的 entries 嗎？\n（manual / roster 來源不會動' + (source === 'wader' ? '；Wader 的起始累計也會一起清' : '') + '）')) return;
-  if (!window.confirm('再確認一次。這個動作不可復原。\n按 OK 才會真的執行。')) return;
-
-  var r = await _plApi('/api/pilot-log/entries?source=' + encodeURIComponent(source) + '&confirm=true', { method: 'DELETE' });
+// V1.3.25：依勾選的資料類別清除（不分來源）。通訊錄保留本人。
+async function _plWipeCategories() {
+  var all = [['flights', '飛時'], ['aircraft', '機籍'], ['types', '機型'], ['crew', '通訊錄']];
+  var picked = all.filter(function(c) { var el = document.getElementById('pl-wipe-' + c[0]); return el && el.checked; });
+  if (picked.length === 0) { _plToast('先勾選要清除的項目', 'error'); return; }
+  var labels = picked.map(function(c) { return c[1]; }).join('、');
+  if (!window.confirm('確定要清除：' + labels + '？\n（清通訊錄會保留你本人）\n這個動作不可復原。')) return;
+  if (!window.confirm('再確認一次。按 OK 才會真的刪除。')) return;
+  var qs = picked.map(function(c) { return c[0]; }).join(',');
+  var r = await _plApi('/api/pilot-log/wipe?categories=' + encodeURIComponent(qs) + '&confirm=true', { method: 'DELETE' });
   if (!r.ok) {
     var err = await r.json().catch(function() { return {}; });
-    _plToast('砍除失敗：' + (err.error || r.status), 'error');
+    _plToast('清除失敗：' + (err.error || r.status), 'error');
     return;
   }
   var j = await r.json();
-  _plToast('已砍除 ' + (j.deleted || 0) + ' 筆 ' + label + ' entries' + (j.opening_deleted ? '（+ 起始累計 ' + j.opening_deleted + ' 型）' : ''));
-  // 清掉 import 介面殘留的結果，並回 main view 讓 list 重新 fetch
-  var resBox = document.getElementById('pl-import-result');
-  if (resBox) resBox.innerHTML = '';
+  var d = j.deleted || {};
+  var parts = [];
+  if (d.flights != null) parts.push('飛時 ' + d.flights + (d.opening ? '（+ 起始累計 ' + d.opening + '）' : ''));
+  if (d.aircraft != null) parts.push('機籍 ' + d.aircraft);
+  if (d.types != null) parts.push('機型 ' + d.types);
+  if (d.crew != null) parts.push('通訊錄 ' + d.crew);
+  _plToast('已清除：' + (parts.join('、') || '無'));
   await _plRefreshMain();
 }
 

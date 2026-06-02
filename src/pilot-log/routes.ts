@@ -51,8 +51,8 @@ import { getSpaPilotLogJs } from '../spa/js-pilot-log.js';
 
 // ── 版本（比照 CrewSync / Morning：每次推版必更新；SW cache 名稱跟著走） ────
 // 本機 preview build 會暫時加 -tNN 後綴方便對版；推正式版前拿掉只留乾淨版號。
-export const PILOT_LOG_VERSION = 'V1.3.24';
-const PILOT_LOG_CACHE = 'pilotlog-v1-3-24';
+export const PILOT_LOG_VERSION = 'V1.3.25';
+const PILOT_LOG_CACHE = 'pilotlog-v1-3-25';
 
 export const pilotLogRouter = express.Router();
 
@@ -335,6 +335,14 @@ if (document.readyState !== 'loading') pilotLogInit();
 function _renderPilotLogChangelog(): string {
   return `
     <div class="pl-cl-v">${PILOT_LOG_VERSION}</div>
+    <div class="pl-cl-txt">
+      <b>Import 介面大改版：左側三分頁，清爽不雜亂 + Wipe 改成勾選類別清除。</b>以前 Import 一頁疊六張卡、來源下拉跟卡片混在一起很亂。現在改成<b>左邊直欄三個分頁</b>，點哪個右邊就顯示哪個：<br>
+      <b>① 📅 班表 Roster</b>（最常用、預設）—— 從 CrewSync 帶班表。<br>
+      <b>② 📥 Logbook 來源</b> —— 進去再子選 <b>LogTen Pro</b>（顯示 Flights / Aircraft / Aircraft Types / Address Book 四格）或 <b>Wader</b>（只顯示它的 CSV）。<br>
+      <b>③ 🗑️ Wipe 清除</b> —— 改成<b>勾選資料類別</b>（飛時 / 機籍 / 機型 / 通訊錄，不分匯入來源），勾哪個刪哪個、全勾就是全部刪除；清通訊錄會<b>保留你本人</b>。一律兩段確認。手機窄螢幕時左欄自動收成上方一排。<br>
+      <b>Import redesigned: a clean left-side 3-tab layout + category-based Wipe.</b> Instead of six stacked cards, the Import page now has a left vertical nav: <b>① 📅 Roster</b> (default), <b>② 📥 Logbook</b> (pick LogTen → 4 cards, or Wader → 1), <b>③ 🗑️ Wipe</b> — now <b>tick which data categories</b> to clear (flights / aircraft / types / address book, regardless of source); wiping the address book keeps your own (self) entry. Two-step confirm throughout; the left nav collapses to a top row on narrow screens.
+    </div>
+    <div class="pl-cl-v old">V1.3.24</div>
     <div class="pl-cl-txt">
       <b>修好 LogTen 匯入漏掉副駕（FO）+ 組員可手填新增 + 本人可編輯 + SIM/DHD 自動完成。</b>這版一次解掉 crew 一整串問題：<br>
       <b>① 匯入終於把 FO / relief 機師帶進來。</b>你的 LogTen 欄位是 <code>FO 1</code>、<code>FO 2</code>（中間有空格）跟 <code>CAP/SFO</code>，舊版比對看死關鍵字又把 FO1/FO2 排除，整批副駕都漏掉，很多航班只剩你一個。現在改成<b>忽略空格、依欄位順序</b>把 PIC 以外的機師（SIC/P2 Crew、CAP/SFO、FO 1、FO 2）填進 Crew 2/3/4，並修好誤抓空的時數欄當正駕的問題。順手把 <code>PIC/P1</code>、<code>SIC/P2</code> 時數欄也讀對（影響 Analyze 的 PIC/SIC 時數）。<br>
@@ -1045,6 +1053,53 @@ pilotLogRouter.delete('/api/pilot-log/entries', requireAuth, async (req: AuthedR
     openingDeleted = o.rowCount || 0;
   }
   res.json({ deleted: r.rowCount, source, opening_deleted: openingDeleted });
+});
+
+// V1.3.25：依「資料類別」清除（不分匯入來源）—— 勾選 flights / aircraft / types / crew。
+// flights = 所有航班 + 起始累計；crew 保留本人（is_self）。全部包進單一 transaction。
+const _PL_WIPE_CATS = ['flights', 'aircraft', 'types', 'crew'];
+pilotLogRouter.delete('/api/pilot-log/wipe', requireAuth, async (req: AuthedRequest, res) => {
+  const pool = getPool();
+  if (!pool || !(await ensureTables())) return res.status(503).json({ error: 'database_unavailable' });
+  if (String(req.query.confirm || '') !== 'true') return res.status(400).json({ error: 'missing_confirm_true' });
+  const cats = String(req.query.categories || '').split(',').map((s) => s.trim()).filter(Boolean);
+  const invalid = cats.filter((c) => _PL_WIPE_CATS.indexOf(c) < 0);
+  if (cats.length === 0 || invalid.length > 0) {
+    return res.status(400).json({ error: 'invalid_categories', allowed: _PL_WIPE_CATS });
+  }
+  const userId = req.pilotUserId!;
+  const deleted: Record<string, number> = {};
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    if (cats.indexOf('flights') >= 0) {
+      const r = await client.query(`DELETE FROM pilot_log_entries WHERE user_id = $1`, [userId]);
+      const o = await client.query(`DELETE FROM pilot_opening_balance WHERE user_id = $1`, [userId]);
+      deleted.flights = r.rowCount || 0;
+      deleted.opening = o.rowCount || 0;
+    }
+    if (cats.indexOf('aircraft') >= 0) {
+      const r = await client.query(`DELETE FROM pilot_aircraft WHERE user_id = $1`, [userId]);
+      deleted.aircraft = r.rowCount || 0;
+    }
+    if (cats.indexOf('types') >= 0) {
+      const r = await client.query(`DELETE FROM pilot_aircraft_types WHERE user_id = $1`, [userId]);
+      deleted.types = r.rowCount || 0;
+    }
+    if (cats.indexOf('crew') >= 0) {
+      // 保留本人（is_self=true）；crew_employee_ids 靠 FK ON DELETE CASCADE 一起清
+      const r = await client.query(`DELETE FROM crew WHERE user_id = $1 AND is_self = false`, [userId]);
+      deleted.crew = r.rowCount || 0;
+    }
+    await client.query('COMMIT');
+    res.json({ ok: true, deleted });
+  } catch (e: any) {
+    try { await client.query('ROLLBACK'); } catch { /* ignore */ }
+    console.error('[pilot-log] category wipe failed:', e.message);
+    res.status(500).json({ error: 'wipe_failed' });
+  } finally {
+    client.release();
+  }
 });
 
 // ── Imports ──────────────────────────────────────────────────────────────────

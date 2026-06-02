@@ -107,9 +107,11 @@ async function run() {
   await check('Import UI 含 Import 按鈕', async () => {
     assert(plHtml.includes('_plUploadFlights(false)'), '找不到 Import 按鈕');
   });
-  await check('Import UI 含 Danger Zone Wipe 按鈕', async () => {
-    assert(plHtml.includes('_plWipeSource(') && plHtml.includes('Wipe Wader') && plHtml.includes('Danger Zone'),
-           '找不到 Wipe LogTen/Wader 按鈕 / Danger Zone 區塊');
+  await check('Import UI 三分頁 + 類別 Wipe（V1.3.25）', async () => {
+    assert(plHtml.includes('function _plImportTab') && plHtml.includes('_plImportLogbookSrc') &&
+           plHtml.includes('pl-imp-nav-roster') && plHtml.includes('_plWipeCategories()') &&
+           plHtml.includes('pl-wipe-'),
+           '找不到 Import 左欄三分頁 / 類別 Wipe 勾選');
   });
   await check('Editor flight_date 用 date type（防 +0YYYYY 顯示 bug）', async () => {
     assert(plHtml.includes("_plEditorField('Date', 'flight_date', 'date')"),
