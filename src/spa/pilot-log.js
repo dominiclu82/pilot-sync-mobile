@@ -795,10 +795,16 @@ function _plRenderEntryRow(e) {
     '<span style="min-width:34px;text-align:right">' + arr + '</span>' +
   '</div>';
 
-  var airports = '<div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px">' +
-    '<span style="font-size:1.35em;font-weight:800;letter-spacing:.5px">' + _plEsc(e.origin || '???') + '</span>' +
-    '<span style="font-size:1.35em;font-weight:800;letter-spacing:.5px">' + _plEsc(e.dest || '???') + '</span>' +
-  '</div>';
+  var airports = e.is_sim
+    ? '<div style="display:flex;align-items:center;gap:8px">' +
+        '<span style="background:#7c3aed;color:#fff;font-size:.6em;font-weight:800;padding:2px 8px;border-radius:5px;letter-spacing:.5px">SIM</span>' +
+        '<span style="font-size:1.05em;font-weight:700">' + _plEsc(e.sim_type || 'Simulator') + '</span>' +
+        (e.sim_minutes ? '<span style="font-size:.72em;color:var(--muted)">' + _plMinToHHMM(e.sim_minutes) + '</span>' : '') +
+      '</div>'
+    : '<div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px">' +
+        '<span style="font-size:1.35em;font-weight:800;letter-spacing:.5px">' + _plEsc(e.origin || '???') + '</span>' +
+        '<span style="font-size:1.35em;font-weight:800;letter-spacing:.5px">' + _plEsc(e.dest || '???') + '</span>' +
+      '</div>';
 
   var meta = '<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;font-size:.7em;color:var(--muted)">' +
     '<span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0">' + acMeta + '</span>' +
@@ -1732,6 +1738,19 @@ function _plOpenImport() {
       '</div>' +
       '<div style="font-size:.65em;color:var(--muted);margin-top:6px">建議先 Preview 確認每筆都解析正常，再按 Import。<br>Run Preview first to confirm every row parses, then Import.</div>' +
     '</div>' +
+    // V1.3.17：Wader logbook CSV 匯入（真實航班 / 模擬機 / 起始累計）。未來會升級成「先選來源 logbook」。
+    '<div style="background:var(--card);border-radius:10px;padding:14px;margin-bottom:12px">' +
+      '<div style="font-size:.85em;font-weight:700;margin-bottom:6px">📄 Wader · CSV 匯出 / export</div>' +
+      '<div style="font-size:.7em;color:var(--muted);margin-bottom:8px;line-height:1.5">' +
+        'Wader logbook → 匯出 CSV。真實航班、模擬機、過往結轉時數（起始累計）都會帶進來。<br>' +
+        'Imports Wader CSV — real flights, simulator sessions, and brought-forward totals.' +
+      '</div>' +
+      '<input type="file" id="pl-wader-file" accept=".csv,text/csv,text/plain" style="font-size:.78em">' +
+      '<div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap">' +
+        '<button onclick="_plUploadWader(true)" style="background:#475569;color:#fff;border:0;border-radius:6px;padding:6px 12px;font-size:.78em;font-weight:700;cursor:pointer">🔍 Preview (dry-run)</button>' +
+        '<button onclick="_plUploadWader(false)" style="background:#10b981;color:#fff;border:0;border-radius:6px;padding:6px 12px;font-size:.78em;font-weight:700;cursor:pointer">Import</button>' +
+      '</div>' +
+    '</div>' +
     // V1.3.07：班表匯入；V1.3.11 改走雲端；V1.3.13 先列月份讓你勾選要匯入哪幾月
     '<div style="background:var(--card);border-radius:10px;padding:14px;margin-bottom:12px">' +
       '<div style="font-size:.85em;font-weight:700;margin-bottom:6px">📅 Roster · 從 CrewSync 帶班表（不用上傳檔）</div>' +
@@ -2023,6 +2042,24 @@ function _plRenderBadRows(badRows) {
   }
   html += '</div>';
   return html;
+}
+
+// V1.3.17：Wader CSV 上傳（真實航班 / 模擬機 / 起始累計）
+async function _plUploadWader(dryRun) {
+  var endpoint = '/api/pilot-log/import/wader' + (dryRun ? '?dryRun=1' : '');
+  var j = await _plUploadFile('pl-wader-file', endpoint);
+  if (!j) return;
+  var resBox = document.getElementById('pl-import-result');
+  if (j.error) {
+    resBox.innerHTML = '<div style="background:#7f1d1d;color:#fff;padding:10px;border-radius:8px;font-size:.78em">❌ ' + _plEsc(j.error) + '</div>';
+    return;
+  }
+  var msg = (dryRun ? '🔍 Dry-run（沒寫入 DB）：' : '✅ 匯入完成：') +
+    '航班 <b>' + (j.imported_flights || 0) + '</b>、模擬機 <b>' + (j.imported_sims || 0) + '</b>、' +
+    '起始累計 <b>' + (j.opening_types || 0) + '</b> 型、重複略過 <b>' + (j.duplicate_skipped || 0) + '</b>、' +
+    '解析失敗 <b>' + (j.parse_errors || 0) + '</b>';
+  resBox.innerHTML = '<div style="background:' + (dryRun ? '#1e3a5f' : '#064e3b') + ';color:#fff;padding:10px;border-radius:8px;font-size:.78em">' + msg + '</div>';
+  if (!dryRun) { await _plRefreshMain(); }
 }
 
 async function _plUploadFlights(dryRun) {
@@ -3097,6 +3134,34 @@ function _plBreakdownTable(title, firstCol, entries, keyFn) {
     '</div></div>';
 }
 
+// V1.3.17：起始累計（已含進總時數）+ 模擬機（不計入飛行時數）兩區塊
+function _plRenderOpeningSim() {
+  var s = _pl.stats || {};
+  var ob = s.opening || [];
+  var sim = s.sim || {};
+  var out = '';
+  if (ob.length) {
+    var rows = ob.map(function(o) {
+      return '<tr><td style="text-align:left;padding:4px 6px">' + _plEsc(o.aircraft_type) + '</td>' +
+        '<td style="text-align:right;padding:4px 6px;font-variant-numeric:tabular-nums">' + _plMinToHHMM(o.total_minutes) + '</td>' +
+        '<td style="text-align:right;padding:4px 6px;font-variant-numeric:tabular-nums">' + _plMinToHHMM(o.pic_minutes) + '</td>' +
+        '<td style="text-align:right;padding:4px 6px;font-variant-numeric:tabular-nums">' + _plMinToHHMM(o.sic_minutes) + '</td></tr>';
+    }).join('');
+    out += '<div style="background:var(--bar-bg-soft);border-radius:10px;padding:14px;margin-bottom:10px">' +
+      '<div style="font-size:.72em;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">起始累計 · Brought Forward（已含進總時數）</div>' +
+      '<table style="width:100%;border-collapse:collapse;font-size:.82em">' +
+      '<tr style="color:var(--muted);font-size:.85em"><th style="text-align:left;padding:4px 6px">Type</th><th style="text-align:right;padding:4px 6px">Total</th><th style="text-align:right;padding:4px 6px">PIC</th><th style="text-align:right;padding:4px 6px">SIC</th></tr>' +
+      rows + '</table></div>';
+  }
+  if (sim.sim_minutes) {
+    out += '<div style="background:var(--bar-bg-soft);border-radius:10px;padding:14px;margin-bottom:10px">' +
+      '<div style="font-size:.72em;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">模擬機 · Simulator（不計入飛行時數）</div>' +
+      '<div style="font-size:1.1em;font-weight:800">' + _plMinToHHMM(sim.sim_minutes) +
+      ' <span style="font-size:.6em;color:var(--muted);font-weight:600">· ' + (sim.sim_count || 0) + ' sessions</span></div></div>';
+  }
+  return out;
+}
+
 function _plRenderTypeBreakdown(entries) {
   return _plBreakdownTable('依機型明細 By Type（時數=時:分、PIC Sec=PIC 段數）', 'Type', entries, function(e) { return e.aircraft_type || '—'; });
 }
@@ -3240,7 +3305,7 @@ function _plRenderAnalyzeContent() {
   });
   var hasStats = _pl.stats && _pl.stats.totals;
   var body = hasStats
-    ? _plRenderStats() + _plRenderTypeBreakdown(entries) + _plRenderCompanyBreakdown(entries) + _plRenderMonthlyChart(entries)
+    ? _plRenderStats() + _plRenderTypeBreakdown(entries) + _plRenderCompanyBreakdown(entries) + _plRenderOpeningSim() + _plRenderMonthlyChart(entries)
     : '<div style="text-align:center;color:var(--muted);padding:40px;font-size:.85em">尚無可分析的飛行紀錄，先到 <b>📒 Logbook</b> 新增或匯入 · No flights to analyze yet — add or import in <b>📒 Logbook</b>.</div>';
   c.innerHTML =
     '<div style="padding:10px 14px">' +

@@ -41,17 +41,18 @@ import {
 } from './beta.js';
 import { getPool, ensureTables, PILOT_LOG_TABLES, insertDbSizeSnapshotIfDue } from './schema.js';
 import { importLogtenFlights, importLogtenAircraft } from './import-logten.js';
+import { importWader } from './import-wader.js';
 import { importLogtenAddressBook } from './import-addressbook.js';
 import { importLogtenAircraftTypes } from './import-aircraft-types.js';
 import { importRoster } from './import-roster.js';
-import { getTotals, getRollingTotals, getByAircraftType } from './stats.js';
+import { getTotals, getRollingTotals, getByAircraftType, getOpeningBalance, getSimTotals } from './stats.js';
 import { loadCredentials } from '../config.js';
 import { getSpaPilotLogJs } from '../spa/js-pilot-log.js';
 
 // ── 版本（比照 CrewSync / Morning：每次推版必更新；SW cache 名稱跟著走） ────
 // 本機 preview build 會暫時加 -tNN 後綴方便對版；推正式版前拿掉只留乾淨版號。
-export const PILOT_LOG_VERSION = 'V1.3.16';
-const PILOT_LOG_CACHE = 'pilotlog-v1-3-16';
+export const PILOT_LOG_VERSION = 'V1.3.17';
+const PILOT_LOG_CACHE = 'pilotlog-v1-3-17';
 
 export const pilotLogRouter = express.Router();
 
@@ -334,6 +335,11 @@ if (document.readyState !== 'loading') pilotLogInit();
 function _renderPilotLogChangelog(): string {
   return `
     <div class="pl-cl-v">${PILOT_LOG_VERSION}</div>
+    <div class="pl-cl-txt">
+      <b>新增 Wader logbook CSV 匯入（真實航班 + 模擬機 + 起始累計）。</b>Import 頁多一顆「<b>📄 Wader · CSV</b>」按鈕，把 Wader 匯出的 CSV 帶進來：① <b>真實航班</b>（含 OOOI、PIC/SIC/night 時數、起降、跑道/SID/STAR、組員）② <b>模擬機</b> session（標 SIM、時數另計、不混進飛行時數）③ <b>過往結轉時數</b>做成「起始累計」（算進總時數 + By Type、分機型保留，但不是單筆航班）。Analyze 新增「起始累計」「模擬機」兩區塊。<br>
+      <b>Add Wader logbook CSV import (flights + simulator + brought-forward totals).</b> The Import page gains a "📄 Wader · CSV" button: ① real flights (OOOI, PIC/SIC/night times, takeoffs/landings, runway/SID/STAR, crew) ② simulator sessions (flagged SIM, counted separately, not in flight hours) ③ pre-app experience as an opening balance (counts toward total + By Type, kept per type, not individual flights). Analyze gains "Brought Forward" and "Simulator" sections.
+    </div>
+    <div class="pl-cl-v old">V1.3.16</div>
     <div class="pl-cl-txt">
       <b>匯入 crew 欄模糊比對 + Add Aircraft 自動帶機型 + crew 排版修正。</b><b>(匯入)</b> LogTen 的 crew 欄名可自訂（PIC/P1 Crew、Relief Crew… 因人而異），之前只認固定名稱、改過名就抓不到（Crew 3/4 空白）。改成<b>含關鍵字就認</b>：PIC/P1、SIC/P2、Relief/P3、CIC/Purser、Observer/OBS 各種寫法都帶得進來，也用在「你這趟是 PIC/SIC」的判斷。<b>(機籍)</b> Add Aircraft 打 tail（如 B-58553）→ 現在連<b>廠商 + 機型下拉也一起自動選好</b>（型錄有的直接選，貨機等自動填）。<b>(排版)</b> 航班編輯器 crew 欄的 rank 不再跑出卡片右邊界。<br>
       <b>Fuzzy crew-column matching on import + Add Aircraft auto-fills type + crew layout fix.</b> <b>(Import)</b> LogTen crew column names are customizable, and old exact-name matching missed renamed columns (Crew 3/4 came in blank). Now matched by keyword — PIC/P1, SIC/P2, Relief/P3, CIC/Purser, Observer/OBS variants all import, and feed the PIC/SIC role inference too. <b>(Registry)</b> Add Aircraft: typing a tail (e.g. B-58553) now also auto-selects the manufacturer + model. <b>(Layout)</b> The rank field in the flight editor's crew rows no longer overflows the card edge.
@@ -993,6 +999,15 @@ pilotLogRouter.post('/api/pilot-log/import/logten-flights', requireAuth, async (
   res.json(r);
 });
 
+// V1.3.17：Wader logbook CSV 匯入（真實航班 / 模擬機 / 起始累計）
+pilotLogRouter.post('/api/pilot-log/import/wader', requireAuth, async (req: AuthedRequest, res) => {
+  const text = typeof req.body === 'string' ? req.body : '';
+  if (!text) return res.status(400).json({ error: 'empty_body' });
+  const dryRun = req.query.dryRun === '1' || req.query.dryRun === 'true';
+  const r = await importWader(req.pilotUserId!, text, { dryRun });
+  res.json(r);
+});
+
 pilotLogRouter.post('/api/pilot-log/import/logten-aircraft', requireAuth, async (req: AuthedRequest, res) => {
   const text = typeof req.body === 'string' ? req.body : '';
   if (!text) return res.status(400).json({ error: 'empty_body' });
@@ -1267,12 +1282,18 @@ pilotLogRouter.post('/api/pilot-log/aircraft', requireAuth, async (req: AuthedRe
 // ── Stats ────────────────────────────────────────────────────────────────────
 pilotLogRouter.get('/api/pilot-log/stats', requireAuth, async (req: AuthedRequest, res) => {
   const userId = req.pilotUserId!;
-  const [totals, rolling, byType] = await Promise.all([
+  // codex P1：讀 pilot_opening_balance / is_sim / sim_minutes 前先確保 schema 已 migrate，
+  // 否則既有部署在 migration 跑前被打 /stats 會 relation/column does not exist → 500。
+  const pool = getPool();
+  if (!pool || !(await ensureTables())) return res.status(503).json({ error: 'database_unavailable' });
+  const [totals, rolling, byType, opening, sim] = await Promise.all([
     getTotals(userId),
     getRollingTotals(userId),
     getByAircraftType(userId),
+    getOpeningBalance(userId),
+    getSimTotals(userId),
   ]);
-  res.json({ totals, rolling, by_type: byType });
+  res.json({ totals, rolling, by_type: byType, opening, sim });
 });
 
 // ── Admin stats（V1.0.05；60s cache） ────────────────────────────────────────

@@ -68,7 +68,7 @@ export async function ensureTables(): Promise<boolean> {
       CREATE TABLE IF NOT EXISTS pilot_log_entries (
         id UUID PRIMARY KEY,
         user_id UUID NOT NULL REFERENCES pilot_users(id) ON DELETE CASCADE,
-        source TEXT NOT NULL CHECK (source IN ('roster','logten','manual')),
+        source TEXT NOT NULL CHECK (source IN ('roster','logten','manual','wader')),
         source_ref TEXT NOT NULL,
         status TEXT NOT NULL CHECK (status IN ('draft','confirmed','roster_removed')) DEFAULT 'draft',
         flight_date DATE NOT NULL,
@@ -125,6 +125,14 @@ export async function ensureTables(): Promise<boolean> {
     // 之後重匯該月就靠它精準掃除被移除的 draft。解跨月回程腿（UTC 落在下個月、但屬於這個月班表）
     // 用 flight_date 區間掃不到 → 殘留的問題（codex P1）。
     await pool.query(`ALTER TABLE pilot_log_entries ADD COLUMN IF NOT EXISTS roster_month TEXT`).catch(() => {});
+    // V1.3.17：模擬機支援 —— sim session 不是真實航班（無起降地、不算飛行時數）。is_sim 標記、
+    // sim_type（FFS/FTD…）、sim_minutes（模擬機時數）另存。統計時 sim 完全跟飛行時數分開。
+    await pool.query(`ALTER TABLE pilot_log_entries ADD COLUMN IF NOT EXISTS is_sim BOOLEAN DEFAULT FALSE`).catch(() => {});
+    await pool.query(`ALTER TABLE pilot_log_entries ADD COLUMN IF NOT EXISTS sim_type TEXT`).catch(() => {});
+    await pool.query(`ALTER TABLE pilot_log_entries ADD COLUMN IF NOT EXISTS sim_minutes INT`).catch(() => {});
+    // V1.3.17：source 加 'wader'。inline CHECK 只對新表生效，既有 prod 表用 ALTER 換 constraint。
+    await pool.query(`ALTER TABLE pilot_log_entries DROP CONSTRAINT IF EXISTS pilot_log_entries_source_check`).catch(() => {});
+    await pool.query(`ALTER TABLE pilot_log_entries ADD CONSTRAINT pilot_log_entries_source_check CHECK (source IN ('roster','logten','manual','wader'))`).catch(() => {});
 
     await pool.query(`
       CREATE TABLE IF NOT EXISTS pilot_aircraft (
@@ -215,6 +223,29 @@ export async function ensureTables(): Promise<boolean> {
       CREATE INDEX IF NOT EXISTS idx_pdsh_captured ON pilot_db_size_history(captured_at);
     `);
 
+    // ── 起始累計 opening balance（V1.3.17）─────────────────────────────────────
+    // 使用者用 App 前的過往飛行時數結轉（Wader CSV「previous experience」列帶進）。
+    // 算進總時數 + By Type，但不是單筆航班。per user per 機型。
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS pilot_opening_balance (
+        id SERIAL PRIMARY KEY,
+        user_id UUID NOT NULL REFERENCES pilot_users(id) ON DELETE CASCADE,
+        aircraft_type TEXT NOT NULL,
+        total_min INT DEFAULT 0,
+        pic_min INT DEFAULT 0,
+        sic_min INT DEFAULT 0,
+        night_min INT DEFAULT 0,
+        day_to INT DEFAULT 0,
+        night_to INT DEFAULT 0,
+        day_ldg INT DEFAULT 0,
+        night_ldg INT DEFAULT 0,
+        source TEXT DEFAULT 'wader',
+        updated_at TIMESTAMPTZ DEFAULT NOW(),
+        UNIQUE (user_id, aircraft_type)
+      );
+      CREATE INDEX IF NOT EXISTS idx_pilot_opening_user ON pilot_opening_balance(user_id);
+    `);
+
     // ── 封閉測試報名（V1.4；🐵 monkey 招募）─────────────────────────────────────
     // 全域（非 per-user）：招募頁報名者。source 區分 public（公開搶席）/ friend（owner 手動加）
     // / owner（擁有者自己，永不佔席次）。status active=正取、waitlist=候補、removed=已剔除。
@@ -249,7 +280,7 @@ export async function ensureTables(): Promise<boolean> {
 export const PILOT_LOG_TABLES: readonly string[] = [
   'pilot_users', 'pilot_user_emails', 'pilot_user_sessions', 'pilot_log_entries',
   'pilot_aircraft', 'pilot_aircraft_types', 'crew', 'crew_employee_ids',
-  'pilot_db_size_history', 'pilot_beta_applicants',
+  'pilot_db_size_history', 'pilot_beta_applicants', 'pilot_opening_balance',
 ];
 
 const SNAP_GAP_MS = 20 * 3600 * 1000;
