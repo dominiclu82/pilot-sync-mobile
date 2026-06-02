@@ -116,8 +116,10 @@ async function run() {
            "flight_date 欄位沒用 'date' type，會顯示 ISO 字串");
   });
   await check('inline JS 能 parse（用 new Function 過編譯，不執行）', async () => {
-    // 抽出整段 <script>...</script>（用最後一個 </script> 為止）
-    const start = plHtml.indexOf('<script>');
+    // 抽出 body 主 script block（最後一個 <script>…</script>）。
+    // head 有個 FOUC 主題小 script；用 indexOf 會從 head script 一路切到 body、把中間整段 HTML
+    // 也夾進去當 JS → 誤判 parse error（Unexpected token '<'）。改 lastIndexOf 只取注入 pilot-log.js 的那段。
+    const start = plHtml.lastIndexOf('<script>');
     const end = plHtml.lastIndexOf('</script>');
     assert(start >= 0 && end > start, '找不到 <script> 區塊');
     try {

@@ -71,17 +71,79 @@ function parseUtc(s?: string): Date | null {
   return isNaN(d.getTime()) ? null : d;
 }
 
-function flightDate(f: RosterFlight): string | null {
-  // 優先 depTimeUtc / depTime / date
-  const candidate = f.depTimeUtc || f.depTime || f.date;
-  if (!candidate) return null;
-  const d = new Date(candidate);
-  if (isNaN(d.getTime())) return null;
-  return d.toISOString().slice(0, 10);
+const MONTHS = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
+
+// V1.3.14：班表月份脈絡（年/月），用來補 CrewSync UTC 戳記缺的年份。
+interface MonthCtx { year: number; month: number; }
+
+// V1.3.14（bug fix）：CrewSync 雲端班表真實航班的 UTC 欄位是 "1610Z/17Jun" 這種格式
+// （HHMM + Z + / + DD + Mmm，**沒有年份**）。舊 code 直接 new Date("1610Z/17Jun")，JS 會把
+// 開頭 "1610" 當成西元 1610 年 → flight_date / std_utc 全爛 → 排序掉到列表尾被 200 筆上限切掉，
+// 前端永遠看不到。這裡正確解析：年份從 ctx（班表月份 _rmonth）推算，跨年邊界校正。
+function parseCrewSyncUtc(s: string | undefined, ctx?: MonthCtx): Date | null {
+  if (!s) return null;
+  const str = String(s).trim();
+  const m = str.match(/^(\d{2})(\d{2})\s*Z?\s*\/\s*(\d{1,2})\s*([A-Za-z]{3,})$/);
+  if (m) {
+    const hh = parseInt(m[1], 10), mm = parseInt(m[2], 10), dd = parseInt(m[3], 10);
+    const monIdx = MONTHS.indexOf(m[4].slice(0, 3).toLowerCase());
+    if (monIdx < 0 || !ctx) return null;
+    let year = ctx.year;
+    // 跨年邊界：Dec 班表帶 Jan leg → 隔年；Jan 班表帶 Dec leg → 前一年。
+    if (ctx.month === 12 && monIdx === 0) year = ctx.year + 1;
+    else if (ctx.month === 1 && monIdx === 11) year = ctx.year - 1;
+    const d = new Date(Date.UTC(year, monIdx, dd, hh, mm));
+    return isNaN(d.getTime()) ? null : d;
+  }
+  // 退回原生 Date（相容未來可能的 ISO 字串），但擋掉年份 < 1900 的明顯誤解析。
+  const d = new Date(str);
+  if (isNaN(d.getTime()) || d.getUTCFullYear() < 1900) return null;
+  return d;
 }
 
-function buildSourceRef(f: RosterFlight, dutyIdx: number): string | null {
-  const date = flightDate(f);
+// V1.3.14：地面班/訓練的日期格式 "2026.Jun.10"（含年份），也吃 "2026.Jun.10 0900L"（取日期段）。
+function parseDotDate(s: string | undefined): string | null {
+  if (!s) return null;
+  const m = String(s).trim().match(/^(\d{4})\.([A-Za-z]{3,})\.(\d{1,2})/);
+  if (!m) return null;
+  const monIdx = MONTHS.indexOf(m[2].slice(0, 3).toLowerCase());
+  if (monIdx < 0) return null;
+  const y = parseInt(m[1], 10), dd = parseInt(m[3], 10);
+  const d = new Date(Date.UTC(y, monIdx, dd));
+  return isNaN(d.getTime()) ? null : d.toISOString().slice(0, 10);
+}
+
+// V1.3.14：從 duty 取月份脈絡 —— 優先 _rmonth（"2026-06"），沒有才退回 reportTime 的日期段。
+function dutyCtx(duty: RosterDuty): MonthCtx | undefined {
+  const rm = (duty as any)._rmonth;
+  if (typeof rm === 'string' && /^\d{4}-\d{2}$/.test(rm)) {
+    return { year: parseInt(rm.slice(0, 4), 10), month: parseInt(rm.slice(5, 7), 10) };
+  }
+  const dd = parseDotDate(duty.reportTime);
+  if (dd) return { year: parseInt(dd.slice(0, 4), 10), month: parseInt(dd.slice(5, 7), 10) };
+  return undefined;
+}
+
+function flightDate(f: RosterFlight, ctx?: MonthCtx): string | null {
+  // 真實航班：用 depTimeUtc（"1610Z/17Jun"）算 UTC 日期。
+  const utc = parseCrewSyncUtc(f.depTimeUtc, ctx);
+  if (utc) return utc.toISOString().slice(0, 10);
+  // 地面班/訓練：date 或 depTime 帶 "2026.Jun.10"。
+  const dot = parseDotDate(f.date) || parseDotDate(f.depTime);
+  if (dot) return dot;
+  // codex P2：退回原生 Date 解析，相容舊 client / 直接呼叫 API 帶 ISO 字串（reportTime/date 非
+  // CrewSync 格式、又沒 _rmonth 的情境）。擋掉年份 < 1900 的誤解析 —— 就是這版要修的 "1610Z/17Jun"
+  // 被當成西元 1610 年那個 bug，避免 fallback 又把它救成爛資料。
+  for (const cand of [f.depTimeUtc, f.depTime, f.date]) {
+    if (!cand) continue;
+    const d = new Date(cand);
+    if (!isNaN(d.getTime()) && d.getUTCFullYear() >= 1900) return d.toISOString().slice(0, 10);
+  }
+  return null;
+}
+
+function buildSourceRef(f: RosterFlight, dutyIdx: number, ctx?: MonthCtx): string | null {
+  const date = flightDate(f, ctx);
   if (!date || !f.flightNo) return null;
   return `roster:${f.flightNo}:${date}:${f.origin || ''}:${f.dest || ''}:${dutyIdx}`;
 }
@@ -101,11 +163,18 @@ function crewVal(m: RosterCrewMember): CrewSlotVal {
 // V1.3.12：班表 position → 6 個固定槽。PIC→pic、OBS→obs、CIC→cic、
 // 其餘駕駛艙（P1~P4/IS 會亂跳，不照號碼）→ 依出現順序填 crew2/crew3/crew4。
 // 其他客艙（SC/CC/PC 等非 CIC）不進槽。內部 key 固定，前端顯示 label 可由使用者自訂。
-function extractCrew(crew?: RosterCrewMember[]): Record<string, CrewSlotVal> | null {
+// V1.3.14：解長程加強組員兩個 PIC 的 bug —— 以前碰到第 2 個 PIC 槽滿了、又是 else-if 不往下掉
+// → 那個人（常常就是 logbook 本人）被整個丟掉。改成：駕駛艙先全部收集不丟人，再分槽；
+// pic 槽用「本人優先」（這趟你是 PIC + 員編對得到本人 → pic 就是你，另一位機長改放 crew2），
+// 其餘依序填 crew2/3/4。selfIds=本人員編集合、entryPosition=你這趟的角色。
+function extractCrew(
+  crew: RosterCrewMember[] | undefined,
+  selfIds?: Set<string>,
+  entryPosition?: 'PIC' | 'SIC' | 'OBSERVER' | null,
+): Record<string, CrewSlotVal> | null {
   if (!crew || !crew.length) return null;
   const out: Record<string, CrewSlotVal> = {};
-  const otherSlots = ['crew2', 'crew3', 'crew4'];
-  let otherIdx = 0;
+  const cockpit: RosterCrewMember[] = [];
   for (const m of crew) {
     if (!m.name || !m.position) continue;
     const pos = m.position.toUpperCase();
@@ -113,12 +182,27 @@ function extractCrew(crew?: RosterCrewMember[]): Record<string, CrewSlotVal> | n
     if (/DHD|DEADHEAD/.test(pos)) continue;   // V1.3.12：搭便機的人沒操作這班，不進槽
     if (/CIC/.test(pos)) { if (!out.cic) out.cic = crewVal(m); }
     else if (/OBS/.test(pos)) { if (!out.obs) out.obs = crewVal(m); }
-    else if (/CAP|CMD|PIC/.test(pos)) { if (!out.pic) out.pic = crewVal(m); }
-    else if (/^P\d|^IS|SFO|FIRST OFFICER|^FO|SIC/.test(pos) || /CAP|SFO|FO|TFO|TCAP/.test(rank)) {
-      if (otherIdx < otherSlots.length) out[otherSlots[otherIdx++]] = crewVal(m);
+    else if (/CAP|CMD|PIC/.test(pos) || /^P\d|^IS|SFO|FIRST OFFICER|^FO|SIC/.test(pos)
+             || /CAP|SFO|FO|TFO|TCAP/.test(rank)) {
+      cockpit.push(m);                         // 駕駛艙全收集，稍後分槽（不再當場丟人）
     }
     // else：其他客艙（SC/CC/PC…非 CIC）→ 不記
   }
+  // pic 槽：① 這趟你是 PIC 且你在駕駛艙名單（員編認本人）→ 放你；② 否則第一個 position 標 PIC 的人；
+  //         ③ 再否則名單第一位。解兩個 PIC 時「哪個是你」的歧義。
+  const isSelf = (m: RosterCrewMember) => !!selfIds && selfIds.has((m.staffId || '').trim());
+  let picIdx = -1;
+  if (entryPosition === 'PIC') picIdx = cockpit.findIndex(isSelf);
+  if (picIdx < 0) picIdx = cockpit.findIndex((m) => /CAP|CMD|PIC/.test((m.position || '').toUpperCase()));
+  if (picIdx < 0 && cockpit.length) picIdx = 0;
+  if (picIdx >= 0) out.pic = crewVal(cockpit[picIdx]);
+  // 其餘駕駛艙 → crew2/crew3/crew4（依出現順序，不丟人；>4 人才溢位，加強組員最多 4 人剛好放滿）
+  const otherSlots = ['crew2', 'crew3', 'crew4'];
+  let oi = 0;
+  cockpit.forEach((m, i) => {
+    if (i === picIdx) return;
+    if (oi < otherSlots.length) out[otherSlots[oi++]] = crewVal(m);
+  });
   return Object.keys(out).length ? out : null;
 }
 
@@ -221,17 +305,35 @@ export async function importRoster(
   // key：員編優先（穩定），沒員編退回 name:名字。
   const contacts = new Map<string, { staffId?: string; name: string }>();
 
+  // V1.3.14：本人的員編（is_self 通訊錄聯絡人掛的所有 employee_id）。crew 分槽時用來認出「你自己」，
+  // 把你擺進符合這趟 position 的槽（解長程兩個 PIC 你被丟掉/擺錯槽）。認不到就退回原本行為。
+  const selfIds = new Set<string>();
+  try {
+    const sidQ = await pool.query(
+      `SELECT e.employee_id FROM crew_employee_ids e
+       JOIN crew c ON c.id = e.crew_id
+       WHERE c.user_id = $1 AND c.is_self = true`,
+      [userId]
+    );
+    for (const r of sidQ.rows) { const s = (r.employee_id || '').trim(); if (s) selfIds.add(s); }
+  } catch (e) { /* 認不到本人員編 → selfIds 空，extractCrew 退回 position 規則 */ }
+
   for (let dutyIdx = 0; dutyIdx < duties.length; dutyIdx++) {
     const duty = duties[dutyIdx];
+    // V1.3.14：班表月份脈絡（補 CrewSync UTC 戳記缺的年份）。
+    const ctx = dutyCtx(duty);
     const onDuty = parseUtc(duty.reportTime);
     const offDuty = parseUtc(duty.endTime);
     const flights = duty.flights || [];
 
     for (const f of flights) {
-      const sourceRef = buildSourceRef(f, dutyIdx);
+      // V1.3.14：地面班/訓練（FSM/S5C 等，無起訖地）不進飛行 logbook，只匯真實航班。
+      if (!f.origin && !f.dest) continue;
+
+      const sourceRef = buildSourceRef(f, dutyIdx, ctx);
       if (!sourceRef) continue;
 
-      const fDate = flightDate(f);
+      const fDate = flightDate(f, ctx);
       if (!fDate) continue;
 
       // V1.3.13：月份篩選 —— 只處理 months 內的航班，但**仍迭代整份 duties**讓 dutyIdx 維持全域。
@@ -243,10 +345,10 @@ export async function importRoster(
       if (months && months.length && months.indexOf(rosterMonth) < 0) continue;
       seenRefs.push(sourceRef);
 
-      const stdUtc = parseUtc(f.depTimeUtc);
-      const staUtc = parseUtc(f.arrTimeUtc);
+      const stdUtc = parseCrewSyncUtc(f.depTimeUtc, ctx);
+      const staUtc = parseCrewSyncUtc(f.arrTimeUtc, ctx);
       const position = normalizePosition(f.position || f.workCode);
-      const crewJson = extractCrew(f.crew);
+      const crewJson = extractCrew(f.crew, selfIds, position);
       // V1.3.12：DHD（搭便機 positioning）→ 標 deadhead，照建 entry 但飛時/PIC/night 全不計
       const isDeadhead = /DHD|DEADHEAD|POSITIONING/i.test((f.position || '') + ' ' + (f.workCode || ''));
       // V1.3.12：蒐集要進通訊錄的組員（去重）
@@ -268,11 +370,11 @@ export async function importRoster(
         await pool.query(
           `INSERT INTO pilot_log_entries
            (id, user_id, source, source_ref, status, flight_date, flight_no, origin, dest,
-            position, std_utc, sta_utc, on_duty_utc, off_duty_utc, crew, is_deadhead)
-           VALUES ($1, $2, 'roster', $3, 'draft', $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)`,
+            position, std_utc, sta_utc, on_duty_utc, off_duty_utc, crew, is_deadhead, roster_month)
+           VALUES ($1, $2, 'roster', $3, 'draft', $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)`,
           [
             randomUUID(), userId, sourceRef, fDate, f.flightNo, f.origin, f.dest,
-            position, stdUtc, staUtc, onDuty, offDuty, crewJson ? JSON.stringify(crewJson) : null, isDeadhead,
+            position, stdUtc, staUtc, onDuty, offDuty, crewJson ? JSON.stringify(crewJson) : null, isDeadhead, rosterMonth,
           ]
         );
         result.inserted++;
@@ -292,12 +394,13 @@ export async function importRoster(
              off_duty_utc = $10,
              crew = $11::jsonb,
              is_deadhead = $12,
+             roster_month = $13,
              updated_at = NOW()
            WHERE id = $1`,
           [
             existing.rows[0].id, fDate, f.flightNo, f.origin, f.dest,
             position, stdUtc, staUtc, onDuty, offDuty,
-            crewJson ? JSON.stringify(crewJson) : null, isDeadhead,
+            crewJson ? JSON.stringify(crewJson) : null, isDeadhead, rosterMonth,
           ]
         );
         result.updated++;
@@ -313,10 +416,10 @@ export async function importRoster(
     } catch (e) { /* 個別組員寫入失敗略過 */ }
   }
 
-  // 範圍內 draft 沒看到的 → roster_removed。
+  // 這次有匯入的月份 draft 沒看到的 → roster_removed。
   // codex P2：必須「per-month」sweep — 若同步了 5/7 但沒同步 6，連續 dateRange 會把 6 月舊
   // draft 全部誤標 removed。優先用 months（每月各自掃），沒給才退回單一 dateRange（舊行為）。
-  const sweepRanges: Array<{ start: string; end: string }> = [];
+  const sweeps: Array<{ month: string | null; start: string; end: string }> = [];
   if (months && months.length) {
     for (const ym of months) {
       const parts = ym.split('-');
@@ -325,23 +428,51 @@ export async function importRoster(
       if (!y || !m) continue;
       const nextMonth1st = new Date(Date.UTC(y, m, 1));                  // m 為 1-base：等同下個月 1 號
       const lastDay = new Date(nextMonth1st.getTime() - 24 * 3600 * 1000);
-      sweepRanges.push({ start: ym + '-01', end: lastDay.toISOString().slice(0, 10) });
+      sweeps.push({ month: ym, start: ym + '-01', end: lastDay.toISOString().slice(0, 10) });
     }
   } else if (dateRange) {
-    sweepRanges.push(dateRange);
+    sweeps.push({ month: null, start: dateRange.start, end: dateRange.end });
   }
-  for (const rg of sweepRanges) {
-    const r = await pool.query(
-      `UPDATE pilot_log_entries SET status = 'roster_removed', updated_at = NOW()
-       WHERE user_id = $1
-         AND source = 'roster'
-         AND status = 'draft'
-         AND flight_date >= $2 AND flight_date <= $3
-         AND NOT (source_ref = ANY($4::text[]))`,
-      [userId, rg.start, rg.end, seenRefs]
-    );
+  // V1.3.14（codex P1 修正）：改用 roster_month 精準掃除 —— 一筆屬於哪個月班表，import 時已記在
+  // roster_month，所以「6 月班表的 SEA→TPE 回程（flight_date 落在 7/1）」會被 6 月 sweep 正確掃到，
+  // 又不會誤動到真正屬於 7 月班表的 draft（它 roster_month='2026-07'）。舊資料 roster_month 為 NULL
+  // → 退回原本的 flight_date 區間掃（非邊界腿都涵蓋；下次重匯就會補上 roster_month、自動升級成精準掃）。
+  for (const sw of sweeps) {
+    const r = sw.month
+      ? await pool.query(
+          `UPDATE pilot_log_entries SET status = 'roster_removed', updated_at = NOW()
+           WHERE user_id = $1
+             AND source = 'roster'
+             AND status = 'draft'
+             AND NOT (source_ref = ANY($5::text[]))
+             AND (
+               roster_month = $2
+               OR (roster_month IS NULL AND flight_date >= $3 AND flight_date <= $4)
+             )`,
+          [userId, sw.month, sw.start, sw.end, seenRefs]
+        )
+      : await pool.query(
+          `UPDATE pilot_log_entries SET status = 'roster_removed', updated_at = NOW()
+           WHERE user_id = $1
+             AND source = 'roster'
+             AND status = 'draft'
+             AND flight_date >= $2 AND flight_date <= $3
+             AND NOT (source_ref = ANY($4::text[]))`,
+          [userId, sw.start, sw.end, seenRefs]
+        );
     result.marked_removed += r.rowCount || 0;
   }
+
+  // V1.3.14（self-heal）：清掉舊版 parse bug 留下的爛 draft —— 真實航班的 depTimeUtc（"1610Z/17Jun"）
+  // 被 new Date 誤判成西元 1610 等 → flight_date 年份 < 2000，排序掉到列表尾被 200 筆上限切掉、永遠看不到。
+  // 這些是 draft、從沒 confirmed，純垃圾，直接刪不留。重匯時自動修好，受影響的人都一併自癒。
+  try {
+    await pool.query(
+      `DELETE FROM pilot_log_entries
+       WHERE user_id = $1 AND source = 'roster' AND status = 'draft' AND flight_date < DATE '2000-01-01'`,
+      [userId]
+    );
+  } catch (e) { /* 清理失敗不該擋住整個匯入 */ }
 
   return result;
 }

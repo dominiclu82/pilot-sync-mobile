@@ -121,6 +121,10 @@ export async function ensureTables(): Promise<boolean> {
     await pool.query(`ALTER TABLE pilot_log_entries ADD COLUMN IF NOT EXISTS is_deadhead BOOLEAN DEFAULT FALSE`).catch(() => {});
     // V1.3.08：LogTen 風格的「上鎖」— 鎖了不能編輯/刪除（防誤改），UI 上可隨時 unlock
     await pool.query(`ALTER TABLE pilot_log_entries ADD COLUMN IF NOT EXISTS is_locked BOOLEAN DEFAULT FALSE`).catch(() => {});
+    // V1.3.14：roster import 的「所屬班表月份」(YYYY-MM)。匯入時記下這筆是哪個月班表帶進來的，
+    // 之後重匯該月就靠它精準掃除被移除的 draft。解跨月回程腿（UTC 落在下個月、但屬於這個月班表）
+    // 用 flight_date 區間掃不到 → 殘留的問題（codex P1）。
+    await pool.query(`ALTER TABLE pilot_log_entries ADD COLUMN IF NOT EXISTS roster_month TEXT`).catch(() => {});
 
     await pool.query(`
       CREATE TABLE IF NOT EXISTS pilot_aircraft (
@@ -211,6 +215,25 @@ export async function ensureTables(): Promise<boolean> {
       CREATE INDEX IF NOT EXISTS idx_pdsh_captured ON pilot_db_size_history(captured_at);
     `);
 
+    // ── 封閉測試報名（V1.4；🐵 monkey 招募）─────────────────────────────────────
+    // 全域（非 per-user）：招募頁報名者。source 區分 public（公開搶席）/ friend（owner 手動加）
+    // / owner（擁有者自己，永不佔席次）。status active=正取、waitlist=候補、removed=已剔除。
+    // 登入白名單 + 名額計數都讀這張（見 beta.ts）。
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS pilot_beta_applicants (
+        id UUID PRIMARY KEY,
+        email TEXT NOT NULL UNIQUE,
+        fleet TEXT,
+        uses_sync BOOLEAN,
+        logbook TEXT,
+        logbook_other TEXT,
+        source TEXT NOT NULL DEFAULT 'public' CHECK (source IN ('public','friend','owner')),
+        status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active','waitlist','removed')),
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      );
+      CREATE INDEX IF NOT EXISTS idx_pilot_beta_status ON pilot_beta_applicants(status);
+    `);
+
     _ready = true;
     console.log('✅ Pilot Log tables ready');
     return true;
@@ -226,7 +249,7 @@ export async function ensureTables(): Promise<boolean> {
 export const PILOT_LOG_TABLES: readonly string[] = [
   'pilot_users', 'pilot_user_emails', 'pilot_user_sessions', 'pilot_log_entries',
   'pilot_aircraft', 'pilot_aircraft_types', 'crew', 'crew_employee_ids',
-  'pilot_db_size_history',
+  'pilot_db_size_history', 'pilot_beta_applicants',
 ];
 
 const SNAP_GAP_MS = 20 * 3600 * 1000;

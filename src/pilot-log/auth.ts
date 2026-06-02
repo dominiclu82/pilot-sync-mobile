@@ -9,6 +9,7 @@ import { randomUUID, randomBytes, createHash, createHmac, timingSafeEqual } from
 import { google } from 'googleapis';
 import { loadCredentials } from '../config.js';
 import { getPool, ensureTables } from './schema.js';
+import { isLoginAllowed } from './beta.js';
 
 const ACCESS_TTL_SECONDS = 60 * 60;            // 1 hour
 const REFRESH_TTL_DAYS = 90;
@@ -125,9 +126,15 @@ export interface SessionPair {
  * Login / sign-up via Google ID token.
  * 找得到 email → 用同一 user；找不到 → 新建 pilot_users + pilot_user_emails。
  */
-export async function loginWithGoogle(idToken: string, userAgent?: string): Promise<SessionPair | null> {
+export async function loginWithGoogle(
+  idToken: string, userAgent?: string
+): Promise<SessionPair | null | 'not_invited'> {
   const verified = await verifyGoogleIdToken(idToken);
   if (!verified) return null;
+
+  // 封閉測試門禁：PILOT_LOG_BETA_GATE=on 時，只有 owner + active 報名者能登入。
+  // 不在白名單 → 回 'not_invited'（不建帳號），路由層轉成友善訊息。gate off 時恆放行。
+  if (!(await isLoginAllowed(verified.email))) return 'not_invited';
 
   const pool = getPool();
   if (!pool || !(await ensureTables())) return null;

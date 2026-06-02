@@ -33,8 +33,12 @@ import {
   rotateRefreshToken,
   revokeRefreshToken,
   requireAuth,
+  verifyGoogleIdToken,
   AuthedRequest,
 } from './auth.js';
+import {
+  getSlots, applyApplicant, listApplicants, addFriend, removeApplicant, isOwnerUserId,
+} from './beta.js';
 import { getPool, ensureTables, PILOT_LOG_TABLES, insertDbSizeSnapshotIfDue } from './schema.js';
 import { importLogtenFlights, importLogtenAircraft } from './import-logten.js';
 import { importLogtenAddressBook } from './import-addressbook.js';
@@ -46,8 +50,8 @@ import { getSpaPilotLogJs } from '../spa/js-pilot-log.js';
 
 // ── 版本（比照 CrewSync / Morning：每次推版必更新；SW cache 名稱跟著走） ────
 // 本機 preview build 會暫時加 -tNN 後綴方便對版；推正式版前拿掉只留乾淨版號。
-export const PILOT_LOG_VERSION = 'V1.3.13';
-const PILOT_LOG_CACHE = 'pilotlog-v1-3-13';
+export const PILOT_LOG_VERSION = 'V1.3.14';
+const PILOT_LOG_CACHE = 'pilotlog-v1-3-14';
 
 export const pilotLogRouter = express.Router();
 
@@ -330,6 +334,11 @@ if (document.readyState !== 'loading') pilotLogInit();
 function _renderPilotLogChangelog(): string {
   return `
     <div class="pl-cl-v">${PILOT_LOG_VERSION}</div>
+    <div class="pl-cl-txt">
+      <b>班表匯入修正 + 通訊錄可直接編輯。</b><b>(匯入)</b> 修好幾個班表匯入問題：① 真實航班的 UTC 時間（像 1610Z/17Jun）少了年份被誤判、整筆掉到列表最底看不到 → 年份改從班表月份推算。② 長程加強組員、兩個機長時，本人有時被整個丟掉或擺錯槽 → 改用員編認出本人、放進正確的槽。③ 跨月回程腿（UTC 落在下個月）重匯時被誤刪 → 改用班表月份精準掃除。④ 地面班 / 訓練不再混進飛行 logbook。<b>(通訊錄)</b> Crew 名單點一個人 → 詳情頁多了 <b>✏️ Edit</b>，可直接改名字 / 員編 / 公司 / 註記，不用再繞去別處找人改；補上員編就能拆開同名同事。也可刪除聯絡人（不影響航班紀錄）。<br>
+      <b>Roster import fixes + edit crew directly.</b> <b>(Import)</b> Fixed several roster-import issues: ① real flights whose UTC time lacked a year (e.g. 1610Z/17Jun) were misparsed and sank to the bottom of the list, invisible — the year is now inferred from the roster month. ② On long-haul augmented flights with two captains, you were sometimes dropped or placed in the wrong slot — now matched by employee id. ③ Cross-month return legs were wrongly removed on re-import — now swept precisely by roster month. ④ Ground duties / training no longer leak into the flight logbook. <b>(Address Book)</b> Tap a crew member → the detail now has <b>✏️ Edit</b> to change name / employee id / organization / comment directly. Adding an employee id separates same-name colleagues. You can also delete a contact (flight records untouched).
+    </div>
+    <div class="pl-cl-v old">V1.3.13</div>
     <div class="pl-cl-txt">
       <b>同名同事用員編拆開 + 班表匯入可挑月份。</b><b>(同名)</b> 公司有同名同事時，Crew 頁的航班數 / drill-down 改成<b>員編優先比對</b>：只要航班帶員編（V1.3.12 起的新紀錄、班表匯入的都有），同名的兩個人就能各自精準歸戶，不再一律標 SAME-NAME。只有「同名<b>又完全沒員編</b>」的人仍無法歸戶（補員編、或編輯航班時從通訊錄點選即可拆開）。<b>(挑月份)</b> Import Roster 改成兩段：先「列出可匯入月份」→ 勾選你要的（預設全選、可全選/全不選）→「匯入選取月份」，不再一次全帶。<br>
       <b>Same-name crew separated by employee id + pick months on roster import.</b> <b>(Same-name)</b> When colleagues share a name, the Crew page now matches flights by <b>employee id first</b>: any flight carrying an id (new V1.3.12+ entries and roster imports) is attributed precisely, so same-name people are no longer blanket-marked SAME-NAME. Only people who share a name <b>and have no employee id at all</b> stay unattributable (add an id, or pick them from the address book when editing a flight). <b>(Pick months)</b> Import Roster is now two-step: list available months → tick the ones you want (all selected by default) → import only those.
@@ -657,6 +666,10 @@ pilotLogRouter.post('/api/pilot-log/auth/login', async (req, res) => {
   }
   const ua = req.headers['user-agent'] || undefined;
   const session = await loginWithGoogle(idToken, ua);
+  // 封閉測試門禁擋下：回 403 + 友善訊息（前端顯示「不在邀請名單」）
+  if (session === 'not_invited') {
+    return res.status(403).json({ error: 'not_invited' });
+  }
   if (!session) return res.status(401).json({ error: 'login_failed' });
   res.cookie(_PL_RT_COOKIE, session.refreshToken, _PL_RT_COOKIE_OPTS);
   res.json(session);
@@ -1121,6 +1134,86 @@ pilotLogRouter.get('/api/pilot-log/crew', requireAuth, async (req: AuthedRequest
   res.json({ crew: r.rows });
 });
 
+// V1.3.14：直接編輯 crew —— 之前只能匯入 / 從航班間接帶員編，沒有「點名單就改」。
+// PUT body: { display_name, organization, comment, employee_ids: string[] }。員編整組覆蓋：
+// 先刪這筆現有的、再插新的；某員編已掛在別的 crew（UNIQUE user_id+employee_id 衝突）→ 跳過並回報。
+pilotLogRouter.put('/api/pilot-log/crew/:id', requireAuth, async (req: AuthedRequest, res) => {
+  const pool = getPool();
+  if (!pool || !(await ensureTables())) return res.status(503).json({ error: 'database_unavailable' });
+  const userId = req.pilotUserId!;
+  const crewId = req.params.id;
+  const body: any = req.body || {};
+  const displayName = String(body.display_name || '').trim();
+  if (!displayName) return res.status(400).json({ error: 'missing_name' });
+  const organization = String(body.organization || '').trim() || null;
+  const comment = String(body.comment || '').trim() || null;
+
+  // employee_ids：接受陣列或「逗號 / 空白分隔」字串；trim + 去空 + 去重
+  let idsRaw: string[] = [];
+  if (Array.isArray(body.employee_ids)) idsRaw = body.employee_ids.map((x: any) => String(x));
+  else if (typeof body.employee_ids === 'string') idsRaw = body.employee_ids.split(/[\s,]+/);
+  const ids = Array.from(new Set(idsRaw.map((s) => s.trim()).filter(Boolean)));
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    // 確認這筆 crew 是本 user 的（避免改到別人）
+    const own = await client.query(`SELECT id FROM crew WHERE id = $1 AND user_id = $2`, [crewId, userId]);
+    if (own.rows.length === 0) { await client.query('ROLLBACK'); return res.status(404).json({ error: 'not_found' }); }
+
+    await client.query(
+      `UPDATE crew SET display_name = $1, organization = $2, comment = $3, updated_at = NOW()
+       WHERE id = $4 AND user_id = $5`,
+      [displayName, organization, comment, crewId, userId]
+    );
+
+    // 員編整組重設：先清這筆現有的，再插新的；衝突（該員編已掛別人）→ 跳過
+    await client.query(`DELETE FROM crew_employee_ids WHERE crew_id = $1 AND user_id = $2`, [crewId, userId]);
+    const skipped: string[] = [];
+    for (const eid of ids) {
+      const ins = await client.query(
+        `INSERT INTO crew_employee_ids (crew_id, user_id, employee_id) VALUES ($1, $2, $3)
+         ON CONFLICT (user_id, employee_id) DO NOTHING`,
+        [crewId, userId, eid]
+      );
+      if ((ins.rowCount || 0) === 0) skipped.push(eid);
+    }
+    await client.query('COMMIT');
+    res.json({ ok: true, skipped });
+  } catch (e: any) {
+    try { await client.query('ROLLBACK'); } catch { /* ignore */ }
+    console.error('[pilot-log] crew update failed:', e.message);
+    res.status(500).json({ error: 'update_failed' });
+  } finally {
+    client.release();
+  }
+});
+
+// V1.3.14：刪除 crew（crew_employee_ids 靠 FK ON DELETE CASCADE 一起走）。只刪通訊錄聯絡人，
+// 不動 pilot_log_entries（航班 crew 欄是 JSONB 快照，跟通訊錄是兩回事）。
+pilotLogRouter.delete('/api/pilot-log/crew/:id', requireAuth, async (req: AuthedRequest, res) => {
+  const pool = getPool();
+  if (!pool) return res.status(503).json({ error: 'database_unavailable' });
+  try {
+    // codex P2：本人聯絡人（is_self）不可刪 —— import-roster 撈本人員編、LogTen 角色判斷都靠它認出
+    // 「你自己」，刪了之後匯入會認不得本人、要重匯通訊錄才修得回。後端硬擋，不只靠 UI。
+    const chk = await pool.query(
+      `SELECT is_self FROM crew WHERE id = $1 AND user_id = $2`,
+      [req.params.id, req.pilotUserId]
+    );
+    if (chk.rows.length === 0) return res.json({ ok: false });
+    if (chk.rows[0].is_self) return res.status(400).json({ error: 'cannot_delete_self' });
+    const r = await pool.query(
+      `DELETE FROM crew WHERE id = $1 AND user_id = $2 AND is_self = false`,
+      [req.params.id, req.pilotUserId]
+    );
+    res.json({ ok: (r.rowCount || 0) > 0 });
+  } catch (e: any) {
+    console.error('[pilot-log] crew delete failed:', e.message);
+    res.status(500).json({ error: 'delete_failed' });
+  }
+});
+
 // 手動新增一架機（V1.0.10）— 公司新交機等情境，不用每次都 export LogTen 再 import
 // upsert 行為：tail_no 已存在 → 用 COALESCE merge（空欄位不洗掉舊資料）
 pilotLogRouter.post('/api/pilot-log/aircraft', requireAuth, async (req: AuthedRequest, res) => {
@@ -1525,6 +1618,76 @@ load();
 </body></html>`);
 });
 
+// ══ 🐵 封閉測試招募（monkey）════════════════════════════════════════════════
+// 招募頁 /monkey（刻意不放 /pilot-log 底下）；報名 / 名額 API；owner 後台 /monkey/admin。
+
+// 名額計數（公開計數器；無 PII）
+pilotLogRouter.get('/api/pilot-log/monkey/slots', async (_req, res) => {
+  try { res.json(await getSlots()); }
+  catch { res.status(503).json({ error: 'unavailable' }); }
+});
+
+// 報名：驗 Google idToken → email + 驗通關碼 + 算名額（滿了轉候補）
+pilotLogRouter.post('/api/pilot-log/monkey/apply', async (req, res) => {
+  const b = req.body || {};
+  if (!b.idToken || typeof b.idToken !== 'string') return res.status(400).json({ error: 'missing_id_token' });
+  const verified = await verifyGoogleIdToken(b.idToken);
+  if (!verified) return res.status(401).json({ error: 'bad_token' });
+  const result = await applyApplicant({
+    email: verified.email,
+    code: typeof b.code === 'string' ? b.code : '',
+    fleet: typeof b.fleet === 'string' ? b.fleet : undefined,
+    usesSync: typeof b.usesSync === 'boolean' ? b.usesSync : undefined,
+    logbook: typeof b.logbook === 'string' ? b.logbook : undefined,
+    logbookOther: typeof b.logbookOther === 'string' ? b.logbookOther : undefined,
+  });
+  if (!result.ok) {
+    if (result.error === 'bad_code') return res.status(403).json({ error: 'bad_code' });
+    return res.status(503).json({ error: 'db' });
+  }
+  res.json({ ok: true, status: result.status, already: !!result.already, email: verified.email });
+});
+
+// 後台（owner 登入後）：列名單 / 加朋友 / 刪一筆。emails=PII，故走 owner 驗證，不放在無密碼的 /oops。
+async function _plRequireOwner(req: AuthedRequest, res: express.Response): Promise<boolean> {
+  if (!(await isOwnerUserId(req.pilotUserId!))) { res.status(403).json({ error: 'not_owner' }); return false; }
+  return true;
+}
+
+pilotLogRouter.get('/api/pilot-log/monkey/admin/list', requireAuth, async (req: AuthedRequest, res) => {
+  if (!(await _plRequireOwner(req, res))) return;
+  res.json({ applicants: await listApplicants(), slots: await getSlots() });
+});
+
+pilotLogRouter.post('/api/pilot-log/monkey/admin/friend', requireAuth, async (req: AuthedRequest, res) => {
+  if (!(await _plRequireOwner(req, res))) return;
+  const email = req.body?.email;
+  if (!email || typeof email !== 'string') return res.status(400).json({ error: 'missing_email' });
+  const r = await addFriend(email);
+  if (!r.ok) return res.status(400).json({ error: 'invalid_email' });
+  res.json({ ok: true, already: !!r.already });
+});
+
+pilotLogRouter.delete('/api/pilot-log/monkey/admin/:id', requireAuth, async (req: AuthedRequest, res) => {
+  if (!(await _plRequireOwner(req, res))) return;
+  res.json({ ok: await removeApplicant(req.params.id) });
+});
+
+// ── 招募頁 /monkey ───────────────────────────────────────────────────────────
+pilotLogRouter.get('/monkey', (_req, res) => {
+  res.setHeader('Content-Type', 'text/html; charset=utf-8');
+  res.setHeader('Cache-Control', 'no-store');
+  res.send(_renderMonkeyHtml());
+});
+
+// ── owner 後台 /monkey/admin（owner Google 登入後看名單）─────────────────────
+pilotLogRouter.get('/monkey/admin', (_req, res) => {
+  res.setHeader('Content-Type', 'text/html; charset=utf-8');
+  res.setHeader('Cache-Control', 'no-store');
+  res.setHeader('X-Robots-Tag', 'noindex');
+  res.send(_renderMonkeyAdminHtml());
+});
+
 // ── Quick suggest ────────────────────────────────────────────────────────────
 // 常用 tail / type / airport / crew name，給編輯器 autocomplete 用
 pilotLogRouter.get('/api/pilot-log/quick-suggest', requireAuth, async (req: AuthedRequest, res) => {
@@ -1561,3 +1724,345 @@ pilotLogRouter.get('/api/pilot-log/quick-suggest', requireAuth, async (req: Auth
     airports: airports.rows.map(r => r.code),
   });
 });
+
+// ══ 🐵 招募頁 HTML ════════════════════════════════════════════════════════════
+// 接上：名額計數（/monkey/slots）+ Google 登入（/config + GSI）+ 報名（/monkey/apply）。
+// 視覺沿用 Pilot Log 夜間主題；通關碼 = 社群置頂那組（後端比對 PILOT_LOG_MONKEY_CODE）。
+function _renderMonkeyHtml(): string {
+  return `<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0a0e1a">
+<title>來當實驗猴 · Pilot Log 封閉測試</title>
+<style>
+:root{ --bg:#0a0e1a; --card:#1a1f2e; --text:#e2e8f0; --muted:#94a3b8; --border:#334155; --accent:#3b82f6; --accent2:#22c55e; --warn:#f59e0b; --input-bg:#0a0e1a; }
+*{box-sizing:border-box;} html{font-size:15px;}
+body{ margin:0; background: radial-gradient(1200px 600px at 50% -10%, rgba(59,130,246,.18), transparent 60%), var(--bg); color:var(--text); font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; line-height:1.6; min-height:100vh; padding:env(safe-area-inset-top) 18px calc(40px + env(safe-area-inset-bottom)); }
+.wrap{max-width:520px; margin:0 auto;}
+.hero{text-align:center; padding:42px 0 14px;}
+.hero .pig{font-size:72px; line-height:1; filter:drop-shadow(0 8px 24px rgba(0,0,0,.4));}
+.hero h1{font-size:1.9em; margin:14px 0 6px; letter-spacing:.5px;}
+.hero .en{color:var(--muted); font-size:.9em; letter-spacing:1px; text-transform:uppercase;}
+.hero .lead{margin:16px auto 0; max-width:430px; color:var(--text); font-size:1.02em;}
+.hero .lead b{color:#fff;}
+.hero .pun{margin:12px auto 0; max-width:420px; font-size:.78em; color:var(--muted); font-style:italic;}
+.slots{ margin:26px auto; max-width:360px; background:linear-gradient(180deg, rgba(59,130,246,.12), rgba(59,130,246,.04)); border:1px solid var(--accent); border-radius:16px; padding:18px 20px; text-align:center; }
+.slots .label{font-size:.78em; color:var(--muted); letter-spacing:.5px;}
+.slots .num{font-size:2.6em; font-weight:800; color:#fff; line-height:1.1; margin:2px 0;}
+.slots .num small{font-size:.34em; font-weight:600; color:var(--muted); vertical-align:middle;}
+.slots .bar{height:8px; border-radius:4px; background:rgba(255,255,255,.08); overflow:hidden; margin:10px 0 4px;}
+.slots .bar > i{display:block; height:100%; background:linear-gradient(90deg,var(--accent),#60a5fa); border-radius:4px; transition:width .4s;}
+.slots .sub{font-size:.74em; color:var(--muted);}
+.card{ background:var(--card); border:1px solid var(--border); border-radius:14px; padding:18px 18px 16px; margin:14px 0; }
+.card h3{margin:0 0 12px; font-size:1.02em; display:flex; align-items:center; gap:8px;}
+.deal{list-style:none; padding:0; margin:0;}
+.deal li{display:flex; gap:10px; padding:7px 0; font-size:.92em; align-items:flex-start;}
+.deal li .ic{flex:0 0 auto; font-size:1.1em; line-height:1.4;}
+.deal li b{color:#fff;}
+.deal li.warn .ic{color:var(--warn);}
+.muted-en{color:var(--muted); font-size:.82em; margin-top:2px;}
+label.q{display:block; font-size:.86em; color:var(--text); margin:14px 0 6px; font-weight:600;}
+label.q span{color:var(--muted); font-weight:400; font-size:.92em;}
+select,input[type=email],input[type=text]{ width:100%; background:var(--input-bg); color:var(--text); border:1px solid var(--border); border-radius:9px; padding:11px 12px; font-size:.95em; -webkit-appearance:none; }
+.chk{display:flex; gap:9px; align-items:flex-start; margin:14px 0 4px; font-size:.86em; color:var(--muted);}
+.chk input{margin-top:3px; transform:scale(1.2);}
+.note{font-size:.74em; color:var(--muted); text-align:center; margin-top:12px; line-height:1.5;}
+.mkmsg{font-size:.8em; text-align:center; margin:10px 0 0; min-height:1.2em;}
+.mkmsg.err{color:#fca5a5;} .mkmsg.ok{color:var(--accent2);}
+#mk-gsi-btn{display:flex; justify-content:center; margin-top:16px; min-height:44px;}
+.done{text-align:center; padding:10px 4px;}
+.done .big{font-size:1.5em; font-weight:800; margin-bottom:8px;}
+.done .openbtn{display:inline-block; margin-top:16px; text-decoration:none; background:var(--accent); color:#fff; font-weight:700; font-size:.95em; padding:12px 22px; border-radius:10px;}
+.foot{text-align:center; color:var(--muted); font-size:.72em; margin-top:30px; line-height:1.7;}
+.foot .ver{opacity:.6;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="hero">
+    <div class="pig">🐵</div>
+    <h1>來當實驗猴</h1>
+    <div class="en">Be a Test Monkey</div>
+    <p class="lead">
+      都說<b>猴子也能開飛機</b> —— 那測個 App 應該也難不倒你。<br>
+      <b>Pilot Log</b> 正在找<b>創始測試員</b>：亂點、狂用、踩到雷就吱一聲。
+    </p>
+    <p class="pun">* 巧的是，工程師管「亂點亂測找 bug」也真的叫 monkey testing。天選之猴，就是你。</p>
+  </div>
+
+  <div class="slots">
+    <div class="label">創始測試員名額</div>
+    <div class="num" id="mkNum">10 <small>席</small></div>
+    <div class="bar"><i id="mkBar" style="width:0%"></i></div>
+    <div class="sub" id="mkSub">名額查詢中…</div>
+  </div>
+
+  <div class="card">
+    <h3>🤝 這場交易</h3>
+    <ul class="deal">
+      <li><span class="ic">🎁</span><div><b>你拿到：</b>創始會員資格，這個 App 永久免費用。<div class="muted-en">Founding member — free forever.</div></div></li>
+      <li><span class="ic">🍌</span><div><b>你要做：</b>認真用、踩到 bug 或有想法，到社群直接講。<div class="muted-en">Use it, report bugs &amp; ideas in the community.</div></div></li>
+      <li class="warn"><span class="ic">⚠️</span><div><b>醜話先說：</b>登入後完全沒在用的帳號會被請出名單，由候補遞補。<div class="muted-en">Dead accounts get replaced from the waitlist.</div></div></li>
+    </ul>
+  </div>
+
+  <div class="card" id="applyCard">
+    <h3>✍️ 報名 · 限 10 名</h3>
+
+    <div style="background:rgba(6,199,85,.08); border:1px solid #06C755; border-radius:10px; padding:13px 14px; margin-bottom:16px">
+      <div style="font-size:.84em; font-weight:700; margin-bottom:5px">① 先進測試員社群，拿「通關碼」</div>
+      <div style="font-size:.73em; color:var(--muted); line-height:1.5; margin-bottom:10px">
+        通關碼藏在社群<b style="color:var(--text)">置頂訊息</b>裡，下面報名要填。<b style="color:var(--warn)">拿不到碼＝送不出報名</b> —— 所以非進不可。可用暱稱，不必露出本尊 LINE。<br>
+        Code is pinned in the community. No code, no signup. Nicknames OK.
+      </div>
+      <a href="https://line.me/ti/g2/ArAw4k1D9vXEAMtBsButFLzSFjXzEvFXfKHQ2A?utm_source=invitation&utm_medium=link_copy&utm_campaign=default"
+         target="_blank" rel="noopener"
+         style="display:flex; align-items:center; justify-content:center; gap:8px; text-decoration:none; background:#06C755; color:#fff; font-weight:700; font-size:.92em; padding:11px; border-radius:9px;">
+        💬 進測試員社群拿通關碼
+      </a>
+    </div>
+
+    <label class="q">② 飛哪個機隊？ <span>Which fleet?</span></label>
+    <select id="qFleet">
+      <option value="">請選擇…</option>
+      <option>A321</option>
+      <option>A330</option>
+      <option>A350</option>
+    </select>
+
+    <label class="q">③ 你目前有在用班表同步嗎？ <span>Using roster sync?</span></label>
+    <select id="qSync" onchange="document.getElementById('qSyncNote').style.display = this.value.indexOf('有')===0 ? 'block' : 'none'">
+      <option value="">請選擇…</option>
+      <option>有 — 我有在用班表同步</option>
+      <option>沒有 / 不知道那是什麼</option>
+    </select>
+    <div id="qSyncNote" style="display:none; margin-top:8px; font-size:.75em; color:var(--text); line-height:1.55; background:rgba(245,158,11,.08); border:1px solid rgba(245,158,11,.35); border-radius:8px; padding:10px 12px">
+      ⚠️ <b>重要：</b>報名請用<b style="color:var(--warn)">跟班表同步「同一個」Google 帳號</b>登入，<br>否則你的班表帶不進 Pilot Log。<br>
+      <span style="color:var(--muted)">Sign up with the <b>same Google account</b> you use for roster sync.</span>
+      <div style="margin-top:7px">班表同步在 👉 <a href="https://oops.h-peak.com/main" target="_blank" rel="noopener" style="color:var(--accent); font-weight:700">oops.h-peak.com/main</a></div>
+    </div>
+
+    <label class="q">④ 現在用什麼記 logbook？ <span>Current logbook?</span></label>
+    <select id="qLog" onchange="document.getElementById('qLogOther').style.display = this.value==='其他' ? 'block' : 'none'">
+      <option value="">請選擇…</option>
+      <option>沒在記 / 偶爾記</option>
+      <option>紙本 Paper</option>
+      <option>Excel / 試算表自製</option>
+      <option>LogTen Pro</option>
+      <option>logATP2</option>
+      <option>ForeFlight Logbook</option>
+      <option>APDL（Airline Pilot Logbook）</option>
+      <option>CrewLounge / MccPILOTLOG</option>
+      <option>MyFlightbook</option>
+      <option>Logbook Pro</option>
+      <option>其他</option>
+    </select>
+    <input type="text" id="qLogOther" placeholder="是哪一套軟體？ Which app?" style="display:none; margin-top:8px;">
+
+    <label class="q">⑤ 社群通關碼 <span>Community code</span></label>
+    <input type="text" id="qCode" placeholder="社群置頂訊息裡的通關碼" autocapitalize="characters">
+
+    <label class="chk">
+      <input type="checkbox" id="qCommit">
+      <span>我願意認真試用，並在社群裡回報問題與想法。<br>I'll use it &amp; report back in the community.</span>
+    </label>
+
+    <div id="mkMsg" class="mkmsg"></div>
+    <div id="mk-gsi-btn"></div>
+    <div class="note">⑥ 用 Google 登入送出報名 —— 綁定你的帳號，之後就用<b>同一個帳號</b>登入 App。</div>
+  </div>
+
+  <div class="foot">
+    Pilot Log · 飛行記錄本 · 封閉測試<br>
+    <span class="ver">Cross-device · 永久保存 · 絕不過期</span>
+  </div>
+</div>
+
+<script>
+function mkEl(id){ return document.getElementById(id); }
+function mkVal(id){ var e=mkEl(id); return e ? (e.value||'').trim() : ''; }
+function mkMsg(t, cls){ var m=mkEl('mkMsg'); m.textContent=t||''; m.className='mkmsg'+(cls?(' '+cls):''); }
+function mkB(n){ return '<b style="color:#fff">'+n+'</b>'; }
+function mkSubText(left){
+  if(left<=0) return '公開名額已滿 · 仍可報名'+mkB('候補');
+  if(left===1) return mkB('最後一席')+' · 你是天選之人，搶到最後一個名額 🐵';
+  if(left===2) return '最後 '+mkB(2)+' 席 · 再猶豫就沒了';
+  if(left===3) return '最後 '+mkB(3)+' 席 · 慢來就沒了';
+  if(left===4) return '還剩 '+mkB(4)+' 席 · 先搶先贏';
+  return '僅剩 '+mkB(left)+' 席 · 先搶先贏';
+}
+
+var MK = { clientId:null };
+
+async function mkLoadSlots(){
+  try{
+    var r = await fetch('/api/pilot-log/monkey/slots');
+    if(!r.ok) return;
+    var s = await r.json();
+    mkEl('mkNum').innerHTML = s.total + ' <small>席</small>';
+    var takenPct = s.publicCap>0 ? Math.round((s.publicCap - s.left)/s.publicCap*100) : 0;
+    mkEl('mkBar').style.width = Math.min(100, takenPct) + '%';
+    mkEl('mkSub').innerHTML = mkSubText(s.full ? 0 : s.left);
+  }catch(e){}
+}
+
+async function mkLoadConfig(){
+  if(MK.clientId) return MK.clientId;
+  try{ var r=await fetch('/api/pilot-log/config'); var j=await r.json(); MK.clientId=j.google_client_id; return MK.clientId; }
+  catch(e){ return null; }
+}
+function mkLoadGis(){
+  if(window.google && window.google.accounts && window.google.accounts.id) return Promise.resolve();
+  if(window._mkGis) return window._mkGis;
+  window._mkGis = new Promise(function(resolve,reject){
+    var s=document.createElement('script'); s.src='https://accounts.google.com/gsi/client'; s.async=true; s.defer=true;
+    s.onload=resolve; s.onerror=function(){reject(new Error('gis'));}; document.head.appendChild(s);
+  });
+  return window._mkGis;
+}
+async function mkInitSignIn(){
+  var clientId = await mkLoadConfig();
+  if(!clientId){ mkMsg('Google 載入失敗，稍後再試','err'); return; }
+  try{ await mkLoadGis(); }catch(e){ mkMsg('Google 載入失敗，稍後再試','err'); return; }
+  google.accounts.id.initialize({ client_id:clientId, callback:mkOnCredential, auto_select:false, cancel_on_tap_outside:true });
+  var host=mkEl('mk-gsi-btn');
+  if(host){ host.innerHTML=''; google.accounts.id.renderButton(host,{ theme:'filled_blue', size:'large', text:'continue_with', shape:'pill', logo_alignment:'left' }); }
+}
+
+async function mkOnCredential(resp){
+  if(!resp || !resp.credential) return;
+  // 先驗表單必填
+  var code=mkVal('qCode'), fleet=mkVal('qFleet'), sync=mkVal('qSync');
+  if(!fleet){ mkMsg('請先選機隊','err'); return; }
+  if(!code){ mkMsg('請先填社群通關碼（社群置頂訊息裡）','err'); return; }
+  if(!mkEl('qCommit').checked){ mkMsg('請勾選願意試用並回報','err'); return; }
+  mkMsg('報名中…');
+  var logbook=mkVal('qLog');
+  var body={
+    idToken: resp.credential, code: code, fleet: fleet,
+    usesSync: sync ? (sync.indexOf('有')===0) : null,
+    logbook: logbook || null,
+    logbookOther: logbook==='其他' ? mkVal('qLogOther') : null
+  };
+  var r, j;
+  try{
+    r = await fetch('/api/pilot-log/monkey/apply', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body) });
+    j = await r.json().catch(function(){ return {}; });
+  }catch(e){ mkMsg('連線失敗，稍後再試','err'); return; }
+  if(r.status===403 && j.error==='bad_code'){ mkMsg('通關碼不對 — 請確認社群置頂的那組','err'); return; }
+  if(r.status===401){ mkMsg('Google 驗證失敗，請重試','err'); return; }
+  if(!r.ok){ mkMsg('報名失敗，稍後再試','err'); return; }
+  mkShowDone(j);
+}
+
+function mkShowDone(j){
+  var card=mkEl('applyCard');
+  var html='<div class="done">';
+  if(j.already){
+    html += '<div class="big">🐵 你已經報名過囉</div><div style="color:var(--muted);font-size:.9em">用同一個帳號（'+ (j.email||'') +'）直接登入 App 就好。</div>';
+  } else if(j.status==='waitlist'){
+    html += '<div class="big" style="color:var(--warn)">🈵 公開名額剛好滿了</div><div style="color:var(--muted);font-size:.9em">你已進<b style="color:#fff">候補名單</b>，有人空出來會在社群通知你，別退社群！</div>';
+  } else {
+    html += '<div class="big" style="color:var(--accent2)">✅ 報名成功！</div><div style="color:var(--muted);font-size:.9em">你已是創始測試員（'+ (j.email||'') +'）。記得<b style="color:#fff">用同一個 Google 帳號</b>登入 App，回報都在社群裡。</div>';
+    html += '<a class="openbtn" href="/pilot-log">📒 打開 Pilot Log</a>';
+  }
+  html += '</div>';
+  card.innerHTML = html;
+  mkLoadSlots();
+  card.scrollIntoView({behavior:'smooth', block:'center'});
+}
+
+function mkInit(){ mkLoadSlots(); mkInitSignIn(); }
+document.addEventListener('DOMContentLoaded', mkInit);
+if(document.readyState!=='loading') mkInit();
+</script>
+</body>
+</html>`;
+}
+
+// ══ 🐵 owner 後台 /monkey/admin ══════════════════════════════════════════════
+// owner Google 登入 → 看報名名單（含 email/機隊/同步/logbook/狀態）+ 加朋友 + 刪一筆。
+// 因為含 PII + 寫入動作，走 owner 驗證（不像 /oops 無密碼）。
+function _renderMonkeyAdminHtml(): string {
+  return `<!DOCTYPE html>
+<html lang="zh-Hant"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex">
+<title>🐵 Monkey · Admin</title>
+<style>
+*{box-sizing:border-box;} body{margin:0;background:#0a0e1a;color:#e2e8f0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:15px;padding:16px;padding-top:max(16px,env(safe-area-inset-top));}
+h1{font-size:1.1em;margin:0 0 12px;}
+.card{background:#1a1f2e;border:1px solid #334155;border-radius:12px;padding:14px;margin-bottom:12px;}
+.muted{color:#94a3b8;} .err{color:#fca5a5;}
+table{width:100%;border-collapse:collapse;font-size:.8em;} th,td{text-align:left;padding:6px 7px;vertical-align:top;}
+th{color:#94a3b8;font-weight:700;} tr+tr td{border-top:1px solid #283449;}
+.pill{display:inline-block;font-size:.85em;font-weight:700;padding:1px 7px;border-radius:6px;}
+.pill.active{background:rgba(34,197,94,.15);color:#4ade80;} .pill.waitlist{background:rgba(245,158,11,.15);color:#fbbf24;}
+.pill.owner{background:rgba(59,130,246,.15);color:#60a5fa;} .pill.friend{background:rgba(168,85,247,.15);color:#c084fc;}
+input{background:#0a0e1a;color:#e2e8f0;border:1px solid #334155;border-radius:8px;padding:9px 11px;font-size:.9em;}
+button{background:#3b82f6;color:#fff;border:0;border-radius:8px;padding:8px 14px;font-size:.82em;font-weight:700;cursor:pointer;}
+button.del{background:#dc2626;padding:4px 9px;font-size:.74em;}
+#gsi{margin:14px 0;}
+</style></head>
+<body>
+<h1>🐵 Monkey · Admin</h1>
+<div id="msg" class="muted" style="font-size:.78em;margin-bottom:8px"></div>
+<div id="login" class="card"><div class="muted" style="font-size:.85em;margin-bottom:6px">擁有者登入</div><div id="gsi"></div></div>
+<div id="panel" style="display:none"></div>
+<script>
+function el(id){return document.getElementById(id);}
+var AD={token:null,clientId:null};
+async function cfg(){ if(AD.clientId)return AD.clientId; try{var r=await fetch('/api/pilot-log/config');var j=await r.json();AD.clientId=j.google_client_id;return AD.clientId;}catch(e){return null;} }
+function gis(){ if(window.google&&google.accounts&&google.accounts.id)return Promise.resolve(); if(window._g)return window._g; window._g=new Promise(function(res,rej){var s=document.createElement('script');s.src='https://accounts.google.com/gsi/client';s.async=true;s.defer=true;s.onload=res;s.onerror=rej;document.head.appendChild(s);}); return window._g; }
+async function initLogin(){
+  var c=await cfg(); if(!c){el('msg').innerHTML='<span class="err">Google 載入失敗</span>';return;}
+  await gis();
+  google.accounts.id.initialize({client_id:c,callback:onCred,auto_select:false});
+  google.accounts.id.renderButton(el('gsi'),{theme:'filled_blue',size:'large',text:'signin_with',shape:'pill'});
+}
+async function onCred(resp){
+  if(!resp||!resp.credential)return;
+  el('msg').textContent='登入中…';
+  var r=await fetch('/api/pilot-log/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({idToken:resp.credential})});
+  if(!r.ok){el('msg').innerHTML='<span class="err">登入失敗</span>';return;}
+  var j=await r.json(); AD.token=j.accessToken; el('login').style.display='none'; load();
+}
+async function api(path,opt){ opt=opt||{}; opt.headers=opt.headers||{}; opt.headers['Authorization']='Bearer '+AD.token; return fetch(path,opt); }
+async function load(){
+  el('msg').textContent='查詢中…';
+  var r=await api('/api/pilot-log/monkey/admin/list');
+  if(r.status===403){el('msg').innerHTML='<span class="err">這個帳號不是擁有者</span>';return;}
+  if(!r.ok){el('msg').innerHTML='<span class="err">查詢失敗 '+r.status+'</span>';return;}
+  var j=await r.json(); render(j);
+}
+function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
+function render(j){
+  var s=j.slots||{}, a=j.applicants||[];
+  el('msg').textContent='公開 '+ (s.publicTaken||0) +'/'+ (s.publicCap||0) +' 席 · 名單共 '+ a.length +' 人';
+  var rows=a.map(function(x){
+    return '<tr><td>'+esc(x.email)+'<div class="muted" style="font-size:.85em">'+esc(x.fleet||'')+(x.uses_sync===true?' · 同步':'')+(x.logbook?(' · '+esc(x.logbook)+(x.logbook_other?(' ('+esc(x.logbook_other)+')'):'')):'')+'</div></td>'+
+      '<td><span class="pill '+esc(x.source)+'">'+esc(x.source)+'</span><br><span class="pill '+esc(x.status)+'">'+esc(x.status)+'</span></td>'+
+      '<td style="text-align:right"><button class="del" data-id="'+esc(x.id)+'" data-email="'+esc(x.email)+'" onclick="del(this)">刪</button></td></tr>';
+  }).join('');
+  var html='<div class="card"><div style="margin-bottom:8px"><input id="fe" type="email" placeholder="朋友 email（不佔公開席次）" style="width:64%"> <button onclick="addF()">+ 加朋友</button></div>'+
+    '<table><tr><th>Email / 資料</th><th>類別 / 狀態</th><th></th></tr>'+rows+'</table></div>'+
+    '<div style="text-align:center;margin:8px 0 24px"><button onclick="load()">↻ 重新整理</button></div>';
+  var p=el('panel'); p.style.display='block'; p.innerHTML=html;
+}
+async function addF(){
+  var v=(el('fe').value||'').trim(); if(!v)return;
+  var r=await api('/api/pilot-log/monkey/admin/friend',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:v})});
+  if(!r.ok){alert('加入失敗');return;} load();
+}
+async function del(btn){
+  var id=btn.getAttribute('data-id'), email=btn.getAttribute('data-email')||'';
+  if(!confirm('刪除 '+email+' ？'))return;
+  var r=await api('/api/pilot-log/monkey/admin/'+id,{method:'DELETE'});
+  if(!r.ok){alert('刪除失敗');return;} load();
+}
+initLogin();
+</script>
+</body></html>`;
+}

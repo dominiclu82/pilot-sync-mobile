@@ -1066,6 +1066,30 @@ function _plCrewVal(raw) {
   if (typeof raw === 'string') return { name: raw, rank: '', eid: '' };
   return { name: raw.name || '', rank: raw.rank || '', eid: raw.eid || '' };
 }
+// V1.3.14：員編 → 通訊錄顯示名字 的索引。班表只帶官方拼音（JUNG-HAO LEE），但通訊錄裡使用者存的是
+// 認得的名字（Reggie Lee 李戎浩）。顯示組員時用員編去換成使用者存的名字 —— 而且是「顯示當下才換」、
+// 不寫死，所以改通訊錄名字、過去所有航班一起更新。以 _pl.crew 陣列參照當快取鍵，名單重載才重建。
+function _plEidNameIndex() {
+  if (_pl._eidIdxSrc === _pl.crew && _pl._eidIdx) return _pl._eidIdx;
+  var byEid = {};
+  (_pl.crew || []).forEach(function(c) {
+    var nm = (c.display_name || '').trim();
+    if (!nm) return;
+    (c.employee_ids || []).forEach(function(eid) {
+      var e = String(eid == null ? '' : eid).trim();
+      if (e && !byEid[e]) byEid[e] = nm;
+    });
+  });
+  _pl._eidIdx = byEid; _pl._eidIdxSrc = _pl.crew;
+  return byEid;
+}
+// 單一 crew 槽值 → 顯示名字：有員編且通訊錄查得到 → 用通訊錄名；否則退回槽裡存的名字（班表拼音）。
+function _plCrewDisplayName(v) {
+  var o = _plCrewVal(v);
+  var eid = (o.eid || '').trim();
+  if (eid) { var idx = _plEidNameIndex(); if (idx[eid]) return idx[eid]; }
+  return o.name ? o.name.trim() : '';
+}
 // V1.3.12（codex P1）：把舊 schema 的 crew key 對映到新 6 槽，讓編輯舊紀錄時看得到、可編、不掉資料。
 // 只在新槽是空的時候搬；observer2 無對應槽 → 留在物件裡（存檔時 _plSaveEntry 會保留，不丟）。
 function _plMigrateLegacyCrew(crew) {
@@ -1144,15 +1168,18 @@ async function _plResetCrewLabels() {
 function _plCrewField(key, e) {
   var val = _plCrewVal(e.crew && e.crew[key]);
   var label = _plCrewLabel(key);
+  // V1.3.14：有員編且通訊錄查得到 → 編輯器也顯示通訊錄名（跟列表一致）。name0 同步設成顯示名，
+  // 這樣「沒被改過 → 沿用舊員編」的判斷仍成立（name === name0），不會弄丟 eid 連結。
+  var dispName = _plCrewDisplayName(val);
   var inputCss = 'background:var(--bg,#0a0e1a);color:var(--text);border:1px solid var(--border,#334155);border-radius:6px;padding:6px 8px;font-size:.78em';
   return '<div style="margin-bottom:8px">' +
     '<div style="font-size:.62em;color:var(--muted);margin-bottom:2px">' + _plEsc(label) + '</div>' +
     '<div style="display:flex;gap:4px">' +
-      '<input id="ple-crew-' + key + '" list="ple-crew-dl" placeholder="name" style="flex:1;' + inputCss + '" value="' + _plEsc(val.name) + '">' +
+      '<input id="ple-crew-' + key + '" list="ple-crew-dl" placeholder="name" style="flex:1;' + inputCss + '" value="' + _plEsc(dispName) + '">' +
       '<input id="ple-crewrank-' + key + '" placeholder="rank" style="width:62px;text-transform:uppercase;' + inputCss + '" value="' + _plEsc(val.rank) + '">' +
     '</div>' +
     '<input type="hidden" id="ple-crewid-' + key + '" value="' + _plEsc(val.eid) + '">' +
-    '<input type="hidden" id="ple-crewname0-' + key + '" value="' + _plEsc(val.name) + '"></div>';  // 原始名字：判斷名字有沒有被改過，改過就不沿用舊員編
+    '<input type="hidden" id="ple-crewname0-' + key + '" value="' + _plEsc(dispName) + '"></div>';  // 原始名字：判斷名字有沒有被改過，改過就不沿用舊員編
 }
 
 // ── V1.3.05：機場座標 + 太陽角度，給手動新增航班自動算 night time / 日夜起降 ─────────
@@ -2525,7 +2552,7 @@ function _plEntryCrewNames(e) {
   var order = ['pic', 'crew2', 'crew3', 'crew4', 'cic', 'obs',
                'sic', 'fo1', 'fo2', 'purser', 'observer1', 'observer2'];
   var names = [], seen = {};
-  function nm(v) { var o = _plCrewVal(v); return o.name ? o.name.trim() : ''; }
+  function nm(v) { return _plCrewDisplayName(v); }   // V1.3.14：員編對得到 → 顯示通訊錄名
   order.forEach(function(k) {
     var n = nm(e.crew[k]);
     if (n) { names.push(n); seen[k] = 1; }
@@ -2576,6 +2603,7 @@ function _plCrewFlightIndex() {
   var ambNames = _plCrewAmbiguousNames();
   var eidToId = {}, nameToId = {};
   (_pl.crew || []).forEach(function(c) {
+    if (c.is_self) return;                                   // V1.3.14：你不會「跟自己飛」→ 本人不進歸戶索引，不算同事航班數
     var nm = (c.display_name || '').trim();
     if (nm && !ambNames[nm]) nameToId[nm] = c.id;            // 只索引「不同名」的名字
     (c.employee_ids || []).forEach(function(eid) { if (eid) eidToId[String(eid).trim()] = c.id; });
@@ -2669,11 +2697,16 @@ function _plRenderCrewRows() {
       var idStr = Array.isArray(p.employee_ids) && p.employee_ids.length ? p.employee_ids.join(' / ') : '';
       var selfMark = p.is_self ? '<span style="background:#0ea5e9;color:#fff;border-radius:4px;padding:1px 6px;font-size:.6em;margin-left:6px">YOU</span>' : '';
       var ambMark = unattrib ? '<span style="background:#f59e0b;color:#000;border-radius:4px;padding:1px 6px;font-size:.6em;margin-left:6px" title="同名且沒有員編，無法判斷哪些航班屬於誰。在 Address Book 給該員編、或之後從通訊錄點選即可拆開">SAME-NAME</span>' : '';
-      var countCell = unattrib
+      var countCell = p.is_self
+        ? '<div style="font-size:.72em;color:var(--muted);text-align:right" title="這是你本人，不計入同事航班數">—</div>'
+        : unattrib
         ? '<div style="font-size:.72em;color:var(--muted);text-align:right" title="同名且無員編，無法計數">—</div>'
         : '<div style="font-size:.72em;color:var(--text);text-align:right">' + (countById[p.id] || 0) + ' flights</div>';
-      rows += '<div onclick="_plOpenCrewDetail(\'' + _plEsc(p.id) + '\')" ' +
-        'style="background:var(--card);border-radius:8px;padding:10px 12px;margin-bottom:6px;cursor:pointer;display:flex;gap:10px;align-items:center">' +
+      // V1.3.14（codex P3）：本人不進歸戶索引 → drill-down 會是空的，所以本人這列不可點（跟自己飛沒意義）。
+      var clickAttr = p.is_self ? '' : 'onclick="_plOpenCrewDetail(\'' + _plEsc(p.id) + '\')" ';
+      var cursorCss = p.is_self ? 'cursor:default' : 'cursor:pointer';
+      rows += '<div ' + clickAttr +
+        'style="background:var(--card);border-radius:8px;padding:10px 12px;margin-bottom:6px;' + cursorCss + ';display:flex;gap:10px;align-items:center">' +
         '<div style="flex:1"><div style="font-size:.85em;font-weight:700">' + _plEsc(p.display_name) + selfMark + ambMark + '</div>' +
           (idStr ? '<div style="font-size:.62em;color:var(--muted)">ID: ' + _plEsc(idStr) + '</div>' : '') +
           (p.organization ? '<div style="font-size:.62em;color:var(--muted)">' + _plEsc(p.organization) + '</div>' : '') + '</div>' +
@@ -2746,10 +2779,91 @@ function _plOpenCrewDetail(crewId) {
         '<div style="font-size:1em;font-weight:700">' + _plEsc(person.display_name) + ' / Flights</div>' +
         '<div style="flex:1"></div>' +
         '<div style="font-size:.72em;color:var(--muted)">' + countLabel + '</div>' +
+        '<button onclick="_plEditCrew(\'' + _plEsc(person.id) + '\')" style="background:transparent;border:1px solid var(--border);color:var(--text);border-radius:6px;padding:4px 9px;font-size:.76em;font-weight:600;cursor:pointer;margin-left:8px">✏️ Edit</button>' +
       '</div>' +
       head +
       bodyHtml +
     '</div>';
+}
+
+// V1.3.14：直接編輯 crew —— 點名單→詳情→✏️ Edit，不用再繞去別處找人改。
+function _plEditCrew(crewId) {
+  var c = document.getElementById('pilotlog-content');
+  if (!c) return;
+  var person = null;
+  for (var i = 0; i < _pl.crew.length; i++) { if (_pl.crew[i].id === crewId) { person = _pl.crew[i]; break; } }
+  if (!person) { _plOpenCrew(); return; }
+  var ids = Array.isArray(person.employee_ids) ? person.employee_ids.join(', ') : '';
+  var inCss = 'width:100%;background:var(--input-bg);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:10px 12px;font-size:.95em;-webkit-appearance:none;box-sizing:border-box';
+  var lblCss = 'display:block;font-size:.8em;color:var(--muted);font-weight:600;margin:12px 0 5px';
+  c.innerHTML =
+    '<div style="padding:12px 14px;max-width:460px;margin:0 auto">' +
+      '<div style="display:flex;align-items:center;gap:10px;margin-bottom:6px">' +
+        '<button onclick="_plOpenCrewDetail(\'' + _plEsc(crewId) + '\')" style="background:transparent;border:0;color:var(--text);font-size:1.2em;cursor:pointer">←</button>' +
+        '<div style="font-size:1em;font-weight:700">✏️ 編輯 Crew</div>' +
+      '</div>' +
+      '<label style="' + lblCss + '">名字 Name</label>' +
+      '<input id="plce-name" type="text" style="' + inCss + '" value="' + _plEsc(person.display_name || '') + '">' +
+      '<label style="' + lblCss + '">員編 Employee ID（多個用逗號分隔）</label>' +
+      '<input id="plce-ids" type="text" style="' + inCss + '" value="' + _plEsc(ids) + '" placeholder="例如 79363, B12345">' +
+      '<label style="' + lblCss + '">公司 Organization</label>' +
+      '<input id="plce-org" type="text" style="' + inCss + '" value="' + _plEsc(person.organization || '') + '">' +
+      '<label style="' + lblCss + '">註記 Comment</label>' +
+      '<input id="plce-comment" type="text" style="' + inCss + '" value="' + _plEsc(person.comment || '') + '">' +
+      '<div style="display:flex;gap:10px;margin-top:18px">' +
+        '<button onclick="_plSaveCrewEdit(\'' + _plEsc(crewId) + '\')" style="flex:1;background:#10b981;color:#fff;border:0;border-radius:8px;padding:11px;font-size:.9em;font-weight:700;cursor:pointer">💾 儲存 Save</button>' +
+        '<button onclick="_plOpenCrewDetail(\'' + _plEsc(crewId) + '\')" style="flex:0 0 auto;background:transparent;color:var(--muted);border:1px solid var(--border);border-radius:8px;padding:11px 16px;font-size:.9em;cursor:pointer">取消</button>' +
+      '</div>' +
+      '<div style="border-top:1px solid var(--border);margin:22px 0 0;padding-top:14px">' +
+        '<button onclick="_plDeleteCrew(\'' + _plEsc(crewId) + '\')" style="background:transparent;color:#ef4444;border:1px solid rgba(239,68,68,.4);border-radius:8px;padding:9px 14px;font-size:.82em;font-weight:700;cursor:pointer">🗑️ 刪除這個 crew</button>' +
+        '<div style="font-size:.7em;color:var(--muted);margin-top:6px">刪除只移除通訊錄聯絡人，不影響你的航班紀錄。<br>Deleting removes the contact only; your flight records are untouched.</div>' +
+      '</div>' +
+    '</div>';
+}
+
+// 重新拉 crew 名單到 _pl.crew（編輯 / 刪除後即時反映；換新陣列參照會讓員編索引快取自動重建）
+async function _plReloadCrew() {
+  try {
+    var r = await _plApi('/api/pilot-log/crew');
+    if (r.ok) { var j = await r.json(); _pl.crew = j.crew || []; try { _plIDBSet('crew', _pl.crew); } catch (e) {} }
+  } catch (e) {}
+}
+
+async function _plSaveCrewEdit(crewId) {
+  var nameEl = document.getElementById('plce-name');
+  var name = nameEl ? (nameEl.value || '').trim() : '';
+  if (!name) { _plToast('名字不能空白 · Name required', 'error'); return; }
+  var idsRaw = (document.getElementById('plce-ids').value || '');
+  var body = {
+    display_name: name,
+    employee_ids: idsRaw.split(/[\s,]+/).map(function (s) { return s.trim(); }).filter(Boolean),
+    organization: (document.getElementById('plce-org').value || '').trim(),
+    comment: (document.getElementById('plce-comment').value || '').trim()
+  };
+  var r;
+  try { r = await _plApi('/api/pilot-log/crew/' + encodeURIComponent(crewId), { method: 'PUT', body: body }); }
+  catch (e) { _plToast('儲存失敗 · Save failed', 'error'); return; }
+  if (!r.ok) { _plToast('儲存失敗 · Save failed', 'error'); return; }
+  var j = await r.json().catch(function () { return {}; });
+  await _plReloadCrew();
+  _plOpenCrewDetail(crewId);
+  if (j.skipped && j.skipped.length) {
+    _plToast('已存；這些員編已掛在別人身上、略過：' + j.skipped.join(', '), 'error');
+  } else {
+    _plToast('已更新 · Updated');
+  }
+}
+
+async function _plDeleteCrew(crewId) {
+  if (!confirm('確定刪除這個 crew？只移除通訊錄聯絡人，不影響航班紀錄。')) return;
+  var r;
+  try { r = await _plApi('/api/pilot-log/crew/' + encodeURIComponent(crewId), { method: 'DELETE' }); }
+  catch (e) { _plToast('刪除失敗 · Delete failed', 'error'); return; }
+  if (r.status === 400) { _plToast('本人聯絡人不能刪除 · Cannot delete your own contact', 'error'); return; }
+  if (!r.ok) { _plToast('刪除失敗 · Delete failed', 'error'); return; }
+  await _plReloadCrew();
+  _plToast('已刪除 · Deleted');
+  _plOpenCrew();
 }
 
 // === SECTION: analyze（純統計 + 圖表）═══════════════════════════════════════
