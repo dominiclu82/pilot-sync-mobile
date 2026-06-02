@@ -51,8 +51,8 @@ import { getSpaPilotLogJs } from '../spa/js-pilot-log.js';
 
 // ── 版本（比照 CrewSync / Morning：每次推版必更新；SW cache 名稱跟著走） ────
 // 本機 preview build 會暫時加 -tNN 後綴方便對版；推正式版前拿掉只留乾淨版號。
-export const PILOT_LOG_VERSION = 'V1.3.25';
-const PILOT_LOG_CACHE = 'pilotlog-v1-3-25';
+export const PILOT_LOG_VERSION = 'V1.3.26';
+const PILOT_LOG_CACHE = 'pilotlog-v1-3-26';
 
 export const pilotLogRouter = express.Router();
 
@@ -335,6 +335,11 @@ if (document.readyState !== 'loading') pilotLogInit();
 function _renderPilotLogChangelog(): string {
   return `
     <div class="pl-cl-v">${PILOT_LOG_VERSION}</div>
+    <div class="pl-cl-txt">
+      <b>修兩個 New Entry bug + 離線秒開。</b><b>(1) 新增航班不再亂帶機型：</b>以前按 + New Entry 會自動塞「機尾庫第一台」的機型 / 機尾（例如 A321-200 / B-16201），不必要。現在<b>留空白讓你自己選</b>。<b>(2) 換機型會清掉舊機尾：</b>以前選了新機型，右邊舊機型的機尾（例如 B-16201）不會消失、對不起來。現在<b>換機型時若機尾不屬於新機型就自動清空</b>。<b>(3) 離線秒開：</b>確定沒網路時，Report / Analyze 不再卡「Loading…」轉半天 —— <b>直接用上次的快取資料即時顯示</b>（頂部維持 OFFLINE 提示）。<br>
+      <b>Two New Entry bugs fixed + instant offline.</b> (1) New Entry no longer auto-fills the first registry aircraft's type/tail (e.g. A321-200 / B-16201) — left blank for you to pick. (2) Changing the aircraft type now clears a tail that doesn't belong to the new type (no more stale mismatched tail). (3) When offline, Report / Analyze stop hanging on "Loading…" and render instantly from the last cached data (OFFLINE banner stays).
+    </div>
+    <div class="pl-cl-v old">V1.3.25</div>
     <div class="pl-cl-txt">
       <b>Import 介面大改版：左側三分頁，清爽不雜亂 + Wipe 改成勾選類別清除。</b>以前 Import 一頁疊六張卡、來源下拉跟卡片混在一起很亂。現在改成<b>左邊直欄三個分頁</b>，點哪個右邊就顯示哪個：<br>
       <b>① 📅 班表 Roster</b>（最常用、預設）—— 從 CrewSync 帶班表。<br>

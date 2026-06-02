@@ -974,11 +974,8 @@ function _plOpenEditor(id) {
     _plMigrateLegacyCrew(_pl.editing.crew);   // V1.3.12：舊 crew schema → 新 6 槽（看得到、可編）
     if (!_pl.editing.approaches) _pl.editing.approaches = [];
   } else {
+    // V1.3.26：新增航班不再硬帶「機尾庫第一台」的機型 / 機尾（user：不必要，且換機型時舊機尾還不清）。留空白讓使用者自己選。
     _pl.editing = _plBlankEntry();
-    if (_pl.aircraft.length) {
-      _pl.editing.tail_no = _pl.aircraft[0].tail_no;
-      _pl.editing.aircraft_type = _pl.aircraft[0].type_code;
-    }
   }
   // iPad（>=768px）且 logbook 的右明細面板存在 → render 到右側、列表保留；
   // 否則（iPhone、或 Aircraft/Crew detail 等場景）→ 全螢幕（原行為）
@@ -1481,8 +1478,17 @@ function _plTailOptionsFor(type, current) {
 function _plRefilterTails() {
   var sel = document.getElementById('ple-tail_no');
   if (!sel) return;
+  var type = _plGetVal('ple-aircraft_type');
   var cur = sel.value;
-  var opts = _plTailOptionsFor(_plGetVal('ple-aircraft_type'), cur);
+  // V1.3.26：換機型 → 只清「機尾庫裡已知、但屬於別機型」的機尾（明確 mismatch，例如 B-16201 是 A321、改成 A330 就清）。
+  // 機尾庫查無的機尾（匯入的歷史機尾，沒建進機尾庫）一律保留 —— 否則改機型會誤刪 valid tail（codex P2）。
+  if (cur && type) {
+    var _all = _pl.aircraft || [];
+    var _inReg = _all.some(function(a) { return a.tail_no === cur; });
+    var _match = _all.some(function(a) { return a.tail_no === cur && a.type_code === type; });
+    if (_inReg && !_match) cur = '';
+  }
+  var opts = _plTailOptionsFor(type, cur);
   sel.innerHTML = opts.map(function(o) {
     return '<option value="' + _plEsc(o) + '"' + (o === cur ? ' selected' : '') + '>' + _plEsc(o || '—') + '</option>';
   }).join('');
@@ -2450,6 +2456,13 @@ async function _plUploadAddressBook() {
 // 主頁 _pl.entries 受 filter + 200 limit 影響，counts 跟 drill-down 不能用它
 async function _plFetchAircraftEntries() {
   // 用 limit=50000（server 端剛調的上限），覆蓋任何真實飛行員職涯範圍。
+  // V1.3.26：已知離線就別等網路 —— 離線時 fetch 會卡很久才失敗（Report/Analyze 一直 Loading…）。
+  // navigator 明確離線 → 直接用既有快取（IDB 已載）+ 標離線，秒回。
+  if (!_plOnline()) {
+    _plSetOffline(true);
+    if (!_pl.aircraftEntries) _pl.aircraftEntries = [];
+    return;
+  }
   // V1.2：網路掛掉保留既有快照（可能來自 IDB），設 OFFLINE 旗標；成功就寫一份回 IDB。
   try {
     var res = await _plApi('/api/pilot-log/entries?limit=50000');
