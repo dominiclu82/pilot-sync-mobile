@@ -51,8 +51,8 @@ import { getSpaPilotLogJs } from '../spa/js-pilot-log.js';
 
 // ── 版本（比照 CrewSync / Morning：每次推版必更新；SW cache 名稱跟著走） ────
 // 本機 preview build 會暫時加 -tNN 後綴方便對版；推正式版前拿掉只留乾淨版號。
-export const PILOT_LOG_VERSION = 'V1.3.20';
-const PILOT_LOG_CACHE = 'pilotlog-v1-3-20';
+export const PILOT_LOG_VERSION = 'V1.3.21';
+const PILOT_LOG_CACHE = 'pilotlog-v1-3-21';
 
 export const pilotLogRouter = express.Router();
 
@@ -335,6 +335,11 @@ if (document.readyState !== 'loading') pilotLogInit();
 function _renderPilotLogChangelog(): string {
   return `
     <div class="pl-cl-v">${PILOT_LOG_VERSION}</div>
+    <div class="pl-cl-txt">
+      <b>Analyze 可點選鑽取：點公司看各機型 PIC/SIC + 該批航班，點機型看各公司。</b>Analyze 的「依公司」「依機型」每一列現在<b>可以點</b>：點「EVA Air」→ 看它<b>各機型的 PIC / SIC 時數</b>（B777 PIC 多少、B787 PIC 多少…）<b>＋那些航班的列表</b>（再點一筆可開進去看 / 編）；點機型 → 看各公司的 PIC / SIC + 航班。終於能查「我在某公司某機型飛了多少 PIC」。<br>
+      <b>Analyze rows are now drill-down.</b> Each row in "By Company" and "By Type" is tappable: tap "EVA Air" → see PIC / SIC hours <b>per type</b> (e.g. B777 PIC, B787 PIC) <b>plus the list of those flights</b> (tap one to open it); tap a type → per-company breakdown + flights. You can finally check "how many PIC hours on this type at this airline".
+    </div>
+    <div class="pl-cl-v old">V1.3.20</div>
     <div class="pl-cl-txt">
       <b>機場碼 IATA / ICAO 自選顯示 + 修好班表航班的 night time 自動計算。</b><b>(顯示)</b> Logbook 工具列加 <b>🌐 切換鈕</b>，機場碼可選 ICAO（預設）或 IATA 顯示，列表與編輯器一致；班表帶 IATA、LogTen 帶 ICAO 不再混亂。<b>(Night)</b> 以前班表航班用 IATA 碼（TPE/LAX）查不到座標、night 一直空白；現在 IATA / ICAO 都查得到座標，而且<b>開啟編輯器就自動補算 night</b>（不用手動碰欄位）。<br>
       <b>IATA / ICAO airport-code display toggle + fixed night-time auto-calc for roster flights.</b> <b>(Display)</b> A 🌐 toggle in the Logbook toolbar switches airport codes between ICAO (default) and IATA, consistent across the list and editor — no more mixed IATA/ICAO from different sources. <b>(Night)</b> Roster flights using IATA codes (TPE/LAX) previously couldn't resolve coordinates so night stayed blank; now both IATA and ICAO resolve, and night auto-computes when you open the editor.

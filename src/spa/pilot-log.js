@@ -3221,21 +3221,22 @@ function _plBreakdownAgg(entries, keyFn) {
   return { rows: rows, tot: tot };
 }
 
-function _plBreakdownTable(title, firstCol, entries, keyFn) {
+function _plBreakdownTable(title, firstCol, entries, keyFn, rowClickFn) {
   if (!entries.length) return '';
   var agg = _plBreakdownAgg(entries, keyFn);
   var th = function(t) { return '<th style="text-align:right;padding:5px 8px;font-weight:700;color:var(--muted);white-space:nowrap">' + t + '</th>'; };
   var head = '<tr><th style="text-align:left;padding:5px 8px;color:var(--muted)">' + firstCol + '</th>' +
     th('Flt') + th('Block') + th('PIC') + th('PIC&nbsp;Sec') + th('SIC') + th('Night') + th('T/O') + th('Ldg') + '</tr>';
   var tdN = function(v) { return '<td style="text-align:right;padding:5px 8px;font-variant-numeric:tabular-nums;white-space:nowrap">' + v + '</td>'; };
-  var rowHtml = function(label, r, extra) {
-    return '<tr style="' + extra + '">' +
-      '<td style="text-align:left;padding:5px 8px;font-weight:700;white-space:nowrap">' + _plEsc(label) + '</td>' +
+  var rowHtml = function(label, r, extra, clickable) {
+    var onclick = (clickable && rowClickFn) ? rowClickFn(label) : null;
+    return '<tr style="' + extra + (onclick ? ';cursor:pointer' : '') + '"' + (onclick ? ' onclick="' + _plEsc(onclick) + '"' : '') + '>' +
+      '<td style="text-align:left;padding:5px 8px;font-weight:700;white-space:nowrap">' + (onclick ? '<span style="color:var(--accent)">▸</span> ' : '') + _plEsc(label) + '</td>' +
       tdN(r.flights) + tdN(_plMinToHHMM(r.block)) + tdN(_plMinToHHMM(r.pic)) + tdN(r.picSec) +
       tdN(_plMinToHHMM(r.sic)) + tdN(_plMinToHHMM(r.night)) + tdN(r.to) + tdN(r.ldg) + '</tr>';
   };
-  var body = agg.rows.map(function(r) { return rowHtml(r.key, r, 'border-top:1px solid var(--border)'); }).join('');
-  var totalRow = rowHtml('Total', agg.tot, 'border-top:2px solid var(--border);font-weight:700');
+  var body = agg.rows.map(function(r) { return rowHtml(r.key, r, 'border-top:1px solid var(--border)', true); }).join('');
+  var totalRow = rowHtml('Total', agg.tot, 'border-top:2px solid var(--border);font-weight:700', false);
   return '<div style="background:var(--bar-bg-soft);border-radius:10px;padding:14px;margin-bottom:10px">' +
     '<div style="font-size:.72em;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">' + title + '</div>' +
     '<div style="overflow-x:auto;-webkit-overflow-scrolling:touch">' +
@@ -3273,7 +3274,34 @@ function _plRenderOpeningSim() {
 }
 
 function _plRenderTypeBreakdown(entries) {
-  return _plBreakdownTable('依機型明細 By Type（時數=時:分、PIC Sec=PIC 段數）', 'Type', entries, function(e) { return e.aircraft_type || '—'; });
+  return _plBreakdownTable('依機型明細 By Type（點機型看各公司 PIC/SIC）', 'Type', entries, function(e) { return e.aircraft_type || '—'; }, function(type) {
+    return (type && type !== '—') ? "_plOpenTypeDetail('" + String(type).replace(/'/g, "\\'") + "')" : null;
+  });
+}
+// V1.3.21：點機型 → 鑽進去看「該機型各公司」的 PIC/SIC 時數
+function _plOpenTypeDetail(type) {
+  var c = document.getElementById('pilotlog-content');
+  if (!c) return;
+  if (_pl.tab !== 'analyze') return;
+  var entries = (_pl.aircraftEntries || []).filter(function(e) {
+    if (e.is_deadhead || e.is_sim || e.status === 'roster_removed') return false;
+    return !!e.in_utc && (e.aircraft_type || '—') === type;
+  });
+  var sorted = entries.slice().sort(function(a, b) { return String(b.flight_date || '').localeCompare(String(a.flight_date || '')); });
+  c.innerHTML =
+    '<div style="padding:10px 14px">' +
+      '<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">' +
+        '<button onclick="_plRenderAnalyze()" style="background:transparent;border:0;color:var(--text);font-size:1.2em;cursor:pointer">←</button>' +
+        '<div style="font-size:1em;font-weight:700">' + _plEsc(type) + '</div>' +
+        '<div style="flex:1"></div>' +
+        '<div style="font-size:.72em;color:var(--muted)">' + entries.length + ' flights</div>' +
+      '</div>' +
+      (entries.length
+        ? _plBreakdownTable(_plEsc(type) + ' · 依公司 By Company（含 PIC / SIC 時數）', 'Company', entries, _plEntryCompany) +
+          '<div style="font-size:.72em;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin:14px 0 8px">航班 · Flights（' + entries.length + '）</div>' +
+          sorted.map(_plRenderEntryRow).join('')
+        : '<div style="text-align:center;color:var(--muted);padding:30px;font-size:.85em">這個機型沒有已飛紀錄。</div>') +
+    '</div>';
 }
 
 // V1.3.15：台灣商用機籍「註冊範圍 → 公司 + 機型」對照（來源：各家維基「註冊編號法則」，源頭民航局）。
@@ -3393,15 +3421,47 @@ function _plAddAcAutofillType(look) {
 }
 
 // 依公司（operator）分析：先用機尾庫 _pl.aircraft 的 operator；沒填 → V1.3.15 用台灣機籍 tail 範圍推。
+// V1.3.21：entry → 公司（機尾庫 operator 優先；沒填用台灣機籍 tail 範圍推）。_pl.aircraft 換新才重建快取。
+function _plEntryCompany(e) {
+  var tail = String((e && e.tail_no) || '').trim().toUpperCase();
+  if (!tail) return '—';
+  if (_pl._opMapSrc !== _pl.aircraft) {
+    var m = {}; (_pl.aircraft || []).forEach(function(a) { if (a.tail_no) m[String(a.tail_no).trim().toUpperCase()] = a.operator || ''; });
+    _pl._opMap = m; _pl._opMapSrc = _pl.aircraft;
+  }
+  var o = _pl._opMap[tail];
+  if (!o) { var look = _plTailLookup(tail); if (look) o = look.operator; }
+  return o || '—';
+}
 function _plRenderCompanyBreakdown(entries) {
-  var op = {};
-  (_pl.aircraft || []).forEach(function(a) { if (a.tail_no) op[String(a.tail_no).trim().toUpperCase()] = a.operator || ''; });
-  return _plBreakdownTable('依公司明細 By Company', 'Company', entries, function(e) {
-    var tail = String(e.tail_no || '').trim().toUpperCase();
-    var o = op[tail];
-    if (!o) { var look = _plTailLookup(tail); if (look) o = look.operator; }   // V1.3.15：機尾庫沒填 → 台灣機籍推
-    return o || '—';
+  return _plBreakdownTable('依公司明細 By Company（點公司看各機型 PIC/SIC）', 'Company', entries, _plEntryCompany, function(company) {
+    return (company && company !== '—') ? "_plOpenCompanyDetail('" + String(company).replace(/'/g, "\\'") + "')" : null;
   });
+}
+// V1.3.21：點公司 → 鑽進去看「該公司各機型」的 PIC/SIC 時數（重用 By Type 表）
+function _plOpenCompanyDetail(company) {
+  var c = document.getElementById('pilotlog-content');
+  if (!c) return;
+  if (_pl.tab !== 'analyze') return;
+  var entries = (_pl.aircraftEntries || []).filter(function(e) {
+    if (e.is_deadhead || e.is_sim || e.status === 'roster_removed') return false;
+    return !!e.in_utc && _plEntryCompany(e) === company;
+  });
+  var sorted = entries.slice().sort(function(a, b) { return String(b.flight_date || '').localeCompare(String(a.flight_date || '')); });
+  c.innerHTML =
+    '<div style="padding:10px 14px">' +
+      '<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">' +
+        '<button onclick="_plRenderAnalyze()" style="background:transparent;border:0;color:var(--text);font-size:1.2em;cursor:pointer">←</button>' +
+        '<div style="font-size:1em;font-weight:700">' + _plEsc(company) + '</div>' +
+        '<div style="flex:1"></div>' +
+        '<div style="font-size:.72em;color:var(--muted)">' + entries.length + ' flights</div>' +
+      '</div>' +
+      (entries.length
+        ? _plBreakdownTable(_plEsc(company) + ' · 依機型 By Type（含 PIC / SIC 時數）', 'Type', entries, function(e) { return e.aircraft_type || '—'; }) +
+          '<div style="font-size:.72em;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin:14px 0 8px">航班 · Flights（' + entries.length + '）</div>' +
+          sorted.map(_plRenderEntryRow).join('')
+        : '<div style="text-align:center;color:var(--muted);padding:30px;font-size:.85em">這家公司沒有已飛紀錄。<br>No flown records for this company.</div>') +
+    '</div>';
 }
 
 function _plRenderAnalyzeContent() {
