@@ -746,10 +746,11 @@ function _plRenderToolbar() {
 // 被選中（iPad detail pane 開著的那筆）會套 .pl-row-sel 描邊。
 var _PL_MON = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
 function _plRenderEntryRow(e) {
-  // V1.3.09：色條改用 in_utc 判斷已完成（user：「已完成綠、未完成藍；未來的跟未完成都是藍色」）
+  // V1.3.09：色條判斷已完成（user：「已完成綠、未完成藍；未來的跟未完成都是藍色」）
+  // V1.3.24：改走 _plEntryIsDone（含 SIM / DHD 過去日期 = 已完成）
   var statusColor;
   if (e.status === 'roster_removed') statusColor = '#94a3b8';        // gray - removed
-  else if (e.in_utc) statusColor = '#10b981';                         // green - done (has actual arrival)
+  else if (_plEntryIsDone(e)) statusColor = '#10b981';               // green - done
   else statusColor = '#3b82f6';                                       // blue - open (future or past-but-not-logged)
 
   // 日期：拆 day / MON 'YY
@@ -1186,12 +1187,20 @@ function _plCrewField(key, e) {
   return '<div style="margin-bottom:8px">' +
     '<div style="font-size:.62em;color:var(--muted);margin-bottom:2px">' + _plEsc(label) + '</div>' +
     '<div style="display:flex;gap:4px">' +
-      '<input id="ple-crew-' + key + '" list="ple-crew-dl" placeholder="name" style="flex:1;min-width:0;' + inputCss + '" value="' + _plEsc(dispName) + '">' +
+      '<input id="ple-crew-' + key + '" list="ple-crew-dl" placeholder="name" oninput="_plCrewSlotInput(\'' + key + '\')" style="flex:1;min-width:0;' + inputCss + '" value="' + _plEsc(dispName) + '">' +
       '<input id="ple-crewrank-' + key + '" placeholder="rank" style="flex:0 0 auto;width:54px;text-transform:uppercase;' + inputCss + '" value="' + _plEsc(val.rank) + '">' +
-      (dispName ? '<button type="button" onclick="_plQuickEditCrewSlot(\'' + key + '\')" title="編輯此聯絡人 Edit contact" style="flex:0 0 auto;background:transparent;border:1px solid var(--border,#334155);border-radius:6px;color:var(--text);font-size:.85em;padding:0 7px;cursor:pointer">✏️</button>' : '') +
+      // V1.3.24：✏️ 永遠在 DOM，但「有名字才顯示」（手填即現、清空即藏）；按了可編輯或新增到通訊錄
+      '<button type="button" id="ple-crewedit-' + key + '" onclick="_plQuickEditCrewSlot(\'' + key + '\')" title="編輯 / 新增此聯絡人 Edit / add contact" style="flex:0 0 auto;background:transparent;border:1px solid var(--border,#334155);border-radius:6px;color:var(--text);font-size:.85em;padding:0 7px;cursor:pointer;display:' + (dispName ? 'inline-block' : 'none') + '">✏️</button>' +
     '</div>' +
     '<input type="hidden" id="ple-crewid-' + key + '" value="' + _plEsc(val.eid) + '">' +
     '<input type="hidden" id="ple-crewname0-' + key + '" value="' + _plEsc(dispName) + '"></div>';  // 原始名字：判斷名字有沒有被改過，改過就不沿用舊員編
+}
+
+// V1.3.24：crew 格有字才顯示 ✏️（手填即現、清空即藏）—— 對應 _plCrewField 的 oninput
+function _plCrewSlotInput(key) {
+  var nameEl = document.getElementById('ple-crew-' + key);
+  var btn = document.getElementById('ple-crewedit-' + key);
+  if (btn) btn.style.display = (nameEl && (nameEl.value || '').trim()) ? 'inline-block' : 'none';
 }
 
 // ── V1.3.05：機場座標 + 太陽角度，給手動新增航班自動算 night time / 日夜起降 ─────────
@@ -1551,7 +1560,7 @@ function _plRenderEditor(target) {
   if (e.id) {
     if (e.status === 'roster_removed') {
       statusBadge = '<span style="background:#94a3b8;color:#fff;border-radius:10px;padding:2px 8px;font-size:.62em;margin-left:8px">removed</span>';
-    } else if (e.in_utc) {
+    } else if (_plEntryIsDone(e)) {
       statusBadge = '<span style="background:#10b981;color:#fff;border-radius:10px;padding:2px 8px;font-size:.62em;margin-left:8px">flown 已完成</span>';
     } else {
       statusBadge = '<span style="background:#3b82f6;color:#fff;border-radius:10px;padding:2px 8px;font-size:.62em;margin-left:8px">open 未完成</span>';
@@ -1835,14 +1844,28 @@ async function _plToggleLock() {
   }
 }
 
+// 本地今天（YYYY-MM-DD）
+function _plTodayStr() {
+  var d = new Date();
+  function p(n) { return (n < 10 ? '0' : '') + n; }
+  return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate());
+}
 // V1.3.09：done / open 改用 in_utc 判斷（user：「未來的跟未完成都是藍色」）。
-// 沒填 in_utc = 未完成（未來計畫的、或飛了還沒補實際時間的）；有 in_utc = 已完成（已抵達、已記錄）。
+// V1.3.24：SIM / DHD 本來就沒 actual In（模擬機 / 搭便機沒 OOOI）→ 改用日期：flight_date
+// 今天或更早（已發生）就算已完成；未來（roster 預排的 DHD）仍未完成（藍）。一般航班維持看 in_utc。
+function _plEntryIsDone(e) {
+  if (!e || e.status === 'roster_removed') return false;
+  if (e.in_utc) return true;
+  if ((e.is_sim || e.is_deadhead) && e.flight_date &&
+      String(e.flight_date).slice(0, 10) <= _plTodayStr()) return true;
+  return false;
+}
 function _plEntryMatchesFilter(e, filter) {
   if (filter === 'all') return true;
   if (filter === 'removed') return e.status === 'roster_removed';
   if (e.status === 'roster_removed') return false;
-  if (filter === 'done') return !!e.in_utc;
-  if (filter === 'open') return !e.in_utc;
+  if (filter === 'done') return _plEntryIsDone(e);
+  if (filter === 'open') return !_plEntryIsDone(e);
   return true;
 }
 
@@ -1890,6 +1913,10 @@ function _plOpenImport() {
         '選填 / Optional：On Duty / Off Duty / PIC/P1 / SIC/P2（沒有也能匯入）。' +
       '</div>' +
       '<input type="file" id="pl-flights-file" accept=".txt,.tab,.tsv,text/plain" style="font-size:.78em">' +
+      '<label style="display:flex;align-items:flex-start;gap:7px;margin-top:10px;font-size:.7em;color:var(--text);cursor:pointer;line-height:1.45">' +
+        '<input type="checkbox" id="pl-flights-overwrite-crew" style="margin-top:2px;flex:0 0 auto">' +
+        '<span><b>覆蓋現有航班的組員</b>（補回 FO 等）· 已存在的航班預設會跳過保護你的編輯；勾這個，就<b>連已完成的航班也用檔案重填組員＋PIC/SIC 時數</b>（其他欄位不動）。第一次修好 FO 後勾一次補舊資料即可。<br><span style="color:var(--muted)">Overwrite crew on existing flights — re-fills crew + PIC/SIC time from the file even on done flights (other fields untouched).</span></span>' +
+      '</label>' +
       '<div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap">' +
         '<button onclick="_plUploadFlights(true)" style="background:#475569;color:#fff;border:0;border-radius:6px;padding:6px 12px;font-size:.78em;font-weight:700;cursor:pointer">🔍 Preview (dry-run)</button>' +
         '<button onclick="_plUploadFlights(false)" style="background:#10b981;color:#fff;border:0;border-radius:6px;padding:6px 12px;font-size:.78em;font-weight:700;cursor:pointer">Import</button>' +
@@ -1913,8 +1940,8 @@ function _plOpenImport() {
     '<div style="background:var(--card);border-radius:10px;padding:14px;margin-bottom:12px">' +
       '<div style="font-size:.85em;font-weight:700;margin-bottom:6px">📅 Roster · 從 CrewSync 帶班表（不用上傳檔）</div>' +
       '<div style="font-size:.7em;color:var(--muted);margin-bottom:8px;line-height:1.5">' +
-        'CrewSync 同步過的班表<b>直接帶進來當 draft</b>，飛了再 confirm。按下面先<b>列出可匯入的月份</b>，勾選你要的再匯入。<br>' +
-        'Pulls the roster CrewSync has synced as draft entries. Tap below to <b>list available months</b>, tick the ones you want, then import.<br>' +
+        'CrewSync 同步過的班表<b>直接帶進來</b>，先是<b>未完成（藍）</b>，飛完補上實際時間（In）就自動變<b>已完成（綠）</b>。按下面先<b>列出可匯入的月份</b>，勾選你要的再匯入。<br>' +
+        'Pulls the roster CrewSync has synced — they arrive as <b>open (blue)</b> and turn <b>done (green)</b> once you log the actual in-time after flying. Tap below to <b>list available months</b>, tick the ones you want, then import.<br>' +
         '<b>用前提示：</b>先去 CrewSync 用<b>同一個 Google 帳號</b>同步當月（與想要的其他月份），再回來。' +
       '</div>' +
       '<button onclick="_plRosterListMonths()" style="background:#10b981;color:#fff;border:0;border-radius:6px;padding:6px 12px;font-size:.78em;font-weight:700;cursor:pointer">📅 列出可匯入月份 / List months</button>' +
@@ -2024,17 +2051,20 @@ async function _plUploadFile(inputId, endpoint) {
 
 function _plRenderPreviewRows(rows) {
   if (!rows || !rows.length) return '';
+  // V1.3.24：badge 改講「已完成/未完成」（不露內部 draft/confirmed）；新增「補組員」action
+  var statusZh = function(s) { return s === 'confirmed' ? '已完成' : '未完成'; };
   var actionBadge = function(action, newStatus) {
-    if (action === 'skip_confirmed') return '<span style="background:#475569;color:#fff;padding:1px 6px;border-radius:4px;font-size:.85em">SKIP</span>';
+    if (action === 'skip_confirmed') return '<span style="background:#475569;color:#fff;padding:1px 6px;border-radius:4px;font-size:.85em">不動</span>';
+    if (action === 'overwrite_crew') return '<span style="background:#8b5cf6;color:#fff;padding:1px 6px;border-radius:4px;font-size:.85em">補組員</span>';
     if (action === 'update') {
       var col = newStatus === 'confirmed' ? '#10b981' : '#f59e0b';
-      return '<span style="background:' + col + ';color:#fff;padding:1px 6px;border-radius:4px;font-size:.85em">UPDATE→' + (newStatus || '?') + '</span>';
+      return '<span style="background:' + col + ';color:#fff;padding:1px 6px;border-radius:4px;font-size:.85em">更新→' + statusZh(newStatus) + '</span>';
     }
     var col = newStatus === 'confirmed' ? '#10b981' : '#f59e0b';
-    return '<span style="background:' + col + ';color:#fff;padding:1px 6px;border-radius:4px;font-size:.85em">NEW ' + (newStatus || '?') + '</span>';
+    return '<span style="background:' + col + ';color:#fff;padding:1px 6px;border-radius:4px;font-size:.85em">新增 ' + statusZh(newStatus) + '</span>';
   };
   // V1.2.04：顯示「全部」row（不再只前 10）、容器加高可捲動
-  var html = '<div style="margin-top:8px;font-size:.7em;color:var(--muted)">共 ' + rows.length + ' 筆預覽，可上下捲（NEW=新增、UPDATE=覆蓋舊 draft、SKIP=已是 confirmed 不動；role=你的角色、pic/sic=實際時數、DH=deadhead）：</div>' +
+  var html = '<div style="margin-top:8px;font-size:.7em;color:var(--muted)">共 ' + rows.length + ' 筆預覽，可上下捲（新增＝新航班、更新＝覆蓋未完成的、不動＝已完成不碰、補組員＝只補/換組員；role=你的角色、pic/sic=實際時數、DH=deadhead）：</div>' +
     '<div style="max-height:60vh;overflow-y:auto;-webkit-overflow-scrolling:touch;margin-top:4px;border:1px solid var(--border);border-radius:6px">';
   for (var i = 0; i < rows.length; i++) {
     var p = rows[i];
@@ -2138,7 +2168,7 @@ async function _plImportRoster(selectedMonths) {
       if (sj && !sj.error) {
         _plToast('班表匯入（雲端）' + (Array.isArray(sj.months) && sj.months.length ? '〔' + sj.months.join(',') + '〕' : '') +
           '：新增 ' + (sj.inserted || 0) + ' / 更新 ' + (sj.updated || 0) +
-          ' / 已 confirmed 略過 ' + (sj.skipped_confirmed || 0) +
+          ' / 已完成略過 ' + (sj.skipped_confirmed || 0) +
           ' / 標 removed ' + (sj.marked_removed || 0) +
           (sj.crew_added ? ' / 通訊錄 +' + sj.crew_added : ''));
         await _plRefreshMain();
@@ -2197,7 +2227,7 @@ async function _plImportRoster(selectedMonths) {
     }
     var j = await r.json();
     _plToast('班表匯入：新增 ' + (j.inserted || 0) + ' / 更新 ' + (j.updated || 0) +
-      ' / 已 confirmed 略過 ' + (j.skipped_confirmed || 0) +
+      ' / 已完成略過 ' + (j.skipped_confirmed || 0) +
       ' / 標 removed ' + (j.marked_removed || 0) +
       (j.crew_added ? ' / 通訊錄 +' + j.crew_added : ''));
     await _plRefreshMain();
@@ -2239,7 +2269,12 @@ async function _plUploadWader(dryRun) {
 }
 
 async function _plUploadFlights(dryRun) {
-  var endpoint = '/api/pilot-log/import/logten-flights' + (dryRun ? '?dryRun=1' : '');
+  var ovEl = document.getElementById('pl-flights-overwrite-crew');
+  var overwrite = !!(ovEl && ovEl.checked);
+  var qs = [];
+  if (dryRun) qs.push('dryRun=1');
+  if (overwrite) qs.push('overwriteCrew=1');
+  var endpoint = '/api/pilot-log/import/logten-flights' + (qs.length ? '?' + qs.join('&') : '');
   var j = await _plUploadFile('pl-flights-file', endpoint);
   if (!j) return;
   var resBox = document.getElementById('pl-import-result');
@@ -2253,13 +2288,18 @@ async function _plUploadFlights(dryRun) {
   }
 
   // 從 preview 算出各 action 數量（dry-run 跟實際都用同一個來源）
-  var nNew = 0, nUpdate = 0;
+  var nNew = 0, nUpdate = 0, nCrew = 0;
   if (j.preview) {
     for (var i = 0; i < j.preview.length; i++) {
       if (j.preview[i].action === 'insert') nNew++;
       else if (j.preview[i].action === 'update') nUpdate++;
+      else if (j.preview[i].action === 'overwrite_crew') nCrew++;
     }
   }
+  // 「已完成航班」的處置：開覆蓋 → 補組員筆數；沒開 → 保留不動筆數
+  var doneLine = overwrite
+    ? '補/換已完成航班組員 <b>' + (dryRun ? nCrew : (j.crew_overwritten || 0)) + '</b>、'
+    : '保留已完成 <b>' + (j.duplicate_skipped || 0) + '</b>、';
 
   if (dryRun) {
     // V1.2.04：欄位偵測 — 一眼看出匯出檔有沒有帶 PIC/SIC 時數欄 + Deadhead 欄
@@ -2267,19 +2307,19 @@ async function _plUploadFlights(dryRun) {
     if (j.headers && j.headers.length) {
       var hset = {};
       j.headers.forEach(function(h) { hset[String(h).toLowerCase().trim()] = true; });
-      var hasPic = hset['pic'] || hset['pic time'] || hset['flight pic'];
-      var hasSic = hset['sic'] || hset['sic time'] || hset['flight sic'];
+      var hasPic = hset['pic'] || hset['pic/p1'] || hset['pic time'] || hset['flight pic'];
+      var hasSic = hset['sic'] || hset['sic/p2'] || hset['sic time'] || hset['flight sic'];
       var hasDh = hset['deadhead'] || hset['positioning'];
       headersInfo = '<div style="margin-top:6px;font-size:.72em;line-height:1.6">' +
         '欄位偵測：PIC 時數 ' + (hasPic ? '✅' : '❌缺') + '　SIC 時數 ' + (hasSic ? '✅' : '❌缺') + '　Deadhead ' + (hasDh ? '✅' : '❌缺') +
         ((!hasPic || !hasSic) ? '<br><span style="color:#fde68a">⚠ 缺 PIC/SIC 時數欄 → 數字會對不上 LogTen。請在 LogTen 匯出時把 PIC、SIC 時數欄勾進去再重匯。</span>' : '') +
-        (!hasDh ? '<br><span style="color:#fde68a">⚠ 缺 Deadhead 欄 → deadhead 仍會靠「過去日期→confirmed」救起，只是不另外標 DH。</span>' : '') +
+        (!hasDh ? '<br><span style="color:#fde68a">⚠ 缺 Deadhead 欄 → deadhead 仍會靠「過去日期自動算已完成」救起，只是不另外標 DH。</span>' : '') +
       '</div>';
     }
     var preview = _plRenderPreviewRows(j.preview);
     resBox.innerHTML = '<div style="background:#1e3a5f;color:#fff;padding:10px;border-radius:8px;font-size:.78em">' +
-      '🔍 Dry-run（沒寫入 DB）：新增 <b>' + nNew + '</b>、更新舊 draft <b>' + nUpdate + '</b>、' +
-      '保留 confirmed <b>' + j.duplicate_skipped + '</b>、解析失敗 <b>' + j.parse_errors + '</b><br>' +
+      '🔍 Dry-run（沒寫入 DB）：新增 <b>' + nNew + '</b>、更新未完成 <b>' + nUpdate + '</b>、' +
+      doneLine + '解析失敗 <b>' + j.parse_errors + '</b><br>' +
       '<span style="font-size:.85em;color:#bfdbfe">確認 OK 後按 Import 真的寫入。</span>' +
       headersInfo +
       preview +
@@ -2287,9 +2327,9 @@ async function _plUploadFlights(dryRun) {
   } else {
     resBox.innerHTML = '<div style="background:#064e3b;color:#fff;padding:10px;border-radius:8px;font-size:.78em">' +
       '✅ 匯入完成：新增 <b>' + (j.inserted || 0) + '</b>、更新 <b>' + (j.updated || 0) + '</b>、' +
-      '保留 confirmed <b>' + j.duplicate_skipped + '</b>、解析失敗 <b>' + j.parse_errors + '</b>' +
+      doneLine + '解析失敗 <b>' + j.parse_errors + '</b>' +
       '</div>';
-    _plToast('匯入完成');
+    _plToast(overwrite && (j.crew_overwritten || 0) > 0 ? ('匯入完成（補組員 ' + j.crew_overwritten + ' 筆）') : '匯入完成');
   }
 }
 
@@ -2913,8 +2953,10 @@ function _plRenderCrewRows() {
       var idStr = Array.isArray(p.employee_ids) && p.employee_ids.length ? p.employee_ids.join(' / ') : '';
       var selfMark = p.is_self ? '<span style="background:#0ea5e9;color:#fff;border-radius:4px;padding:1px 6px;font-size:.6em;margin-left:6px">YOU</span>' : '';
       var ambMark = unattrib ? '<span style="background:#f59e0b;color:#000;border-radius:4px;padding:1px 6px;font-size:.6em;margin-left:6px" title="同名且沒有員編，無法判斷哪些航班屬於誰。在 Address Book 給該員編、或之後從通訊錄點選即可拆開">SAME-NAME</span>' : '';
+      // V1.3.24：本人那列不可點 drill-down（跟自己飛沒意義）→ 但給一顆 ✏️ Edit，讓你能編輯自己
+      // （改名 / 補員編）。沒有它的話，本人永遠進不去那個藏在 drill-down 裡的編輯鈕。
       var countCell = p.is_self
-        ? '<div style="font-size:.72em;color:var(--muted);text-align:right" title="這是你本人，不計入同事航班數">—</div>'
+        ? '<button type="button" onclick="event.stopPropagation();_plEditCrew(\'' + _plEsc(p.id) + '\')" style="background:transparent;border:1px solid var(--border);color:var(--text);border-radius:6px;padding:4px 9px;font-size:.72em;font-weight:600;cursor:pointer;white-space:nowrap" title="編輯本人 Edit yourself">✏️ Edit</button>'
         : unattrib
         ? '<div style="font-size:.72em;color:var(--muted);text-align:right" title="同名且無員編，無法計數">—</div>'
         : '<div style="font-size:.72em;color:var(--text);text-align:right">' + (countById[p.id] || 0) + ' flights</div>';
@@ -3102,42 +3144,76 @@ function _plQuickEditCrewSlot(key) {
   var nameEl = document.getElementById('ple-crew-' + key);
   var eid = eidEl ? (eidEl.value || '').trim() : '';
   var name = nameEl ? (nameEl.value || '').trim() : '';
+  if (!name) { _plToast('先填名字 · Enter a name first', 'error'); return; }
   var contact = _plCrewByEid(eid);
   if (!contact && name) {
     var matches = (_pl.crew || []).filter(function(c) { return (c.display_name || '').trim() === name; });
     if (matches.length === 1) contact = matches[0];
     else if (matches.length > 1) { _plToast('同名多人，請先補員編再編輯 · Same name, add an id first', 'error'); return; }
   }
-  if (!contact) { _plToast('這個人還不在通訊錄（先存航班、或到 👥 Crew 新增）· Not in address book yet', 'error'); return; }
-  _plOpenCrewModal(contact, key);
+  // V1.3.24：通訊錄已有 → 編輯；還沒有（手填的新人）→ 跳「新增聯絡人」直接建進通訊錄並掛上，不再擋
+  if (contact) _plOpenCrewModal(contact, key);
+  else _plOpenCrewModal(null, key, name);
 }
 
 function _plCloseCrewModal() { var m = document.getElementById('pl-crew-modal'); if (m) m.remove(); }
 
-function _plOpenCrewModal(contact, slotKey) {
+// contact 為 null → 新增模式（prefillName 帶入手填的名字）；否則編輯既有聯絡人
+function _plOpenCrewModal(contact, slotKey, prefillName) {
   _plCloseCrewModal();
-  var ids = Array.isArray(contact.employee_ids) ? contact.employee_ids.join(', ') : '';
+  var isNew = !contact;
+  var ids = (contact && Array.isArray(contact.employee_ids)) ? contact.employee_ids.join(', ') : '';
+  var nameVal = isNew ? (prefillName || '') : (contact.display_name || '');
   var inCss = 'width:100%;background:var(--input-bg,#0a0e1a);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:10px 12px;font-size:.95em;-webkit-appearance:none;box-sizing:border-box';
   var lblCss = 'display:block;font-size:.78em;color:var(--muted);font-weight:600;margin:12px 0 5px';
   var wrap = document.createElement('div');
   wrap.id = 'pl-crew-modal';
   wrap.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:400;display:flex;align-items:center;justify-content:center;padding:20px';
   wrap.onclick = function(ev) { if (ev.target === wrap) _plCloseCrewModal(); };
+  var saveOnclick = isNew
+    ? '_plQuickCreateCrew(\'' + slotKey + '\')'
+    : '_plQuickSaveCrew(\'' + _plEsc(contact.id) + '\',\'' + slotKey + '\')';
   wrap.innerHTML =
     '<div style="background:var(--card);border:1px solid var(--border);border-radius:14px;padding:18px;max-width:380px;width:100%">' +
-      '<div style="font-weight:700;margin-bottom:4px">✏️ 編輯聯絡人 · Edit contact</div>' +
-      '<div style="font-size:.7em;color:var(--muted);margin-bottom:8px">改完所有航班顯示的這個人一起更新。</div>' +
+      '<div style="font-weight:700;margin-bottom:4px">' + (isNew ? '➕ 新增聯絡人 · Add contact' : '✏️ 編輯聯絡人 · Edit contact') + '</div>' +
+      '<div style="font-size:.7em;color:var(--muted);margin-bottom:8px">' + (isNew ? '把手填的這個人建進通訊錄並掛到這格，之後可重複選用。' : '改完所有航班顯示的這個人一起更新。') + '</div>' +
       '<label style="' + lblCss + '">名字 Name</label>' +
-      '<input id="plqe-name" type="text" style="' + inCss + '" value="' + _plEsc(contact.display_name || '') + '">' +
+      '<input id="plqe-name" type="text" style="' + inCss + '" value="' + _plEsc(nameVal) + '">' +
       '<label style="' + lblCss + '">員編 Employee ID（多個用逗號分隔）</label>' +
       '<input id="plqe-ids" type="text" style="' + inCss + '" value="' + _plEsc(ids) + '" placeholder="例如 79363, B12345">' +
       '<div style="display:flex;gap:10px;margin-top:18px">' +
-        '<button type="button" onclick="_plQuickSaveCrew(\'' + _plEsc(contact.id) + '\',\'' + slotKey + '\')" style="flex:1;background:#10b981;color:#fff;border:0;border-radius:8px;padding:11px;font-size:.9em;font-weight:700;cursor:pointer">💾 儲存 Save</button>' +
+        '<button type="button" onclick="' + saveOnclick + '" style="flex:1;background:#10b981;color:#fff;border:0;border-radius:8px;padding:11px;font-size:.9em;font-weight:700;cursor:pointer">💾 儲存 Save</button>' +
         '<button type="button" onclick="_plCloseCrewModal()" style="flex:0 0 auto;background:transparent;color:var(--muted);border:1px solid var(--border);border-radius:8px;padding:11px 16px;font-size:.9em;cursor:pointer">取消</button>' +
       '</div>' +
     '</div>';
   document.body.appendChild(wrap);
   var f = document.getElementById('plqe-name'); if (f) f.focus();
+}
+
+// V1.3.24：新增聯絡人（手填組員 → 建進通訊錄並掛回該格）
+async function _plQuickCreateCrew(slotKey) {
+  var name = (document.getElementById('plqe-name').value || '').trim();
+  if (!name) { _plToast('名字不能空白 · Name required', 'error'); return; }
+  var idsRaw = (document.getElementById('plqe-ids').value || '');
+  var newIds = idsRaw.split(/[\s,]+/).map(function (s) { return s.trim(); }).filter(Boolean);
+  var r;
+  try { r = await _plApi('/api/pilot-log/crew', { method: 'POST', body: { display_name: name, employee_ids: newIds } }); }
+  catch (e) { _plToast('新增失敗 · Add failed', 'error'); return; }
+  if (!r.ok) { _plToast('新增失敗 · Add failed', 'error'); return; }
+  var j = await r.json().catch(function () { return {}; });
+  await _plReloadCrew();
+  // 回填這一格：名字 + 主要員編。codex P2：被 server 略過的員編（已掛別人）不能塞進這格，
+  // 否則會把這趟誤掛到別人 / 觸發 SAME-NAME。只用「真的存進這位新聯絡人」的員編。
+  var skipped = j.skipped || [];
+  var accepted = newIds.filter(function (id) { return skipped.indexOf(id) < 0; });
+  var newEid = accepted[0] || '';
+  var sName = document.getElementById('ple-crew-' + slotKey); if (sName) sName.value = name;
+  var sId = document.getElementById('ple-crewid-' + slotKey); if (sId) sId.value = newEid;
+  var sName0 = document.getElementById('ple-crewname0-' + slotKey); if (sName0) sName0.value = name;
+  _plCrewSlotInput(slotKey);   // 確保 ✏️ 仍顯示
+  _plCloseCrewModal();
+  if (j.skipped && j.skipped.length) _plToast('已新增；這些員編已掛別人、略過：' + j.skipped.join(', '), 'error');
+  else _plToast('已加入通訊錄 · Added');
 }
 
 async function _plQuickSaveCrew(contactId, slotKey) {

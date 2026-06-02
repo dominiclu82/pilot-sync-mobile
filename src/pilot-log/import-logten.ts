@@ -145,6 +145,7 @@ export interface ImportLogtenFlightsResult {
   inserted: number;
   updated: number;
   duplicate_skipped: number;            // 命中 confirmed → 不動
+  crew_overwritten?: number;            // V1.3.24：overwriteCrew 模式下，confirmed 航班被補/換組員的筆數
   parse_errors: number;
   bad_rows?: Array<{ row: number; flight_no?: string; date?: string; reason: string }>;
   preview?: Array<{
@@ -152,8 +153,8 @@ export interface ImportLogtenFlightsResult {
     aircraft_type: string; tail_no: string;
     out_utc: string | null; off_utc: string | null; on_utc: string | null; in_utc: string | null;
     block: string | null; pic: string | null; sic: string | null;
-    action: 'insert' | 'update' | 'skip_confirmed';
-    new_status: 'draft' | 'confirmed' | null;   // skip_confirmed 時為 null
+    action: 'insert' | 'update' | 'skip_confirmed' | 'overwrite_crew';
+    new_status: 'draft' | 'confirmed' | null;   // skip_confirmed / overwrite_crew 時為 null
     position?: string | null;                    // V1.2.03：推斷的角色（PIC/SIC/null）
     deadhead?: boolean;                          // V1.2.03：是否 positioning
     pic_min?: number | null;                     // V1.2.04：讀到的 LogTen PIC 時數（分）
@@ -167,7 +168,7 @@ export interface ImportLogtenFlightsResult {
 export async function importLogtenFlights(
   userId: string,
   text: string,
-  opts: { dryRun?: boolean } = {}
+  opts: { dryRun?: boolean; overwriteCrew?: boolean } = {}
 ): Promise<ImportLogtenFlightsResult> {
   const pool = getPool();
   if (!pool || !(await ensureTables())) {
@@ -188,7 +189,7 @@ export async function importLogtenFlights(
   }
 
   const result: ImportLogtenFlightsResult = {
-    inserted: 0, updated: 0, duplicate_skipped: 0, parse_errors: 0,
+    inserted: 0, updated: 0, duplicate_skipped: 0, crew_overwritten: 0, parse_errors: 0,
     bad_rows: [], preview: [],
     dry_run: !!opts.dryRun,
     headers,                                       // V1.2.04：回傳欄位 headers，方便確認 PIC/SIC 時數欄有沒有被讀到
@@ -248,6 +249,8 @@ export async function importLogtenFlights(
   // UPDATE: 走逐筆（draft → confirmed 在正常流程中是少數，per-row UPDATE 不是瓶頸）
   const insertBatch: any[][] = [];
   const updateBatch: Array<{ id: string; params: any[] }> = [];
+  // V1.3.24：overwriteCrew —— 對 confirmed 航班只補/換組員 + PIC/SIC 時數 + position，其餘欄位不動
+  const crewUpdateBatch: Array<{ id: string; crewJson: string | null; picMin: number | null; sicMin: number | null; position: string | null }> = [];
 
   // V1.2.04 / codex P2：同檔內「日期+航班號+起降」完全相同的不同航班（同日同班號折返、
   // 兩段 leg）原本 source_ref 會碰撞、被 merge 掉一筆。先掃一遍找出哪些 base 重複，
@@ -267,12 +270,12 @@ export async function importLogtenFlights(
   // 真飛了會有 Out 直接 confirmed）。
   const _PL_PAST_CUTOFF = new Date(Date.now() - 12 * 3600 * 1000).toISOString().slice(0, 10);
 
-  // V1.3.16：crew 欄名因人而異（LogTen 可自訂欄名），改「含關鍵字就認」的模糊比對，解析一次。
-  // 兩輪：先找含「CREW」的欄（最像組員姓名欄、避開 PIC/SIC 時數欄），找不到再放寬。
-  // skip 已被別槽認領的欄，避免一欄被指到兩個槽。完全亂取的怪名仍可能漏（之後可加欄位對應 UI）。
-  const _crewExclude = ['TIME', 'HOUR', 'REMARK', 'NOTE', 'DUTY', 'NIGHT', 'INSTRUMENT', 'APPROACH', 'LDG', 'TAKEOFF', 'LANDING', 'TOTAL', 'BLOCK'];
-  // codex P1：值是 HH:MM / 純數字的欄是「時數欄」不是姓名欄（例如標準 PIC/SIC 時數欄叫 "PIC"/"SIC"），
-  // 名字被改名（如 "Captain"）時，第二輪放寬比對可能誤抓到時數欄、把 crew.pic 設成 "1:30"。用值擋掉。
+  // V1.3.24：crew 欄位偵測重寫 —— 比對「忽略空格」（"FO 1" = "FO1"），CAP/SFO 等一律納入，
+  // 不再用「某關鍵字鎖死某槽 + 排除清單」（舊版把 FO1/FO2 排除、又抓不到 "FO 1" 帶空格 → FO 整批漏）。
+  // 角色：PIC/P1 Crew → pic；其餘機師欄（SIC/P2 Crew、CAP/SFO、FO 1、FO 2…）照「欄位出現順序」非空填
+  // crew2/crew3/crew4；Purser → cic；Observer / Observer 2 → obs。用值（_looksLikeName）擋掉時數欄
+  // （值是 HH:MM 的 PIC/P1、SIC/P2 那種純時數欄）。
+  const _norm = (s: string): string => String(s || '').toUpperCase().replace(/\s+/g, '');
   const _looksLikeName = (col: string): boolean => {
     for (let i = 0; i < rows.length && i < 30; i++) {
       const v = String(rows[i][col] || '').trim();
@@ -283,25 +286,53 @@ export async function importLogtenFlights(
     }
     return true;                                      // 全空 → 允許（反正不會帶入值）
   };
-  const _findCrewCol = (tests: string[], extra: string[] = [], skip: (string | undefined)[] = []): string | undefined => {
-    for (const crewFirst of [true, false]) {
-      for (const h of headers) {
-        if (skip.indexOf(h) >= 0) continue;
-        const u = h.toUpperCase();
-        if (_crewExclude.some((x) => u.includes(x))) continue;
-        if (crewFirst && u.indexOf('CREW') < 0) continue;
-        if (extra.some((x) => u.includes(x))) continue;
-        if (tests.some((x) => u.includes(x)) && _looksLikeName(h)) return h;
-      }
+  // FO 當成「token」比對，避免誤吃 INFO / OFFICER 之類（OFFICER 另由 FIRSTOFFICER 命中）
+  const _hasFO = (n: string): boolean => /(^|[^A-Z])FO\d*($|[^A-Z])/.test(n);
+  // V1.3.24（實檔驗證後補）：是否「真的有名字值」。關鍵 —— 有些匯出同時有「PIC/P1」(時數，常空)
+  // 跟「PIC/P1 Crew」(姓名)。時數欄若整欄空，_looksLikeName 會放行 → 會搶走 PIC 槽、把姓名欄擠掉。
+  // 所以同槽多候選時，優先選「有姓名值」的那欄；都沒有才退回第一個（涵蓋稀疏但合法的欄）。
+  // 掃「整份」rows（不設上限）：relief 欄常在早年 2 人派遣是空的、晚幾百筆才開始有人，
+  // 設 cap 會把它們誤判成「沒名字值」而丟掉。整份掃一遍很便宜（大多欄很快就命中第一個非空值）。
+  const _hasNameValues = (col: string): boolean => {
+    for (let i = 0; i < rows.length; i++) {
+      const v = String(rows[i][col] || '').trim();
+      if (!v) continue;
+      if (/^\d{1,3}:\d{2}$/.test(v)) return false;   // 撞到 HH:MM 時數 → 這是時數欄、不是姓名欄
+      if (/^[\d.:]+$/.test(v)) return false;
+      return true;                                    // 有字母 → 真有名字
     }
-    return undefined;
+    return false;                                     // 整欄空 → 沒有名字值
   };
-  const colPic = _findCrewCol(['PIC/P1', 'PIC', 'P1', 'CAPTAIN', 'COMMANDER']);
-  const colSic = _findCrewCol(['SIC/P2', 'SIC', 'P2', 'FIRST OFFICER', 'CO-PILOT', 'COPILOT'], ['RELIEF', 'P3', 'P4', 'FO1', 'FO2'], [colPic]);
-  const colR2 = _findCrewCol(['RELIEF CREW 2', 'RELIEF 2', 'RELIEF2', 'FO2', 'P4', 'CREW 4', '4TH'], [], [colPic, colSic]);
-  const colR1 = _findCrewCol(['RELIEF', 'FO1', 'P3', 'CREW 3', '3RD'], ['2', 'P4', 'FO2'], [colPic, colSic, colR2]);
-  const colCic = _findCrewCol(['CIC', 'PURSER', 'CHIEF', 'IN-CHARGE', 'IN CHARGE'], [], [colPic, colSic, colR1, colR2]);
-  const colObs = _findCrewCol(['OBSERVER', 'OBS', 'JUMPSEAT', 'JUMP SEAT', 'SUPERNUMERARY'], [], [colPic, colSic, colR1, colR2, colCic]);
+  const _crewExclude = ['TIME', 'HOUR', 'REMARK', 'NOTE', 'DUTY', 'NIGHT', 'INSTRUMENT', 'APPROACH',
+    'LDG', 'TAKEOFF', 'LANDING', 'TOTAL', 'BLOCK', 'DISTANCE', 'PILOTFLYING', 'PAX', 'SCHED'];
+  // 先把每個 header 歸到候選清單（照 header 順序），再「優先有名字值」選定 —— 不再 greedy 取第一個
+  const picCand: string[] = [], pilotCand: string[] = [], cicCand: string[] = [], obsCand: string[] = [], obs2Cand: string[] = [];
+  for (const h of headers) {
+    const n = _norm(h);
+    if (_crewExclude.some((x) => n.includes(x))) continue;
+    if (!_looksLikeName(h)) continue;        // 擋「有 HH:MM 值」的時數欄（SIC/P2 那種有值的）
+    if (/OBSERVER.?2|OBS.?2/.test(n)) { obs2Cand.push(h); continue; }
+    if (n.includes('OBSERVER') || n.includes('JUMPSEAT') || n.includes('SUPERNUMERARY') || n === 'OBS') { obsCand.push(h); continue; }
+    if (n.includes('PURSER') || n.includes('CIC') || n.includes('CHIEF') || n.includes('INCHARGE')) { cicCand.push(h); continue; }
+    const reliefish = n.includes('SFO') || n.includes('RELIEF') || n.includes('RCA') || n.includes('RCP') || n.includes('CRUISE');
+    if (!reliefish && (n.includes('PIC') || /(^|[^A-Z])P1($|[^A-Z])/.test(n) || n.includes('CAPTAIN') || n.includes('COMMANDER'))) { picCand.push(h); continue; }
+    const isPilot = n.includes('SIC') || /(^|[^A-Z])P2($|[^A-Z])/.test(n) || _hasFO(n) ||
+      n.includes('SFO') || n.includes('CAP') || n.includes('RCA') || n.includes('RCP') ||
+      n.includes('RELIEF') || n.includes('CRUISE') || /(^|[^A-Z])P[34]($|[^A-Z])/.test(n) ||
+      n.includes('COPILOT') || n.includes('FIRSTOFFICER');
+    if (isPilot) pilotCand.push(h);
+  }
+  // 選定：同槽多候選 → 優先「有名字值」，否則退回第一個
+  const _pick = (cands: string[]): string | undefined => cands.find(_hasNameValues) || cands[0];
+  const colPic = _pick(picCand);
+  const colCic = _pick(cicCand);
+  const colObs = _pick(obsCand);
+  const colObs2 = _pick(obs2Cand);
+  // 機師欄（→ crew2/3/4）：排掉已選為 PIC 的，優先保留有名字值的（同時擋掉空的時數欄如 PIC/P1）
+  let pilotCols = pilotCand.filter((c) => c !== colPic && _hasNameValues(c));
+  if (pilotCols.length === 0) pilotCols = pilotCand.filter((c) => c !== colPic);   // 保險：全沒名字值才退回
+  // position 推斷用：pilotCols 裡第一個 SIC/P2 姓名欄
+  const colSic = pilotCols.find((c) => { const n = _norm(c); return n.includes('SIC') || /(^|[^A-Z])P2($|[^A-Z])/.test(n); });
 
   for (let i = 0; i < rows.length; i++) {
     const row = rows[i];
@@ -345,21 +376,24 @@ export async function importLogtenFlights(
         if (a) approaches.push(a);
       }
 
-      // V1.3.16：用上面模糊比對解析出的欄位讀 crew。
+      // V1.3.24：crew 依角色 + 順序組裝。PIC 固定 pic；PIC 以外機師欄非空值照 header 順序填 crew2/3/4。
+      // 直接寫新 6 槽 schema（pic/crew2/crew3/crew4/cic/obs），前端不必再 migrate。
       const crew: Record<string, string> = {};
-      const pic = colPic ? row[colPic] : undefined;
-      const sic = colSic ? row[colSic] : undefined;
-      const relief1 = colR1 ? row[colR1] : undefined;
-      const relief2 = colR2 ? row[colR2] : undefined;
-      const cic = colCic ? row[colCic] : undefined;
-      const obs = colObs ? row[colObs] : undefined;
+      const pic = colPic ? String(row[colPic] || '').trim() : '';
+      const sic = colSic ? String(row[colSic] || '').trim() : '';   // position 推斷用
       if (pic) crew.pic = pic;
-      if (sic) crew.sic = sic;              // → crew2
-      if (relief1) crew.fo1 = relief1;      // → crew3
-      if (relief2) crew.fo2 = relief2;      // → crew4
-      if (cic) crew.purser = cic;           // → cic
-      if (obs) crew.observer1 = obs;        // → obs
-      if (row['Observer 2']) crew.observer2 = row['Observer 2'];
+      const _slots = ['crew2', 'crew3', 'crew4'];
+      let _si = 0;
+      for (const c of pilotCols) {
+        const v = String(row[c] || '').trim();
+        if (!v) continue;
+        if (_si >= _slots.length) break;     // >3 名副/巡航機師（罕見）就不再塞
+        crew[_slots[_si]] = v;
+        _si++;
+      }
+      if (colCic) { const v = String(row[colCic] || '').trim(); if (v) crew.cic = v; }
+      if (colObs) { const v = String(row[colObs] || '').trim(); if (v) crew.obs = v; }
+      if (colObs2) { const v = String(row[colObs2] || '').trim(); if (v) crew.observer2 = v; }   // 第 7 人：留存不顯示（無對應槽）
 
       // V1.2.03：Deadhead = LogTen 標記 positioning 的欄位。deadhead 是已發生事件
       // （你被載過去、沒操作），先判它，因為它會蓋掉 position 推斷。
@@ -367,8 +401,9 @@ export async function importLogtenFlights(
 
       // V1.2.04：讀 LogTen 實際 PIC/SIC 時數（多候選欄名，取第一個能解析成 HH:MM 的）。
       // 這是統計要加總的真值；deadhead/加強組員巡航等既非 P1 也非 P2 的時間就不會被灌進來。
-      const picMin = parseHHColonMM(row['PIC'] || row['PIC Time'] || row['Flight PIC']);
-      const sicMin = parseHHColonMM(row['SIC'] || row['SIC Time'] || row['Flight SIC']);
+      // V1.3.24：時數欄名也因人而異 —— 你的匯出是 "PIC/P1" / "SIC/P2"（不是 "PIC"/"SIC"），補進候選。
+      const picMin = parseHHColonMM(row['PIC'] || row['PIC/P1'] || row['PIC Time'] || row['Flight PIC']);
+      const sicMin = parseHHColonMM(row['SIC'] || row['SIC/P2'] || row['SIC Time'] || row['Flight SIC']);
 
       // V1.3.03：起降只在「你是 Pilot Flying」時才算（user：不是 PF 就不該有起降紀錄）。
       // 讀 LogTen「Pilot Flying」欄；非 PF → 起降全 0；PF → 用 LogTen 值但 clamp 掉爆值
@@ -402,12 +437,14 @@ export async function importLogtenFlights(
       // V1.0.04 補：existingMap 在 loop 中也即時回寫，讓「同一檔內重複 sourceRef」
       // 走跟 cross-run 一樣的語意（confirmed → 後者 skip；draft → 後者覆蓋前者）
       const existing = existingMap.get(sourceRef);
-      let action: 'insert' | 'update' | 'skip_confirmed';
+      let action: 'insert' | 'update' | 'skip_confirmed' | 'overwrite_crew';
       let existingId: string | null = null;
       if (!existing) {
         action = 'insert';
       } else if (existing.status === 'confirmed') {
-        action = 'skip_confirmed';
+        // V1.3.24：confirmed 預設 skip（保護你的編輯）；開 overwriteCrew → 只補/換組員，不動其他欄位
+        action = opts.overwriteCrew ? 'overwrite_crew' : 'skip_confirmed';
+        existingId = existing.id;
       } else {
         action = 'update';
         existingId = existing.id;
@@ -446,7 +483,8 @@ export async function importLogtenFlights(
 
       // 即時回寫 existingMap：之後同 sourceRef 的 row 會走 update 或 skip
       // 不論 dryRun 或實際 run，都要回寫，否則 dryRun preview 會跟實際行為不一致
-      existingMap.set(sourceRef, { id: decidedId, status: newStatus });
+      // overwrite_crew 不改 status（維持 confirmed），其餘用 newStatus
+      existingMap.set(sourceRef, { id: decidedId, status: action === 'overwrite_crew' ? existing!.status : newStatus });
 
       if (opts.dryRun) continue;
 
@@ -455,7 +493,10 @@ export async function importLogtenFlights(
       const distanceVal = parseDecimalOrNull(row['Distance']);
       const paxVal = parseIntOrNull(row['Total Pax']);
 
-      if (action === 'update') {
+      if (action === 'overwrite_crew') {
+        // V1.3.24：只補/換組員 + PIC/SIC 時數 + position（SQL 用 COALESCE：檔案沒值就保留原值，不洗白）
+        crewUpdateBatch.push({ id: decidedId, crewJson, picMin, sicMin, position });
+      } else if (action === 'update') {
         updateBatch.push({
           id: decidedId,
           params: [
@@ -515,7 +556,7 @@ export async function importLogtenFlights(
   if (opts.dryRun) return result;
 
   // 沒任何寫入需求（全部 skip_confirmed）→ 直接回，省掉 TX 開銷
-  if (insertBatch.length === 0 && updateBatch.length === 0) return result;
+  if (insertBatch.length === 0 && updateBatch.length === 0 && crewUpdateBatch.length === 0) return result;
 
   // ── 包進單一 transaction：要嘛全寫成功，要嘛全 ROLLBACK，避免 partial 狀態 ──
   // codex 提醒：原本 bulk INSERT 後接 UPDATE，若中途任一失敗會留下部分寫入。
@@ -523,6 +564,7 @@ export async function importLogtenFlights(
   const client = await pool.connect();
   let insertedCount = 0;
   let updatedCount = 0;
+  let crewUpdatedCount = 0;
   try {
     await client.query('BEGIN');
 
@@ -567,13 +609,32 @@ export async function importLogtenFlights(
       updatedCount++;
     }
 
+    // V1.3.24：overwriteCrew —— 對 confirmed 航班只補/換組員 + PIC/SIC 時數 + position。
+    // COALESCE：檔案有值才覆蓋、沒值保留原值（crew 由檔案決定取代，pic/sic/position 只填不洗白）。
+    for (const u of crewUpdateBatch) {
+      await client.query(
+        // codex P1：用 JSONB 合併（檔案的槽覆蓋、檔案沒提供的槽保留）而非整包取代 —— 避免把
+        // 檔案這趟沒帶到的組員（手填的、或客艙）洗掉。檔案完全沒 crew（$2 null）→ 原封不動。
+        `UPDATE pilot_log_entries SET
+           crew = CASE WHEN $2::jsonb IS NULL THEN crew ELSE COALESCE(crew, '{}'::jsonb) || $2::jsonb END,
+           pic_minutes = COALESCE($3, pic_minutes),
+           sic_minutes = COALESCE($4, sic_minutes),
+           position = COALESCE($5, position),
+           updated_at = NOW()
+         WHERE id = $1`,
+        [u.id, u.crewJson, u.picMin, u.sicMin, u.position]
+      );
+      crewUpdatedCount++;
+    }
+
     await client.query('COMMIT');
     // 只有 COMMIT 成功才寫進 result；不然 ROLLBACK 後 DB 是空的，計數也該是 0
     result.inserted = insertedCount;
     result.updated = updatedCount;
+    result.crew_overwritten = crewUpdatedCount;
 
     // V1.0.05 monitoring：成功匯入後寫 last_import_at（fire-and-forget，跟主 TX 解耦）
-    if (insertedCount > 0 || updatedCount > 0) {
+    if (insertedCount > 0 || updatedCount > 0 || crewUpdatedCount > 0) {
       pool.query(
         `UPDATE pilot_users SET last_import_at = NOW() WHERE id = $1`,
         [userId]

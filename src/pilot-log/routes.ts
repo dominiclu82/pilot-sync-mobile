@@ -51,8 +51,8 @@ import { getSpaPilotLogJs } from '../spa/js-pilot-log.js';
 
 // ── 版本（比照 CrewSync / Morning：每次推版必更新；SW cache 名稱跟著走） ────
 // 本機 preview build 會暫時加 -tNN 後綴方便對版；推正式版前拿掉只留乾淨版號。
-export const PILOT_LOG_VERSION = 'V1.3.23';
-const PILOT_LOG_CACHE = 'pilotlog-v1-3-23';
+export const PILOT_LOG_VERSION = 'V1.3.24';
+const PILOT_LOG_CACHE = 'pilotlog-v1-3-24';
 
 export const pilotLogRouter = express.Router();
 
@@ -335,6 +335,25 @@ if (document.readyState !== 'loading') pilotLogInit();
 function _renderPilotLogChangelog(): string {
   return `
     <div class="pl-cl-v">${PILOT_LOG_VERSION}</div>
+    <div class="pl-cl-txt">
+      <b>修好 LogTen 匯入漏掉副駕（FO）+ 組員可手填新增 + 本人可編輯 + SIM/DHD 自動完成。</b>這版一次解掉 crew 一整串問題：<br>
+      <b>① 匯入終於把 FO / relief 機師帶進來。</b>你的 LogTen 欄位是 <code>FO 1</code>、<code>FO 2</code>（中間有空格）跟 <code>CAP/SFO</code>，舊版比對看死關鍵字又把 FO1/FO2 排除，整批副駕都漏掉，很多航班只剩你一個。現在改成<b>忽略空格、依欄位順序</b>把 PIC 以外的機師（SIC/P2 Crew、CAP/SFO、FO 1、FO 2）填進 Crew 2/3/4，並修好誤抓空的時數欄當正駕的問題。順手把 <code>PIC/P1</code>、<code>SIC/P2</code> 時數欄也讀對（影響 Analyze 的 PIC/SIC 時數）。<br>
+      <b>② 匯入加「覆蓋現有航班的組員」選項。</b>已完成的航班預設會被保護跳過，所以光重匯救不回舊資料。勾這個選項重新上傳，就<b>只補/換組員＋PIC/SIC 時數</b>（其他欄位不動），一次補回所有過去航班的 FO。<br>
+      <b>③ 手填的組員現在可編輯 / 可新增進通訊錄。</b>在航班裡手打一個組員，旁邊的 <b>✏️</b> 會即時出現（空格沒名字就不顯示）；按下去如果通訊錄還沒這個人，會跳<b>「新增聯絡人」</b>直接建進去並掛上，之後可重複選用。<br>
+      <b>④ 通訊錄裡「本人」那列終於可以編輯</b>（多了 ✏️ Edit，可改名 / 補員編）。<br>
+      <b>⑤ SIM / DHD 過去日期自動算「已完成」</b>（綠）；未來預排的仍是未完成（藍）。模擬機 / 搭便機沒有 OOOI，改用日期判斷。<br>
+      <b>⑥ 文案統一</b>：使用者看到的一律「已完成 / 未完成」，不再出現內部的 draft / confirm 字眼。
+    </div>
+    <div class="pl-cl-txt" style="border-top:1px solid var(--border,#334155);margin-top:6px;padding-top:6px">
+      <b>Fixed missing FO on LogTen import + crew can be hand-added + edit yourself + SIM/DHD auto-done.</b> A whole cluster of crew fixes:<br>
+      <b>① FO / relief pilots finally import.</b> Your LogTen columns are <code>FO 1</code>, <code>FO 2</code> (with a space) and <code>CAP/SFO</code>; the old keyword matcher excluded FO1/FO2 and couldn't match the spaced names, so every relief pilot was dropped and many flights showed only you. Detection is now <b>space-insensitive and order-based</b> — non-PIC pilots (SIC/P2 Crew, CAP/SFO, FO 1, FO 2) fill Crew 2/3/4 in column order — plus a fix so an empty time column can't be mistaken for PIC. The <code>PIC/P1</code> / <code>SIC/P2</code> time columns now read correctly too (affects Analyze PIC/SIC hours).<br>
+      <b>② New "overwrite crew on existing flights" import option.</b> Done flights are protected/skipped by default, so a plain re-import won't fix old data. Tick this and re-upload to <b>re-fill crew + PIC/SIC time only</b> (other fields untouched) across all your past flights.<br>
+      <b>③ Hand-typed crew can now be edited / added to the address book.</b> Type a name in a crew slot and the <b>✏️</b> appears instantly (hidden when empty); if that person isn't in the address book yet, it opens <b>"Add contact"</b> to create and link them.<br>
+      <b>④ You can finally edit your own entry</b> in the address book (a new ✏️ Edit — rename / add employee id).<br>
+      <b>⑤ Past-dated SIM / DHD auto-count as done</b> (green); future-scheduled stay open (blue). SIM/DHD have no OOOI, so date decides.<br>
+      <b>⑥ Wording unified</b> to "done / open" everywhere — the internal draft / confirm terms no longer leak into the UI.
+    </div>
+    <div class="pl-cl-v old">V1.3.23</div>
     <div class="pl-cl-txt">
       <b>匯入（LogTen / Wader）的 night / PIC / SIC 上鎖，編輯時間不會被自動重算蓋掉。</b>從 LogTen Pro / Wader 帶進來的夜航、PIC、SIC 是你<b>原本就記好的正本</b>。現在打開這類紀錄時會自動「上鎖」——就算你之後去改 OOOI 或航線，這三個欄位也<b>不會</b>被系統的自動計算覆蓋掉（要改可以直接手動改）。班表（Roster）與手動新增的航班不受影響，仍照常自動算 night。<br>
       <b>Imported (LogTen / Wader) night / PIC / SIC are now locked from auto-recalc when you edit times.</b> Night, PIC and SIC brought in from LogTen Pro / Wader are <b>your originally-logged values</b>. Opening such an entry now locks those three fields — editing OOOI or the route will <b>not</b> overwrite them with the auto-calculation (you can still change them by hand). Roster and manually-added flights are unaffected and keep auto-computing night.
@@ -1033,7 +1052,9 @@ pilotLogRouter.post('/api/pilot-log/import/logten-flights', requireAuth, async (
   const text = typeof req.body === 'string' ? req.body : '';
   if (!text) return res.status(400).json({ error: 'empty_body' });
   const dryRun = req.query.dryRun === '1' || req.query.dryRun === 'true';
-  const r = await importLogtenFlights(req.pilotUserId!, text, { dryRun });
+  // V1.3.24：overwriteCrew —— 對已完成（confirmed）航班也補/換組員 + PIC/SIC 時數（其餘欄位不動）
+  const overwriteCrew = req.query.overwriteCrew === '1' || req.query.overwriteCrew === 'true';
+  const r = await importLogtenFlights(req.pilotUserId!, text, { dryRun, overwriteCrew });
   res.json(r);
 });
 
@@ -1247,6 +1268,49 @@ pilotLogRouter.put('/api/pilot-log/crew/:id', requireAuth, async (req: AuthedReq
     try { await client.query('ROLLBACK'); } catch { /* ignore */ }
     console.error('[pilot-log] crew update failed:', e.message);
     res.status(500).json({ error: 'update_failed' });
+  } finally {
+    client.release();
+  }
+});
+
+// V1.3.24：新增 crew 聯絡人（從航班編輯器手填組員 → ✏️ 直接建進通訊錄並掛到該格）。
+pilotLogRouter.post('/api/pilot-log/crew', requireAuth, async (req: AuthedRequest, res) => {
+  const pool = getPool();
+  if (!pool || !(await ensureTables())) return res.status(503).json({ error: 'database_unavailable' });
+  const userId = req.pilotUserId!;
+  const body: any = req.body || {};
+  const displayName = String(body.display_name || '').trim();
+  if (!displayName) return res.status(400).json({ error: 'missing_name' });
+  const organization = String(body.organization || '').trim() || null;
+  const comment = String(body.comment || '').trim() || null;
+  let idsRaw: string[] = [];
+  if (Array.isArray(body.employee_ids)) idsRaw = body.employee_ids.map((x: any) => String(x));
+  else if (typeof body.employee_ids === 'string') idsRaw = body.employee_ids.split(/[\s,]+/);
+  const ids = Array.from(new Set(idsRaw.map((s) => s.trim()).filter(Boolean)));
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const newId = randomUUID();
+    await client.query(
+      `INSERT INTO crew (id, user_id, display_name, organization, comment) VALUES ($1, $2, $3, $4, $5)`,
+      [newId, userId, displayName, organization, comment]
+    );
+    const skipped: string[] = [];
+    for (const eid of ids) {
+      const ins = await client.query(
+        `INSERT INTO crew_employee_ids (crew_id, user_id, employee_id) VALUES ($1, $2, $3)
+         ON CONFLICT (user_id, employee_id) DO NOTHING`,
+        [newId, userId, eid]
+      );
+      if ((ins.rowCount || 0) === 0) skipped.push(eid);
+    }
+    await client.query('COMMIT');
+    res.json({ ok: true, id: newId, skipped });
+  } catch (e: any) {
+    try { await client.query('ROLLBACK'); } catch { /* ignore */ }
+    console.error('[pilot-log] crew create failed:', e.message);
+    res.status(500).json({ error: 'create_failed' });
   } finally {
     client.release();
   }
