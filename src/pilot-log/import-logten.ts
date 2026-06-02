@@ -89,9 +89,11 @@ function parseDecimalOrNull(s: string): number | null {
 // v1 簡化：留空 position（之後使用者可在 UI 編輯）。
 
 // ── Flights file 解析 ────────────────────────────────────────────────────────
+// V1.3.15：On Duty / Off Duty / PIC/P1 / SIC/P2 改成「選填」—— 勤務時間跟組員名字非必要
+// （很多人的 LogTen Dynamic Export 沒勾這幾欄），有就解析、沒有就留空，不該整批擋掉。
+// 解析端本來就容忍它們不存在（row['On Duty'] 等 undefined → null/skip），只是 header 檢查太嚴。
 const FLIGHTS_REQUIRED = [
-  'Date', 'Flight #', 'From', 'To', 'Aircraft Type', 'Aircraft ID',
-  'Out', 'In', 'On Duty', 'Off Duty', 'PIC/P1', 'SIC/P2',
+  'Date', 'Flight #', 'From', 'To', 'Aircraft Type', 'Aircraft ID', 'Out', 'In',
 ];
 
 // V1.0.04：Bulk INSERT 用的 column 順序與 JSONB 標記

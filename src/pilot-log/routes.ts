@@ -50,8 +50,8 @@ import { getSpaPilotLogJs } from '../spa/js-pilot-log.js';
 
 // ── 版本（比照 CrewSync / Morning：每次推版必更新；SW cache 名稱跟著走） ────
 // 本機 preview build 會暫時加 -tNN 後綴方便對版；推正式版前拿掉只留乾淨版號。
-export const PILOT_LOG_VERSION = 'V1.3.14';
-const PILOT_LOG_CACHE = 'pilotlog-v1-3-14';
+export const PILOT_LOG_VERSION = 'V1.3.15';
+const PILOT_LOG_CACHE = 'pilotlog-v1-3-15';
 
 export const pilotLogRouter = express.Router();
 
@@ -334,6 +334,11 @@ if (document.readyState !== 'loading') pilotLogInit();
 function _renderPilotLogChangelog(): string {
   return `
     <div class="pl-cl-v">${PILOT_LOG_VERSION}</div>
+    <div class="pl-cl-txt">
+      <b>航班裡直接改同事 + 台灣機籍自動分公司 + LogTen 匯入放寬。</b><b>(改同事)</b> 航班編輯器的 crew 格選了同事，旁邊多了 <b>✏️</b>，直接改名字 / 員編（彈窗、不離開航班），改完所有航班一起更新；補員編就能拆同名。<b>(機籍)</b> 內建台灣六家航空（華航 / 長榮 / 星宇 / 立榮 / 華信 / 虎航）的註冊編號範圍：Analyze「依公司」<b>就算機尾庫沒填 operator 也能自動分出航空公司</b>；Add Aircraft 打 tail（如 B-58205）自動帶出公司。<b>(匯入)</b> LogTen 航班匯入的 On Duty / Off Duty / PIC/P1 / SIC/P2 改成<b>選填</b>——沒勾這幾欄也能匯入。<br>
+      <b>Edit crew inside a flight + auto-detect Taiwan operators + looser LogTen import.</b> <b>(Edit crew)</b> Each crew slot in the flight editor now has an ✏️ to edit that colleague's name / employee id in a popup without leaving the flight; changes apply across all flights. Adding an id separates same-name colleagues. <b>(Registry)</b> Built-in registration ranges for six Taiwan carriers (China Airlines / EVA / Starlux / UNI / Mandarin / Tigerair): Analyze "By Company" now derives the operator from the tail even when your registry has none; Add Aircraft auto-fills the operator from the tail (e.g. B-58205). <b>(Import)</b> LogTen flight import now treats On Duty / Off Duty / PIC/P1 / SIC/P2 as optional — exports without those columns import fine.
+    </div>
+    <div class="pl-cl-v old">V1.3.14</div>
     <div class="pl-cl-txt">
       <b>班表匯入修正 + 通訊錄可直接編輯。</b><b>(匯入)</b> 修好幾個班表匯入問題：① 真實航班的 UTC 時間（像 1610Z/17Jun）少了年份被誤判、整筆掉到列表最底看不到 → 年份改從班表月份推算。② 長程加強組員、兩個機長時，本人有時被整個丟掉或擺錯槽 → 改用員編認出本人、放進正確的槽。③ 跨月回程腿（UTC 落在下個月）重匯時被誤刪 → 改用班表月份精準掃除。④ 地面班 / 訓練不再混進飛行 logbook。<b>(通訊錄)</b> Crew 名單點一個人 → 詳情頁多了 <b>✏️ Edit</b>，可直接改名字 / 員編 / 公司 / 註記，不用再繞去別處找人改；補上員編就能拆開同名同事。也可刪除聯絡人（不影響航班紀錄）。<br>
       <b>Roster import fixes + edit crew directly.</b> <b>(Import)</b> Fixed several roster-import issues: ① real flights whose UTC time lacked a year (e.g. 1610Z/17Jun) were misparsed and sank to the bottom of the list, invisible — the year is now inferred from the roster month. ② On long-haul augmented flights with two captains, you were sometimes dropped or placed in the wrong slot — now matched by employee id. ③ Cross-month return legs were wrongly removed on re-import — now swept precisely by roster month. ④ Ground duties / training no longer leak into the flight logbook. <b>(Address Book)</b> Tap a crew member → the detail now has <b>✏️ Edit</b> to change name / employee id / organization / comment directly. Adding an employee id separates same-name colleagues. You can also delete a contact (flight records untouched).
@@ -1642,6 +1647,7 @@ pilotLogRouter.post('/api/pilot-log/monkey/apply', async (req, res) => {
     logbookOther: typeof b.logbookOther === 'string' ? b.logbookOther : undefined,
   });
   if (!result.ok) {
+    if (result.error === 'closed') return res.status(403).json({ error: 'closed' });
     if (result.error === 'bad_code') return res.status(403).json({ error: 'bad_code' });
     return res.status(503).json({ error: 'db' });
   }
@@ -1904,7 +1910,14 @@ async function mkLoadSlots(){
     mkEl('mkNum').innerHTML = s.total + ' <small>席</small>';
     var takenPct = s.publicCap>0 ? Math.round((s.publicCap - s.left)/s.publicCap*100) : 0;
     mkEl('mkBar').style.width = Math.min(100, takenPct) + '%';
+    if(s.open === false){
+      mkEl('mkSub').innerHTML = '報名已截止 · Signups closed';
+      var card = mkEl('applyCard');
+      if(card) card.innerHTML = '<div class="done"><div class="big">🙏 報名已截止</div><div style="color:var(--muted);font-size:.92em;line-height:1.6">這一梯創始測試員已招滿，謝謝你的興趣！<br>下一梯開放會在社群公告。<br><span style="font-size:.88em">This round is full — thanks! Next round will be announced in the community.</span></div></div>';
+      return false;
+    }
     mkEl('mkSub').innerHTML = mkSubText(s.full ? 0 : s.left);
+    return true;
   }catch(e){}
 }
 
@@ -1974,7 +1987,7 @@ function mkShowDone(j){
   card.scrollIntoView({behavior:'smooth', block:'center'});
 }
 
-function mkInit(){ mkLoadSlots(); mkInitSignIn(); }
+async function mkInit(){ var open = await mkLoadSlots(); if(open !== false) mkInitSignIn(); }
 document.addEventListener('DOMContentLoaded', mkInit);
 if(document.readyState!=='loading') mkInit();
 </script>

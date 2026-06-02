@@ -1177,6 +1177,7 @@ function _plCrewField(key, e) {
     '<div style="display:flex;gap:4px">' +
       '<input id="ple-crew-' + key + '" list="ple-crew-dl" placeholder="name" style="flex:1;' + inputCss + '" value="' + _plEsc(dispName) + '">' +
       '<input id="ple-crewrank-' + key + '" placeholder="rank" style="width:62px;text-transform:uppercase;' + inputCss + '" value="' + _plEsc(val.rank) + '">' +
+      (dispName ? '<button type="button" onclick="_plQuickEditCrewSlot(\'' + key + '\')" title="編輯此聯絡人 Edit contact" style="flex:0 0 auto;background:transparent;border:1px solid var(--border,#334155);border-radius:6px;color:var(--text);font-size:.8em;padding:0 9px;cursor:pointer">✏️</button>' : '') +
     '</div>' +
     '<input type="hidden" id="ple-crewid-' + key + '" value="' + _plEsc(val.eid) + '">' +
     '<input type="hidden" id="ple-crewname0-' + key + '" value="' + _plEsc(dispName) + '"></div>';  // 原始名字：判斷名字有沒有被改過，改過就不沿用舊員編
@@ -1721,7 +1722,8 @@ function _plOpenImport() {
       '<div style="font-size:.85em;font-weight:700;margin-bottom:6px">✈️ Flights · Tab 動態匯出 / Dynamic Export</div>' +
       '<div style="font-size:.7em;color:var(--muted);margin-bottom:8px;line-height:1.5">' +
         'LogTen Pro 6 → File → Export → Dynamic Export Flights (Tab)。<br>' +
-        '必填欄位 / Required columns：Date / Flight # / From / To / Aircraft Type / Aircraft ID / Out / In / On Duty / Off Duty / PIC/P1 / SIC/P2。' +
+        '必填欄位 / Required：Date / Flight # / From / To / Aircraft Type / Aircraft ID / Out / In。<br>' +
+        '選填 / Optional：On Duty / Off Duty / PIC/P1 / SIC/P2（沒有也能匯入）。' +
       '</div>' +
       '<input type="file" id="pl-flights-file" accept=".txt,.tab,.tsv,text/plain" style="font-size:.78em">' +
       '<div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap">' +
@@ -2442,7 +2444,8 @@ function _plOpenAddAircraft() {
         '<div style="font-size:1em;font-weight:700">+ Add Aircraft</div>' +
       '</div>' +
       '<div style="background:var(--card);border-radius:10px;padding:14px">' +
-        field('Tail # *（機號，例：B-58502）', 'pl-add-tail', 'B-58502') +
+        dlField('Tail # *（機號，例：B-58502）', 'pl-add-tail', 'B-58502', '', '_plAddAcTailLookup()') +
+        '<div id="pl-add-tw-hint" style="font-size:.7em;margin:-2px 0 10px;min-height:1em"></div>' +
         // V1.3.06：Manufacturer 改回 <select>。原本的 datalist 在欄位已有值時會用值去濾建議，
         //          導致使用者想重選廠商時下拉只剩當前那家（user：「會被底下機型限制住」），體驗壞掉。
         '<div style="margin-bottom:10px">' +
@@ -2866,6 +2869,95 @@ async function _plDeleteCrew(crewId) {
   _plOpenCrew();
 }
 
+// V1.3.15：航班編輯器 crew 格 → ✏️ 直接改那個聯絡人（彈窗，不離開航班）。
+// 用員編找聯絡人；員編對不到再用「唯一同名」回查；都查不到 → 提示（還沒進通訊錄）。
+function _plCrewByEid(eid) {
+  var e = String(eid == null ? '' : eid).trim();
+  if (!e) return null;
+  var list = _pl.crew || [];
+  for (var i = 0; i < list.length; i++) {
+    var ids = list[i].employee_ids || [];
+    for (var j = 0; j < ids.length; j++) {
+      if (String(ids[j] == null ? '' : ids[j]).trim() === e) return list[i];
+    }
+  }
+  return null;
+}
+
+function _plQuickEditCrewSlot(key) {
+  var eidEl = document.getElementById('ple-crewid-' + key);
+  var nameEl = document.getElementById('ple-crew-' + key);
+  var eid = eidEl ? (eidEl.value || '').trim() : '';
+  var name = nameEl ? (nameEl.value || '').trim() : '';
+  var contact = _plCrewByEid(eid);
+  if (!contact && name) {
+    var matches = (_pl.crew || []).filter(function(c) { return (c.display_name || '').trim() === name; });
+    if (matches.length === 1) contact = matches[0];
+    else if (matches.length > 1) { _plToast('同名多人，請先補員編再編輯 · Same name, add an id first', 'error'); return; }
+  }
+  if (!contact) { _plToast('這個人還不在通訊錄（先存航班、或到 👥 Crew 新增）· Not in address book yet', 'error'); return; }
+  _plOpenCrewModal(contact, key);
+}
+
+function _plCloseCrewModal() { var m = document.getElementById('pl-crew-modal'); if (m) m.remove(); }
+
+function _plOpenCrewModal(contact, slotKey) {
+  _plCloseCrewModal();
+  var ids = Array.isArray(contact.employee_ids) ? contact.employee_ids.join(', ') : '';
+  var inCss = 'width:100%;background:var(--input-bg,#0a0e1a);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:10px 12px;font-size:.95em;-webkit-appearance:none;box-sizing:border-box';
+  var lblCss = 'display:block;font-size:.78em;color:var(--muted);font-weight:600;margin:12px 0 5px';
+  var wrap = document.createElement('div');
+  wrap.id = 'pl-crew-modal';
+  wrap.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:400;display:flex;align-items:center;justify-content:center;padding:20px';
+  wrap.onclick = function(ev) { if (ev.target === wrap) _plCloseCrewModal(); };
+  wrap.innerHTML =
+    '<div style="background:var(--card);border:1px solid var(--border);border-radius:14px;padding:18px;max-width:380px;width:100%">' +
+      '<div style="font-weight:700;margin-bottom:4px">✏️ 編輯聯絡人 · Edit contact</div>' +
+      '<div style="font-size:.7em;color:var(--muted);margin-bottom:8px">改完所有航班顯示的這個人一起更新。</div>' +
+      '<label style="' + lblCss + '">名字 Name</label>' +
+      '<input id="plqe-name" type="text" style="' + inCss + '" value="' + _plEsc(contact.display_name || '') + '">' +
+      '<label style="' + lblCss + '">員編 Employee ID（多個用逗號分隔）</label>' +
+      '<input id="plqe-ids" type="text" style="' + inCss + '" value="' + _plEsc(ids) + '" placeholder="例如 79363, B12345">' +
+      '<div style="display:flex;gap:10px;margin-top:18px">' +
+        '<button type="button" onclick="_plQuickSaveCrew(\'' + _plEsc(contact.id) + '\',\'' + slotKey + '\')" style="flex:1;background:#10b981;color:#fff;border:0;border-radius:8px;padding:11px;font-size:.9em;font-weight:700;cursor:pointer">💾 儲存 Save</button>' +
+        '<button type="button" onclick="_plCloseCrewModal()" style="flex:0 0 auto;background:transparent;color:var(--muted);border:1px solid var(--border);border-radius:8px;padding:11px 16px;font-size:.9em;cursor:pointer">取消</button>' +
+      '</div>' +
+    '</div>';
+  document.body.appendChild(wrap);
+  var f = document.getElementById('plqe-name'); if (f) f.focus();
+}
+
+async function _plQuickSaveCrew(contactId, slotKey) {
+  var name = (document.getElementById('plqe-name').value || '').trim();
+  if (!name) { _plToast('名字不能空白 · Name required', 'error'); return; }
+  var idsRaw = (document.getElementById('plqe-ids').value || '');
+  // 找原聯絡人，保留 organization / comment（PUT 是整筆覆蓋，不帶會被洗成空）
+  var contact = null;
+  for (var i = 0; i < (_pl.crew || []).length; i++) { if (_pl.crew[i].id === contactId) { contact = _pl.crew[i]; break; } }
+  var newIds = idsRaw.split(/[\s,]+/).map(function (s) { return s.trim(); }).filter(Boolean);
+  var body = {
+    display_name: name,
+    employee_ids: newIds,
+    organization: contact ? (contact.organization || '') : '',
+    comment: contact ? (contact.comment || '') : ''
+  };
+  var r;
+  try { r = await _plApi('/api/pilot-log/crew/' + encodeURIComponent(contactId), { method: 'PUT', body: body }); }
+  catch (e) { _plToast('儲存失敗 · Save failed', 'error'); return; }
+  if (!r.ok) { _plToast('儲存失敗 · Save failed', 'error'); return; }
+  var j = await r.json().catch(function () { return {}; });
+  await _plReloadCrew();
+  // 回填航班編輯器這一格：名字 + 員編（原員編還在就留，否則用新主要員編）+ 同步 name0 防存檔誤判改名
+  var origEid = (document.getElementById('ple-crewid-' + slotKey) || {}).value || '';
+  var newEid = newIds.indexOf(origEid) >= 0 ? origEid : (newIds[0] || '');
+  var sName = document.getElementById('ple-crew-' + slotKey); if (sName) sName.value = name;
+  var sId = document.getElementById('ple-crewid-' + slotKey); if (sId) sId.value = newEid;
+  var sName0 = document.getElementById('ple-crewname0-' + slotKey); if (sName0) sName0.value = name;
+  _plCloseCrewModal();
+  if (j.skipped && j.skipped.length) _plToast('已存；這些員編已掛在別人身上、略過：' + j.skipped.join(', '), 'error');
+  else _plToast('已更新 · Updated');
+}
+
 // === SECTION: analyze（純統計 + 圖表）═══════════════════════════════════════
 // 統計卡片沿用 _plRenderStats()；圖表用純 CSS bar（不引 chart library，離線可用、
 // 顏色走 var()/固定 accent 兩主題都讀得清楚，切日夜不必重畫）。
@@ -3009,12 +3101,81 @@ function _plRenderTypeBreakdown(entries) {
   return _plBreakdownTable('依機型明細 By Type（時數=時:分、PIC Sec=PIC 段數）', 'Type', entries, function(e) { return e.aircraft_type || '—'; });
 }
 
-// 依公司（operator）分析：entry 沒存 operator，用 tail_no 對應機尾庫 _pl.aircraft 的 operator
+// V1.3.15：台灣商用機籍「註冊範圍 → 公司 + 機型」對照（來源：各家維基「註冊編號法則」，源頭民航局）。
+// 用數字範圍精準比對（B-xxxxx 取後 5 碼），範圍互不重疊（B-162/163/165/167=長榮、B-168=華信、
+// B-170=立榮、B-178=長榮787），解 B-16xxx / B-17xxx 多家共用。新交機 / 退役時更新這份。
+var _PL_TW_REG = [
+  // 星宇 Starlux
+  { op: 'Starlux', s: 58201, e: 58227, t: 'A321neo' },
+  { op: 'Starlux', s: 58301, e: 58311, t: 'A330neo' },
+  { op: 'Starlux', s: 58501, e: 58510, t: 'A350-900' },
+  { op: 'Starlux', s: 58551, e: 58568, t: 'A350-1000' },
+  { op: 'Starlux', s: 58581, e: 58590, t: 'A350F' },
+  // 長榮 EVA Air
+  { op: 'EVA Air', s: 16200, e: 16299, t: 'A321neo' },
+  { op: 'EVA Air', s: 16331, e: 16340, t: 'A330-300' },
+  { op: 'EVA Air', s: 16501, e: 16527, t: 'A350-1000' },
+  { op: 'EVA Air', s: 16701, e: 16740, t: '777-300ER' },
+  { op: 'EVA Air', s: 16781, e: 16790, t: '777F' },
+  { op: 'EVA Air', s: 17801, e: 17819, t: '787-10' },
+  { op: 'EVA Air', s: 17881, e: 17899, t: '787-9' },
+  // 華航 China Airlines
+  { op: 'China Airlines', s: 18001, e: 18007, t: '777-300ER' },
+  { op: 'China Airlines', s: 18051, e: 18055, t: '777-300ER' },
+  { op: 'China Airlines', s: 18031, e: 18050, t: '777-9' },
+  { op: 'China Airlines', s: 18101, e: 18136, t: 'A321neo' },
+  { op: 'China Airlines', s: 18306, e: 18317, t: 'A330-300' },
+  { op: 'China Airlines', s: 18358, e: 18361, t: 'A330-300' },
+  { op: 'China Airlines', s: 18651, e: 18653, t: '737-800' },
+  { op: 'China Airlines', s: 18660, e: 18665, t: '737-800' },
+  { op: 'China Airlines', s: 18717, e: 18725, t: '747-400F' },
+  { op: 'China Airlines', s: 18771, e: 18786, t: '777-200F' },
+  { op: 'China Airlines', s: 18787, e: 18795, t: '777-8F' },
+  { op: 'China Airlines', s: 18811, e: 18832, t: '787-9' },
+  { op: 'China Airlines', s: 18901, e: 18930, t: 'A350-900' },
+  { op: 'China Airlines', s: 18931, e: 18950, t: 'A350-1000' },
+  // 立榮 UNI Air
+  { op: 'UNI Air', s: 17001, e: 17017, t: 'ATR 72-600' },
+  // 華信 Mandarin
+  { op: 'Mandarin', s: 16821, e: 16829, t: 'E190' },
+  { op: 'Mandarin', s: 16851, e: 16868, t: 'ATR 72-600' },
+  // 虎航 Tigerair Taiwan
+  { op: 'Tigerair Taiwan', s: 50001, e: 50018, t: 'A320' },
+  { op: 'Tigerair Taiwan', s: 50021, e: 50037, t: 'A320neo' },
+  { op: 'Tigerair Taiwan', s: 50051, e: 50067, t: 'A321neo' },
+];
+// tail（B-xxxxx）→ { operator, type }；查不到回 null（不亂猜）
+function _plTailLookup(tail) {
+  var m = String(tail == null ? '' : tail).toUpperCase().replace(/\s/g, '').match(/^B-?(\d{5})$/);
+  if (!m) return null;
+  var n = parseInt(m[1], 10);
+  for (var i = 0; i < _PL_TW_REG.length; i++) {
+    var r = _PL_TW_REG[i];
+    if (n >= r.s && n <= r.e) return { operator: r.op, type: r.t };
+  }
+  return null;
+}
+
+// V1.3.15：Add Aircraft 打 tail → 自動帶公司（空白時才帶，不覆蓋手填）+ 顯示偵測到的公司/機型。
+function _plAddAcTailLookup() {
+  var tailEl = document.getElementById('pl-add-tail');
+  var hintEl = document.getElementById('pl-add-tw-hint');
+  var look = _plTailLookup(tailEl ? tailEl.value : '');
+  if (!look) { if (hintEl) hintEl.innerHTML = ''; return; }
+  var opEl = document.getElementById('pl-add-operator');
+  if (opEl && !opEl.value.trim()) opEl.value = look.operator;
+  if (hintEl) hintEl.innerHTML = '<span style="color:#10b981">✓ 台灣機籍：<b>' + _plEsc(look.operator) + '</b> · ' + _plEsc(look.type) + '（公司已自動帶入）</span>';
+}
+
+// 依公司（operator）分析：先用機尾庫 _pl.aircraft 的 operator；沒填 → V1.3.15 用台灣機籍 tail 範圍推。
 function _plRenderCompanyBreakdown(entries) {
   var op = {};
   (_pl.aircraft || []).forEach(function(a) { if (a.tail_no) op[String(a.tail_no).trim().toUpperCase()] = a.operator || ''; });
   return _plBreakdownTable('依公司明細 By Company', 'Company', entries, function(e) {
-    return op[String(e.tail_no || '').trim().toUpperCase()] || '—';
+    var tail = String(e.tail_no || '').trim().toUpperCase();
+    var o = op[tail];
+    if (!o) { var look = _plTailLookup(tail); if (look) o = look.operator; }   // V1.3.15：機尾庫沒填 → 台灣機籍推
+    return o || '—';
   });
 }
 

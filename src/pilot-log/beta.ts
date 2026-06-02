@@ -17,6 +17,9 @@ const TOTAL_SLOTS = parseInt(process.env.PILOT_LOG_BETA_TOTAL_SLOTS || '10', 10)
 const PUBLIC_SLOTS = parseInt(process.env.PILOT_LOG_BETA_PUBLIC_SLOTS || '5', 10) || 5;
 // 封閉測試門禁：on=只有 owner + active 報名者能登入 App；預設 off（不影響現有開發 / 既有使用者）。
 const GATE_ON = String(process.env.PILOT_LOG_BETA_GATE || 'off').toLowerCase() === 'on';
+// 公開報名開關：on=開放、off=關閉（頁面顯示已截止、後端擋新報名）。預設 off（已招滿/暫停）。
+// 要重開設 PILOT_LOG_MONKEY_OPEN=on。owner 後台與既有報名者登入不受此影響。
+const MONKEY_OPEN = String(process.env.PILOT_LOG_MONKEY_OPEN || 'off').toLowerCase() === 'on';
 // 報名臨界區的 Postgres advisory lock key（任意固定值）：序列化「算名額 + 寫入」防超賣（codex P2）。
 const BETA_LOCK_KEY = 918273645;
 
@@ -67,6 +70,7 @@ export interface SlotInfo {
   publicTaken: number;  // 已被公開報名佔走幾席
   left: number;         // 公開還剩幾席
   full: boolean;        // 公開額滿
+  open: boolean;        // 報名是否開放（PILOT_LOG_MONKEY_OPEN）
 }
 
 export async function getSlots(): Promise<SlotInfo> {
@@ -82,18 +86,20 @@ export async function getSlots(): Promise<SlotInfo> {
     } catch { /* 計數失敗就當 0，不擋頁面 */ }
   }
   const left = Math.max(0, PUBLIC_SLOTS - publicTaken);
-  return { total: TOTAL_SLOTS, publicCap: PUBLIC_SLOTS, publicTaken, left, full: left <= 0 };
+  return { total: TOTAL_SLOTS, publicCap: PUBLIC_SLOTS, publicTaken, left, full: left <= 0, open: MONKEY_OPEN };
 }
 
 // ── 報名 ─────────────────────────────────────────────────────────────────────
 export type ApplyResult =
   | { ok: true; status: 'active' | 'waitlist' | 'owner'; already?: boolean }
-  | { ok: false; error: 'bad_code' | 'db' };
+  | { ok: false; error: 'bad_code' | 'db' | 'closed' };
 
 export async function applyApplicant(input: {
   email: string; code: string; fleet?: string; usesSync?: boolean;
   logbook?: string; logbookOther?: string;
 }): Promise<ApplyResult> {
+  // 報名已關閉 → 直接擋（owner 後台 / 既有報名者登入不走這條，不受影響）
+  if (!MONKEY_OPEN) return { ok: false, error: 'closed' };
   // 通關碼先驗（不對就不寫 DB）
   if (normCode(input.code) !== normCode(MONKEY_CODE)) return { ok: false, error: 'bad_code' };
 
