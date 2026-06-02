@@ -51,8 +51,8 @@ import { getSpaPilotLogJs } from '../spa/js-pilot-log.js';
 
 // ── 版本（比照 CrewSync / Morning：每次推版必更新；SW cache 名稱跟著走） ────
 // 本機 preview build 會暫時加 -tNN 後綴方便對版；推正式版前拿掉只留乾淨版號。
-export const PILOT_LOG_VERSION = 'V1.3.26';
-const PILOT_LOG_CACHE = 'pilotlog-v1-3-26';
+export const PILOT_LOG_VERSION = 'V1.3.27';
+const PILOT_LOG_CACHE = 'pilotlog-v1-3-27';
 
 export const pilotLogRouter = express.Router();
 
@@ -335,6 +335,11 @@ if (document.readyState !== 'loading') pilotLogInit();
 function _renderPilotLogChangelog(): string {
   return `
     <div class="pl-cl-v">${PILOT_LOG_VERSION}</div>
+    <div class="pl-cl-txt">
+      <b>資料管理三件套：crew 編輯一致 + Aircraft 列表按公司分類收合 + Aircraft 可編輯。</b><b>(1) 兩個 crew 編輯入口統一：</b>以前在「通訊錄」改聯絡人有 公司 / 註記 可填，但在「航班裡點 ✏️」只給 名字 / 員編 —— 兩邊不一樣。現在<b>航班裡的 ✏️ 也補上 公司 / 註記</b>，跟通訊錄一致。<b>(2) Aircraft 列表改按公司分類 + 預設全收合：</b>以前一打開全部機尾攤開、又是按機型分。現在<b>依公司（operator）分組、預設全部收合</b>，點公司才展開；每架底下標機型。<b>(3) Aircraft 可編輯：</b>以前機尾新增後打錯只能刪掉重建。現在 Aircraft 明細頁右上有 <b>✏️ Edit</b>，可改公司 / 機型 / 廠商 / Model / 備註（機號不可改，要改請刪重建）。<br>
+      <b>Data-management trio: consistent crew edit + Aircraft list grouped by company &amp; collapsed + editable Aircraft.</b> (1) The crew ✏️ inside a flight now also has Organization / Comment, matching the Address Book editor. (2) The Aircraft list is now grouped by company (operator) and collapsed by default (tap a company to expand; each tail shows its type). (3) Aircraft are now editable — an ✏️ Edit on the aircraft detail page lets you fix operator / type / make / model / notes (tail # is fixed; delete &amp; re-add to change it).
+    </div>
+    <div class="pl-cl-v old">V1.3.26</div>
     <div class="pl-cl-txt">
       <b>修兩個 New Entry bug + 離線秒開。</b><b>(1) 新增航班不再亂帶機型：</b>以前按 + New Entry 會自動塞「機尾庫第一台」的機型 / 機尾（例如 A321-200 / B-16201），不必要。現在<b>留空白讓你自己選</b>。<b>(2) 換機型會清掉舊機尾：</b>以前選了新機型，右邊舊機型的機尾（例如 B-16201）不會消失、對不起來。現在<b>換機型時若機尾不屬於新機型就自動清空</b>。<b>(3) 離線秒開：</b>確定沒網路時，Report / Analyze 不再卡「Loading…」轉半天 —— <b>直接用上次的快取資料即時顯示</b>（頂部維持 OFFLINE 提示）。<br>
       <b>Two New Entry bugs fixed + instant offline.</b> (1) New Entry no longer auto-fills the first registry aircraft's type/tail (e.g. A321-200 / B-16201) — left blank for you to pick. (2) Changing the aircraft type now clears a tail that doesn't belong to the new type (no more stale mismatched tail). (3) When offline, Report / Analyze stop hanging on "Loading…" and render instantly from the last cached data (OFFLINE banner stays).
@@ -1438,6 +1443,34 @@ pilotLogRouter.post('/api/pilot-log/aircraft', requireAuth, async (req: AuthedRe
   } catch (e: any) {
     console.error('[pilot-log] aircraft create failed:', e.message);
     res.status(500).json({ error: 'create_failed' });
+  }
+});
+
+// V1.3.27：編輯既有機尾（user：新增後不能編輯、有錯只能刪重建不合理）。以原 tail 為 key，
+// 純 UPDATE 覆寫 operator/type/make/model/notes（可清空，跟 POST 的 COALESCE merge 不同）。tail_no 不可改。
+pilotLogRouter.put('/api/pilot-log/aircraft/:tail', requireAuth, async (req: AuthedRequest, res) => {
+  const pool = getPool();
+  if (!pool || !(await ensureTables())) return res.status(503).json({ error: 'database_unavailable' });
+  const userId = req.pilotUserId!;
+  const tail_no = String(req.params.tail || '').trim().toUpperCase();
+  if (!tail_no) return res.status(400).json({ error: 'missing_tail_no' });
+  const body: any = req.body || {};
+  const operator = String(body.operator || '').trim() || null;
+  const type_code = String(body.type_code || '').trim() || null;
+  const make = String(body.make || '').trim() || null;
+  const model = String(body.model || '').trim() || null;
+  const notes = String(body.notes || '').trim() || null;
+  try {
+    const r = await pool.query(
+      `UPDATE pilot_aircraft SET operator = $1, type_code = $2, make = $3, model = $4, notes = $5
+       WHERE user_id = $6 AND tail_no = $7 RETURNING *`,
+      [operator, type_code, make, model, notes, userId, tail_no]
+    );
+    if (r.rows.length === 0) return res.status(404).json({ error: 'not_found' });
+    res.json({ aircraft: r.rows[0], ok: true });
+  } catch (e: any) {
+    console.error('[pilot-log] aircraft update failed:', e.message);
+    res.status(500).json({ error: 'update_failed' });
   }
 });
 
