@@ -1511,6 +1511,24 @@ function _plWireEditor() {
     var el = document.getElementById('ple-' + n);
     if (el) el.addEventListener('input', _plAutoCalcTimes);
   });
+  // V1.3.23：LogTen / Wader 匯入帶來的 night / PIC / SIC 是「正本」（pilot 自己記的）→ 上鎖，
+  // 標記為手動，之後就算編輯 OOOI / 航線也不會被自動重算蓋掉。Roster / manual 不鎖（要靠自動算）。
+  var _src = (_pl.editing && _pl.editing.source) || '';
+  if (_src === 'logten' || _src === 'wader') {
+    ['night_minutes', 'pic_minutes', 'sic_minutes'].forEach(function(n) {
+      var el = document.getElementById('ple-' + n);
+      if (el && (el.value || '').trim()) el.dataset.manual = '1';   // 有值才鎖；空的仍可手動補
+    });
+    // 但若使用者「明確改 position」→ pic/sic 解鎖 + 依新角色重帶（避免 position=SIC 卻把時數還掛在 pic）。
+    // night 仍維持上鎖（換 position 不該動夜航）。原 _plAutoCalcRole 監聽先觸發但被鎖擋掉，這裡解鎖後補跑一次。
+    var _posEl = document.getElementById('ple-position');
+    if (_posEl) _posEl.addEventListener('change', function() {
+      ['pic_minutes', 'sic_minutes'].forEach(function(n) {
+        var el = document.getElementById('ple-' + n); if (el) delete el.dataset.manual;
+      });
+      _plAutoCalcRole();
+    });
+  }
   // V1.3.20：開啟時自動補算 night —— 班表航班用 IATA 碼以前查不到座標、night 一直空白；
   // 現在 _plApt 兩種碼都查得到。只在 night 空 + 有 off/on 時補（避免動到已存的 block）。
   var _nEl = document.getElementById('ple-night_minutes');

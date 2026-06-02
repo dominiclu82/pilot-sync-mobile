@@ -51,8 +51,8 @@ import { getSpaPilotLogJs } from '../spa/js-pilot-log.js';
 
 // ── 版本（比照 CrewSync / Morning：每次推版必更新；SW cache 名稱跟著走） ────
 // 本機 preview build 會暫時加 -tNN 後綴方便對版；推正式版前拿掉只留乾淨版號。
-export const PILOT_LOG_VERSION = 'V1.3.22';
-const PILOT_LOG_CACHE = 'pilotlog-v1-3-22';
+export const PILOT_LOG_VERSION = 'V1.3.23';
+const PILOT_LOG_CACHE = 'pilotlog-v1-3-23';
 
 export const pilotLogRouter = express.Router();
 
@@ -335,6 +335,11 @@ if (document.readyState !== 'loading') pilotLogInit();
 function _renderPilotLogChangelog(): string {
   return `
     <div class="pl-cl-v">${PILOT_LOG_VERSION}</div>
+    <div class="pl-cl-txt">
+      <b>匯入（LogTen / Wader）的 night / PIC / SIC 上鎖，編輯時間不會被自動重算蓋掉。</b>從 LogTen Pro / Wader 帶進來的夜航、PIC、SIC 是你<b>原本就記好的正本</b>。現在打開這類紀錄時會自動「上鎖」——就算你之後去改 OOOI 或航線，這三個欄位也<b>不會</b>被系統的自動計算覆蓋掉（要改可以直接手動改）。班表（Roster）與手動新增的航班不受影響，仍照常自動算 night。<br>
+      <b>Imported (LogTen / Wader) night / PIC / SIC are now locked from auto-recalc when you edit times.</b> Night, PIC and SIC brought in from LogTen Pro / Wader are <b>your originally-logged values</b>. Opening such an entry now locks those three fields — editing OOOI or the route will <b>not</b> overwrite them with the auto-calculation (you can still change them by hand). Roster and manually-added flights are unaffected and keep auto-computing night.
+    </div>
+    <div class="pl-cl-v old">V1.3.22</div>
     <div class="pl-cl-txt">
       <b>夜航時間改用法規標準的 block 算法（Out→In，含滑行）。</b>之前 night 只算「空中段」（起飛→落地），所以你改推離時間（Out）night 不會動。現在依 <b>FAA 14 CFR 1.1 / EASA FCL.050</b> 改成算整段 block：<b>起點滑行（Out→Off）＋ 空中（Off→On）＋ 終點滑行（On→In）</b>，落在夜間的部分都算進去——滑行的夜航終於不再漏。缺 Out / In 時自動退化為只算空中段。<br>
       <b>Night time now uses the regulatory block-based method (Out→In, incl. taxi).</b> Night was previously airborne-only (takeoff→landing), so changing your out-time didn't move it. Per <b>FAA 14 CFR 1.1 / EASA FCL.050</b>, night is now computed across the whole block: <b>taxi-out (Out→Off) + airborne (Off→On) + taxi-in (On→In)</b>, counting any portion that falls in darkness — taxi night is no longer dropped. Falls back to airborne-only when Out/In are missing.
