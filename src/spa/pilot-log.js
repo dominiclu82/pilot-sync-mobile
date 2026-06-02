@@ -1175,9 +1175,9 @@ function _plCrewField(key, e) {
   return '<div style="margin-bottom:8px">' +
     '<div style="font-size:.62em;color:var(--muted);margin-bottom:2px">' + _plEsc(label) + '</div>' +
     '<div style="display:flex;gap:4px">' +
-      '<input id="ple-crew-' + key + '" list="ple-crew-dl" placeholder="name" style="flex:1;' + inputCss + '" value="' + _plEsc(dispName) + '">' +
-      '<input id="ple-crewrank-' + key + '" placeholder="rank" style="width:62px;text-transform:uppercase;' + inputCss + '" value="' + _plEsc(val.rank) + '">' +
-      (dispName ? '<button type="button" onclick="_plQuickEditCrewSlot(\'' + key + '\')" title="編輯此聯絡人 Edit contact" style="flex:0 0 auto;background:transparent;border:1px solid var(--border,#334155);border-radius:6px;color:var(--text);font-size:.8em;padding:0 9px;cursor:pointer">✏️</button>' : '') +
+      '<input id="ple-crew-' + key + '" list="ple-crew-dl" placeholder="name" style="flex:1;min-width:0;' + inputCss + '" value="' + _plEsc(dispName) + '">' +
+      '<input id="ple-crewrank-' + key + '" placeholder="rank" style="flex:0 0 auto;width:54px;text-transform:uppercase;' + inputCss + '" value="' + _plEsc(val.rank) + '">' +
+      (dispName ? '<button type="button" onclick="_plQuickEditCrewSlot(\'' + key + '\')" title="編輯此聯絡人 Edit contact" style="flex:0 0 auto;background:transparent;border:1px solid var(--border,#334155);border-radius:6px;color:var(--text);font-size:.85em;padding:0 7px;cursor:pointer">✏️</button>' : '') +
     '</div>' +
     '<input type="hidden" id="ple-crewid-' + key + '" value="' + _plEsc(val.eid) + '">' +
     '<input type="hidden" id="ple-crewname0-' + key + '" value="' + _plEsc(dispName) + '"></div>';  // 原始名字：判斷名字有沒有被改過，改過就不沿用舊員編
@@ -3104,56 +3104,77 @@ function _plRenderTypeBreakdown(entries) {
 // V1.3.15：台灣商用機籍「註冊範圍 → 公司 + 機型」對照（來源：各家維基「註冊編號法則」，源頭民航局）。
 // 用數字範圍精準比對（B-xxxxx 取後 5 碼），範圍互不重疊（B-162/163/165/167=長榮、B-168=華信、
 // B-170=立榮、B-178=長榮787），解 B-16xxx / B-17xxx 多家共用。新交機 / 退役時更新這份。
+// 每筆多帶 c = ICAO 機型代碼，給 Add Aircraft 連動廠商/機型下拉用（型錄查得到 → 直接選；
+// 貨機等型錄沒有的代碼 → 走自訂帶入）。
 var _PL_TW_REG = [
   // 星宇 Starlux
-  { op: 'Starlux', s: 58201, e: 58227, t: 'A321neo' },
-  { op: 'Starlux', s: 58301, e: 58311, t: 'A330neo' },
-  { op: 'Starlux', s: 58501, e: 58510, t: 'A350-900' },
-  { op: 'Starlux', s: 58551, e: 58568, t: 'A350-1000' },
-  { op: 'Starlux', s: 58581, e: 58590, t: 'A350F' },
+  { op: 'Starlux', s: 58201, e: 58227, t: 'A321neo', c: 'A21N' },
+  { op: 'Starlux', s: 58301, e: 58311, t: 'A330neo', c: 'A339' },
+  { op: 'Starlux', s: 58501, e: 58510, t: 'A350-900', c: 'A359' },
+  { op: 'Starlux', s: 58551, e: 58568, t: 'A350-1000', c: 'A35K' },
+  { op: 'Starlux', s: 58581, e: 58590, t: 'A350F', c: 'A35F' },
   // 長榮 EVA Air
-  { op: 'EVA Air', s: 16200, e: 16299, t: 'A321neo' },
-  { op: 'EVA Air', s: 16331, e: 16340, t: 'A330-300' },
-  { op: 'EVA Air', s: 16501, e: 16527, t: 'A350-1000' },
-  { op: 'EVA Air', s: 16701, e: 16740, t: '777-300ER' },
-  { op: 'EVA Air', s: 16781, e: 16790, t: '777F' },
-  { op: 'EVA Air', s: 17801, e: 17819, t: '787-10' },
-  { op: 'EVA Air', s: 17881, e: 17899, t: '787-9' },
+  { op: 'EVA Air', s: 16200, e: 16299, t: 'A321neo', c: 'A21N' },
+  { op: 'EVA Air', s: 16331, e: 16340, t: 'A330-300', c: 'A333' },
+  { op: 'EVA Air', s: 16501, e: 16527, t: 'A350-1000', c: 'A35K' },
+  { op: 'EVA Air', s: 16701, e: 16740, t: '777-300ER', c: 'B77W' },
+  { op: 'EVA Air', s: 16781, e: 16790, t: '777F', c: 'B77F' },
+  { op: 'EVA Air', s: 17801, e: 17819, t: '787-10', c: 'B78X' },
+  { op: 'EVA Air', s: 17881, e: 17899, t: '787-9', c: 'B789' },
   // 華航 China Airlines
-  { op: 'China Airlines', s: 18001, e: 18007, t: '777-300ER' },
-  { op: 'China Airlines', s: 18051, e: 18055, t: '777-300ER' },
-  { op: 'China Airlines', s: 18031, e: 18050, t: '777-9' },
-  { op: 'China Airlines', s: 18101, e: 18136, t: 'A321neo' },
-  { op: 'China Airlines', s: 18306, e: 18317, t: 'A330-300' },
-  { op: 'China Airlines', s: 18358, e: 18361, t: 'A330-300' },
-  { op: 'China Airlines', s: 18651, e: 18653, t: '737-800' },
-  { op: 'China Airlines', s: 18660, e: 18665, t: '737-800' },
-  { op: 'China Airlines', s: 18717, e: 18725, t: '747-400F' },
-  { op: 'China Airlines', s: 18771, e: 18786, t: '777-200F' },
-  { op: 'China Airlines', s: 18787, e: 18795, t: '777-8F' },
-  { op: 'China Airlines', s: 18811, e: 18832, t: '787-9' },
-  { op: 'China Airlines', s: 18901, e: 18930, t: 'A350-900' },
-  { op: 'China Airlines', s: 18931, e: 18950, t: 'A350-1000' },
+  { op: 'China Airlines', s: 18001, e: 18007, t: '777-300ER', c: 'B77W' },
+  { op: 'China Airlines', s: 18051, e: 18055, t: '777-300ER', c: 'B77W' },
+  { op: 'China Airlines', s: 18031, e: 18050, t: '777-9', c: 'B779' },
+  { op: 'China Airlines', s: 18101, e: 18136, t: 'A321neo', c: 'A21N' },
+  { op: 'China Airlines', s: 18306, e: 18317, t: 'A330-300', c: 'A333' },
+  { op: 'China Airlines', s: 18358, e: 18361, t: 'A330-300', c: 'A333' },
+  { op: 'China Airlines', s: 18651, e: 18653, t: '737-800', c: 'B738' },
+  { op: 'China Airlines', s: 18660, e: 18665, t: '737-800', c: 'B738' },
+  { op: 'China Airlines', s: 18717, e: 18725, t: '747-400F', c: 'B74F' },
+  { op: 'China Airlines', s: 18771, e: 18786, t: '777-200F', c: 'B77F' },
+  { op: 'China Airlines', s: 18787, e: 18795, t: '777-8F', c: 'B778' },
+  { op: 'China Airlines', s: 18811, e: 18832, t: '787-9', c: 'B789' },
+  { op: 'China Airlines', s: 18901, e: 18930, t: 'A350-900', c: 'A359' },
+  { op: 'China Airlines', s: 18931, e: 18950, t: 'A350-1000', c: 'A35K' },
   // 立榮 UNI Air
-  { op: 'UNI Air', s: 17001, e: 17017, t: 'ATR 72-600' },
+  { op: 'UNI Air', s: 17001, e: 17017, t: 'ATR 72-600', c: 'AT76' },
   // 華信 Mandarin
-  { op: 'Mandarin', s: 16821, e: 16829, t: 'E190' },
-  { op: 'Mandarin', s: 16851, e: 16868, t: 'ATR 72-600' },
+  { op: 'Mandarin', s: 16821, e: 16829, t: 'E190', c: 'E190' },
+  { op: 'Mandarin', s: 16851, e: 16868, t: 'ATR 72-600', c: 'AT76' },
   // 虎航 Tigerair Taiwan
-  { op: 'Tigerair Taiwan', s: 50001, e: 50018, t: 'A320' },
-  { op: 'Tigerair Taiwan', s: 50021, e: 50037, t: 'A320neo' },
-  { op: 'Tigerair Taiwan', s: 50051, e: 50067, t: 'A321neo' },
+  { op: 'Tigerair Taiwan', s: 50001, e: 50018, t: 'A320', c: 'A320' },
+  { op: 'Tigerair Taiwan', s: 50021, e: 50037, t: 'A320neo', c: 'A20N' },
+  { op: 'Tigerair Taiwan', s: 50051, e: 50067, t: 'A321neo', c: 'A21N' },
 ];
-// tail（B-xxxxx）→ { operator, type }；查不到回 null（不亂猜）
+// tail（B-xxxxx）→ { operator, type, code }；查不到回 null（不亂猜）
 function _plTailLookup(tail) {
   var m = String(tail == null ? '' : tail).toUpperCase().replace(/\s/g, '').match(/^B-?(\d{5})$/);
   if (!m) return null;
   var n = parseInt(m[1], 10);
   for (var i = 0; i < _PL_TW_REG.length; i++) {
     var r = _PL_TW_REG[i];
-    if (n >= r.s && n <= r.e) return { operator: r.op, type: r.t };
+    if (n >= r.s && n <= r.e) return { operator: r.op, type: r.t, code: r.c };
   }
   return null;
+}
+// ICAO 代碼 → 型錄 { make, model }；查不到回 null（貨機等不在型錄內）
+function _plAcFindByCode(code) {
+  var c = String(code || '').toUpperCase();
+  if (!c) return null;
+  var cat = _plAcMergedCatalog(), found = null;
+  Object.keys(cat).forEach(function(mk) {
+    cat[mk].forEach(function(r) { if (String(r[0]).toUpperCase() === c) found = { make: mk, model: r[1] }; });
+  });
+  return found;
+}
+// 機型字串 → 廠商（型錄沒對到代碼時的 fallback）
+function _plMakeFromType(t) {
+  var s = String(t || '').toUpperCase().replace(/[\s-]/g, '');
+  if (s.indexOf('ATR') === 0) return 'ATR';
+  if (s.charAt(0) === 'A') return 'Airbus';
+  if (s.charAt(0) === '7' || s.charAt(0) === 'B') return 'Boeing';
+  if (s.charAt(0) === 'E') return 'Embraer';
+  return '';
 }
 
 // V1.3.15：Add Aircraft 打 tail → 自動帶公司（空白時才帶，不覆蓋手填）+ 顯示偵測到的公司/機型。
@@ -3164,7 +3185,36 @@ function _plAddAcTailLookup() {
   if (!look) { if (hintEl) hintEl.innerHTML = ''; return; }
   var opEl = document.getElementById('pl-add-operator');
   if (opEl && !opEl.value.trim()) opEl.value = look.operator;
-  if (hintEl) hintEl.innerHTML = '<span style="color:#10b981">✓ 台灣機籍：<b>' + _plEsc(look.operator) + '</b> · ' + _plEsc(look.type) + '（公司已自動帶入）</span>';
+  _plAddAcAutofillType(look);   // 連帶把廠商 + 機型下拉也選好
+  if (hintEl) hintEl.innerHTML = '<span style="color:#10b981">✓ 台灣機籍：<b>' + _plEsc(look.operator) + '</b> · ' + _plEsc(look.type) + '（公司 / 機型已自動帶入）</span>';
+}
+
+// 偵測到 tail → 連動 Add Aircraft 的廠商 + 機型下拉（使用者已自選廠商則不覆蓋）。
+function _plAddAcAutofillType(look) {
+  var makeSel = document.getElementById('pl-add-make');
+  if (!makeSel) return;
+  // codex P2：使用者手選過廠商（且不是我們上次自動填的那個）→ 不覆蓋；空的或自動填的 → 可重帶（改 tail）。
+  if (makeSel.value && makeSel.value !== window._plAcAutofilledMake) return;
+  var hit = _plAcFindByCode(look.code);
+  var make = hit ? hit.make : _plMakeFromType(look.type);
+  if (!make) return;
+  var hasMake = false;
+  for (var i = 0; i < makeSel.options.length; i++) { if (makeSel.options[i].value === make) { hasMake = true; break; } }
+  if (!hasMake) return;
+  makeSel.value = make;
+  window._plAcAutofilledMake = make;   // 記下這是自動填的，改 tail 時才能再覆蓋
+  _plAddAcMakeChange();   // 重建該廠商的 model select
+  var modelSel = document.getElementById('pl-add-model');
+  if (!modelSel) return;
+  if (hit) {
+    modelSel.value = hit.model;   // 型錄有 → 直接選（type code 存檔時 derive）
+  } else {
+    // 型錄沒有（貨機等）→ Other + 自填機型 + type code
+    modelSel.value = '__other__';
+    _plAddAcModelChange();
+    var mc = document.getElementById('pl-add-model-custom'); if (mc) mc.value = look.type;
+    var tc = document.getElementById('pl-add-type'); if (tc && look.code) tc.value = look.code;
+  }
 }
 
 // 依公司（operator）分析：先用機尾庫 _pl.aircraft 的 operator；沒填 → V1.3.15 用台灣機籍 tail 範圍推。

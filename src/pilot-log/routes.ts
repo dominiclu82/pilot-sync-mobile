@@ -50,8 +50,8 @@ import { getSpaPilotLogJs } from '../spa/js-pilot-log.js';
 
 // ── 版本（比照 CrewSync / Morning：每次推版必更新；SW cache 名稱跟著走） ────
 // 本機 preview build 會暫時加 -tNN 後綴方便對版；推正式版前拿掉只留乾淨版號。
-export const PILOT_LOG_VERSION = 'V1.3.15';
-const PILOT_LOG_CACHE = 'pilotlog-v1-3-15';
+export const PILOT_LOG_VERSION = 'V1.3.16';
+const PILOT_LOG_CACHE = 'pilotlog-v1-3-16';
 
 export const pilotLogRouter = express.Router();
 
@@ -334,6 +334,11 @@ if (document.readyState !== 'loading') pilotLogInit();
 function _renderPilotLogChangelog(): string {
   return `
     <div class="pl-cl-v">${PILOT_LOG_VERSION}</div>
+    <div class="pl-cl-txt">
+      <b>匯入 crew 欄模糊比對 + Add Aircraft 自動帶機型 + crew 排版修正。</b><b>(匯入)</b> LogTen 的 crew 欄名可自訂（PIC/P1 Crew、Relief Crew… 因人而異），之前只認固定名稱、改過名就抓不到（Crew 3/4 空白）。改成<b>含關鍵字就認</b>：PIC/P1、SIC/P2、Relief/P3、CIC/Purser、Observer/OBS 各種寫法都帶得進來，也用在「你這趟是 PIC/SIC」的判斷。<b>(機籍)</b> Add Aircraft 打 tail（如 B-58553）→ 現在連<b>廠商 + 機型下拉也一起自動選好</b>（型錄有的直接選，貨機等自動填）。<b>(排版)</b> 航班編輯器 crew 欄的 rank 不再跑出卡片右邊界。<br>
+      <b>Fuzzy crew-column matching on import + Add Aircraft auto-fills type + crew layout fix.</b> <b>(Import)</b> LogTen crew column names are customizable, and old exact-name matching missed renamed columns (Crew 3/4 came in blank). Now matched by keyword — PIC/P1, SIC/P2, Relief/P3, CIC/Purser, Observer/OBS variants all import, and feed the PIC/SIC role inference too. <b>(Registry)</b> Add Aircraft: typing a tail (e.g. B-58553) now also auto-selects the manufacturer + model. <b>(Layout)</b> The rank field in the flight editor's crew rows no longer overflows the card edge.
+    </div>
+    <div class="pl-cl-v old">V1.3.15</div>
     <div class="pl-cl-txt">
       <b>航班裡直接改同事 + 台灣機籍自動分公司 + LogTen 匯入放寬。</b><b>(改同事)</b> 航班編輯器的 crew 格選了同事，旁邊多了 <b>✏️</b>，直接改名字 / 員編（彈窗、不離開航班），改完所有航班一起更新；補員編就能拆同名。<b>(機籍)</b> 內建台灣六家航空（華航 / 長榮 / 星宇 / 立榮 / 華信 / 虎航）的註冊編號範圍：Analyze「依公司」<b>就算機尾庫沒填 operator 也能自動分出航空公司</b>；Add Aircraft 打 tail（如 B-58205）自動帶出公司。<b>(匯入)</b> LogTen 航班匯入的 On Duty / Off Duty / PIC/P1 / SIC/P2 改成<b>選填</b>——沒勾這幾欄也能匯入。<br>
       <b>Edit crew inside a flight + auto-detect Taiwan operators + looser LogTen import.</b> <b>(Edit crew)</b> Each crew slot in the flight editor now has an ✏️ to edit that colleague's name / employee id in a popup without leaving the flight; changes apply across all flights. Adding an id separates same-name colleagues. <b>(Registry)</b> Built-in registration ranges for six Taiwan carriers (China Airlines / EVA / Starlux / UNI / Mandarin / Tigerair): Analyze "By Company" now derives the operator from the tail even when your registry has none; Add Aircraft auto-fills the operator from the tail (e.g. B-58205). <b>(Import)</b> LogTen flight import now treats On Duty / Off Duty / PIC/P1 / SIC/P2 as optional — exports without those columns import fine.

@@ -267,6 +267,42 @@ export async function importLogtenFlights(
   // 真飛了會有 Out 直接 confirmed）。
   const _PL_PAST_CUTOFF = new Date(Date.now() - 12 * 3600 * 1000).toISOString().slice(0, 10);
 
+  // V1.3.16：crew 欄名因人而異（LogTen 可自訂欄名），改「含關鍵字就認」的模糊比對，解析一次。
+  // 兩輪：先找含「CREW」的欄（最像組員姓名欄、避開 PIC/SIC 時數欄），找不到再放寬。
+  // skip 已被別槽認領的欄，避免一欄被指到兩個槽。完全亂取的怪名仍可能漏（之後可加欄位對應 UI）。
+  const _crewExclude = ['TIME', 'HOUR', 'REMARK', 'NOTE', 'DUTY', 'NIGHT', 'INSTRUMENT', 'APPROACH', 'LDG', 'TAKEOFF', 'LANDING', 'TOTAL', 'BLOCK'];
+  // codex P1：值是 HH:MM / 純數字的欄是「時數欄」不是姓名欄（例如標準 PIC/SIC 時數欄叫 "PIC"/"SIC"），
+  // 名字被改名（如 "Captain"）時，第二輪放寬比對可能誤抓到時數欄、把 crew.pic 設成 "1:30"。用值擋掉。
+  const _looksLikeName = (col: string): boolean => {
+    for (let i = 0; i < rows.length && i < 30; i++) {
+      const v = String(rows[i][col] || '').trim();
+      if (!v) continue;
+      if (/^\d{1,3}:\d{2}$/.test(v)) return false;   // HH:MM 時數
+      if (/^[\d.:]+$/.test(v)) return false;          // 純數字 / 時間
+      return true;                                    // 有字母 → 像名字
+    }
+    return true;                                      // 全空 → 允許（反正不會帶入值）
+  };
+  const _findCrewCol = (tests: string[], extra: string[] = [], skip: (string | undefined)[] = []): string | undefined => {
+    for (const crewFirst of [true, false]) {
+      for (const h of headers) {
+        if (skip.indexOf(h) >= 0) continue;
+        const u = h.toUpperCase();
+        if (_crewExclude.some((x) => u.includes(x))) continue;
+        if (crewFirst && u.indexOf('CREW') < 0) continue;
+        if (extra.some((x) => u.includes(x))) continue;
+        if (tests.some((x) => u.includes(x)) && _looksLikeName(h)) return h;
+      }
+    }
+    return undefined;
+  };
+  const colPic = _findCrewCol(['PIC/P1', 'PIC', 'P1', 'CAPTAIN', 'COMMANDER']);
+  const colSic = _findCrewCol(['SIC/P2', 'SIC', 'P2', 'FIRST OFFICER', 'CO-PILOT', 'COPILOT'], ['RELIEF', 'P3', 'P4', 'FO1', 'FO2'], [colPic]);
+  const colR2 = _findCrewCol(['RELIEF CREW 2', 'RELIEF 2', 'RELIEF2', 'FO2', 'P4', 'CREW 4', '4TH'], [], [colPic, colSic]);
+  const colR1 = _findCrewCol(['RELIEF', 'FO1', 'P3', 'CREW 3', '3RD'], ['2', 'P4', 'FO2'], [colPic, colSic, colR2]);
+  const colCic = _findCrewCol(['CIC', 'PURSER', 'CHIEF', 'IN-CHARGE', 'IN CHARGE'], [], [colPic, colSic, colR1, colR2]);
+  const colObs = _findCrewCol(['OBSERVER', 'OBS', 'JUMPSEAT', 'JUMP SEAT', 'SUPERNUMERARY'], [], [colPic, colSic, colR1, colR2, colCic]);
+
   for (let i = 0; i < rows.length; i++) {
     const row = rows[i];
     try {
@@ -309,15 +345,20 @@ export async function importLogtenFlights(
         if (a) approaches.push(a);
       }
 
+      // V1.3.16：用上面模糊比對解析出的欄位讀 crew。
       const crew: Record<string, string> = {};
-      const pic = row['PIC/P1 Crew'] || row['PIC/P1'];
-      const sic = row['SIC/P2 Crew'] || row['SIC/P2'];
+      const pic = colPic ? row[colPic] : undefined;
+      const sic = colSic ? row[colSic] : undefined;
+      const relief1 = colR1 ? row[colR1] : undefined;
+      const relief2 = colR2 ? row[colR2] : undefined;
+      const cic = colCic ? row[colCic] : undefined;
+      const obs = colObs ? row[colObs] : undefined;
       if (pic) crew.pic = pic;
-      if (sic) crew.sic = sic;
-      if (row['FO 1']) crew.fo1 = row['FO 1'];
-      if (row['FO 2']) crew.fo2 = row['FO 2'];
-      if (row['Purser']) crew.purser = row['Purser'];
-      if (row['Observer']) crew.observer1 = row['Observer'];
+      if (sic) crew.sic = sic;              // → crew2
+      if (relief1) crew.fo1 = relief1;      // → crew3
+      if (relief2) crew.fo2 = relief2;      // → crew4
+      if (cic) crew.purser = cic;           // → cic
+      if (obs) crew.observer1 = obs;        // → obs
       if (row['Observer 2']) crew.observer2 = row['Observer 2'];
 
       // V1.2.03：Deadhead = LogTen 標記 positioning 的欄位。deadhead 是已發生事件
