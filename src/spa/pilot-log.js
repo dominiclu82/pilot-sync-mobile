@@ -1274,7 +1274,7 @@ function _plLoadAirports() {
   if (_plAirportsP) return _plAirportsP;
   _plAirportsP = new Promise(function(res) {
     var s = document.createElement('script');
-    s.src = '/pilot-log/airport-db.js'; s.async = true;
+    s.src = '/pilot-log/airport-db.js?v=' + (window._PL_VER || '1'); s.async = true;   // V1.3.38：版本化網址，版本一變強制重抓（解 7 天快取卡舊資料）
     s.onload = function() { _PL_GAPT_IDX = null; res(window._PL_AIRPORTS || []); };
     s.onerror = function() { _plAirportsP = null; res([]); };   // 失敗可重試
     (document.head || document.documentElement).appendChild(s);
@@ -2881,10 +2881,25 @@ function _plOpenPlaceDetail(key) {
   flights.sort(function(a, b) { return (b.flight_date || '').localeCompare(a.flight_date || ''); });
   var info = _plAptInfo(key);
   var disp = _plAptFmt(key);
+  // V1.3.38：機場詳情 —— 時區（含當地即時時間）/ 座標 / 海拔 / 跑道
+  var det = '';
+  if (info) {
+    var bits = [];
+    if (info.tz) {
+      var lt = '';
+      try { lt = new Intl.DateTimeFormat('en-GB', { timeZone: info.tz, hour: '2-digit', minute: '2-digit', hour12: false }).format(new Date()); } catch (e) {}
+      bits.push('🕐 ' + _plEsc(info.tz) + (lt ? '（當地 ' + lt + '）' : ''));
+    }
+    if (info.lat != null && info.lon != null) bits.push('📍 ' + info.lat + ', ' + info.lon);
+    if (info.elev !== '' && info.elev != null) bits.push('⛰️ ' + info.elev + ' ft');
+    if (info.runways && info.runways.length) bits.push('🛬 RWY ' + info.runways.join(' / '));
+    if (bits.length) det = '<div style="color:var(--muted);margin-top:6px;font-size:.92em;line-height:1.8">' + bits.join('<br>') + '</div>';
+  }
   var head = '<div style="background:var(--card);border-radius:8px;padding:12px;margin-bottom:10px;font-size:.78em">' +
     '<div style="font-weight:700;font-size:1.1em">' + _plEsc(disp) +
       (info && info.icao && info.iata ? ' <span style="color:var(--muted);font-size:.78em">' + _plEsc(info.icao) + ' / ' + _plEsc(info.iata) + '</span>' : '') + '</div>' +
     (info ? '<div style="color:var(--muted);margin-top:4px">' + _plEsc([info.name, info.city, info.cc].filter(Boolean).join(' · ')) + '</div>' : '') +
+    det +
   '</div>';
   var rows = flights.length === 0
     ? '<div style="text-align:center;color:var(--muted);padding:30px;font-size:.85em">沒有航班。 · No flights.</div>'

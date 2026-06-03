@@ -52,8 +52,8 @@ import { getAirportDbJs } from '../spa/js-airport-db.js';
 
 // ── 版本（比照 CrewSync / Morning：每次推版必更新；SW cache 名稱跟著走） ────
 // 本機 preview build 會暫時加 -tNN 後綴方便對版；推正式版前拿掉只留乾淨版號。
-export const PILOT_LOG_VERSION = 'V1.3.37';
-const PILOT_LOG_CACHE = 'pilotlog-v1-3-37';
+export const PILOT_LOG_VERSION = 'V1.3.38';
+const PILOT_LOG_CACHE = 'pilotlog-v1-3-38';
 
 export const pilotLogRouter = express.Router();
 
@@ -322,6 +322,7 @@ if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('/pilot-log/sw.js', { scope: '/pilot-log' }).catch(function(){});
 }
 
+window._PL_VER = '${PILOT_LOG_VERSION}';   // V1.3.38：給 airport-db.js 做版本化網址用（避免 7 天快取卡舊資料）
 ${getSpaPilotLogJs()}
 
 document.addEventListener('DOMContentLoaded', function(){ pilotLogInit(); });
@@ -336,6 +337,11 @@ if (document.readyState !== 'loading') pilotLogInit();
 function _renderPilotLogChangelog(): string {
   return `
     <div class="pl-cl-v">${PILOT_LOG_VERSION}</div>
+    <div class="pl-cl-txt">
+      <b>修好跑道下拉（快取卡舊資料）＋機場詳情補資料。</b><b>(1) 跑道下拉修正：</b>上一版的跑道下拉是空的 —— 機場資料檔被瀏覽器 7 天快取卡在舊版（沒有跑道那欄），改成<b>版本化網址</b>強制重抓，現在 Dep/Arr 跑道下拉正常跳出該機場的實際跑道。<b>(2) 機場詳情補資料：</b>在 Places 點任一機場，現在看得到<b>時區（含當地即時時間）、座標、海拔、跑道</b>。<br>
+      <b>Runway dropdown fix (stale cache) + airport detail data.</b> (1) Last version's runway dropdown was empty — the airport data file was stuck on a 7-day browser cache (old version without the runways column); switched to a versioned URL to force a refresh, so Dep/Arr runway dropdowns now show the airport's actual runways. (2) Tapping an airport in Places now shows its timezone (with live local time), coordinates, elevation and runways.
+    </div>
+    <div class="pl-cl-v old">V1.3.37</div>
     <div class="pl-cl-txt">
       <b>跑道下拉 + 組員顯示修正 + 匯入自動帶組員 + 機場代碼自動大寫。</b><b>(1) Dep/Arr 跑道改下拉：</b>起飛/落地跑道<b>依該機場實際跑道</b>選（資料內建），不用背；跑道跟 SID/STAR 排在<b>同一區、照飛行時序</b>（Dep Rwy → SID → STAR → Arr Rwy）。<b>(2) 修組員「最後一個重複」：</b>有些航班列表把最後一位組員顯示兩次 —— 你的<b>資料其實沒壞</b>（flight detail 一直正確），是列表顯示沒去重，已修。<b>(3) 匯入更直覺：</b>拿掉「覆蓋組員」勾選 —— 匯入<b>一律自動帶入/補上組員</b>（含 FO），其他欄位（你的編輯）不動；重匯也會補回 Crew 人數。<b>(4) New Entry 機場代碼自動大寫</b>（IATA/ICAO 都是）。<b>(5) 機場庫升級：</b>加入<b>時區、海拔、州、跑道</b>（為下一版機場頁鋪路）。<br>
       <b>Runway dropdown + crew display fix + auto crew on import + auto-uppercase airport codes.</b> (1) Dep/Arr runway are now dropdowns driven by the airport's actual runways (built-in); runway sits with SID/STAR in one block, in flight order (Dep Rwy → SID → STAR → Arr Rwy). (2) Fixed the "last crew member shown twice" on some list views — your data was never broken (flight detail was always correct), the list just didn't de-duplicate; fixed. (3) Import is simpler: the "overwrite crew" checkbox is gone — import always fills/updates crew (incl. FO) without touching your other edits; re-import also backfills the crew count. (4) New Entry auto-uppercases airport codes. (5) Airport DB now carries timezone, elevation, state and runways (groundwork for the Airports page).
