@@ -51,8 +51,8 @@ import { getSpaPilotLogJs } from '../spa/js-pilot-log.js';
 
 // ── 版本（比照 CrewSync / Morning：每次推版必更新；SW cache 名稱跟著走） ────
 // 本機 preview build 會暫時加 -tNN 後綴方便對版；推正式版前拿掉只留乾淨版號。
-export const PILOT_LOG_VERSION = 'V1.3.34';
-const PILOT_LOG_CACHE = 'pilotlog-v1-3-34';
+export const PILOT_LOG_VERSION = 'V1.3.35';
+const PILOT_LOG_CACHE = 'pilotlog-v1-3-35';
 
 export const pilotLogRouter = express.Router();
 
@@ -335,6 +335,11 @@ if (document.readyState !== 'loading') pilotLogInit();
 function _renderPilotLogChangelog(): string {
   return `
     <div class="pl-cl-v">${PILOT_LOG_VERSION}</div>
+    <div class="pl-cl-txt">
+      <b>內建台灣機隊，一鍵挑機加進機尾庫。</b>✈️ Aircraft 頁多了「<b>🇹🇼 從機隊</b>」：列出台灣 6 家航司（星宇 / 長榮 / 華航 / 華信 / 立榮 / 虎航）的<b>現役機隊</b>，依公司 → 機型分組，<b>點一架就加進你的機尾庫</b>（自動帶公司 + 機型，不用手 key）。已在庫的標綠色 ✓。退役機不在這份現役清單，仍可用「+ Add Aircraft」手動加（你飛過的退役機，公司/機型一樣推算得出來）。<br>
+      <b>Built-in Taiwan fleets — tap to add aircraft.</b> The ✈️ Aircraft page gains 🇹🇼 Pick from fleet: browse the current fleets of Taiwan's six carriers (Starlux / EVA / China Airlines / Mandarin / UNI / Tigerair) by airline → type, and tap a tail to add it to your registry (operator + type auto-filled). Already-added tails show a green ✓. Retired aircraft aren't in this current-fleet list — use "+ Add Aircraft" for those.
+    </div>
+    <div class="pl-cl-v old">V1.3.34</div>
     <div class="pl-cl-txt">
       <b>拿掉「已移除」篩選 + Report 多餘字樣，介面更乾淨。</b>「已移除」（班表同步時被取消的航班）這個篩選分類拿掉了——這種紀錄<b>不再出現在 All</b>，篩選列也少一顆鈕（紀錄仍留在資料庫，只是畫面上不顯示）。另外 Report 右上角那句「只計已飛航班」也拿掉（Report 本來就只算已飛的，不用特別寫）。<br>
       <b>Removed the "Removed" filter + a redundant Report label.</b> The "Removed" category (roster-sync-cancelled flights) is gone — those records no longer show in All, and the filter row loses a button (the records stay in the database, just hidden). The Report page also drops the redundant "flown flights only" label.
@@ -1658,8 +1663,22 @@ pilotLogRouter.get('/api/pilot-log/oops/stats', async (req, res) => {
 
     // ── V1.2.06：整個資料庫總量（含餐廳 POS 等所有表）+ 全表 size 排行 ─────────────
     // pilot-log 跟餐廳出勤系統共用同一個 Postgres，這裡才看得到「總共用多少 / 還剩多少 / 餐廳吃多少」。
-    const dbSizeRow = await pool.query(`SELECT pg_database_size(current_database())::bigint AS bytes`);
-    const dbTotalBytes = Number(dbSizeRow.rows[0].bytes);
+    // V1.3.35（修）：Render「Storage used」≈ 所有 database + WAL + 開銷，不是單一 database 的邏輯大小。
+    // 原本 pg_database_size(current_database()) 少算其他 DB 跟 WAL → 顯示遠低於 Render（user：Render 15.64% vs 本頁 2.8%）。
+    let allDbBytes = 0;
+    try {
+      const r = await pool.query(`SELECT COALESCE(SUM(pg_database_size(oid)),0)::bigint AS bytes FROM pg_database WHERE NOT datistemplate`);
+      allDbBytes = Number(r.rows[0].bytes);
+    } catch {
+      const r = await pool.query(`SELECT pg_database_size(current_database())::bigint AS bytes`);
+      allDbBytes = Number(r.rows[0].bytes);
+    }
+    let walBytes = 0;
+    try {
+      const w = await pool.query(`SELECT COALESCE(SUM(size),0)::bigint AS bytes FROM pg_ls_waldir()`);
+      walBytes = Number(w.rows[0].bytes);
+    } catch { /* 多數 Render 帳號無 pg_monitor → 拿不到 WAL，walBytes 留 0 */ }
+    const dbTotalBytes = allDbBytes + walBytes;   // ≈ Render「Storage used」
     const GB = 1024 * 1024 * 1024;
     const topTablesRow = await pool.query(`
       SELECT relname AS name,
@@ -1765,6 +1784,8 @@ pilotLogRouter.get('/api/pilot-log/oops/stats', async (req, res) => {
         // V1.2.06：整個 DB（含餐廳 POS）對 1GB 的用量
         db_total_size_bytes: dbTotalBytes,
         db_total_size_mb: Math.round(dbTotalBytes / 1024 / 1024 * 10) / 10,
+        all_db_size_mb: Math.round(allDbBytes / 1024 / 1024 * 10) / 10,   // V1.3.35：全部 database（資料）
+        wal_size_mb: Math.round(walBytes / 1024 / 1024 * 10) / 10,        // WAL（拿不到權限時為 0）
         db_used_pct_of_1gb: Math.round(dbTotalBytes / GB * 1000) / 10,
         db_free_mb_of_1gb: Math.round((GB - dbTotalBytes) / 1024 / 1024 * 10) / 10,
         restaurant_etc_size_mb: Math.round((dbTotalBytes - totalSize) / 1024 / 1024 * 10) / 10,  // 總量扣掉 pilot-log = 餐廳+晨報+其他+開銷
@@ -1892,10 +1913,11 @@ function render(j){
   var pct = s.db_used_pct_of_1gb || 0;
   var out = '';
   // 儲存總覽
-  out += '<div class="card"><div class="lbl">整個資料庫 / 1 GB（含餐廳 + pilot-log + 全部）</div>' +
+  out += '<div class="card"><div class="lbl">磁碟用量 / 1 GB（≈ Render Storage：全部 DB + WAL）</div>' +
     '<div class="big">' + fmtMB(s.db_total_size_mb) + ' <span class="muted" style="font-size:.5em">/ 1024 MB · ' + pct + '%</span></div>' +
     '<div class="bar"><i style="width:' + Math.min(pct,100) + '%"></i></div>' +
-    '<div class="muted" style="font-size:.78em">剩餘 ' + fmtMB(s.db_free_mb_of_1gb) + '</div></div>';
+    '<div class="muted" style="font-size:.78em">剩餘 ' + fmtMB(s.db_free_mb_of_1gb) + '　·　資料 ' + fmtMB(s.all_db_size_mb) + ' + WAL ' + fmtMB(s.wal_size_mb) +
+    (s.wal_size_mb===0?'（WAL 無權限取得，數字會略低於 Render）':'') + '</div></div>';
   // 成長速度 / 滿載推估（V1.2.07）
   var g = s.growth || {};
   out += '<div class="card"><div class="lbl">成長速度 / 多久滿 1 GB</div>';

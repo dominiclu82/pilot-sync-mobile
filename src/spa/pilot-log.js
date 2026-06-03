@@ -2641,6 +2641,8 @@ function _plRenderAircraftList() {
         // V1.3.32：匯出機尾庫 / 機型目錄 CSV
         '<button onclick="_plExportAircraftCsv()" style="background:transparent;color:var(--muted);border:1px solid var(--border,#334155);border-radius:6px;padding:5px 9px;font-size:.72em;cursor:pointer">⬇️ Aircraft</button>' +
         '<button onclick="_plExportTypesCsv()" style="background:transparent;color:var(--muted);border:1px solid var(--border,#334155);border-radius:6px;padding:5px 9px;font-size:.72em;cursor:pointer">⬇️ Types</button>' +
+        // V1.3.35：從台灣機隊挑機（內建現役機隊，點選一鍵加入）
+        '<button onclick="_plOpenFleetPicker()" style="background:#6366f1;color:#fff;border:0;border-radius:6px;padding:6px 12px;font-size:.78em;font-weight:700;cursor:pointer">🇹🇼 從機隊</button>' +
         '<button onclick="_plOpenAddAircraft()" style="background:#10b981;color:#fff;border:0;border-radius:6px;padding:6px 12px;font-size:.78em;font-weight:700;cursor:pointer">+ Add Aircraft</button>' +
       '</div>' +
       '<div style="font-size:.7em;color:var(--muted);margin-bottom:10px">依機型分組，共 ' + _pl.aircraft.length + ' 架；點任一筆查看用過這架的所有航班。<br>Grouped by type — tap a tail to see every flight on it.</div>' +
@@ -2972,6 +2974,87 @@ async function _plSubmitAddAircraft() {
   } catch (e) {
     if (resBox) resBox.innerHTML = '<div style="background:#7f1d1d;color:#fff;padding:8px 10px;border-radius:6px;font-size:.78em">❌ ' + _plEsc((e && e.message) || 'unknown') + '</div>';
   }
+}
+
+// V1.3.35：台灣 6 航司「逐架現役」機隊（user 2026-06-03 提供，截自 xmyzl）。只給選機 picker 用，
+// 不參與推算（推算仍走 _PL_TW_REG 範圍，涵蓋退役機）。tail = B-xxxxx 後 5 碼。資料會過時，需可更新。
+var _PL_TW_FLEET = [
+  { op: 'Starlux', type: 'A321neo', code: 'A21N', tails: [58201,58202,58203,58204,58205,58206,58207,58208,58209,58210,58211,58212,58213] },
+  { op: 'Starlux', type: 'A330-900', code: 'A339', tails: [58301,58302,58303,58304,58305,58306,58307,58308] },
+  { op: 'Starlux', type: 'A350-900', code: 'A359', tails: [58501,58502,58503,58504,58505,58506,58507,58508,58509,58510] },
+  { op: 'Starlux', type: 'A350-1000', code: 'A35K', tails: [58551,58552] },
+  { op: 'EVA Air', type: 'A321-200', code: 'A321', tails: [16208,16209,16211,16212,16213,16215,16216,16217,16218,16219,16220,16221,16222,16223,16225,16226,16227] },
+  { op: 'EVA Air', type: 'A330-300', code: 'A333', tails: [16331,16332,16333,16335,16336,16337,16338,16339,16340] },
+  { op: 'EVA Air', type: 'B777-300ER', code: 'B77W', tails: [16705,16706,16707,16708,16709,16710,16711,16712,16713,16715,16716,16717,16718,16719,16720,16721,16722,16723,16725,16726,16727,16728,16729,16730,16731,16732,16733,16735,16736,16737,16738,16739,16740] },
+  { op: 'EVA Air', type: 'B777F', code: 'B77F', tails: [16781,16782,16783,16785,16786,16787,16788,16789,16790] },
+  { op: 'EVA Air', type: 'B787-9', code: 'B789', tails: [17881,17882,17883,17885,17886,17887,17888,17889,17890] },
+  { op: 'EVA Air', type: 'B787-10', code: 'B78X', tails: [17801,17802,17803,17805,17806,17807,17808,17809,17810,17811,17812,17813,17815] },
+  { op: 'China Airlines', type: 'A321neo', code: 'A21N', tails: [18101,18102,18103,18105,18106,18107,18108,18109,18110,18111,18112,18115,18116,18117,18118,18120,18121,18122,18123] },
+  { op: 'China Airlines', type: 'A330-300', code: 'A333', tails: [18306,18307,18308,18309,18311,18315,18316,18317,18358,18359,18360,18361] },
+  { op: 'China Airlines', type: 'A350-900', code: 'A359', tails: [18901,18902,18903,18905,18906,18907,18908,18909,18910,18912,18915,18916,18917,18918,18919,18920] },
+  { op: 'China Airlines', type: 'B737-800', code: 'B738', tails: [18651,18652,18660,18661,18662,18663,18665] },
+  { op: 'China Airlines', type: 'B747-400F', code: 'B74F', tails: [18717,18718,18719,18720,18721,18722,18723,18725] },
+  { op: 'China Airlines', type: 'B777-300ER', code: 'B77W', tails: [18001,18002,18003,18005,18006,18007,18051,18052,18053,18055] },
+  { op: 'China Airlines', type: 'B777F', code: 'B77F', tails: [18771,18772,18773,18775,18776,18777,18778,18779,18780,18781] },
+  { op: 'Mandarin', type: 'ATR72-600', code: 'AT76', tails: [16855,16856,16857,16858,16859,16860,16861,16862,16863,16865,16866,16867,16868] },
+  { op: 'Mandarin', type: 'B737-800', code: 'B738', tails: [18653] },
+  { op: 'UNI Air', type: 'ATR72-600', code: 'AT76', tails: [17001,17002,17003,17005,17006,17007,17008,17009,17011,17012,17013,17015,17016,17017] },
+  { op: 'Tigerair Taiwan', type: 'A320-200', code: 'A320', tails: [50001,50005,50006,50008,50011,50015,50016,50017,50018] },
+  { op: 'Tigerair Taiwan', type: 'A320neo', code: 'A20N', tails: [50021,50022,50023,50025,50026,50027,50028,50029] },
+];
+function _plFleetMake(type, code) {
+  if (/ATR/i.test(type)) return 'ATR';
+  if (/^A/.test(type) || /^A/.test(code)) return 'Airbus';
+  if (/^B/.test(type) || /^B/.test(code)) return 'Boeing';
+  return '';
+}
+// V1.3.35：從台灣機隊挑機 → 一鍵加進自己的機尾庫（依公司 → 機型 → 點機尾）
+function _plOpenFleetPicker() {
+  var c = document.getElementById('pilotlog-content');
+  if (!c) return;
+  var have = {}; (_pl.aircraft || []).forEach(function(a) { if (a.tail_no) have[String(a.tail_no).toUpperCase()] = true; });
+  var byOp = {}, opOrder = [];
+  _PL_TW_FLEET.forEach(function(f) { if (!byOp[f.op]) { byOp[f.op] = []; opOrder.push(f.op); } byOp[f.op].push(f); });
+  var body = '';
+  opOrder.forEach(function(op) {
+    var total = byOp[op].reduce(function(s, f) { return s + f.tails.length; }, 0);
+    body += '<div style="font-size:.95em;font-weight:800;margin:16px 0 4px">' + _plEsc(op) + ' <span style="font-size:.62em;color:var(--muted);font-weight:400">· ' + total + ' 架</span></div>';
+    byOp[op].forEach(function(f) {
+      body += '<div style="font-size:.72em;font-weight:700;color:var(--accent);margin:8px 0 5px">' + _plEsc(f.type) + ' <span style="color:var(--muted);font-weight:400">· ' + f.tails.length + '</span></div>' +
+        '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:4px">';
+      f.tails.forEach(function(n) {
+        var tail = 'B-' + n;
+        body += have[tail.toUpperCase()]
+          ? '<span style="background:#10b981;color:#fff;border:1px solid #10b981;border-radius:6px;padding:6px 9px;font-size:.74em">✓ ' + tail + '</span>'
+          : '<button onclick="_plPickFleetAircraft(\'' + tail + '\',\'' + _plJs(f.op) + '\',\'' + _plJs(f.type) + '\',\'' + _plJs(f.code) + '\')" style="background:var(--card);color:var(--text);border:1px solid var(--border,#334155);border-radius:6px;padding:6px 9px;font-size:.74em;cursor:pointer">' + tail + '</button>';
+      });
+      body += '</div>';
+    });
+  });
+  c.innerHTML =
+    '<div style="padding:10px 14px">' +
+      '<div style="display:flex;align-items:center;gap:10px;margin-bottom:6px">' +
+        '<button onclick="_plOpenAircraft()" style="background:transparent;border:0;color:var(--text);font-size:1.2em;cursor:pointer">←</button>' +
+        '<div style="font-size:1em;font-weight:700">🇹🇼 從機隊挑機 · Pick from fleet</div>' +
+      '</div>' +
+      '<div style="font-size:.7em;color:var(--muted);margin-bottom:6px">台灣 6 家現役機隊。點一架加進你的機尾庫（綠色 ✓ = 已在庫）。退役機不在此清單，仍可用 + Add Aircraft 手動加。<br>Tap a tail to add it to your aircraft registry.</div>' +
+      body +
+    '</div>';
+}
+async function _plPickFleetAircraft(tail, op, type, code) {
+  try {
+    // codex P1：type_code 要存 ICAO 碼（A359），不是可讀型號（A350-900）—— 跟 LogTen 匯入一致，
+    // 才不會破壞 _plLookupTypeFullName / 編輯器 tail 篩選；可讀型號放 model。
+    var res = await _plApi('/api/pilot-log/aircraft', { method: 'POST', body: { tail_no: tail, operator: op, type_code: code, make: _plFleetMake(type, code), model: type } });
+    if (res.status === 200 || res.status === 201) {
+      await _plFetchAll();
+      _plToast('已加入 ' + tail);
+      _plOpenFleetPicker();   // 重畫，該 tail 變 ✓
+      return;
+    }
+    var ej = await res.json().catch(function() { return {}; });
+    _plToast('加入失敗：' + (ej.error || res.status), 'error');
+  } catch (e) { _plToast('加入失敗', 'error'); }
 }
 
 // === SECTION: crew（V1.0.11） ═══════════════════════════════════════════════════
