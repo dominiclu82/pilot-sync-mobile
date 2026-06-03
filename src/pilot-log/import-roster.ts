@@ -399,12 +399,13 @@ export async function importRoster(
              crew = $11::jsonb,
              is_deadhead = $12,
              roster_month = $13,
+             crew_count = COALESCE(crew_count, $14),
              updated_at = NOW()
            WHERE id = $1`,
           [
             existing.rows[0].id, fDate, f.flightNo, f.origin, f.dest,
             position, stdUtc, staUtc, onDuty, offDuty,
-            crewJson ? JSON.stringify(crewJson) : null, isDeadhead, rosterMonth,
+            crewJson ? JSON.stringify(crewJson) : null, isDeadhead, rosterMonth, crewCount,
           ]
         );
         result.updated++;

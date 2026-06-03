@@ -52,8 +52,8 @@ import { getAirportDbJs } from '../spa/js-airport-db.js';
 
 // ── 版本（比照 CrewSync / Morning：每次推版必更新；SW cache 名稱跟著走） ────
 // 本機 preview build 會暫時加 -tNN 後綴方便對版；推正式版前拿掉只留乾淨版號。
-export const PILOT_LOG_VERSION = 'V1.3.36';
-const PILOT_LOG_CACHE = 'pilotlog-v1-3-36';
+export const PILOT_LOG_VERSION = 'V1.3.37';
+const PILOT_LOG_CACHE = 'pilotlog-v1-3-37';
 
 export const pilotLogRouter = express.Router();
 
@@ -336,6 +336,11 @@ if (document.readyState !== 'loading') pilotLogInit();
 function _renderPilotLogChangelog(): string {
   return `
     <div class="pl-cl-v">${PILOT_LOG_VERSION}</div>
+    <div class="pl-cl-txt">
+      <b>跑道下拉 + 組員顯示修正 + 匯入自動帶組員 + 機場代碼自動大寫。</b><b>(1) Dep/Arr 跑道改下拉：</b>起飛/落地跑道<b>依該機場實際跑道</b>選（資料內建），不用背；跑道跟 SID/STAR 排在<b>同一區、照飛行時序</b>（Dep Rwy → SID → STAR → Arr Rwy）。<b>(2) 修組員「最後一個重複」：</b>有些航班列表把最後一位組員顯示兩次 —— 你的<b>資料其實沒壞</b>（flight detail 一直正確），是列表顯示沒去重，已修。<b>(3) 匯入更直覺：</b>拿掉「覆蓋組員」勾選 —— 匯入<b>一律自動帶入/補上組員</b>（含 FO），其他欄位（你的編輯）不動；重匯也會補回 Crew 人數。<b>(4) New Entry 機場代碼自動大寫</b>（IATA/ICAO 都是）。<b>(5) 機場庫升級：</b>加入<b>時區、海拔、州、跑道</b>（為下一版機場頁鋪路）。<br>
+      <b>Runway dropdown + crew display fix + auto crew on import + auto-uppercase airport codes.</b> (1) Dep/Arr runway are now dropdowns driven by the airport's actual runways (built-in); runway sits with SID/STAR in one block, in flight order (Dep Rwy → SID → STAR → Arr Rwy). (2) Fixed the "last crew member shown twice" on some list views — your data was never broken (flight detail was always correct), the list just didn't de-duplicate; fixed. (3) Import is simpler: the "overwrite crew" checkbox is gone — import always fills/updates crew (incl. FO) without touching your other edits; re-import also backfills the crew count. (4) New Entry auto-uppercases airport codes. (5) Airport DB now carries timezone, elevation, state and runways (groundwork for the Airports page).
+    </div>
+    <div class="pl-cl-v old">V1.3.36</div>
     <div class="pl-cl-txt">
       <b>飛行明細升級（跑道 + POB）＋依機場查航班＋內建全球機場庫。</b><b>(1) 明細新欄位：</b>加 <b>Dep / Arr 跑道</b>（SIM/DHD 也能記）；新增「<b>POB 機上人數</b>」區——填 <b>Crew（含後艙空服）＋ Pax 自動算出 POB</b>；Pax 從起降區搬到這裡更合理。匯入班表會自動帶組員人數當 Crew 初值，你可自己改（重匯不會蓋掉你改的）。<b>(2) 🗺️ Places 依機場查航班：</b>工具列新增 Places，列出你<b>飛過的機場</b>（依航班數排序，↗ 出發 / ↘ 抵達），點任一機場看所有進出航班；只算已飛，未來班表不會混進來。<b>(3) 內建全球機場庫（約 4,200 個）：</b>編輯航班時 From / To <b>自動顯示機場名稱</b>；IATA ↔ ICAO 切換、夜航判斷現在<b>全世界機場都認得</b>。<b>(4) 機隊挑機可反悔：</b>從機隊加錯了，再點一下綠色 ✓ 可取消（前提是還沒有航班；已有航班的會擋住）。<b>(5) Aircraft 機型也可收合：</b>機尾庫的機型子分組現在也能各自收合。<br>
       <b>Flight detail upgrade (runways + POB) + view flights by airport + built-in global airport database.</b> (1) Detail fields: added Dep / Arr runway (works for SIM/DHD too); a new POB section — enter Crew (incl. cabin) + Pax and POB is auto-summed; Pax moved here from the takeoffs/landings block. Roster import seeds the crew count (editable; re-import won't overwrite your edits). (2) 🗺️ Places: a new toolbar button lists the airports you've flown (by frequency, ↗ departures / ↘ arrivals); tap one to see every flight to/from it — flown flights only, future roster legs excluded. (3) Built-in global airport DB (~4,200): From/To now show airport names, and IATA↔ICAO switching plus night calc work for airports worldwide. (4) Fleet picker is reversible: tap a green ✓ to remove a tail you added by mistake (only if it has no flights yet). (5) Aircraft type sub-groups are now individually collapsible.
@@ -2025,7 +2030,7 @@ function render(j){
     '<div class="bar"><i style="width:' + Math.min(pct,100) + '%"></i></div>' +
     '<div class="muted" style="font-size:.78em">' +
     (hasRender
-      ? '剩餘 ' + fmtMB(freeMB) + '　·　來源 Render Metrics API（= 後台 Storage，含 WAL+系統）。其中資料庫資料 ' + fmtMB(s.all_db_size_mb) + ' MB，其餘為 WAL/系統開銷。'
+      ? '剩餘 ' + fmtMB(freeMB) + '　·　來源 Render Metrics API（= 後台 Storage，含 WAL+系統）。其中資料庫資料 ' + fmtMB(s.all_db_size_mb) + '，其餘為 WAL/系統開銷。'
       : '剩餘 ' + fmtMB(freeMB) + '　·　資料 ' + fmtMB(s.all_db_size_mb) + ' + WAL ' + fmtMB(s.wal_size_mb) +
         '（WAL 無權限取得，會比 Render 後台低 ~120MB；設 RENDER_API_KEY + RENDER_PG_ID 後顯示真實值）'
     ) + '</div></div>';

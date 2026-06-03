@@ -613,13 +613,16 @@ export async function importLogtenFlights(
     // COALESCE：檔案有值才覆蓋、沒值保留原值（crew 由檔案決定取代，pic/sic/position 只填不洗白）。
     for (const u of crewUpdateBatch) {
       await client.query(
-        // codex P1：用 JSONB 合併（檔案的槽覆蓋、檔案沒提供的槽保留）而非整包取代 —— 避免把
+        // crew 用 JSONB 合併（檔案的槽覆蓋、檔案沒提供的槽保留）而非整包取代 —— 避免把
         // 檔案這趟沒帶到的組員（手填的、或客艙）洗掉。檔案完全沒 crew（$2 null）→ 原封不動。
+        // V1.3.37（codex）：拿掉「覆蓋組員」勾選、改成一律帶組員後，pic/sic/position 改「只補空缺」
+        // COALESCE(現值, 檔案值) —— 現有值（你手改 / 已確認的）保留不動，只有原本空白才用檔案補。
+        // 兼顧「保護手動修正」＋「補上缺的角色/時數」。
         `UPDATE pilot_log_entries SET
            crew = CASE WHEN $2::jsonb IS NULL THEN crew ELSE COALESCE(crew, '{}'::jsonb) || $2::jsonb END,
-           pic_minutes = COALESCE($3, pic_minutes),
-           sic_minutes = COALESCE($4, sic_minutes),
-           position = COALESCE($5, position),
+           pic_minutes = COALESCE(pic_minutes, $3),
+           sic_minutes = COALESCE(sic_minutes, $4),
+           position = COALESCE(position, $5),
            updated_at = NOW()
          WHERE id = $1`,
         [u.id, u.crewJson, u.picMin, u.sicMin, u.position]

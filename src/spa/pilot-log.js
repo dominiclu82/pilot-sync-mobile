@@ -1059,7 +1059,9 @@ function _plEditorField(label, name, type, opts) {
     input = '<input ' + attrs + ' value="' + _plEsc(dateStr) + '" placeholder="YYYY-MM-DD" maxlength="10">';
   } else {
     var dval = opts.fmt ? opts.fmt(val) : val;   // V1.3.20：可選顯示格式轉換（如機場碼 IATA/ICAO）
-    input = '<input ' + attrs + ' value="' + _plEsc(dval) + '"' + (opts.placeholder ? ' placeholder="' + _plEsc(opts.placeholder) + '"' : '') + '>';
+    var listAttr = opts.listId ? ' list="' + opts.listId + '" autocomplete="off"' : '';   // V1.3.37：可接 datalist 下拉
+    input = '<input ' + attrs + listAttr + ' value="' + _plEsc(dval) + '"' + (opts.placeholder ? ' placeholder="' + _plEsc(opts.placeholder) + '"' : '') + '>' +
+      (opts.listId ? '<datalist id="' + opts.listId + '"></datalist>' : '');
   }
   if (type === 'check') return '<div style="margin-bottom:8px">' + input + '</div>';
   return '<div style="margin-bottom:8px">' +
@@ -1297,7 +1299,8 @@ function _plAptInfo(code) {
   var idx = _plGAptIdx();
   var a = idx[c] || (_PL_IATA2ICAO[c] && idx[_PL_IATA2ICAO[c]]);
   if (!a) return null;
-  return { icao: a[0], iata: a[1], name: a[2], city: a[3], cc: a[4], lat: a[5], lon: a[6] };
+  return { icao: a[0], iata: a[1], name: a[2], city: a[3], cc: a[4], lat: a[5], lon: a[6],
+           tz: a[7] || '', elev: a[8], region: a[9] || '', runways: a[10] || [] };
 }
 // 機場顯示名稱（「City Name」風格，查無回空字串）
 function _plAptName(code) {
@@ -1589,16 +1592,29 @@ function _plUpdateAptNames() {
     (on && dn ? '　→　' : '') +
     (dn ? '<b>' + _plEsc(d.toUpperCase()) + '</b> ' + _plEsc(dn) : '');
 }
+// V1.3.37：依 From/To 機場填 Dep/Arr 跑道下拉清單（資料來自全域機場庫，庫載入後才有）
+function _plFillRwyList(listId, code) {
+  var dl = document.getElementById(listId); if (!dl) return;
+  var info = _plAptInfo(code);
+  var rwys = (info && info.runways) || [];
+  dl.innerHTML = rwys.map(function(r) { return '<option value="' + _plEsc(r) + '"></option>'; }).join('');
+}
+function _plUpdateRwyLists() {
+  _plFillRwyList('ple-dep-rwy-list', (document.getElementById('ple-origin') || {}).value || '');
+  _plFillRwyList('ple-arr-rwy-list', (document.getElementById('ple-dest') || {}).value || '');
+}
 
 function _plWireEditor() {
   _plPobSync();                                   // 初始 POB（locked 也要顯示）
   _plUpdateAptNames();
+  _plUpdateRwyLists();                             // 初始跑道下拉（庫已載入時就有）
   // codex P2：機場庫是非同步載入。庫到之前 _plApt() 查不到非硬編機場座標 → night/起降被算成空。
-  // 庫載入後除了補機場名，還要補算一次（只在仍是同一筆、未上鎖時；_plAutoCalcTimes 會尊重手動鎖值）。
+  // 庫載入後除了補機場名 + 跑道下拉，還要補算一次（只在仍是同一筆、未上鎖時；_plAutoCalcTimes 會尊重手動鎖值）。
   var _wireEntryId = _pl.editing ? _pl.editing.id : null;
   _plLoadAirports().then(function() {
     if (!_pl.editing || _pl.editing.id !== _wireEntryId) return;   // 已換/關編輯器 → 不動
     _plUpdateAptNames();
+    _plUpdateRwyLists();
     if (!_pl.editing.is_locked) _plAutoCalcTimes();
   });
   // V1.3.08：上鎖的航班 — 所有編輯欄位 disabled；Lock 按鈕仍可用以解鎖
@@ -1612,6 +1628,14 @@ function _plWireEditor() {
     });
     return;   // 鎖了就不掛 auto-calc 監聽（沒意義 — 改不動）
   }
+  // V1.3.37：機場代碼欄（From/To）即時轉大寫 —— 不管打 IATA 或 ICAO、大小寫，一律大寫顯示＋存。
+  ['origin', 'dest'].forEach(function(n) {
+    var el = document.getElementById('ple-' + n);
+    if (el) el.addEventListener('input', function() {
+      var p = el.selectionStart, up = el.value.toUpperCase();
+      if (up !== el.value) { el.value = up; try { el.setSelectionRange(p, p); } catch (e) {} }
+    });
+  });
   ['out_utc', 'off_utc', 'on_utc', 'in_utc'].forEach(function(n) {
     var el = document.getElementById('ple-' + n);
     if (el) el.addEventListener('input', _plAutoCalcTimes);
@@ -1639,7 +1663,7 @@ function _plWireEditor() {
   });
   ['origin', 'dest'].forEach(function(n) {
     var el = document.getElementById('ple-' + n);
-    if (el) el.addEventListener('input', _plUpdateAptNames);
+    if (el) { el.addEventListener('input', _plUpdateAptNames); el.addEventListener('input', _plUpdateRwyLists); }
   });
   // V1.3.23：LogTen / Wader 匯入帶來的 night / PIC / SIC 是「正本」（pilot 自己記的）→ 上鎖，
   // 標記為手動，之後就算編輯 OOOI / 航線也不會被自動重算蓋掉。Roster / manual 不鎖（要靠自動算）。
@@ -1725,7 +1749,6 @@ function _plRenderEditor(target) {
       _plFieldRow(2, _plEditorField('Date', 'flight_date', 'date') + _plEditorField('Flight #', 'flight_no', 'text')) +
       '<div id="ple-route-row" style="display:' + (_plEntryType(e) === 'sim' ? 'none' : '') + '">' + _plFieldRow(2, _plEditorField('From (' + (_plAptFmtCur() === 'iata' ? 'IATA' : 'ICAO') + ')', 'origin', 'text', { fmt: _plAptFmt }) + _plEditorField('To (' + (_plAptFmtCur() === 'iata' ? 'IATA' : 'ICAO') + ')', 'dest', 'text', { fmt: _plAptFmt })) +
         '<div id="ple-aptname-row" style="font-size:.6em;color:var(--muted);margin:-4px 0 8px;line-height:1.4"></div></div>' +
-      _plFieldRow(2, _plEditorField('Dep Rwy', 'dep_rwy', 'text') + _plEditorField('Arr Rwy', 'arr_rwy', 'text')) +
       _plFieldRow(3, _plEditorField('Aircraft Type', 'aircraft_type', 'select', { options: typeOptions }) +
         _plEditorField('Tail #（清單來自 ✈️ Aircraft）', 'tail_no', 'select', { options: tailOptions }) +
         _plEditorField('Position', 'position', 'select', { options: ['', 'PIC', 'SIC', 'SFO', 'FO', 'OBSERVER'] })) +
@@ -1783,7 +1806,8 @@ function _plRenderEditor(target) {
     // ── Other：SID+STAR / Remarks ──
     '<div style="margin-top:12px;background:var(--card);border-radius:10px;padding:12px">' +
       '<div style="font-size:.7em;font-weight:700;color:var(--muted);text-transform:uppercase;margin-bottom:8px">Other</div>' +
-      _plFieldRow(2, _plEditorField('SID', 'sid', 'text') + _plEditorField('STAR', 'star', 'text')) +
+      _plFieldRow(2, _plEditorField('Dep Rwy', 'dep_rwy', 'text', { listId: 'ple-dep-rwy-list' }) + _plEditorField('SID', 'sid', 'text')) +
+      _plFieldRow(2, _plEditorField('STAR', 'star', 'text') + _plEditorField('Arr Rwy', 'arr_rwy', 'text', { listId: 'ple-arr-rwy-list' })) +
       _plEditorField('Remarks', 'remarks', 'textarea') +
     '</div>' +
 
@@ -1831,8 +1855,8 @@ async function _plSaveEntry() {
   var body = {
     flight_date: _plReadField('flight_date'),
     flight_no: _plReadField('flight_no'),
-    origin: _plReadField('origin'),
-    dest: _plReadField('dest'),
+    origin: (_plReadField('origin') || '').toUpperCase(),
+    dest: (_plReadField('dest') || '').toUpperCase(),
     aircraft_type: _plReadField('aircraft_type'),
     tail_no: _plReadField('tail_no'),
     position: _plReadField('position') || null,
@@ -2139,10 +2163,7 @@ function _plImportCardsLogTen() {
         '必填 / Required：Date / Flight # / From / To / Aircraft Type / Aircraft ID / Out / In。' +
       '</div>' +
       '<input type="file" id="pl-flights-file" accept=".txt,.tab,.tsv,text/plain" style="font-size:.78em">' +
-      '<label style="display:flex;align-items:flex-start;gap:7px;margin-top:10px;font-size:.7em;color:var(--text);cursor:pointer;line-height:1.45">' +
-        '<input type="checkbox" id="pl-flights-overwrite-crew" style="margin-top:2px;flex:0 0 auto">' +
-        '<span><b>覆蓋現有航班的組員</b>（補回 FO 等）· 已存在的航班預設跳過保護你的編輯；勾這個就<b>連已完成的航班也用檔案重填組員＋PIC/SIC 時數</b>（其他欄位不動）。第一次修好 FO 後勾一次補舊資料即可。</span>' +
-      '</label>' +
+      '<div style="margin-top:10px;font-size:.68em;color:var(--muted);line-height:1.45">匯入會<b>自動帶入 / 補上組員</b>（含 FO）：已存在的航班也會用檔案重填組員＋PIC/SIC 時數，其他欄位（時間、你的編輯）不動。</div>' +
       '<div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap">' +
         '<button onclick="_plUploadFlights(true)" style="background:#475569;color:#fff;border:0;border-radius:6px;padding:6px 12px;font-size:.78em;font-weight:700;cursor:pointer">🔍 Preview (dry-run)</button>' +
         '<button onclick="_plUploadFlights(false)" style="background:#10b981;color:#fff;border:0;border-radius:6px;padding:6px 12px;font-size:.78em;font-weight:700;cursor:pointer">Import</button>' +
@@ -2472,8 +2493,7 @@ async function _plUploadWader(dryRun) {
 }
 
 async function _plUploadFlights(dryRun) {
-  var ovEl = document.getElementById('pl-flights-overwrite-crew');
-  var overwrite = !!(ovEl && ovEl.checked);
+  var overwrite = true;   // V1.3.37：一律自動帶入/覆蓋組員（拿掉勾選 — 匯入航班卻不帶組員無實務意義）
   var qs = [];
   if (dryRun) qs.push('dryRun=1');
   if (overwrite) qs.push('overwriteCrew=1');
@@ -3364,19 +3384,19 @@ function _plEntryCrewNames(e) {
   if (!e || !e.crew || typeof e.crew !== 'object') return [];
   // V1.3.12：新 6 槽 PIC 先，再 Crew2-4 / CIC / OBS；後面接舊 key（相容已匯入的舊資料）。
   // 槽值相容字串(舊)與 {name,...}(新)。
-  var order = ['pic', 'crew2', 'crew3', 'crew4', 'cic', 'obs',
-               'sic', 'fo1', 'fo2', 'purser', 'observer1', 'observer2'];
-  var names = [], seen = {};
+  var primary = ['pic', 'crew2', 'crew3', 'crew4', 'cic', 'obs'];          // 正式 6 槽：一律列
+  var legacy = ['sic', 'fo1', 'fo2', 'purser', 'observer1', 'observer2'];  // 舊殘留槽：對正式槽去重
+  var names = [], seenName = {};
   function nm(v) { return _plCrewDisplayName(v); }   // V1.3.14：員編對得到 → 顯示通訊錄名
-  order.forEach(function(k) {
-    var n = nm(e.crew[k]);
-    if (n) { names.push(n); seen[k] = 1; }
-  });
-  // 其他未列在 order 的 key 也補在後面（保險，不漏人）
+  // 正式 6 槽：全列（即使兩位不同人剛好同名也都顯示，不誤併 — codex P2）。
+  primary.forEach(function(k) { var n = nm(e.crew[k]); if (n) { names.push(n); seenName[n] = 1; } });
+  // V1.3.37：舊殘留槽（如 observer2）只在「沒跟正式槽重名」時補 —— 解掉「最後一個重複」
+  // （同一人殘留在舊欄位），但不會把正式槽裡的合法同名誤併成一個。
+  legacy.forEach(function(k) { var n = nm(e.crew[k]); if (n && !seenName[n]) { names.push(n); seenName[n] = 1; } });
+  // 其他未列名的 key 也補在後面（保險，不漏人），同樣對已列名字去重
   Object.keys(e.crew).forEach(function(k) {
-    if (seen[k]) return;
-    var n = nm(e.crew[k]);
-    if (n) names.push(n);
+    if (primary.indexOf(k) >= 0 || legacy.indexOf(k) >= 0) return;
+    var n = nm(e.crew[k]); if (n && !seenName[n]) names.push(n);
   });
   return names;
 }
