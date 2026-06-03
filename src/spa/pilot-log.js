@@ -2607,10 +2607,13 @@ function _plRenderAircraftList() {
   }
   c.innerHTML =
     '<div style="padding:10px 14px">' +
-      '<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">' +
+      '<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap">' +
         '<button onclick="_plRenderMain()" style="background:transparent;border:0;color:var(--text);font-size:1.2em;cursor:pointer">←</button>' +
         '<div style="font-size:1em;font-weight:700">✈️ Aircraft</div>' +
         '<div style="flex:1"></div>' +
+        // V1.3.32：匯出機尾庫 / 機型目錄 CSV
+        '<button onclick="_plExportAircraftCsv()" style="background:transparent;color:var(--muted);border:1px solid var(--border,#334155);border-radius:6px;padding:5px 9px;font-size:.72em;cursor:pointer">⬇️ Aircraft</button>' +
+        '<button onclick="_plExportTypesCsv()" style="background:transparent;color:var(--muted);border:1px solid var(--border,#334155);border-radius:6px;padding:5px 9px;font-size:.72em;cursor:pointer">⬇️ Types</button>' +
         '<button onclick="_plOpenAddAircraft()" style="background:#10b981;color:#fff;border:0;border-radius:6px;padding:6px 12px;font-size:.78em;font-weight:700;cursor:pointer">+ Add Aircraft</button>' +
       '</div>' +
       '<div style="font-size:.7em;color:var(--muted);margin-bottom:10px">依機型分組，共 ' + _pl.aircraft.length + ' 架；點任一筆查看用過這架的所有航班。<br>Grouped by type — tap a tail to see every flight on it.</div>' +
@@ -3063,10 +3066,12 @@ function _plRenderCrewList() {
   var term = (_plCrewSearchTerm || '');
   c.innerHTML =
     '<div style="padding:10px 14px">' +
-      '<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">' +
+      '<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap">' +
         '<button onclick="_plRenderMain()" style="background:transparent;border:0;color:var(--text);font-size:1.2em;cursor:pointer">←</button>' +
         '<div style="font-size:1em;font-weight:700">👥 Crew</div>' +
         '<div style="flex:1"></div>' +
+        // V1.3.32：匯出通訊錄 CSV
+        '<button onclick="_plExportCrewCsv()" style="background:transparent;color:var(--muted);border:1px solid var(--border,#334155);border-radius:6px;padding:5px 9px;font-size:.72em;cursor:pointer">⬇️ Export</button>' +
         '<div style="font-size:.7em;color:var(--muted)">共 ' + _pl.crew.length + ' 人</div>' +
       '</div>' +
       _plCrewLabelsEditor() +
@@ -4149,6 +4154,38 @@ function _plExportCsv() {
   document.body.removeChild(a);
   setTimeout(function() { URL.revokeObjectURL(url); }, 1000);
   _plToast('Exported ' + src.length + ' flights to CSV');
+}
+
+// V1.3.32：通用 CSV 下載（比照 Report Export CSV：BOM + CRLF）。給通訊錄 / 飛機 / 機型匯出共用。
+function _plDownloadCsv(filename, head, rows) {
+  var lines = [head.map(_plCsvCell).join(',')];
+  rows.forEach(function(cells) { lines.push(cells.map(_plCsvCell).join(',')); });
+  var blob = new Blob([String.fromCharCode(0xFEFF) + lines.join('\r\n')], { type: 'text/csv;charset=utf-8' });
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a'); a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  setTimeout(function() { URL.revokeObjectURL(url); }, 1000);
+}
+function _plExportCrewCsv() {
+  var rows = (_pl.crew || []).map(function(c) {
+    return [c.display_name || '', (Array.isArray(c.employee_ids) ? c.employee_ids.join('; ') : ''), c.organization || '', c.comment || '', c.is_self ? '1' : ''];
+  });
+  _plDownloadCsv('crew_addressbook.csv', ['Name', 'Employee IDs', 'Organization', 'Comment', 'This is Me'], rows);
+  _plToast('Exported ' + rows.length + ' crew');
+}
+function _plExportAircraftCsv() {
+  var rows = (_pl.aircraft || []).map(function(a) {
+    return [a.tail_no || '', a.operator || '', a.type_code || '', a.make || '', a.model || '', a.notes || ''];
+  });
+  _plDownloadCsv('aircraft.csv', ['Tail', 'Operator', 'Type', 'Make', 'Model', 'Notes'], rows);
+  _plToast('Exported ' + rows.length + ' aircraft');
+}
+function _plExportTypesCsv() {
+  var rows = (_pl.aircraftTypes || []).map(function(t) {
+    return [t.type_code || '', t.make || '', t.model || '', t.engine_type || '', t.category || '', t.class || '', t.notes || ''];
+  });
+  _plDownloadCsv('aircraft_types.csv', ['Type', 'Make', 'Model', 'Engine Type', 'Category', 'Class', 'Notes'], rows);
+  _plToast('Exported ' + rows.length + ' types');
 }
 
 // === SECTION: entry point ════════════════════════════════════════════════════

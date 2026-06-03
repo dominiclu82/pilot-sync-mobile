@@ -51,8 +51,8 @@ import { getSpaPilotLogJs } from '../spa/js-pilot-log.js';
 
 // ── 版本（比照 CrewSync / Morning：每次推版必更新；SW cache 名稱跟著走） ────
 // 本機 preview build 會暫時加 -tNN 後綴方便對版；推正式版前拿掉只留乾淨版號。
-export const PILOT_LOG_VERSION = 'V1.3.31';
-const PILOT_LOG_CACHE = 'pilotlog-v1-3-31';
+export const PILOT_LOG_VERSION = 'V1.3.32';
+const PILOT_LOG_CACHE = 'pilotlog-v1-3-32';
 
 export const pilotLogRouter = express.Router();
 
@@ -335,6 +335,11 @@ if (document.readyState !== 'loading') pilotLogInit();
 function _renderPilotLogChangelog(): string {
   return `
     <div class="pl-cl-v">${PILOT_LOG_VERSION}</div>
+    <div class="pl-cl-txt">
+      <b>可以匯出資料了：通訊錄 / 機尾庫 / 機型目錄（比照 LogTen）。</b>之前只能匯出航班，現在 <b>👥 Crew 頁</b>右上多了「⬇️ Export」匯出整本通訊錄（名字 / 員編 / 公司 / 註記）；<b>✈️ Aircraft 頁</b>多了「⬇️ Aircraft」「⬇️ Types」匯出機尾庫（機號 / 公司 / 機型 / 廠商 / Model / 備註）與機型目錄。都是 UTF-8 CSV，Excel 直接開得開，方便你備份或搬到別的軟體。<br>
+      <b>You can now export your data: address book / aircraft / aircraft types (like LogTen).</b> Previously only flights could be exported. The 👥 Crew page gets a ⬇️ Export (name / employee id / org / comment); the ✈️ Aircraft page gets ⬇️ Aircraft and ⬇️ Types for the tail registry and type catalog. All UTF-8 CSV (opens in Excel) for backup or moving to other software.
+    </div>
+    <div class="pl-cl-v old">V1.3.31</div>
     <div class="pl-cl-txt">
       <b>iPhone 版面整理：Logbook 工具列 + Report 日期區間。</b>Logbook 上面那排按鈕（新增 / 匯入 / Aircraft / Crew / IATA + 篩選 + Logout）以前在手機擠成一坨，現在分成<b>「動作」一列、「篩選」一列</b>，清楚不亂（彩色保留）。Report 的「Hours Summary」日期選擇器以前在手機跟下面卡片黏在一起，現在<b>標題自己一行、日期區間另一行平分撐開</b>，好點選。<br>
       <b>iPhone layout tidy-up: Logbook toolbar &amp; Report date range.</b> The Logbook button row (add / import / aircraft / crew / IATA + filters + logout) was cramped on phones — now split into an action row and a filter row (colors kept). The Report "Hours Summary" date pickers no longer overlap the cards on phones: the title sits on its own line and the date range fills the next.
