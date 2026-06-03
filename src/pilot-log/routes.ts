@@ -52,8 +52,8 @@ import { getAirportDbJs } from '../spa/js-airport-db.js';
 
 // ── 版本（比照 CrewSync / Morning：每次推版必更新；SW cache 名稱跟著走） ────
 // 本機 preview build 會暫時加 -tNN 後綴方便對版；推正式版前拿掉只留乾淨版號。
-export const PILOT_LOG_VERSION = 'V1.3.38';
-const PILOT_LOG_CACHE = 'pilotlog-v1-3-38';
+export const PILOT_LOG_VERSION = 'V2.0.01';
+const PILOT_LOG_CACHE = 'pilotlog-v2-0-01';
 
 export const pilotLogRouter = express.Router();
 
@@ -337,6 +337,11 @@ if (document.readyState !== 'loading') pilotLogInit();
 function _renderPilotLogChangelog(): string {
   return `
     <div class="pl-cl-v">${PILOT_LOG_VERSION}</div>
+    <div class="pl-cl-txt">
+      <b>🗺️ Airports 大改版 —— 機場資訊中心。</b>Places 改名 <b>Airports</b>，整頁重做成 LogTen 風格：<b>寬螢幕三欄</b>（機場列表 ｜ 機場資訊 ｜ 航班）、<b>iPhone 三層</b>（列表 → 機場 → 航班，關閉自動回上一層）。點任一機場，中間看得到完整資訊：<b>ICAO / IATA / 城市 / 國家全名 / 磁偏角（WMM 模型算）/ 時區（UTC offset + 當地即時時間）/ 座標 / 海拔 / 跑道</b>，再附一張<b>衛星地圖</b>（看得到真實跑道、航廈）＋ 可寫<b>機場筆記</b>。航班用 <b>All / 🛫 Dep / 🛬 Arr</b> 分頁分開看出發/抵達。<br>
+      <b>🗺️ Airports — a full airport hub (major update).</b> Places is renamed <b>Airports</b> and rebuilt LogTen-style: three columns on wide screens (airport list ｜ info ｜ flights), three levels on iPhone (list → airport → flight, back returns to the previous level). Tap any airport for full details: ICAO / IATA / city / full country name / magnetic variation (WMM) / timezone (UTC offset + live local time) / coordinates / elevation / runways, plus a satellite map (real runways &amp; terminals) and an editable note. Flights split into All / 🛫 Dep / 🛬 Arr tabs.
+    </div>
+    <div class="pl-cl-v old">V1.3.38</div>
     <div class="pl-cl-txt">
       <b>修好跑道下拉（快取卡舊資料）＋機場詳情補資料。</b><b>(1) 跑道下拉修正：</b>上一版的跑道下拉是空的 —— 機場資料檔被瀏覽器 7 天快取卡在舊版（沒有跑道那欄），改成<b>版本化網址</b>強制重抓，現在 Dep/Arr 跑道下拉正常跳出該機場的實際跑道。<b>(2) 機場詳情補資料：</b>在 Places 點任一機場，現在看得到<b>時區（含當地即時時間）、座標、海拔、跑道</b>。<br>
       <b>Runway dropdown fix (stale cache) + airport detail data.</b> (1) Last version's runway dropdown was empty — the airport data file was stuck on a 7-day browser cache (old version without the runways column); switched to a versioned URL to force a refresh, so Dep/Arr runway dropdowns now show the airport's actual runways. (2) Tapping an airport in Places now shows its timezone (with live local time), coordinates, elevation and runways.
@@ -750,6 +755,18 @@ self.addEventListener('fetch', e => {
   // API 走網路優先（auth + 動態資料絕不能從 cache 拿）
   if (u.pathname.startsWith('/api/pilot-log')) {
     e.respondWith(fetch(e.request));
+    return;
+  }
+  // V2.0.01（codex P2）：機場庫 network-first —— 有網路一定拿最新（跑道/磁偏角/新增機場），
+  // 離線才退回快取。不靠 HTML shell 注入的版號（cache-first shell 第一次升級會給舊版號 → 抓到舊機場庫）。
+  if (u.pathname === '/pilot-log/airport-db.js') {
+    e.respondWith(
+      fetch(e.request).then(r => {
+        const cp = r.clone();
+        caches.open(CACHE).then(c => c.put(e.request, cp)).catch(()=>{});
+        return r;
+      }).catch(() => caches.match(e.request, { ignoreSearch: true }))
+    );
     return;
   }
   // 靜態資源 cache 優先 + 背景更新

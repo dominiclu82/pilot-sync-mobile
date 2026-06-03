@@ -23,6 +23,7 @@
     "dotenv": "^16.5.0",
     "express": "^5.1.0",
     "flightradarapi": "^1.4.0",
+    "geomagnetism": "^0.2.0",
     "googleapis": "^150.0.1",
     "ical": "^0.8.0",
     "jsdom": "^29.0.2",

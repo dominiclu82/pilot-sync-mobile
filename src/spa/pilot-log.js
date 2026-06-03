@@ -736,7 +736,7 @@ function _plRenderToolbar() {
       '<button onclick="_plOpenImport()" style="background:#6366f1;' + actBtn + '">📥 Import</button>' +
       '<button onclick="_plOpenAircraft()" style="background:#0ea5e9;' + actBtn + '">✈️ Aircraft</button>' +
       '<button onclick="_plOpenCrew()" style="background:#a855f7;' + actBtn + '">👥 Crew</button>' +
-      '<button onclick="_plOpenPlaces()" style="background:#f59e0b;' + actBtn + '">🗺️ Places</button>' +
+      '<button onclick="_plOpenPlaces()" style="background:#f59e0b;' + actBtn + '">🗺️ Airports</button>' +
       // V1.3.29：機場碼切換比照日夜間 —— 顯示「按了會切到的目標」
       '<button onclick="_plToggleAptFmt()" style="background:transparent;color:var(--muted);border:1px solid var(--border,#334155);border-radius:6px;padding:6px 10px;font-size:.72em;cursor:pointer" title="機場碼顯示切換：按一下切到另一種">🌐 ' + (_plAptFmtCur() === 'iata' ? 'ICAO' : 'IATA') + '</button>' +
       // V1.3.33：一鍵上鎖 / 解鎖全部航班
@@ -904,6 +904,7 @@ async function _plConfirmAllDrafts() {
 function _plRenderMain() {
   var c = document.getElementById('pilotlog-content');
   if (!c) return;
+  _pl.aptReturn = false;   // V1.3.39：回到 Logbook 主列表 → 清掉 Airports 返回標記
   // V1.3 離線優先：只有「有網路且手機裡沒有可用身分」才跳登入（Google 登入本來就要網路）。
   // 離線時即使 _pl.user 物件還沒建好，也照樣顯示快取的 logbook，不卡登入。
   if (!_pl.user && _plOnline() && !_plHasSession()) { _plRenderLogin(); return; }
@@ -1006,6 +1007,14 @@ function _plOpenEditor(id) {
 function _plCloseEditor() {
   _pl.editing = null;
   _pl.selectedId = null;
+  // V2.0.01（codex P2）：從 Airports 點航班進來的 → 關閉回對的那一層（三層導航才順）：
+  //   寬螢幕 → 回三欄（保留選中機場）；窄螢幕 → 回該機場詳情頁（不是回最上層列表）。
+  if (_pl.aptReturn) {
+    if (_plAptIsWide()) _plRenderPlaces();
+    else if (_pl.aptDetailKey) _plOpenPlaceDetail(_pl.aptDetailKey);
+    else _plOpenPlaces();
+    return;
+  }
   // iPad split：清右側回 placeholder + 重畫列表去掉 highlight；列表保持原位不重 fetch
   if (_plWide() && document.getElementById('pl-detail-pane')) {
     document.getElementById('pl-detail-pane').innerHTML = _plDetailPlaceholder();
@@ -1057,11 +1066,17 @@ function _plEditorField(label, name, type, opts) {
       }
     }
     input = '<input ' + attrs + ' value="' + _plEsc(dateStr) + '" placeholder="YYYY-MM-DD" maxlength="10">';
+  } else if (opts.listId) {
+    // V2.0.01：datalist 下拉 + 持續顯示的 ▾ 提示（讓使用者知道可下拉選，也能手動輸入覆蓋）
+    var dvalL = opts.fmt ? opts.fmt(val) : val;
+    var attrsL = attrs.replace('padding:6px 8px', 'padding:6px 26px 6px 8px');
+    input = '<div style="position:relative">' +
+      '<input ' + attrsL + ' list="' + opts.listId + '" autocomplete="off" value="' + _plEsc(dvalL) + '" placeholder="' + _plEsc(opts.placeholder || '選或輸入 · pick or type') + '">' +
+      '<span style="position:absolute;right:9px;top:50%;transform:translateY(-50%);pointer-events:none;color:var(--muted);font-size:.8em">▾</span>' +
+      '<datalist id="' + opts.listId + '"></datalist></div>';
   } else {
     var dval = opts.fmt ? opts.fmt(val) : val;   // V1.3.20：可選顯示格式轉換（如機場碼 IATA/ICAO）
-    var listAttr = opts.listId ? ' list="' + opts.listId + '" autocomplete="off"' : '';   // V1.3.37：可接 datalist 下拉
-    input = '<input ' + attrs + listAttr + ' value="' + _plEsc(dval) + '"' + (opts.placeholder ? ' placeholder="' + _plEsc(opts.placeholder) + '"' : '') + '>' +
-      (opts.listId ? '<datalist id="' + opts.listId + '"></datalist>' : '');
+    input = '<input ' + attrs + ' value="' + _plEsc(dval) + '"' + (opts.placeholder ? ' placeholder="' + _plEsc(opts.placeholder) + '"' : '') + '>';
   }
   if (type === 'check') return '<div style="margin-bottom:8px">' + input + '</div>';
   return '<div style="margin-bottom:8px">' +
@@ -1300,7 +1315,7 @@ function _plAptInfo(code) {
   var a = idx[c] || (_PL_IATA2ICAO[c] && idx[_PL_IATA2ICAO[c]]);
   if (!a) return null;
   return { icao: a[0], iata: a[1], name: a[2], city: a[3], cc: a[4], lat: a[5], lon: a[6],
-           tz: a[7] || '', elev: a[8], region: a[9] || '', runways: a[10] || [] };
+           tz: a[7] || '', elev: a[8], region: a[9] || '', runways: a[10] || [], mvar: a[11] };
 }
 // 機場顯示名稱（「City Name」風格，查無回空字串）
 function _plAptName(code) {
@@ -2072,6 +2087,7 @@ async function _plDeleteEntry() {
 // V1.3.25：Import 改成左側直欄三分頁（📅 班表 / 📥 Logbook / 🗑️ Wipe）+ 右側內容，
 // 不再一次疊六張卡。Logbook 進去再子選 LogTen（4 格）/ Wader（1 格）；Wipe 用勾選類別。
 function _plOpenImport() {
+  _pl.aptReturn = false;   // V2.0.01（codex P2）：離開 Airports → 清返回標記，免得從這裡開編輯器關閉時誤跳 Airports
   var c = document.getElementById('pilotlog-content');
   if (!c) return;
   c.innerHTML =
@@ -2667,6 +2683,7 @@ function _plToggleAircraftSubtype(key) {
 }
 
 async function _plOpenAircraft() {
+  _pl.aptReturn = false;   // V2.0.01（codex P2）：離開 Airports → 清返回標記
   var c = document.getElementById('pilotlog-content');
   if (!c) return;
   // Loading state（避免空白）
@@ -2819,23 +2836,16 @@ function _plPlacesEntries() {
 async function _plOpenPlaces() {
   var c = document.getElementById('pilotlog-content');
   if (!c) return;
+  _pl.aptReturn = true;   // V1.3.39：標記「在 Airports」→ 從這裡點航班進編輯器，關閉就回 Airports
   c.innerHTML = '<div style="text-align:center;color:var(--muted);padding:40px;font-size:.85em">載入機場… · Loading places…</div>';
   await Promise.all([_plFetchAircraftEntries(), _plLoadAirports()]);
   _plRenderPlaces();
 }
-function _plRenderPlaces() {
-  var c = document.getElementById('pilotlog-content');
-  if (!c) return;
-  var map = {};   // canon ICAO → {key, dep, arr}
-  function bump(code, dir) {
-    var k = _plCanonApt(code); if (!k) return;
-    if (!map[k]) map[k] = { key: k, dep: 0, arr: 0 };
-    map[k][dir]++;
-  }
-  _plPlacesEntries().forEach(function(e) {
-    if (e.origin) bump(e.origin, 'dep');
-    if (e.dest) bump(e.dest, 'arr');
-  });
+// 機場聚合列表（你飛過的機場 + 出發/抵達數），依航班數排序
+function _plAirportAgg() {
+  var map = {};
+  function bump(code, dir) { var k = _plCanonApt(code); if (!k) return; if (!map[k]) map[k] = { key: k, dep: 0, arr: 0 }; map[k][dir]++; }
+  _plPlacesEntries().forEach(function(e) { if (e.origin) bump(e.origin, 'dep'); if (e.dest) bump(e.dest, 'arr'); });
   var list = Object.keys(map).map(function(k) {
     var m = map[k]; m.total = m.dep + m.arr;
     var info = _plAptInfo(k);
@@ -2843,77 +2853,169 @@ function _plRenderPlaces() {
     return m;
   });
   list.sort(function(a, b) { return b.total - a.total || a.key.localeCompare(b.key); });
-
-  var rows;
-  if (list.length === 0) {
-    rows = '<div style="text-align:center;color:var(--muted);padding:30px;font-size:.85em">還沒有任何航班機場資料。 · No airports yet.</div>';
-  } else {
-    rows = list.map(function(m) {
-      var sub = [m.city, m.cc].filter(Boolean).join(' · ');
-      return '<div onclick="_plOpenPlaceDetail(\'' + _plJs(m.key) + '\')" style="background:var(--card);border-radius:8px;padding:10px 12px;margin-bottom:6px;cursor:pointer;display:flex;align-items:center;gap:10px">' +
-        '<div style="min-width:58px;font-weight:800;font-size:1.05em">' + _plEsc(_plAptFmt(m.key)) + '</div>' +
-        '<div style="flex:1;min-width:0">' +
-          '<div style="font-size:.8em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + _plEsc(m.full || '—') + '</div>' +
-          (sub ? '<div style="font-size:.66em;color:var(--muted)">' + _plEsc(sub) + '</div>' : '') +
-        '</div>' +
-        '<div style="text-align:right;font-size:.64em;color:var(--muted);white-space:nowrap;line-height:1.3">↗ ' + m.dep + ' · ↘ ' + m.arr + '<br><b style="color:var(--text);font-size:1.5em">' + m.total + '</b></div>' +
-      '</div>';
-    }).join('');
-  }
-  c.innerHTML =
-    '<div style="padding:10px 14px">' +
-      '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap">' +
-        '<button onclick="_plRenderMain()" style="background:transparent;border:0;color:var(--text);font-size:1.2em;cursor:pointer">←</button>' +
-        '<div style="font-size:1em;font-weight:700">🗺️ Places</div>' +
-        '<div style="flex:1"></div>' +
-        '<div style="font-size:.72em;color:var(--muted)">' + list.length + ' airports</div>' +
-      '</div>' +
-      '<div style="font-size:.7em;color:var(--muted);margin-bottom:10px">你飛過的機場，依航班數排序。↗ 出發 · ↘ 抵達。點任一筆查看進出這機場的所有航班。<br>Airports you\'ve flown, by frequency — tap one to see every flight to/from it.</div>' +
-      rows +
-    '</div>';
+  return list;
 }
+// 機場列表 HTML（左欄 / 窄螢幕全寬）；sel = 三欄目前選中（highlight）
+function _plAptListHtml(list, sel) {
+  if (list.length === 0) return '<div style="text-align:center;color:var(--muted);padding:30px;font-size:.85em">還沒有任何航班機場資料。 · No airports yet.</div>';
+  return list.map(function(m) {
+    var on = (m.key === sel);
+    var sub = [m.city, m.cc].filter(Boolean).join(' · ');
+    return '<div onclick="_plSelectAirport(\'' + _plJs(m.key) + '\')" style="background:' + (on ? 'rgba(59,130,246,.18)' : 'var(--card)') + ';border:1px solid ' + (on ? '#3b82f6' : 'transparent') + ';border-radius:8px;padding:9px 12px;margin-bottom:6px;cursor:pointer;display:flex;align-items:center;gap:10px">' +
+      '<div style="min-width:54px;font-weight:800;font-size:1em">' + _plEsc(_plAptFmt(m.key)) + '</div>' +
+      '<div style="flex:1;min-width:0">' +
+        '<div style="font-size:.78em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + _plEsc(m.full || '—') + '</div>' +
+        (sub ? '<div style="font-size:.64em;color:var(--muted)">' + _plEsc(sub) + '</div>' : '') +
+      '</div>' +
+      '<div style="text-align:right;font-size:.6em;color:var(--muted);white-space:nowrap;line-height:1.3">↗' + m.dep + ' ↘' + m.arr + '<br><b style="color:var(--text);font-size:1.5em">' + m.total + '</b></div>' +
+    '</div>';
+  }).join('');
+}
+function _plAptIsWide() { return (typeof window !== 'undefined' && window.innerWidth >= 980); }
+
+// 🗺️ Airports —— 寬螢幕三欄（列表 | 資訊 | 航班）；窄螢幕列表（點 → 詳情頁）
+function _plRenderPlaces() {
+  var c = document.getElementById('pilotlog-content');
+  if (!c) return;
+  var list = _plAirportAgg();
+  var wide = _plAptIsWide();
+  var sel = _pl.airportSel;
+  if (sel && !list.some(function(m) { return m.key === sel; })) sel = null;
+  if (wide && !sel && list.length) sel = list[0].key;
+  _pl.airportSel = sel;
+
+  var header = '<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap">' +
+    '<button onclick="_plRenderMain()" style="background:transparent;border:0;color:var(--text);font-size:1.2em;cursor:pointer">←</button>' +
+    '<div style="font-size:1em;font-weight:700">🗺️ Airports</div>' +
+    '<div style="flex:1"></div>' +
+    '<div style="font-size:.72em;color:var(--muted)">' + list.length + ' airports</div>' +
+  '</div>';
+
+  if (!wide) {
+    c.innerHTML = '<div style="padding:10px 14px">' + header +
+      '<div style="font-size:.68em;color:var(--muted);margin-bottom:10px">你飛過的機場，依航班數排序。點任一筆看進出航班。<br>Airports you\'ve flown — tap to see flights.</div>' +
+      _plAptListHtml(list, null) + '</div>';
+    return;
+  }
+  // 寬螢幕三欄：外框固定高度，三欄各自獨立捲動（不整頁一起捲）
+  c.innerHTML = '<div style="padding:10px 14px">' + header +
+    '<div style="display:flex;gap:14px;align-items:stretch;height:calc(100vh - 138px)">' +
+      '<div style="flex:0 0 290px;overflow-y:auto;padding-right:2px">' + _plAptListHtml(list, sel) + '</div>' +
+      (sel
+        ? '<div style="flex:0 0 320px;overflow-y:auto;padding-right:2px">' + _plAptInfoHtml(sel) + '</div>' +
+          '<div style="flex:1;min-width:0;overflow-y:auto">' + _plAptFlightsHtml(sel) + '</div>'
+        : '<div style="flex:1;color:var(--muted);padding:30px;font-size:.85em">左邊選一個機場 · pick an airport</div>') +
+    '</div>' +
+  '</div>';
+}
+// 點機場：寬螢幕更新三欄中右；窄螢幕進詳情頁
+function _plSelectAirport(key) {
+  _pl.placeFilter = 'all';
+  if (_plAptIsWide()) { _pl.airportSel = key; _plRenderPlaces(); }
+  else { _plOpenPlaceDetail(key); }
+}
+// V1.3.39：機場個人筆記（Note）—— 先存本機 localStorage（server 同步版之後做）
+// V2.0.01（codex P2）：per-user key —— 同裝置多帳號 / 登出登入不會互相看到/蓋掉筆記
+function _plAptNoteKey() { return 'pilotlog_apt_notes_' + ((_pl.user && _pl.user.id) || 'anon'); }
+function _plAirportNote(icao) {
+  try { return (JSON.parse(localStorage.getItem(_plAptNoteKey()) || '{}'))[icao] || ''; } catch (e) { return ''; }
+}
+// V1.3.39：inline 編輯（textarea 失焦直接存；不彈窗、不重畫以免丟焦/閃）
+function _plSaveAirportNote(icao, val) {
+  try {
+    var k = _plAptNoteKey(), m = JSON.parse(localStorage.getItem(k) || '{}');
+    if (val && val.trim()) m[icao] = val.trim(); else delete m[icao];
+    localStorage.setItem(k, JSON.stringify(m));
+  } catch (e) {}
+}
+// 機場資訊卡 HTML（label 左值右；三欄中欄 + 窄螢幕詳情共用）
+function _plAptInfoHtml(key) {
+  var info = _plAptInfo(key);
+  function cell(lbl, val) {
+    if (val == null || val === '') return '';
+    return '<div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px;padding:7px 0;border-bottom:1px solid var(--border,#1e293b)">' +
+      '<span style="color:var(--muted);font-size:.7em;text-transform:uppercase;letter-spacing:.3px;white-space:nowrap">' + lbl + '</span>' +
+      '<span style="font-weight:600;font-size:.82em;text-align:right">' + val + '</span></div>';
+  }
+  if (!info) return '<div style="background:var(--card);border-radius:10px;padding:12px;font-size:.78em;color:var(--muted)">機場庫載入中… · loading airport DB…</div>';
+  var ltime = '', tzOff = '';
+  if (info.tz) {
+    try { ltime = new Intl.DateTimeFormat('en-GB', { timeZone: info.tz, hour: '2-digit', minute: '2-digit', hour12: false }).format(new Date()); } catch (e) {}
+    try {
+      var _tp = new Intl.DateTimeFormat('en-US', { timeZone: info.tz, timeZoneName: 'shortOffset' }).formatToParts(new Date());
+      var _to = _tp.find(function(x) { return x.type === 'timeZoneName'; });
+      if (_to) tzOff = _to.value.replace('GMT', 'UTC');   // 「GMT+8」→「UTC+8」（含夏令時自動）
+    } catch (e) {}
+  }
+  var cName = info.cc || '';
+  try { if (info.cc) cName = new Intl.DisplayNames(['en'], { type: 'region' }).of(info.cc) || info.cc; } catch (e) {}
+  var st = '';
+  if (['US', 'CA', 'AU'].indexOf(info.cc) >= 0 && info.region && info.region.indexOf('-') >= 0) st = info.region.split('-')[1];
+  var mvStr = (info.mvar != null) ? (Math.abs(info.mvar) + '°' + (info.mvar < 0 ? 'W' : info.mvar > 0 ? 'E' : '')) : '';
+  // 衛星地圖（Esri World Imagery 靜態圖；公開服務、無金鑰，看得到真實跑道/航廈）
+  var mapImg = '';
+  if (info.lat != null && info.lon != null) {
+    var bbox = (info.lon - 0.06) + ',' + (info.lat - 0.045) + ',' + (info.lon + 0.06) + ',' + (info.lat + 0.045);
+    var mUrl = 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/export?bbox=' + bbox + '&bboxSR=4326&imageSR=4326&size=560,380&format=png&f=image';
+    mapImg = '<div style="margin:10px 0"><img src="' + mUrl + '" alt="satellite" onerror="this.parentNode.style.display=\'none\'" style="width:100%;border-radius:8px;display:block" loading="lazy"></div>';
+  }
+  return '<div style="background:var(--card);border-radius:10px;padding:4px 14px">' +
+    cell('Name', _plEsc(info.name)) +
+    cell('ICAO', _plEsc(info.icao)) + cell('IATA', _plEsc(info.iata)) +
+    cell('City', _plEsc(info.city)) + cell('State', _plEsc(st)) +
+    cell('Country', _plEsc(cName)) + cell('Elevation', (info.elev !== '' && info.elev != null) ? info.elev + ' ft' : '') +
+    cell('Mag Var', mvStr) +
+    cell('Timezone', _plEsc(info.tz) + (tzOff ? ' <span style="color:var(--muted);font-weight:400">· ' + tzOff + '</span>' : '') + (ltime ? ' <span style="color:var(--muted);font-weight:400">· ' + ltime + '</span>' : '')) +
+    cell('Lat / Lon', info.lat != null ? info.lat + ', ' + info.lon : '') +
+    cell('Runways', (info.runways && info.runways.length) ? _plEsc(info.runways.join(' / ')) : '') +
+    mapImg +
+    '<div style="padding:7px 0;border-top:1px solid var(--border,#1e293b);margin-top:3px">' +
+      '<div style="color:var(--muted);font-size:.7em;text-transform:uppercase;letter-spacing:.3px;margin-bottom:4px">Note</div>' +
+      '<textarea onblur="_plSaveAirportNote(\'' + _plJs(info.icao || key) + '\', this.value)" placeholder="新增機場筆記… · add a note" rows="2" style="width:100%;background:var(--bg,#0a0e1a);border:1px solid var(--border,#334155);border-radius:6px;color:var(--text);font-size:.82em;padding:6px 8px;resize:vertical;font-family:inherit;outline:none;box-sizing:border-box">' + _plEsc(_plAirportNote(info.icao || key)) + '</textarea></div>' +
+  '</div>';
+}
+// 航班分頁 + 列表 HTML（三欄右欄 + 窄螢幕詳情共用）
+function _plAptFlightsHtml(key) {
+  var all = _plPlacesEntries().filter(function(e) { return _plCanonApt(e.origin) === key || _plCanonApt(e.dest) === key; });
+  var depF = all.filter(function(e) { return _plCanonApt(e.origin) === key; });
+  var arrF = all.filter(function(e) { return _plCanonApt(e.dest) === key; });
+  var filt = _pl.placeFilter || 'all';
+  var flights = (filt === 'dep' ? depF : filt === 'arr' ? arrF : all).slice();
+  flights.sort(function(a, b) { return (b.flight_date || '').localeCompare(a.flight_date || ''); });
+  function ftab(f, lbl, n) {
+    var on = (filt === f);
+    return '<button onclick="_plSetPlaceFilter(\'' + f + '\',\'' + _plJs(key) + '\')" style="flex:1;background:' + (on ? '#3b82f6' : 'transparent') + ';color:' + (on ? '#fff' : 'var(--muted)') + ';border:1px solid ' + (on ? '#3b82f6' : 'var(--border,#334155)') + ';border-radius:6px;padding:7px 4px;font-size:.74em;font-weight:600;cursor:pointer">' + lbl + ' <b>' + n + '</b></button>';
+  }
+  var tabs = '<div style="display:flex;gap:6px;margin-bottom:10px">' +
+    ftab('all', 'All', all.length) + ftab('dep', '🛫 Dep', depF.length) + ftab('arr', '🛬 Arr', arrF.length) + '</div>';
+  var rows = flights.length === 0
+    ? '<div style="text-align:center;color:var(--muted);padding:24px;font-size:.85em">沒有航班。 · No flights.</div>'
+    : flights.map(_plRenderEntryRow).join('');
+  return tabs + rows;
+}
+// 分頁切換：寬螢幕重畫三欄（保 sel）、窄螢幕重畫詳情頁
+function _plEnterPlace(key) { _pl.placeFilter = 'all'; _plOpenPlaceDetail(key); }
+function _plSetPlaceFilter(f, key) {
+  _pl.placeFilter = f;
+  if (_plAptIsWide()) { _pl.airportSel = key; _plRenderPlaces(); }
+  else _plOpenPlaceDetail(key);
+}
+// 窄螢幕：單機場詳情頁（資訊 + 航班，← 回列表）
 function _plOpenPlaceDetail(key) {
   var c = document.getElementById('pilotlog-content');
   if (!c) return;
-  var flights = _plPlacesEntries().filter(function(e) {
-    return _plCanonApt(e.origin) === key || _plCanonApt(e.dest) === key;
-  });
-  flights.sort(function(a, b) { return (b.flight_date || '').localeCompare(a.flight_date || ''); });
+  _pl.aptDetailKey = key;   // V2.0.01（codex P2）：記住正在看哪個機場 → 從這裡點航班、關閉時回到這頁（不是回列表）
   var info = _plAptInfo(key);
   var disp = _plAptFmt(key);
-  // V1.3.38：機場詳情 —— 時區（含當地即時時間）/ 座標 / 海拔 / 跑道
-  var det = '';
-  if (info) {
-    var bits = [];
-    if (info.tz) {
-      var lt = '';
-      try { lt = new Intl.DateTimeFormat('en-GB', { timeZone: info.tz, hour: '2-digit', minute: '2-digit', hour12: false }).format(new Date()); } catch (e) {}
-      bits.push('🕐 ' + _plEsc(info.tz) + (lt ? '（當地 ' + lt + '）' : ''));
-    }
-    if (info.lat != null && info.lon != null) bits.push('📍 ' + info.lat + ', ' + info.lon);
-    if (info.elev !== '' && info.elev != null) bits.push('⛰️ ' + info.elev + ' ft');
-    if (info.runways && info.runways.length) bits.push('🛬 RWY ' + info.runways.join(' / '));
-    if (bits.length) det = '<div style="color:var(--muted);margin-top:6px;font-size:.92em;line-height:1.8">' + bits.join('<br>') + '</div>';
-  }
-  var head = '<div style="background:var(--card);border-radius:8px;padding:12px;margin-bottom:10px;font-size:.78em">' +
-    '<div style="font-weight:700;font-size:1.1em">' + _plEsc(disp) +
-      (info && info.icao && info.iata ? ' <span style="color:var(--muted);font-size:.78em">' + _plEsc(info.icao) + ' / ' + _plEsc(info.iata) + '</span>' : '') + '</div>' +
-    (info ? '<div style="color:var(--muted);margin-top:4px">' + _plEsc([info.name, info.city, info.cc].filter(Boolean).join(' · ')) + '</div>' : '') +
-    det +
+  c.innerHTML = '<div style="padding:10px 14px">' +
+    '<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">' +
+      '<button onclick="_plOpenPlaces()" style="background:transparent;border:0;color:var(--text);font-size:1.2em;cursor:pointer">←</button>' +
+      '<div style="font-size:1.1em;font-weight:800">' + _plEsc(disp) +
+        (info && info.icao && info.iata ? ' <span style="color:var(--muted);font-size:.66em;font-weight:400">' + _plEsc(info.icao) + ' / ' + _plEsc(info.iata) + '</span>' : '') + '</div>' +
+    '</div>' +
+    '<div style="margin-bottom:10px">' + _plAptInfoHtml(key) + '</div>' +
+    _plAptFlightsHtml(key) +
   '</div>';
-  var rows = flights.length === 0
-    ? '<div style="text-align:center;color:var(--muted);padding:30px;font-size:.85em">沒有航班。 · No flights.</div>'
-    : flights.map(_plRenderEntryRow).join('');
-  c.innerHTML =
-    '<div style="padding:10px 14px">' +
-      '<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">' +
-        '<button onclick="_plOpenPlaces()" style="background:transparent;border:0;color:var(--text);font-size:1.2em;cursor:pointer">←</button>' +
-        '<div style="font-size:1em;font-weight:700">' + _plEsc(disp) + ' / Flights</div>' +
-        '<div style="flex:1"></div>' +
-        '<div style="font-size:.72em;color:var(--muted)">' + flights.length + ' flights</div>' +
-      '</div>' +
-      head + rows +
-    '</div>';
 }
 
 function _plOpenAircraftDetail(tail) {
@@ -3386,6 +3488,7 @@ async function _plUnpickFleetAircraft(tail) {
 var _plCrewSearchTerm = '';
 
 async function _plOpenCrew() {
+  _pl.aptReturn = false;   // V2.0.01（codex P2）：離開 Airports → 清返回標記
   var c = document.getElementById('pilotlog-content');
   if (!c) return;
   c.innerHTML = '<div style="text-align:center;color:var(--muted);padding:40px;font-size:.85em">載入 crew… · Loading crew…</div>';
@@ -3856,6 +3959,7 @@ async function _plQuickSaveCrew(contactId, slotKey) {
 async function _plRenderAnalyze() {
   var c = document.getElementById('pilotlog-content');
   if (!c) return;
+  _pl.aptReturn = false;   // V1.3.39：切到 Analyze → 清 Airports 返回標記
   if (!_pl.user) { _plRenderLogin(); return; }
   _plShowTabBar(true);
   _plHighlightTab('analyze');
@@ -4401,6 +4505,7 @@ function _plRenderAnalyzeContent() {
 async function _plRenderReport() {
   var c = document.getElementById('pilotlog-content');
   if (!c) return;
+  _pl.aptReturn = false;   // V1.3.39：切到 Report → 清 Airports 返回標記
   if (!_pl.user) { _plRenderLogin(); return; }
   _plShowTabBar(true);
   _plHighlightTab('report');
