@@ -727,20 +727,24 @@ function _plRenderToolbar() {
       (active ? '#fff' : 'var(--text)') + ';border:1px solid var(--border,#334155);' +
       'border-radius:6px;padding:4px 10px;font-size:.75em;cursor:pointer;margin-right:4px">' + label + '</button>';
   };
-  return '<div style="display:flex;align-items:center;flex-wrap:wrap;gap:6px;margin-bottom:10px">' +
-    '<button onclick="_plOpenEditor(null)" style="background:#10b981;color:#fff;border:0;border-radius:6px;padding:6px 12px;font-size:.8em;font-weight:700;cursor:pointer">+ New Entry</button>' +
-    '<button onclick="_plOpenImport()" style="background:#6366f1;color:#fff;border:0;border-radius:6px;padding:6px 12px;font-size:.8em;font-weight:700;cursor:pointer">📥 Import</button>' +
-    '<button onclick="_plOpenAircraft()" style="background:#0ea5e9;color:#fff;border:0;border-radius:6px;padding:6px 12px;font-size:.8em;font-weight:700;cursor:pointer">✈️ Aircraft</button>' +
-    '<button onclick="_plOpenCrew()" style="background:#a855f7;color:#fff;border:0;border-radius:6px;padding:6px 12px;font-size:.8em;font-weight:700;cursor:pointer">👥 Crew</button>' +
-    // V1.3.20：機場碼顯示格式切換（IATA / ICAO）
-    // V1.3.29：比照日夜間按鈕 —— 顯示「按了會切到的目標」（不是目前狀態）
-    '<button onclick="_plToggleAptFmt()" style="background:transparent;color:var(--muted);border:1px solid var(--border,#334155);border-radius:6px;padding:6px 10px;font-size:.72em;cursor:pointer" title="機場碼顯示切換：按一下切到另一種">🌐 ' + (_plAptFmtCur() === 'iata' ? 'ICAO' : 'IATA') + '</button>' +
-    // V1.3.08：拿掉 ✓ Confirm All — LogTen 模型沒有 confirm 概念
-    '<div style="flex:1"></div>' +
-    filterBtn('all', 'All') + filterBtn('done', '已完成 Done') +
-    filterBtn('open', '未完成 Open') + filterBtn('removed', '已移除 Removed') +
-    '<button onclick="_plLogout()" style="background:transparent;color:var(--muted);border:0;font-size:.7em;cursor:pointer;margin-left:8px">Logout</button>' +
-    '</div>';
+  // V1.3.31：iPhone 版面 —— 動作鈕一列、篩選鈕另一列（不再擠成一坨）；保留彩色
+  var actBtn = 'border:0;border-radius:6px;padding:6px 12px;font-size:.8em;font-weight:700;cursor:pointer;color:#fff';
+  return '<div style="margin-bottom:10px">' +
+    '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px">' +
+      '<button onclick="_plOpenEditor(null)" style="background:#10b981;' + actBtn + '">+ New Entry</button>' +
+      '<button onclick="_plOpenImport()" style="background:#6366f1;' + actBtn + '">📥 Import</button>' +
+      '<button onclick="_plOpenAircraft()" style="background:#0ea5e9;' + actBtn + '">✈️ Aircraft</button>' +
+      '<button onclick="_plOpenCrew()" style="background:#a855f7;' + actBtn + '">👥 Crew</button>' +
+      // V1.3.29：機場碼切換比照日夜間 —— 顯示「按了會切到的目標」
+      '<button onclick="_plToggleAptFmt()" style="background:transparent;color:var(--muted);border:1px solid var(--border,#334155);border-radius:6px;padding:6px 10px;font-size:.72em;cursor:pointer" title="機場碼顯示切換：按一下切到另一種">🌐 ' + (_plAptFmtCur() === 'iata' ? 'ICAO' : 'IATA') + '</button>' +
+    '</div>' +
+    '<div style="display:flex;flex-wrap:wrap;gap:4px;align-items:center">' +
+      filterBtn('all', 'All') + filterBtn('done', '已完成 Done') +
+      filterBtn('open', '未完成 Open') + filterBtn('removed', '已移除 Removed') +
+      '<div style="flex:1;min-width:8px"></div>' +
+      '<button onclick="_plLogout()" style="background:transparent;color:var(--muted);border:0;font-size:.7em;cursor:pointer">Logout</button>' +
+    '</div>' +
+  '</div>';
 }
 
 // LogTen Pro 風格的密集 4 行卡：
@@ -4059,12 +4063,14 @@ function _plRenderReportContent() {
   }
   var inputStyle = 'background:var(--input-bg);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:5px 8px;font-size:.78em';
   var rangeHtml =
-    '<div style="display:flex;align-items:center;gap:8px;margin:14px 0 8px;flex-wrap:wrap">' +
-      '<div style="font-size:.85em;font-weight:700">📅 Hours Summary</div>' +
-      '<div style="flex:1"></div>' +
-      '<input type="date" value="' + _plEsc(r.from) + '" onchange="_plSetReportFrom(this.value)" style="' + inputStyle + '">' +
-      '<span style="color:var(--muted);font-size:.78em">→</span>' +
-      '<input type="date" value="' + _plEsc(r.to) + '" onchange="_plSetReportTo(this.value)" style="' + inputStyle + '">' +
+    // V1.3.31：標題自己一行、日期區間另一行（兩個 date 平分撐開），iPhone 不再擠成一團
+    '<div style="margin:14px 0 8px">' +
+      '<div style="font-size:.85em;font-weight:700;margin-bottom:6px">📅 Hours Summary</div>' +
+      '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">' +
+        '<input type="date" value="' + _plEsc(r.from) + '" onchange="_plSetReportFrom(this.value)" style="' + inputStyle + ';flex:1;min-width:130px">' +
+        '<span style="color:var(--muted);font-size:.78em">→</span>' +
+        '<input type="date" value="' + _plEsc(r.to) + '" onchange="_plSetReportTo(this.value)" style="' + inputStyle + ';flex:1;min-width:130px">' +
+      '</div>' +
     '</div>' +
     '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:6px">' +
       sumCell('Block', _plMinToHHMM(agg.block)) +

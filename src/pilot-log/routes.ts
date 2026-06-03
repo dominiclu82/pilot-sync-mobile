@@ -51,8 +51,8 @@ import { getSpaPilotLogJs } from '../spa/js-pilot-log.js';
 
 // ── 版本（比照 CrewSync / Morning：每次推版必更新；SW cache 名稱跟著走） ────
 // 本機 preview build 會暫時加 -tNN 後綴方便對版；推正式版前拿掉只留乾淨版號。
-export const PILOT_LOG_VERSION = 'V1.3.30';
-const PILOT_LOG_CACHE = 'pilotlog-v1-3-30';
+export const PILOT_LOG_VERSION = 'V1.3.31';
+const PILOT_LOG_CACHE = 'pilotlog-v1-3-31';
 
 export const pilotLogRouter = express.Router();
 
@@ -335,6 +335,11 @@ if (document.readyState !== 'loading') pilotLogInit();
 function _renderPilotLogChangelog(): string {
   return `
     <div class="pl-cl-v">${PILOT_LOG_VERSION}</div>
+    <div class="pl-cl-txt">
+      <b>iPhone 版面整理：Logbook 工具列 + Report 日期區間。</b>Logbook 上面那排按鈕（新增 / 匯入 / Aircraft / Crew / IATA + 篩選 + Logout）以前在手機擠成一坨，現在分成<b>「動作」一列、「篩選」一列</b>，清楚不亂（彩色保留）。Report 的「Hours Summary」日期選擇器以前在手機跟下面卡片黏在一起，現在<b>標題自己一行、日期區間另一行平分撐開</b>，好點選。<br>
+      <b>iPhone layout tidy-up: Logbook toolbar &amp; Report date range.</b> The Logbook button row (add / import / aircraft / crew / IATA + filters + logout) was cramped on phones — now split into an action row and a filter row (colors kept). The Report "Hours Summary" date pickers no longer overlap the cards on phones: the title sits on its own line and the date range fills the next.
+    </div>
+    <div class="pl-cl-v old">V1.3.30</div>
     <div class="pl-cl-txt">
       <b>Analyze 補上更多明細（比照 LogTen）+ 拿掉多餘字樣。</b>Analyze 右欄選中的那一組，現在除了彩色橫條，<b>多一張明細卡</b>：日/夜起飛、日/夜落地、Autolands、總距離（NM）、Approach 數、總載客 Pax、Total Duty。順手把右上角多餘的「全部已飛資料」字樣拿掉（左欄本來就能選組，那句話反而像不能改）。<br>
       <b>Analyze gains more detail (LogTen-style) + a redundant label removed.</b> The selected group's right pane now adds a detail card — day/night takeoffs &amp; landings, autolands, total distance (NM), approaches, total pax, total duty — alongside the bars. Also removed the redundant "all flown data" label.
