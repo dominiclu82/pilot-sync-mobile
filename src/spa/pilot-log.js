@@ -737,6 +737,9 @@ function _plRenderToolbar() {
       '<button onclick="_plOpenCrew()" style="background:#a855f7;' + actBtn + '">👥 Crew</button>' +
       // V1.3.29：機場碼切換比照日夜間 —— 顯示「按了會切到的目標」
       '<button onclick="_plToggleAptFmt()" style="background:transparent;color:var(--muted);border:1px solid var(--border,#334155);border-radius:6px;padding:6px 10px;font-size:.72em;cursor:pointer" title="機場碼顯示切換：按一下切到另一種">🌐 ' + (_plAptFmtCur() === 'iata' ? 'ICAO' : 'IATA') + '</button>' +
+      // V1.3.33：一鍵上鎖 / 解鎖全部航班
+      '<button onclick="_plLockAll(true)" style="background:transparent;color:var(--muted);border:1px solid var(--border,#334155);border-radius:6px;padding:6px 10px;font-size:.72em;cursor:pointer" title="一鍵上鎖全部航班">🔒 全鎖</button>' +
+      '<button onclick="_plLockAll(false)" style="background:transparent;color:var(--muted);border:1px solid var(--border,#334155);border-radius:6px;padding:6px 10px;font-size:.72em;cursor:pointer" title="一鍵解鎖全部航班">🔓 全開</button>' +
     '</div>' +
     '<div style="display:flex;flex-wrap:wrap;gap:4px;align-items:center">' +
       filterBtn('all', 'All') + filterBtn('done', '已完成 Done') +
@@ -1859,6 +1862,29 @@ async function _plToggleLock() {
     _plRenderList();
   } catch (err) {
     _plToast('鎖定切換失敗', 'error');
+  }
+}
+
+// V1.3.33：一鍵上鎖 / 解鎖全部航班
+async function _plLockAll(locked) {
+  var msg = locked
+    ? '把「全部航班」一次上鎖嗎？\n鎖了就不能編輯 / 刪除（要改先解鎖）。'
+    : '把「全部航班」一次解鎖嗎？';
+  if (!window.confirm(msg)) return;
+  if (!_plOnline()) { _plToast('🔒 一鍵上鎖需要連網路', 'error'); return; }
+  try {
+    var r = await _plApi('/api/pilot-log/entries/lock-all', { method: 'POST', body: { locked: locked } });
+    if (!r.ok) { var ej = await r.json().catch(function() { return {}; }); _plToast('操作失敗 ' + (ej.error || r.status), 'error'); return; }
+    var j = await r.json().catch(function() { return {}; });
+    // codex P2：不要 _plRefreshMain（會用 server 快照蓋掉 outbox 裡未同步的離線編輯）。直接改本地 is_locked。
+    (_pl.entries || []).forEach(function(e) { e.is_locked = locked; });
+    if (_pl.aircraftEntries) _pl.aircraftEntries.forEach(function(e) { e.is_locked = locked; });
+    _plCacheSaveEntries();
+    if (_pl.aircraftEntries) _plCacheSaveAircraftEntries();
+    _plToast((locked ? '🔒 已上鎖 ' : '🔓 已解鎖 ') + (j.updated || 0) + ' 筆');
+    if (!_pl.editing) _plRenderMain();
+  } catch (e) {
+    _plToast('操作失敗', 'error');
   }
 }
 
@@ -4089,10 +4115,17 @@ function _plRenderReportContent() {
       sumCell('Takeoffs', agg.takeoffs) +
     '</div>' +
     '<div style="display:flex;gap:8px;flex-wrap:wrap">' +
-      '<button onclick="_plExportCsv()" style="background:#10b981;color:#fff;border:0;border-radius:6px;padding:8px 14px;font-size:.8em;font-weight:700;cursor:pointer">⬇️ Export CSV</button>' +
+      '<button onclick="_plExportCsv()" style="background:#10b981;color:#fff;border:0;border-radius:6px;padding:8px 14px;font-size:.8em;font-weight:700;cursor:pointer">⬇️ 航班 Flights CSV</button>' +
       '<button onclick="window.print()" style="background:transparent;color:var(--text);border:1px solid var(--border);border-radius:6px;padding:8px 14px;font-size:.8em;font-weight:700;cursor:pointer">🖨️ Print</button>' +
     '</div>' +
-    '<div style="font-size:.62em;color:var(--muted);margin-top:8px">CSV 為區間內已飛（confirmed）航班，含 PIC/SIC、起降、夜航時數 · CSV covers confirmed (flown) flights in the selected range (' + _plEsc(r.from) + ' → ' + _plEsc(r.to) + '): PIC/SIC, takeoffs/landings, night time.</div>';
+    '<div style="font-size:.62em;color:var(--muted);margin-top:8px">航班 CSV 為區間內已飛（confirmed）航班，含 PIC/SIC、起降、夜航時數（' + _plEsc(r.from) + ' → ' + _plEsc(r.to) + '）。</div>' +
+    // V1.3.33：其他資料匯出集中在 Report（各頁也有，這裡一站全包）。通訊錄/飛機/機型不分區間、匯出全部。
+    '<div style="font-size:.62em;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin:16px 0 6px">其他資料匯出 · Export data（全部，不分區間）</div>' +
+    '<div style="display:flex;gap:8px;flex-wrap:wrap">' +
+      '<button onclick="_plExportCrewCsv()" style="background:transparent;color:var(--text);border:1px solid var(--border,#334155);border-radius:6px;padding:7px 12px;font-size:.78em;font-weight:700;cursor:pointer">👥 通訊錄 Crew</button>' +
+      '<button onclick="_plExportAircraftCsv()" style="background:transparent;color:var(--text);border:1px solid var(--border,#334155);border-radius:6px;padding:7px 12px;font-size:.78em;font-weight:700;cursor:pointer">✈️ 機尾庫 Aircraft</button>' +
+      '<button onclick="_plExportTypesCsv()" style="background:transparent;color:var(--text);border:1px solid var(--border,#334155);border-radius:6px;padding:7px 12px;font-size:.78em;font-weight:700;cursor:pointer">🧭 機型 Types</button>' +
+    '</div>';
 
   c.innerHTML =
     '<div style="padding:10px 14px">' +

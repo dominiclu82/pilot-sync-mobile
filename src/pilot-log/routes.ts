@@ -51,8 +51,8 @@ import { getSpaPilotLogJs } from '../spa/js-pilot-log.js';
 
 // ── 版本（比照 CrewSync / Morning：每次推版必更新；SW cache 名稱跟著走） ────
 // 本機 preview build 會暫時加 -tNN 後綴方便對版；推正式版前拿掉只留乾淨版號。
-export const PILOT_LOG_VERSION = 'V1.3.32';
-const PILOT_LOG_CACHE = 'pilotlog-v1-3-32';
+export const PILOT_LOG_VERSION = 'V1.3.33';
+const PILOT_LOG_CACHE = 'pilotlog-v1-3-33';
 
 export const pilotLogRouter = express.Router();
 
@@ -335,6 +335,11 @@ if (document.readyState !== 'loading') pilotLogInit();
 function _renderPilotLogChangelog(): string {
   return `
     <div class="pl-cl-v">${PILOT_LOG_VERSION}</div>
+    <div class="pl-cl-txt">
+      <b>匯出集中到 Report + 一鍵上鎖全部航班。</b><b>(1) 匯出集中：</b>通訊錄 / 機尾庫 / 機型的匯出現在 <b>📄 Report 頁也有</b>（跟航班 CSV 放一起，一站全包）；各頁原本的匯出鈕也保留。<b>(2) 一鍵上鎖：</b>Logbook 工具列加「<b>🔒 全鎖</b>」「<b>🔓 全開</b>」，一次把<b>全部航班上鎖 / 解鎖</b>。上鎖後防誤改——不能編輯也不能刪除，要改先解鎖（跟單筆 🔒 Lock 同樣道理，只是一次全部）。<br>
+      <b>Exports centralized in Report + one-click lock-all.</b> (1) Crew / aircraft / type exports now also live on the 📄 Report page (next to the flights CSV); the per-page buttons stay too. (2) The Logbook toolbar gains 🔒 Lock all / 🔓 Unlock all to lock or unlock every flight at once (locked = protected from accidental edits/deletes; unlock to edit).
+    </div>
+    <div class="pl-cl-v old">V1.3.32</div>
     <div class="pl-cl-txt">
       <b>可以匯出資料了：通訊錄 / 機尾庫 / 機型目錄（比照 LogTen）。</b>之前只能匯出航班，現在 <b>👥 Crew 頁</b>右上多了「⬇️ Export」匯出整本通訊錄（名字 / 員編 / 公司 / 註記）；<b>✈️ Aircraft 頁</b>多了「⬇️ Aircraft」「⬇️ Types」匯出機尾庫（機號 / 公司 / 機型 / 廠商 / Model / 備註）與機型目錄。都是 UTF-8 CSV，Excel 直接開得開，方便你備份或搬到別的軟體。<br>
       <b>You can now export your data: address book / aircraft / aircraft types (like LogTen).</b> Previously only flights could be exported. The 👥 Crew page gets a ⬇️ Export (name / employee id / org / comment); the ✈️ Aircraft page gets ⬇️ Aircraft and ⬇️ Types for the tail registry and type catalog. All UTF-8 CSV (opens in Excel) for backup or moving to other software.
@@ -1036,6 +1041,20 @@ pilotLogRouter.post('/api/pilot-log/entries/confirm-drafts', requireAuth, async 
     [req.pilotUserId]
   );
   res.json({ confirmed: r.rowCount ?? 0 });
+});
+
+// V1.3.33：一鍵上鎖 / 解鎖全部航班（LogTen 風防誤改）。{locked:true} 全鎖、{locked:false} 全開。
+// IS DISTINCT FROM 只動「狀態真的會變」的列，回傳實際變動筆數。
+pilotLogRouter.post('/api/pilot-log/entries/lock-all', requireAuth, async (req: AuthedRequest, res) => {
+  const pool = getPool();
+  if (!pool || !(await ensureTables())) return res.status(503).json({ error: 'database_unavailable' });
+  const locked = req.body?.locked !== false;   // 預設 true（鎖）
+  const r = await pool.query(
+    `UPDATE pilot_log_entries SET is_locked = $1, updated_at = NOW()
+       WHERE user_id = $2 AND is_locked IS DISTINCT FROM $1 RETURNING id`,
+    [locked, req.pilotUserId]
+  );
+  res.json({ updated: r.rowCount ?? 0, locked });
 });
 
 // ── Entries: delete ──────────────────────────────────────────────────────────
