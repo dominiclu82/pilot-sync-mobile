@@ -720,6 +720,7 @@ function _plRenderStats() {
 }
 
 function _plRenderToolbar() {
+  if (_pl.filter === 'removed') _pl.filter = 'all';   // V1.3.34：拿掉 removed 篩選 → 舊偏好正規化回 all
   var filterBtn = function(val, label) {
     var active = _pl.filter === val;
     return '<button onclick="_plSetFilter(\'' + val + '\')" style="background:' +
@@ -743,7 +744,7 @@ function _plRenderToolbar() {
     '</div>' +
     '<div style="display:flex;flex-wrap:wrap;gap:4px;align-items:center">' +
       filterBtn('all', 'All') + filterBtn('done', '已完成 Done') +
-      filterBtn('open', '未完成 Open') + filterBtn('removed', '已移除 Removed') +
+      filterBtn('open', '未完成 Open') +
       '<div style="flex:1;min-width:8px"></div>' +
       '<button onclick="_plLogout()" style="background:transparent;color:var(--muted);border:0;font-size:.7em;cursor:pointer">Logout</button>' +
     '</div>' +
@@ -1905,9 +1906,9 @@ function _plEntryIsDone(e) {
   return false;
 }
 function _plEntryMatchesFilter(e, filter) {
-  if (filter === 'all') return true;
-  if (filter === 'removed') return e.status === 'roster_removed';
+  // V1.3.34：roster_removed 完全不在任何篩選顯示（含 All）—— user：removed 就是 removed，不該出現在 All
   if (e.status === 'roster_removed') return false;
+  if (filter === 'all') return true;
   if (filter === 'done') return _plEntryIsDone(e);
   if (filter === 'open') return !_plEntryIsDone(e);
   return true;
@@ -4129,9 +4130,8 @@ function _plRenderReportContent() {
 
   c.innerHTML =
     '<div style="padding:10px 14px">' +
-      '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">' +
+      '<div style="margin-bottom:10px">' +
         '<div style="font-size:1em;font-weight:700">📄 Report</div>' +
-        '<div style="font-size:.65em;color:var(--muted)">只計已飛航班 · Flown flights only</div>' +
       '</div>' +
       recencyHtml +
       '<hr style="border:none;border-top:1px solid var(--border);margin:6px 0">' +

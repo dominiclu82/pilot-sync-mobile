@@ -51,8 +51,8 @@ import { getSpaPilotLogJs } from '../spa/js-pilot-log.js';
 
 // ── 版本（比照 CrewSync / Morning：每次推版必更新；SW cache 名稱跟著走） ────
 // 本機 preview build 會暫時加 -tNN 後綴方便對版；推正式版前拿掉只留乾淨版號。
-export const PILOT_LOG_VERSION = 'V1.3.33';
-const PILOT_LOG_CACHE = 'pilotlog-v1-3-33';
+export const PILOT_LOG_VERSION = 'V1.3.34';
+const PILOT_LOG_CACHE = 'pilotlog-v1-3-34';
 
 export const pilotLogRouter = express.Router();
 
@@ -335,6 +335,11 @@ if (document.readyState !== 'loading') pilotLogInit();
 function _renderPilotLogChangelog(): string {
   return `
     <div class="pl-cl-v">${PILOT_LOG_VERSION}</div>
+    <div class="pl-cl-txt">
+      <b>拿掉「已移除」篩選 + Report 多餘字樣，介面更乾淨。</b>「已移除」（班表同步時被取消的航班）這個篩選分類拿掉了——這種紀錄<b>不再出現在 All</b>，篩選列也少一顆鈕（紀錄仍留在資料庫，只是畫面上不顯示）。另外 Report 右上角那句「只計已飛航班」也拿掉（Report 本來就只算已飛的，不用特別寫）。<br>
+      <b>Removed the "Removed" filter + a redundant Report label.</b> The "Removed" category (roster-sync-cancelled flights) is gone — those records no longer show in All, and the filter row loses a button (the records stay in the database, just hidden). The Report page also drops the redundant "flown flights only" label.
+    </div>
+    <div class="pl-cl-v old">V1.3.33</div>
     <div class="pl-cl-txt">
       <b>匯出集中到 Report + 一鍵上鎖全部航班。</b><b>(1) 匯出集中：</b>通訊錄 / 機尾庫 / 機型的匯出現在 <b>📄 Report 頁也有</b>（跟航班 CSV 放一起，一站全包）；各頁原本的匯出鈕也保留。<b>(2) 一鍵上鎖：</b>Logbook 工具列加「<b>🔒 全鎖</b>」「<b>🔓 全開</b>」，一次把<b>全部航班上鎖 / 解鎖</b>。上鎖後防誤改——不能編輯也不能刪除，要改先解鎖（跟單筆 🔒 Lock 同樣道理，只是一次全部）。<br>
       <b>Exports centralized in Report + one-click lock-all.</b> (1) Crew / aircraft / type exports now also live on the 📄 Report page (next to the flights CSV); the per-page buttons stay too. (2) The Logbook toolbar gains 🔒 Lock all / 🔓 Unlock all to lock or unlock every flight at once (locked = protected from accidental edits/deletes; unlock to edit).
