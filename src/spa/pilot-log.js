@@ -733,7 +733,8 @@ function _plRenderToolbar() {
     '<button onclick="_plOpenAircraft()" style="background:#0ea5e9;color:#fff;border:0;border-radius:6px;padding:6px 12px;font-size:.8em;font-weight:700;cursor:pointer">✈️ Aircraft</button>' +
     '<button onclick="_plOpenCrew()" style="background:#a855f7;color:#fff;border:0;border-radius:6px;padding:6px 12px;font-size:.8em;font-weight:700;cursor:pointer">👥 Crew</button>' +
     // V1.3.20：機場碼顯示格式切換（IATA / ICAO）
-    '<button onclick="_plToggleAptFmt()" style="background:transparent;color:var(--muted);border:1px solid var(--border,#334155);border-radius:6px;padding:6px 10px;font-size:.72em;cursor:pointer" title="機場碼顯示 IATA / ICAO 切換">🌐 ' + (_plAptFmtCur() === 'iata' ? 'IATA' : 'ICAO') + '</button>' +
+    // V1.3.29：比照日夜間按鈕 —— 顯示「按了會切到的目標」（不是目前狀態）
+    '<button onclick="_plToggleAptFmt()" style="background:transparent;color:var(--muted);border:1px solid var(--border,#334155);border-radius:6px;padding:6px 10px;font-size:.72em;cursor:pointer" title="機場碼顯示切換：按一下切到另一種">🌐 ' + (_plAptFmtCur() === 'iata' ? 'ICAO' : 'IATA') + '</button>' +
     // V1.3.08：拿掉 ✓ Confirm All — LogTen 模型沒有 confirm 概念
     '<div style="flex:1"></div>' +
     filterBtn('all', 'All') + filterBtn('done', '已完成 Done') +
@@ -2575,18 +2576,28 @@ function _plRenderAircraftList() {
         '<span style="font-size:.62em;color:var(--muted)">' + list.length + ' tail · ' + grpFlights(gop) + ' flights</span>' +
       '</div>';
       rows += '<div style="display:' + (collapsed ? 'none' : 'block') + '">';
-      list.sort(function(a, b) { return (tailCount[b.tail_no] || 0) - (tailCount[a.tail_no] || 0); });
-      for (var ti = 0; ti < list.length; ti++) {
-        var ac = list[ti];
-        var count = tailCount[ac.tail_no] || 0;
-        var tlbl = _plAircraftTypeLabel(ac);   // V1.3.28：type_code 空就用 tail 推
-        rows += '<div onclick="_plOpenAircraftDetail(\'' + _plEsc(ac.tail_no) + '\')" ' +
-          'style="background:var(--card);border-radius:8px;padding:9px 12px;margin-bottom:5px;cursor:pointer;display:flex;gap:10px;align-items:center">' +
-          '<div style="flex:1;min-width:0"><span style="font-size:.85em;font-weight:700">' + _plEsc(ac.tail_no) + '</span>' +
-          (tlbl ? '<span style="font-size:.62em;color:var(--muted)"> · ' + _plEsc(tlbl) + '</span>' : '') + '</div>' +
-          '<div style="font-size:.72em;color:var(--text);text-align:right;white-space:nowrap">' + count + ' flights</div>' +
+      // V1.3.29：公司內再依「機型」分組（機型子標題 → 該型機尾）。user：分了公司要再分機型。
+      var byType = {}, tOrder = [];
+      list.forEach(function(ac) { var tl = _plAircraftTypeLabel(ac) || '—'; if (!byType[tl]) { byType[tl] = []; tOrder.push(tl); } byType[tl].push(ac); });
+      var typeFlights = function(tl) { var s = 0; byType[tl].forEach(function(a) { s += tailCount[a.tail_no] || 0; }); return s; };
+      tOrder.sort(function(x, y) { return typeFlights(y) - typeFlights(x); });   // 飛最多的機型在前
+      tOrder.forEach(function(tl) {
+        var tlist = byType[tl];
+        rows += '<div style="display:flex;align-items:baseline;gap:6px;margin:8px 0 4px 4px">' +
+          '<span style="font-size:.76em;font-weight:700;color:var(--accent)">' + _plEsc(tl) + '</span>' +
+          '<span style="flex:1"></span>' +
+          '<span style="font-size:.58em;color:var(--muted)">' + tlist.length + ' tail · ' + typeFlights(tl) + ' flights</span>' +
+        '</div>';
+        tlist.sort(function(a, b) { return (tailCount[b.tail_no] || 0) - (tailCount[a.tail_no] || 0); });
+        tlist.forEach(function(ac) {
+          var count = tailCount[ac.tail_no] || 0;
+          rows += '<div onclick="_plOpenAircraftDetail(\'' + _plEsc(ac.tail_no) + '\')" ' +
+            'style="background:var(--card);border-radius:8px;padding:9px 12px;margin:0 0 5px 8px;cursor:pointer;display:flex;gap:10px;align-items:center">' +
+            '<div style="flex:1;min-width:0"><span style="font-size:.85em;font-weight:700">' + _plEsc(ac.tail_no) + '</span></div>' +
+            '<div style="font-size:.72em;color:var(--text);text-align:right;white-space:nowrap">' + count + ' flights</div>' +
           '</div>';
-      }
+        });
+      });
       rows += '</div>';   // close per-company collapsible wrapper
     }
   }
@@ -3757,6 +3768,101 @@ function _plOpenCompanyDetail(company) {
     '</div>';
 }
 
+// ── V1.3.29：LogTen 風兩欄 Analyze ──────────────────────────────────────────
+// 左欄選「組」（時間區間 / 公司 / 機型），右欄顯示該組彩色比例橫條 + 依機型(或依公司)卡片。
+// iPad 兩欄、iPhone 由上至下堆疊。資料用已飛 entries（in_utc、非 deadhead/removed）。
+function _plDaysAgoStr(n) {
+  var d = new Date(); d.setDate(d.getDate() - n);
+  return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2);
+}
+function _plAnSum(entries) {
+  var s = { flights: 0, block: 0, air: 0, night: 0, pic: 0, sic: 0 };
+  for (var i = 0; i < entries.length; i++) {
+    var e = entries[i];
+    s.flights++;
+    s.block += e.block_minutes || 0;
+    s.air += e.air_minutes || 0;
+    s.night += e.night_minutes || 0;
+    s.pic += (e.pic_minutes != null) ? e.pic_minutes : (e.position === 'PIC' ? (e.block_minutes || 0) : 0);
+    s.sic += (e.sic_minutes != null) ? e.sic_minutes : (_plIsSicPos(e.position) ? (e.block_minutes || 0) : 0);
+  }
+  return s;
+}
+// codex P1：'All' 組要把「起始累計（brought forward）」加進去 —— 舊版總計含它（走 _pl.stats），
+// 不加會讓有匯入結轉時數的人總時數憑空少一截。其他組（時間/公司/機型）不含（結轉無日期/機尾）。
+function _plAnGroupSum(g) {
+  var s = _plAnSum(g.entries);
+  if (g.id === 'all') {
+    var ob = (_pl.stats && _pl.stats.opening) || [];
+    ob.forEach(function(o) { s.block += o.total_minutes || 0; s.pic += o.pic_minutes || 0; s.sic += o.sic_minutes || 0; s.night += o.night_minutes || 0; });
+  }
+  return s;
+}
+var _PL_AN_COL = { block: 'var(--accent)', air: '#64748b', night: '#3b82f6', pic: '#ef4444', sic: '#f59e0b' };
+function _plAnBar(label, mins, maxMins, color) {
+  var pct = maxMins > 0 ? Math.max(mins > 0 ? 3 : 0, Math.round(mins / maxMins * 100)) : 0;
+  return '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">' +
+    '<div style="flex:0 0 44px;font-size:.66em;color:' + color + ';font-weight:700">' + label + '</div>' +
+    '<div style="flex:0 0 60px;text-align:right;font-size:.74em;font-weight:700;font-variant-numeric:tabular-nums">' + _plMinToHHMM(mins) + '</div>' +
+    '<div style="flex:1;min-width:0;background:var(--bar-bg);border-radius:5px;height:13px;overflow:hidden">' +
+      '<div style="width:' + pct + '%;height:100%;background:' + color + ';border-radius:5px"></div>' +
+    '</div></div>';
+}
+function _plAnBarsCard(title, sub, s, clickAttr) {
+  var max = s.block || 1;
+  return '<div style="background:var(--bar-bg-soft);border-radius:10px;padding:13px;margin-bottom:9px' + (clickAttr ? ';cursor:pointer' : '') + '"' + (clickAttr || '') + '>' +
+    '<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:9px">' +
+      '<div style="font-size:.92em;font-weight:800">' + (clickAttr ? '<span style="color:var(--accent)">▸</span> ' : '') + _plEsc(title) + '</div>' +
+      '<div style="font-size:.68em;color:var(--muted)">' + _plEsc(sub) + '</div>' +
+    '</div>' +
+    _plAnBar('Block', s.block, max, _PL_AN_COL.block) +
+    (s.air ? _plAnBar('Air', s.air, max, _PL_AN_COL.air) : '') +
+    _plAnBar('Night', s.night, max, _PL_AN_COL.night) +
+    _plAnBar('PIC', s.pic, max, _PL_AN_COL.pic) +
+    _plAnBar('SIC', s.sic, max, _PL_AN_COL.sic) +
+  '</div>';
+}
+// 依維度（type / company）切卡片，點卡片進既有 drill-down
+function _plAnDimCards(entries, dim) {
+  var groups = {}, order = [];
+  entries.forEach(function(e) {
+    var k = (dim === 'company') ? _plEntryCompany(e) : (e.aircraft_type || '—');
+    if (!k) k = '—';
+    if (!groups[k]) { groups[k] = []; order.push(k); }
+    groups[k].push(e);
+  });
+  order.sort(function(a, b) { return _plAnSum(groups[b]).block - _plAnSum(groups[a]).block; });
+  return order.map(function(k) {
+    var s = _plAnSum(groups[k]);
+    var click = '';
+    if (k && k !== '—') {
+      var fn = (dim === 'company') ? '_plOpenCompanyDetail' : '_plOpenTypeDetail';
+      click = ' onclick="' + fn + "('" + _plJs(k) + "')" + '"';
+    }
+    return _plAnBarsCard(k, s.flights + ' flights', s, click);
+  }).join('');
+}
+// 建左欄群組（時間 / 公司 / 機型），各帶已過濾 entries
+function _plAnBuildGroups(all) {
+  var groups = [];
+  function add(id, label, section, filtered) { groups.push({ id: id, label: label, section: section, entries: filtered }); }
+  add('all', 'All Flight Time', 'time', all);
+  [[7, 'Last 7 Days'], [28, 'Last 28 Days'], [90, 'Last 90 Days'], [365, 'Last 12 Months']].forEach(function(p) {
+    var cut = _plDaysAgoStr(p[0] - 1);   // codex P2：含今天往回 N 天 = today-(N-1)，跟後端 rolling 一致（不多一天）
+    add('d' + p[0], p[1], 'time', all.filter(function(e) { return String(e.flight_date || '').slice(0, 10) >= cut; }));
+  });
+  var byCo = {}, coOrder = [];
+  all.forEach(function(e) { var co = _plEntryCompany(e); if (co && co !== '—') { if (!byCo[co]) { byCo[co] = []; coOrder.push(co); } byCo[co].push(e); } });
+  coOrder.sort(function(a, b) { return _plAnSum(byCo[b]).block - _plAnSum(byCo[a]).block; });
+  coOrder.forEach(function(co) { add('co:' + co, co, 'company', byCo[co]); });
+  var byT = {}, tOrder = [];
+  all.forEach(function(e) { var t = e.aircraft_type || '—'; if (!byT[t]) { byT[t] = []; tOrder.push(t); } byT[t].push(e); });
+  tOrder.sort(function(a, b) { return _plAnSum(byT[b]).block - _plAnSum(byT[a]).block; });
+  tOrder.forEach(function(t) { add('ty:' + t, t, 'type', byT[t]); });
+  return groups;
+}
+function _plAnSelect(id) { _pl.anGroup = id; _plRenderAnalyzeContent(); }
+
 function _plRenderAnalyzeContent() {
   var c = document.getElementById('pilotlog-content');
   if (!c) return;
@@ -3766,17 +3872,61 @@ function _plRenderAnalyzeContent() {
     if (e.is_deadhead || e.status === 'roster_removed') return false;
     return !!e.in_utc;
   });
-  var hasStats = _pl.stats && _pl.stats.totals;
-  var body = hasStats
-    ? _plRenderStats() + _plRenderTypeBreakdown(entries) + _plRenderCompanyBreakdown(entries) + _plRenderOpeningSim() + _plRenderMonthlyChart(entries)
-    : '<div style="text-align:center;color:var(--muted);padding:40px;font-size:.85em">尚無可分析的飛行紀錄，先到 <b>📒 Logbook</b> 新增或匯入 · No flights to analyze yet — add or import in <b>📒 Logbook</b>.</div>';
+  if (!entries.length) {
+    // codex P1：沒有已飛航班但有起始累計 / SIM 時，仍要顯示那些區塊（不要只丟空訊息）
+    var extra = _plRenderOpeningSim();
+    c.innerHTML = '<div style="padding:10px 14px"><div style="font-size:1em;font-weight:700;margin-bottom:10px">📊 Analyze</div>' +
+      (extra || '<div style="text-align:center;color:var(--muted);padding:40px;font-size:.85em">尚無可分析的飛行紀錄，先到 <b>📒 Logbook</b> 新增或匯入 · No flights to analyze yet.</div>') +
+      '</div>';
+    return;
+  }
+  var groups = _plAnBuildGroups(entries);
+  var sel = null;
+  for (var i = 0; i < groups.length; i++) { if (groups[i].id === (_pl.anGroup || 'all')) { sel = groups[i]; break; } }
+  if (!sel) sel = groups[0];
+  // 左欄：分區 + 各組（label + block 時數），選中高亮
+  var sectionTitle = { time: '時間 Time', company: '依公司 Company', type: '依機型 Type' };
+  var leftHtml = '', curSection = '';
+  groups.forEach(function(g) {
+    if (g.section !== curSection) {
+      curSection = g.section;
+      leftHtml += '<div style="font-size:.6em;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin:12px 4px 5px">' + sectionTitle[g.section] + '</div>';
+    }
+    var active = (g.id === sel.id);
+    var s = _plAnGroupSum(g);
+    leftHtml += '<div onclick="_plAnSelect(\'' + _plJs(g.id) + '\')" style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:9px 11px;border-radius:8px;margin-bottom:4px;cursor:pointer;' +
+      (active ? 'background:var(--accent);color:#fff' : 'background:var(--bar-bg-soft)') + '">' +
+      '<div style="font-size:.78em;font-weight:700;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + _plEsc(g.label) + '</div>' +
+      '<div style="font-size:.72em;font-variant-numeric:tabular-nums;' + (active ? '' : 'color:var(--muted)') + '">' + _plMinToHHMM(s.block) + '</div>' +
+    '</div>';
+  });
+  // 右欄：選中組的總計橫條 + 依機型(或依公司)卡片；'all' 再加月圖 + 起始累計/SIM
+  var selSum = _plAnGroupSum(sel);
+  var dim = (sel.section === 'type') ? 'company' : 'type';
+  var rightHtml =
+    '<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:10px">' +
+      '<div style="font-size:1.05em;font-weight:800">' + _plEsc(sel.label) + '</div>' +
+      '<div style="font-size:.7em;color:var(--muted)">' + selSum.flights + ' flights</div>' +
+    '</div>' +
+    _plAnBarsCard('總計 Totals', _plMinToHHMM(selSum.block) + ' block', selSum, '') +
+    '<div style="font-size:.62em;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin:14px 4px 7px">' + (dim === 'company' ? '依公司 By Company' : '依機型 By Type') + '（點看明細）</div>' +
+    _plAnDimCards(sel.entries, dim) +
+    (sel.id === 'all' ? _plRenderMonthlyChart(entries) + _plRenderOpeningSim() : '');
   c.innerHTML =
+    '<style>' +
+      '.pl-an-wrap{display:flex;gap:14px;max-width:1100px;margin:0 auto}' +
+      '.pl-an-left{flex:0 0 268px}.pl-an-right{flex:1;min-width:0}' +
+      '@media(max-width:760px){.pl-an-wrap{flex-direction:column}.pl-an-left{flex:none}}' +
+    '</style>' +
     '<div style="padding:10px 14px">' +
-      '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">' +
+      '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">' +
         '<div style="font-size:1em;font-weight:700">📊 Analyze</div>' +
         '<div style="font-size:.65em;color:var(--muted)">全部已飛資料 · All flown data</div>' +
       '</div>' +
-      body +
+      '<div class="pl-an-wrap">' +
+        '<div class="pl-an-left">' + leftHtml + '</div>' +
+        '<div class="pl-an-right">' + rightHtml + '</div>' +
+      '</div>' +
     '</div>';
 }
 

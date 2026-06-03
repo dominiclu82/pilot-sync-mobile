@@ -51,8 +51,8 @@ import { getSpaPilotLogJs } from '../spa/js-pilot-log.js';
 
 // ── 版本（比照 CrewSync / Morning：每次推版必更新；SW cache 名稱跟著走） ────
 // 本機 preview build 會暫時加 -tNN 後綴方便對版；推正式版前拿掉只留乾淨版號。
-export const PILOT_LOG_VERSION = 'V1.3.28';
-const PILOT_LOG_CACHE = 'pilotlog-v1-3-28';
+export const PILOT_LOG_VERSION = 'V1.3.29';
+const PILOT_LOG_CACHE = 'pilotlog-v1-3-29';
 
 export const pilotLogRouter = express.Router();
 
@@ -335,6 +335,11 @@ if (document.readyState !== 'loading') pilotLogInit();
 function _renderPilotLogChangelog(): string {
   return `
     <div class="pl-cl-v">${PILOT_LOG_VERSION}</div>
+    <div class="pl-cl-txt">
+      <b>Analyze 大改版（LogTen 風兩欄）+ Aircraft 加機型分層 + 機場碼按鈕改邏輯。</b><b>(1) Analyze 兩欄：</b>仿 LogTen——<b>左邊選一組</b>（全部 / 近 7・28・90 天・12 個月 / 依公司 / 依機型，每組帶總時數），<b>右邊出彩色比例橫條</b>（Block / Air / Night / PIC / SIC）+ <b>依機型（或依公司）卡片</b>，點卡片進明細。iPad 兩欄、iPhone 由上至下堆疊——順便把舊表格在手機上爆版的問題解掉。<b>(2) Aircraft 加機型分層：</b>機尾庫現在是 <b>公司 → 機型 → 機尾</b> 三層（之前只有公司）。<b>(3) 機場碼按鈕：</b>🌐 IATA/ICAO 改成跟日夜間按鈕一樣的邏輯——<b>顯示「按了會切到的目標」</b>（例如目前 ICAO 就顯示 IATA），不再顯示目前狀態。<br>
+      <b>Analyze redesigned (LogTen-style two columns) + Aircraft gains a type layer + airport-code button logic.</b> (1) Analyze: pick a group on the left (All / last 7·28·90 days·12 months / by company / by type, each with a total), the right shows colored proportion bars (Block/Air/Night/PIC/SIC) + by-type (or by-company) cards you can tap into. Two columns on iPad, stacked on iPhone — also fixes the old table overflow on phones. (2) Aircraft list is now company → type → tail (three levels). (3) The 🌐 IATA/ICAO button now matches the day/night button: it shows the target you'll switch to, not the current state.
+    </div>
+    <div class="pl-cl-v old">V1.3.28</div>
     <div class="pl-cl-txt">
       <b>修好 Aircraft 全變「no operator」+ Position 下拉新增 SFO / FO。</b><b>(1) Aircraft 分類修正：</b>上一版改成「依公司分組」時，誤用了機尾庫的 operator 欄位 —— 但你那個欄位大多是空的，結果全部掉進「no operator」、根本沒分到公司，抱歉。現在改成<b>跟 Analyze「依公司」同一套：operator 空就用台灣機籍的 tail 範圍推</b>（B-16xxx → EVA Air、B-58xxx → Starlux…），公司就分對了；每架的機型也一樣推得出來。<b>(2) Position 多 SFO / FO：</b>航班的「Position」下拉除了 PIC / SIC / OBSERVER，<b>新增 SFO、FO 可選</b>；兩者都當 SIC 計時數（co-pilot 記 SIC）。<br>
       <b>Fixed Aircraft all showing "no operator" + added SFO / FO to Position.</b> (1) Last version's "group by company" mistakenly read the registry's operator field, which is mostly empty for you, so everything fell into "no operator" — sorry. It now derives the company the same way Analyze does: when operator is blank, it's inferred from the Taiwan registration ranges (B-16xxx → EVA Air, B-58xxx → Starlux…); type is inferred too. (2) The flight Position dropdown gains SFO and FO (both counted as SIC, since co-pilots log SIC time).
