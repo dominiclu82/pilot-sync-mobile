@@ -52,8 +52,8 @@ import { getAirportDbJs } from '../spa/js-airport-db.js';
 
 // ── 版本（比照 CrewSync / Morning：每次推版必更新；SW cache 名稱跟著走） ────
 // 本機 preview build 會暫時加 -tNN 後綴方便對版；推正式版前拿掉只留乾淨版號。
-export const PILOT_LOG_VERSION = 'V2.0.02';
-const PILOT_LOG_CACHE = 'pilotlog-v2-0-02';
+export const PILOT_LOG_VERSION = 'V2.0.03';
+const PILOT_LOG_CACHE = 'pilotlog-v2-0-03';
 
 export const pilotLogRouter = express.Router();
 
@@ -337,6 +337,11 @@ if (document.readyState !== 'loading') pilotLogInit();
 function _renderPilotLogChangelog(): string {
   return `
     <div class="pl-cl-v">${PILOT_LOG_VERSION}</div>
+    <div class="pl-cl-txt">
+      <b>✈️ 37 個星宇航點的衛星地圖 → 飛機上離線也看得到。</b>第一次有網路打開 App 時，會在<b>背景</b>把 37 個星宇定期航點的衛星地圖<b>預先抓進手機</b>，存在一個<b>「改版也不會清掉」的永久快取</b>，並請求瀏覽器持久化（避免被系統清除）。之後就算<b>飛機上離線</b>，這 37 個機場的衛星地圖照樣看得到。其他全球機場（非星宇 37）維持線上即時抓。整批約 6MB，存在你裝置、<b>不佔我們的資料庫</b>。<br>
+      <b>Offline satellite maps for the 37 Starlux airports.</b> On the first online launch, the app prefetches the satellite maps for the 37 Starlux scheduled airports into a persistent cache (survives app updates) and requests persistent storage, so they stay viewable offline (e.g. in-flight). Other airports worldwide still load live. ~6MB, stored on your device — not in our database.
+    </div>
+    <div class="pl-cl-v old">V2.0.02</div>
     <div class="pl-cl-txt">
       <b>班表匯入防呆 + ⭐ 星宇航點。</b><b>(1) 班表查重：</b>匯入班表時，<b>同一天＋同班號＋同起降</b>若已經有「已完成」的紀錄（LogTen / 手動）→ <b>自動略過</b>，不再重複建草稿（解決「當月已飛已記、又匯班表」變兩筆的問題）；匯入結果會顯示「已記略過 X 筆」。<b>(2) 月份預設：</b>列出可匯月份時，<b>當月及未來月份預設勾</b>，只有過去月份預設不勾（標「過去」）、要補再自己勾。<b>(3) ⭐ 星宇航點：</b>Airports 頁多了「<b>✈️ 飛過的 / ⭐ 星宇</b>」切換 —— ⭐ 星宇會列出<b>全部 37 個定期航點</b>（含還沒飛過的，依 Ops Spec C-6），點進去就能看任一機場的資訊／衛星地圖；飛過的列表裡星宇航點也標 ⭐。<br>
       <b>Roster import guard + ⭐ Starlux airports.</b> (1) Importing a roster now skips a flight if the same date + flight no. + route already has a completed record (LogTen/manual) — no more duplicate drafts; the result shows how many were skipped. (2) The month picker checks the current month and all future months by default; only past months are unchecked. (3) Airports gains a ✈️ Flown / ⭐ Starlux toggle — ⭐ lists all 37 scheduled airports (incl. ones you haven't flown yet) so you can open any for info/satellite map; flown airports that are Starlux destinations are marked ⭐ too.
@@ -756,6 +761,16 @@ self.addEventListener('activate', e => {
 self.addEventListener('fetch', e => {
   if (e.request.method !== 'GET') return;
   const u = new URL(e.request.url);
+  // V2.0.03：衛星地圖（Esri）→ 獨立永久快取 plapt-maps（不以 pilotlog- 開頭 → activate 不清）。
+  //   cache-first：預抓過/看過的離線可用；沒有就網路抓並存。飛機上離線也看得到星宇航點地圖。
+  if (u.hostname === 'server.arcgisonline.com') {
+    e.respondWith(
+      caches.open('plapt-maps').then(c => c.match(e.request).then(hit =>
+        hit || fetch(e.request).then(r => { c.put(e.request, r.clone()).catch(()=>{}); return r; }).catch(() => hit)
+      ))
+    );
+    return;
+  }
   if (!u.pathname.startsWith('/pilot-log') && !u.pathname.startsWith('/api/pilot-log')) return;
   // API 走網路優先（auth + 動態資料絕不能從 cache 拿）
   if (u.pathname.startsWith('/api/pilot-log')) {

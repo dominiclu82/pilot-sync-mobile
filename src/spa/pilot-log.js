@@ -1324,6 +1324,38 @@ function _plAptName(code) {
   if (i.city && i.name && i.name.indexOf(i.city) < 0) return i.city + ' · ' + i.name;
   return i.name || i.city || '';
 }
+// V2.0.03：機場衛星地圖網址（Esri World Imagery 靜態圖）。詳情顯示 + 離線預快取共用同一個 URL
+function _plAptMapUrl(lat, lon) {
+  var bbox = (lon - 0.06) + ',' + (lat - 0.045) + ',' + (lon + 0.06) + ',' + (lat + 0.045);
+  return 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/export?bbox=' + bbox + '&bboxSR=4326&imageSR=4326&size=560,380&format=png&f=image';
+}
+// V2.0.03：背景把 37 個星宇航點的衛星圖預抓進「永久快取」（SW 攔 Esri 存 plapt-maps）→ 飛機上離線也看得到。
+// 只抓一次（已快取就跳過），並請求持久化儲存避免被系統清掉。
+var _plMapsPrefetched = false;
+function _plPrefetchStarluxMaps() {
+  if (_plMapsPrefetched || !window._PL_AIRPORTS) return;
+  var go = function() {
+    if (_plMapsPrefetched || !window._PL_AIRPORTS) return;
+    _plMapsPrefetched = true;
+    try {
+      Object.keys(_PL_STARLUX_APTS).forEach(function(icao) {
+        var info = _plAptInfo(icao);
+        if (!info || info.lat == null || info.lon == null) return;
+        try { fetch(_plAptMapUrl(info.lat, info.lon), { mode: 'no-cors' }); } catch (e) {}   // 觸發 SW 攔截 → 存永久快取
+      });
+      if (navigator.storage && navigator.storage.persist) { try { navigator.storage.persist(); } catch (e) {} }
+    } catch (e) {}
+  };
+  // V2.0.03（codex P2）：要等 SW 真正「控制頁面」才抓，否則首次安裝時 fetch 直接走網路、不經 SW，
+  // 存不進 plapt-maps → 首次離線地圖會失效。有 controller 就直接抓；沒有就等 ready / controllerchange。
+  var sw = navigator.serviceWorker;
+  if (!sw) { go(); return; }
+  if (sw.controller) { go(); return; }
+  (sw.ready || Promise.resolve()).then(function() {
+    if (sw.controller) go();
+    else { try { sw.addEventListener('controllerchange', go, { once: true }); } catch (e) { go(); } }
+  }).catch(go);
+}
 
 // code（ICAO 或 IATA）→ 座標：先試小表，再 IATA→ICAO，最後全域庫 fallback
 function _plApt(code) {
@@ -2988,9 +3020,7 @@ function _plAptInfoHtml(key) {
   // 衛星地圖（Esri World Imagery 靜態圖；公開服務、無金鑰，看得到真實跑道/航廈）
   var mapImg = '';
   if (info.lat != null && info.lon != null) {
-    var bbox = (info.lon - 0.06) + ',' + (info.lat - 0.045) + ',' + (info.lon + 0.06) + ',' + (info.lat + 0.045);
-    var mUrl = 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/export?bbox=' + bbox + '&bboxSR=4326&imageSR=4326&size=560,380&format=png&f=image';
-    mapImg = '<div style="margin:10px 0"><img src="' + mUrl + '" alt="satellite" onerror="this.parentNode.style.display=\'none\'" style="width:100%;border-radius:8px;display:block" loading="lazy"></div>';
+    mapImg = '<div style="margin:10px 0"><img src="' + _plAptMapUrl(info.lat, info.lon) + '" alt="satellite" onerror="this.parentNode.style.display=\'none\'" style="width:100%;border-radius:8px;display:block" loading="lazy"></div>';
   }
   return '<div style="background:var(--card);border-radius:10px;padding:4px 14px">' +
     cell('Name', _plEsc(info.name)) +
@@ -4816,7 +4846,7 @@ async function pilotLogInit() {
 
   // codex P2：背景預載全域機場庫（~317KB，不擋首屏）。預載後主頁/Report 的 IATA↔ICAO 切換、
   // 機場名稱、夜航座標才能涵蓋全世界機場，不必先進 Places/編輯器才生效。
-  try { _plLoadAirports(); } catch (e) {}
+  try { _plLoadAirports().then(_plPrefetchStarluxMaps); } catch (e) {}   // V2.0.03：庫載入後背景預抓 37 星宇航點離線地圖
 }
 
 // V1.3：同步觸發點 — 一回連 / 切回前景就自動補送 outbox（只註冊一次）
