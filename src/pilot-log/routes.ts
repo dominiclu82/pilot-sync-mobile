@@ -51,8 +51,8 @@ import { getSpaPilotLogJs } from '../spa/js-pilot-log.js';
 
 // ── 版本（比照 CrewSync / Morning：每次推版必更新；SW cache 名稱跟著走） ────
 // 本機 preview build 會暫時加 -tNN 後綴方便對版；推正式版前拿掉只留乾淨版號。
-export const PILOT_LOG_VERSION = 'V1.3.29';
-const PILOT_LOG_CACHE = 'pilotlog-v1-3-29';
+export const PILOT_LOG_VERSION = 'V1.3.30';
+const PILOT_LOG_CACHE = 'pilotlog-v1-3-30';
 
 export const pilotLogRouter = express.Router();
 
@@ -335,6 +335,11 @@ if (document.readyState !== 'loading') pilotLogInit();
 function _renderPilotLogChangelog(): string {
   return `
     <div class="pl-cl-v">${PILOT_LOG_VERSION}</div>
+    <div class="pl-cl-txt">
+      <b>Analyze 補上更多明細（比照 LogTen）+ 拿掉多餘字樣。</b>Analyze 右欄選中的那一組，現在除了彩色橫條，<b>多一張明細卡</b>：日/夜起飛、日/夜落地、Autolands、總距離（NM）、Approach 數、總載客 Pax、Total Duty。順手把右上角多餘的「全部已飛資料」字樣拿掉（左欄本來就能選組，那句話反而像不能改）。<br>
+      <b>Analyze gains more detail (LogTen-style) + a redundant label removed.</b> The selected group's right pane now adds a detail card — day/night takeoffs &amp; landings, autolands, total distance (NM), approaches, total pax, total duty — alongside the bars. Also removed the redundant "all flown data" label.
+    </div>
+    <div class="pl-cl-v old">V1.3.29</div>
     <div class="pl-cl-txt">
       <b>Analyze 大改版（LogTen 風兩欄）+ Aircraft 加機型分層 + 機場碼按鈕改邏輯。</b><b>(1) Analyze 兩欄：</b>仿 LogTen——<b>左邊選一組</b>（全部 / 近 7・28・90 天・12 個月 / 依公司 / 依機型，每組帶總時數），<b>右邊出彩色比例橫條</b>（Block / Air / Night / PIC / SIC）+ <b>依機型（或依公司）卡片</b>，點卡片進明細。iPad 兩欄、iPhone 由上至下堆疊——順便把舊表格在手機上爆版的問題解掉。<b>(2) Aircraft 加機型分層：</b>機尾庫現在是 <b>公司 → 機型 → 機尾</b> 三層（之前只有公司）。<b>(3) 機場碼按鈕：</b>🌐 IATA/ICAO 改成跟日夜間按鈕一樣的邏輯——<b>顯示「按了會切到的目標」</b>（例如目前 ICAO 就顯示 IATA），不再顯示目前狀態。<br>
       <b>Analyze redesigned (LogTen-style two columns) + Aircraft gains a type layer + airport-code button logic.</b> (1) Analyze: pick a group on the left (All / last 7·28·90 days·12 months / by company / by type, each with a total), the right shows colored proportion bars (Block/Air/Night/PIC/SIC) + by-type (or by-company) cards you can tap into. Two columns on iPad, stacked on iPhone — also fixes the old table overflow on phones. (2) Aircraft list is now company → type → tail (three levels). (3) The 🌐 IATA/ICAO button now matches the day/night button: it shows the target you'll switch to, not the current state.
@@ -1584,6 +1589,15 @@ pilotLogRouter.get('/api/pilot-log/oops/stats', async (req, res) => {
     const statusMap: Record<string, number> = { draft: 0, confirmed: 0, roster_removed: 0 };
     for (const r of byStatus.rows) statusMap[r.status] = r.c;
 
+    // V1.3.30：成長摘要（非隱私，公開頁也能看）—— 近 7 / 30 天新增幾人、幾筆航班
+    const recent = await pool.query(`
+      SELECT
+        (SELECT COUNT(*) FROM pilot_users WHERE created_at > NOW() - INTERVAL '7 days')::int       AS new_users_7d,
+        (SELECT COUNT(*) FROM pilot_users WHERE created_at > NOW() - INTERVAL '30 days')::int      AS new_users_30d,
+        (SELECT COUNT(*) FROM pilot_log_entries WHERE created_at > NOW() - INTERVAL '7 days')::int  AS new_entries_7d,
+        (SELECT COUNT(*) FROM pilot_log_entries WHERE created_at > NOW() - INTERVAL '30 days')::int AS new_entries_30d
+    `);
+
     // ── Tables 區（三個 size 都回） ────
     // 清單用 schema.ts 的單一事實來源 PILOT_LOG_TABLES（餐廳+其他 = DB 總量扣掉這些）。
     const tableNames = PILOT_LOG_TABLES;
@@ -1711,6 +1725,7 @@ pilotLogRouter.get('/api/pilot-log/oops/stats', async (req, res) => {
           max_per_user: perUser.rows[0].max_per_user,
           by_status: statusMap,
         },
+        recent_growth: recent.rows[0],   // V1.3.30
         total_pilot_log_size_bytes: totalSize,
         total_pilot_log_size_mb: Math.round(totalSize / 1024 / 1024 * 10) / 10,
         // V1.2.06：整個 DB（含餐廳 POS）對 1GB 的用量
@@ -1735,6 +1750,50 @@ pilotLogRouter.get('/api/pilot-log/oops/stats', async (req, res) => {
   } catch (e: any) {
     console.error('[pilot-log] admin stats error:', e.message);
     res.status(500).json({ error: 'internal', detail: e.message });
+  }
+});
+
+// V1.3.30：逐人用量明細（含 email + 佔用空間）—— 鎖在 owner Google 登入後面（無密碼公開頁仍匿名）。
+// 空間用 pg_column_size 加總每人在各表的 row 大小（約略、不含 index/TOAST，但夠看相對大戶），依大小排序。
+pilotLogRouter.get('/api/pilot-log/oops/users', requireAuth, async (req: AuthedRequest, res) => {
+  if (!(await _plRequireOwner(req, res))) return;
+  const pool = getPool();
+  if (!pool || !(await ensureTables())) return res.status(503).json({ error: 'database_unavailable' });
+  try {
+    const r = await pool.query(`
+      SELECT
+        (SELECT email FROM pilot_user_emails WHERE user_id = u.id ORDER BY is_primary DESC, linked_at ASC LIMIT 1) AS email,
+        u.created_at, u.last_seen_at, u.last_import_at,
+        (SELECT COUNT(*) FROM pilot_log_entries WHERE user_id = u.id)::int AS entry_count,
+        (SELECT COUNT(*) FROM pilot_aircraft WHERE user_id = u.id)::int    AS aircraft_count,
+        (
+          COALESCE((SELECT SUM(pg_column_size(e.*)) FROM pilot_log_entries e WHERE e.user_id = u.id), 0) +
+          COALESCE((SELECT SUM(pg_column_size(a.*)) FROM pilot_aircraft a WHERE a.user_id = u.id), 0) +
+          COALESCE((SELECT SUM(pg_column_size(cr.*)) FROM crew cr WHERE cr.user_id = u.id), 0) +
+          COALESCE((SELECT SUM(pg_column_size(t.*)) FROM pilot_aircraft_types t WHERE t.user_id = u.id), 0) +
+          COALESCE((SELECT SUM(pg_column_size(ob.*)) FROM pilot_opening_balance ob WHERE ob.user_id = u.id), 0) +
+          COALESCE((SELECT SUM(pg_column_size(ss.*)) FROM pilot_user_sessions ss WHERE ss.user_id = u.id), 0) +
+          COALESCE((SELECT SUM(pg_column_size(ce.*)) FROM crew_employee_ids ce WHERE ce.user_id = u.id), 0) +
+          COALESCE((SELECT SUM(pg_column_size(em.*)) FROM pilot_user_emails em WHERE em.user_id = u.id), 0)
+        )::bigint AS bytes
+      FROM pilot_users u
+      ORDER BY bytes DESC
+    `);
+    const fmtD = (d: any) => (d ? new Date(d).toISOString().slice(0, 10) : null);
+    const users = r.rows.map((x: any) => ({
+      email: x.email || '(no email)',
+      kb: Math.round(Number(x.bytes) / 1024 * 10) / 10,
+      mb: Math.round(Number(x.bytes) / 1024 / 1024 * 100) / 100,
+      entry_count: x.entry_count,
+      aircraft_count: x.aircraft_count,
+      created_at: fmtD(x.created_at),
+      last_seen_at: fmtD(x.last_seen_at),
+      last_import_at: fmtD(x.last_import_at),
+    }));
+    res.json({ users });
+  } catch (e: any) {
+    console.error('[pilot-log] oops users error:', e.message);
+    res.status(500).json({ error: 'internal' });
   }
 });
 
@@ -1775,6 +1834,12 @@ tr+tr td { border-top:1px solid #283449; }
 <h1>📊 Pilot Log · DB Admin</h1>
 <div id="msg" class="muted" style="font-size:.72em;margin-bottom:10px"></div>
 <div id="out"></div>
+<div class="card"><div class="lbl">逐人用量（Owner 登入才看 · 含 email）</div>
+  <div class="muted" style="font-size:.72em;margin-bottom:8px">只看「誰佔多少空間」（容量管理用），不讀任何航班內容。</div>
+  <div id="ologin"></div>
+  <div id="omsg" class="muted" style="font-size:.72em;margin-top:6px"></div>
+  <div id="ousers" style="margin-top:8px"></div>
+</div>
 <script>
 function fmtMB(v){ return (v==null?'—':v) + ' MB'; }
 function el(id){ return document.getElementById(id); }
@@ -1838,6 +1903,11 @@ function render(j){
   out += '<div class="card"><div class="lbl">使用者 / 紀錄</div>' +
     '<div class="muted" style="font-size:.82em;line-height:1.8">使用者 '+ (u.total||0) +'（有資料 '+(u.with_entries||0)+'、近 7 天活躍 '+(u.active_7d||0)+'）<br>' +
     '航班總筆數 '+ (en.total||0) +'（confirmed '+((en.by_status||{}).confirmed||0)+' / draft '+((en.by_status||{}).draft||0)+'）</div></div>';
+  // V1.3.30：近期成長（新增幾人、幾筆航班）
+  var rg = s.recent_growth || {};
+  out += '<div class="card"><div class="lbl">近期成長</div>' +
+    '<div class="muted" style="font-size:.82em;line-height:1.8">近 7 天：<b style="color:#e2e8f0">+'+(rg.new_users_7d||0)+'</b> 人、<b style="color:#e2e8f0">+'+(rg.new_entries_7d||0)+'</b> 筆航班<br>' +
+    '近 30 天：<b style="color:#e2e8f0">+'+(rg.new_users_30d||0)+'</b> 人、<b style="color:#e2e8f0">+'+(rg.new_entries_30d||0)+'</b> 筆航班</div></div>';
   // top users（匿名：只排名 + 筆數，不顯示 email / id，避免無密碼下外洩）
   var tu = b.top_users_by_entries || [];
   if(tu.length){
@@ -1848,8 +1918,17 @@ function render(j){
   el('out').innerHTML = out;
 }
 function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
+// ── V1.3.30：Owner 登入看逐人用量（複用 pilot-log 的 Google 登入）────────────
+var OW = { token:null, clientId:null };
+async function ocfg(){ if(OW.clientId)return OW.clientId; try{var r=await fetch('/api/pilot-log/config');var j=await r.json();OW.clientId=j.google_client_id;return OW.clientId;}catch(e){return null;} }
+function ogis(){ if(window.google&&google.accounts&&google.accounts.id)return Promise.resolve(); if(window._g)return window._g; window._g=new Promise(function(res,rej){var s=document.createElement('script');s.src='https://accounts.google.com/gsi/client';s.async=true;s.defer=true;s.onload=res;s.onerror=rej;document.head.appendChild(s);}); return window._g; }
+async function ologinInit(){ var c=await ocfg(); if(!c){ el('ologin').textContent='(無 client id)'; return; } try{ await ogis(); google.accounts.id.initialize({client_id:c,callback:oOnCred,auto_select:false}); el('ologin').innerHTML=''; google.accounts.id.renderButton(el('ologin'),{theme:'filled_blue',size:'large',text:'signin_with',shape:'pill'}); }catch(e){ el('ologin').innerHTML='<span class="err">登入元件載入失敗</span>'; } }
+async function oOnCred(resp){ el('omsg').textContent='登入中…'; try{ var r=await fetch('/api/pilot-log/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({idToken:resp.credential})}); if(!r.ok){ el('omsg').innerHTML='<span class="err">登入失敗 '+r.status+'</span>'; return; } var j=await r.json(); OW.token=j.accessToken; oLoadUsers(); }catch(e){ el('omsg').innerHTML='<span class="err">'+(e&&e.message||'error')+'</span>'; } }
+async function oLoadUsers(){ el('omsg').textContent='查詢中…'; try{ var r=await fetch('/api/pilot-log/oops/users',{headers:{'Authorization':'Bearer '+OW.token}}); if(r.status===403){ OW.token=null; el('ologin').style.display=''; el('omsg').innerHTML='<span class="err">這個帳號不是擁有者，請換一個擁有者帳號登入</span>'; return; } if(!r.ok){ el('omsg').innerHTML='<span class="err">查詢失敗 '+r.status+'</span>'; return; } var j=await r.json(); el('ologin').style.display='none'; oRenderUsers(j.users||[]); el('omsg').textContent='共 '+(j.users||[]).length+' 人 · 依佔用空間大到小'; }catch(e){ el('omsg').innerHTML='<span class="err">'+(e&&e.message||'error')+'</span>'; } }
+function oRenderUsers(us){ if(!us.length){ el('ousers').innerHTML='<div class="muted">沒有使用者</div>'; return; } var max=us[0].kb||1; var rows=us.map(function(x){ var w=Math.max(2,Math.round((x.kb/max)*100)); var size=(x.mb>=0.1)?(x.mb+' MB'):(x.kb+' KB'); return '<tr><td style="max-width:180px;overflow:hidden;text-overflow:ellipsis">'+esc(x.email)+'</td><td>'+size+'</td><td>'+x.entry_count+'</td><td>'+(x.created_at||'—')+'</td><td style="width:64px"><span class="tbar" style="width:'+w+'%"></span></td></tr>'; }).join(''); el('ousers').innerHTML='<table><tr><th>Email</th><th>空間</th><th>航班</th><th>加入</th><th></th></tr>'+rows+'</table>'; }
 // 一開頁就自動查詢（無密碼）
 load();
+ologinInit();
 </script>
 </body></html>`);
 });

@@ -3776,7 +3776,8 @@ function _plDaysAgoStr(n) {
   return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2);
 }
 function _plAnSum(entries) {
-  var s = { flights: 0, block: 0, air: 0, night: 0, pic: 0, sic: 0 };
+  var s = { flights: 0, block: 0, air: 0, night: 0, pic: 0, sic: 0,
+            dist: 0, dayTO: 0, nightTO: 0, dayLdg: 0, nightLdg: 0, autoland: 0, appr: 0, pax: 0, duty: 0 };
   for (var i = 0; i < entries.length; i++) {
     var e = entries[i];
     s.flights++;
@@ -3785,8 +3786,32 @@ function _plAnSum(entries) {
     s.night += e.night_minutes || 0;
     s.pic += (e.pic_minutes != null) ? e.pic_minutes : (e.position === 'PIC' ? (e.block_minutes || 0) : 0);
     s.sic += (e.sic_minutes != null) ? e.sic_minutes : (_plIsSicPos(e.position) ? (e.block_minutes || 0) : 0);
+    s.dist += Number(e.distance_nm) || 0;
+    s.dayTO += e.day_takeoffs || 0; s.nightTO += e.night_takeoffs || 0;
+    s.dayLdg += e.day_landings || 0; s.nightLdg += e.night_landings || 0;
+    s.autoland += e.autolands || 0;
+    s.appr += (Array.isArray(e.approaches) ? e.approaches.length : 0);
+    s.pax += e.pax_count || 0;
+    s.duty += e.total_duty_minutes || 0;
   }
   return s;
+}
+// V1.3.30：LogTen 風明細數字（起降 / 距離 / Approach / Pax / Duty）—— 給右欄選中組用
+function _plAnDetailCard(s) {
+  function rw(label, val) { return '<div style="display:flex;justify-content:space-between;padding:3px 0;font-size:.76em"><span style="color:var(--muted)">' + label + '</span><span style="font-weight:700;font-variant-numeric:tabular-nums">' + val + '</span></div>'; }
+  function sec(t) { return '<div style="font-size:.58em;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin:11px 0 3px">' + t + '</div>'; }
+  return '<div style="background:var(--bar-bg-soft);border-radius:10px;padding:13px;margin-bottom:9px">' +
+    sec('Flight 飛行') +
+    rw('Block', _plMinToHHMM(s.block)) + rw('Air', _plMinToHHMM(s.air)) +
+    rw('Distance (NM)', Math.round(s.dist).toLocaleString()) +
+    sec('Landings 起降') +
+    rw('Day T/O', s.dayTO) + rw('Night T/O', s.nightTO) +
+    rw('Day Ldg', s.dayLdg) + rw('Night Ldg', s.nightLdg) +
+    rw('Autolands', s.autoland) +
+    sec('Operations / Pax') +
+    rw('Approaches', s.appr) + rw('Total Pax', s.pax.toLocaleString()) +
+    rw('Total Duty', _plMinToHHMM(s.duty)) +
+  '</div>';
 }
 // codex P1：'All' 組要把「起始累計（brought forward）」加進去 —— 舊版總計含它（走 _pl.stats），
 // 不加會讓有匯入結轉時數的人總時數憑空少一截。其他組（時間/公司/機型）不含（結轉無日期/機尾）。
@@ -3909,6 +3934,7 @@ function _plRenderAnalyzeContent() {
       '<div style="font-size:.7em;color:var(--muted)">' + selSum.flights + ' flights</div>' +
     '</div>' +
     _plAnBarsCard('總計 Totals', _plMinToHHMM(selSum.block) + ' block', selSum, '') +
+    _plAnDetailCard(selSum) +
     '<div style="font-size:.62em;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin:14px 4px 7px">' + (dim === 'company' ? '依公司 By Company' : '依機型 By Type') + '（點看明細）</div>' +
     _plAnDimCards(sel.entries, dim) +
     (sel.id === 'all' ? _plRenderMonthlyChart(entries) + _plRenderOpeningSim() : '');
@@ -3919,9 +3945,8 @@ function _plRenderAnalyzeContent() {
       '@media(max-width:760px){.pl-an-wrap{flex-direction:column}.pl-an-left{flex:none}}' +
     '</style>' +
     '<div style="padding:10px 14px">' +
-      '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">' +
+      '<div style="margin-bottom:12px">' +
         '<div style="font-size:1em;font-weight:700">📊 Analyze</div>' +
-        '<div style="font-size:.65em;color:var(--muted)">全部已飛資料 · All flown data</div>' +
       '</div>' +
       '<div class="pl-an-wrap">' +
         '<div class="pl-an-left">' + leftHtml + '</div>' +
