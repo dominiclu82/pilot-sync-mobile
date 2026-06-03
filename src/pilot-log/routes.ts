@@ -52,8 +52,8 @@ import { getAirportDbJs } from '../spa/js-airport-db.js';
 
 // ── 版本（比照 CrewSync / Morning：每次推版必更新；SW cache 名稱跟著走） ────
 // 本機 preview build 會暫時加 -tNN 後綴方便對版；推正式版前拿掉只留乾淨版號。
-export const PILOT_LOG_VERSION = 'V2.0.01';
-const PILOT_LOG_CACHE = 'pilotlog-v2-0-01';
+export const PILOT_LOG_VERSION = 'V2.0.02';
+const PILOT_LOG_CACHE = 'pilotlog-v2-0-02';
 
 export const pilotLogRouter = express.Router();
 
@@ -337,6 +337,11 @@ if (document.readyState !== 'loading') pilotLogInit();
 function _renderPilotLogChangelog(): string {
   return `
     <div class="pl-cl-v">${PILOT_LOG_VERSION}</div>
+    <div class="pl-cl-txt">
+      <b>班表匯入防呆 + ⭐ 星宇航點。</b><b>(1) 班表查重：</b>匯入班表時，<b>同一天＋同班號＋同起降</b>若已經有「已完成」的紀錄（LogTen / 手動）→ <b>自動略過</b>，不再重複建草稿（解決「當月已飛已記、又匯班表」變兩筆的問題）；匯入結果會顯示「已記略過 X 筆」。<b>(2) 月份預設：</b>列出可匯月份時，<b>當月及未來月份預設勾</b>，只有過去月份預設不勾（標「過去」）、要補再自己勾。<b>(3) ⭐ 星宇航點：</b>Airports 頁多了「<b>✈️ 飛過的 / ⭐ 星宇</b>」切換 —— ⭐ 星宇會列出<b>全部 37 個定期航點</b>（含還沒飛過的，依 Ops Spec C-6），點進去就能看任一機場的資訊／衛星地圖；飛過的列表裡星宇航點也標 ⭐。<br>
+      <b>Roster import guard + ⭐ Starlux airports.</b> (1) Importing a roster now skips a flight if the same date + flight no. + route already has a completed record (LogTen/manual) — no more duplicate drafts; the result shows how many were skipped. (2) The month picker checks the current month and all future months by default; only past months are unchecked. (3) Airports gains a ✈️ Flown / ⭐ Starlux toggle — ⭐ lists all 37 scheduled airports (incl. ones you haven't flown yet) so you can open any for info/satellite map; flown airports that are Starlux destinations are marked ⭐ too.
+    </div>
+    <div class="pl-cl-v old">V2.0.01</div>
     <div class="pl-cl-txt">
       <b>🗺️ Airports 大改版 —— 機場資訊中心。</b>Places 改名 <b>Airports</b>，整頁重做成 LogTen 風格：<b>寬螢幕三欄</b>（機場列表 ｜ 機場資訊 ｜ 航班）、<b>iPhone 三層</b>（列表 → 機場 → 航班，關閉自動回上一層）。點任一機場，中間看得到完整資訊：<b>ICAO / IATA / 城市 / 國家全名 / 磁偏角（WMM 模型算）/ 時區（UTC offset + 當地即時時間）/ 座標 / 海拔 / 跑道</b>，再附一張<b>衛星地圖</b>（看得到真實跑道、航廈）＋ 可寫<b>機場筆記</b>。航班用 <b>All / 🛫 Dep / 🛬 Arr</b> 分頁分開看出發/抵達。<br>
       <b>🗺️ Airports — a full airport hub (major update).</b> Places is renamed <b>Airports</b> and rebuilt LogTen-style: three columns on wide screens (airport list ｜ info ｜ flights), three levels on iPhone (list → airport → flight, back returns to the previous level). Tap any airport for full details: ICAO / IATA / city / full country name / magnetic variation (WMM) / timezone (UTC offset + live local time) / coordinates / elevation / runways, plus a satellite map (real runways &amp; terminals) and an editable note. Flights split into All / 🛫 Dep / 🛬 Arr tabs.

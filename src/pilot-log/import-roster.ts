@@ -54,6 +54,7 @@ export interface ImportRosterResult {
   skipped_confirmed: number;
   marked_removed: number;
   crew_added?: number;   // V1.3.12：自動加進通訊錄的組員數
+  skipped_existing?: number;   // V2.0.02：同航班已有「已完成」紀錄（LogTen/手動）→ 略過不重複建草稿
 }
 
 function normalizePosition(raw?: string): 'PIC' | 'SIC' | 'OBSERVER' | null {
@@ -297,7 +298,7 @@ export async function importRoster(
   }
 
   const result: ImportRosterResult = {
-    inserted: 0, updated: 0, skipped_confirmed: 0, marked_removed: 0, crew_added: 0,
+    inserted: 0, updated: 0, skipped_confirmed: 0, marked_removed: 0, crew_added: 0, skipped_existing: 0,
   };
 
   const seenRefs: string[] = [];
@@ -359,11 +360,31 @@ export async function importRoster(
         if (!contacts.has(key)) contacts.set(key, { staffId: sid || undefined, name: m.name });
       }
 
-      // 查現有
+      // 查現有（同 roster source_ref）
       const existing = await pool.query(
         `SELECT id, status FROM pilot_log_entries WHERE user_id = $1 AND source = 'roster' AND source_ref = $2`,
         [userId, sourceRef]
       );
+
+      // V2.0.02（codex P1）：跨來源查重 —— 不管 roster 這邊有沒有都查。同一天+班號+起降若已有「已完成」
+      // 紀錄（LogTen/手動，confirmed 或有實際落地 in_utc），就不要 roster 草稿重複：既有 roster draft/removed
+      // 直接刪掉（完成版取代）、沒有就不建。confirmed 的 roster 不動（使用者已親自確認）。
+      {
+        const dup = await pool.query(
+          `SELECT id FROM pilot_log_entries
+           WHERE user_id = $1 AND flight_date = $2 AND flight_no = $3 AND origin = $4 AND dest = $5
+             AND source <> 'roster' AND (status = 'confirmed' OR in_utc IS NOT NULL)
+           LIMIT 1`,
+          [userId, fDate, f.flightNo, f.origin, f.dest]
+        );
+        if (dup.rows.length > 0) {
+          if (existing.rows.length > 0 && existing.rows[0].status !== 'confirmed') {
+            await pool.query('DELETE FROM pilot_log_entries WHERE id = $1', [existing.rows[0].id]);
+          }
+          result.skipped_existing = (result.skipped_existing || 0) + 1;
+          continue;
+        }
+      }
 
       // V1.3.36：班表帶的組員人數當 crew_count 初值（POB 用）。只在「新建」帶入，
       // 之後使用者可自行編輯（含補後艙空服）；re-import 不覆寫，保留使用者改的值。

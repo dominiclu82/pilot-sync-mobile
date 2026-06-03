@@ -2361,13 +2361,18 @@ async function _plRosterListMonths() {
     box.innerHTML = '<div style="background:#3b2f0a;border:1px solid #f59e0b;color:#fbbf24;border-radius:6px;padding:8px 10px;font-size:.72em">' + _plEsc(hint) + '</div>';
     return;
   }
+  // V2.0.02（codex P3）：當月及「以後」（含更遠的未來班表）都預設勾；只有「過去」（早於當月）才不勾，
+  // 避免誤匯一堆過去草稿，又不會把有效的未來班表漏掉。
+  var _now = new Date();
+  var _cm = _now.getFullYear() + '-' + String(_now.getMonth() + 1).padStart(2, '0');
   var checks = months.map(function(mo) {
+    var on = (mo >= _cm);
     return '<label style="display:flex;align-items:center;gap:8px;padding:5px 6px;font-size:.8em;cursor:pointer">' +
-      '<input type="checkbox" class="pl-rmonth" value="' + _plEsc(mo) + '" checked style="width:16px;height:16px">' +
-      '<span>' + _plEsc(mo) + '</span></label>';
+      '<input type="checkbox" class="pl-rmonth" value="' + _plEsc(mo) + '"' + (on ? ' checked' : '') + ' style="width:16px;height:16px">' +
+      '<span>' + _plEsc(mo) + (on ? '' : ' <span style="color:var(--muted);font-size:.85em">（過去 · 預設不勾）</span>') + '</span></label>';
   }).join('');
   box.innerHTML =
-    '<div style="font-size:.68em;color:var(--muted);margin-bottom:4px">勾選要匯入的月份（預設全選）：</div>' +
+    '<div style="font-size:.68em;color:var(--muted);margin-bottom:4px">勾選要匯入的月份（<b>當月及未來預設勾</b>，過去月份預設不勾、要補再自己勾）：</div>' +
     '<div style="display:flex;gap:8px;margin-bottom:4px">' +
       '<button onclick="_plRosterMonthsAll(true)" style="background:transparent;border:1px solid var(--border,#334155);color:var(--muted);border-radius:6px;padding:3px 8px;font-size:.68em;cursor:pointer">全選</button>' +
       '<button onclick="_plRosterMonthsAll(false)" style="background:transparent;border:1px solid var(--border,#334155);color:var(--muted);border-radius:6px;padding:3px 8px;font-size:.68em;cursor:pointer">全不選</button>' +
@@ -2409,6 +2414,7 @@ async function _plImportRoster(selectedMonths) {
         _plToast('班表匯入（雲端）' + (Array.isArray(sj.months) && sj.months.length ? '〔' + sj.months.join(',') + '〕' : '') +
           '：新增 ' + (sj.inserted || 0) + ' / 更新 ' + (sj.updated || 0) +
           ' / 已完成略過 ' + (sj.skipped_confirmed || 0) +
+          (sj.skipped_existing ? ' / 已記略過 ' + sj.skipped_existing : '') +
           ' / 標 removed ' + (sj.marked_removed || 0) +
           (sj.crew_added ? ' / 通訊錄 +' + sj.crew_added : ''));
         await _plRefreshMain();
@@ -2468,6 +2474,7 @@ async function _plImportRoster(selectedMonths) {
     var j = await r.json();
     _plToast('班表匯入：新增 ' + (j.inserted || 0) + ' / 更新 ' + (j.updated || 0) +
       ' / 已完成略過 ' + (j.skipped_confirmed || 0) +
+      (j.skipped_existing ? ' / 已記略過 ' + j.skipped_existing : '') +
       ' / 標 removed ' + (j.marked_removed || 0) +
       (j.crew_added ? ' / 通訊錄 +' + j.crew_added : ''));
     await _plRefreshMain();
@@ -2815,6 +2822,14 @@ function _plRenderAircraftList() {
 }
 
 // === SECTION: Places（V1.3.36）— 仿 LogTen「依機場查航班」══════════════════════
+// V2.0.02：星宇定期航點 37 個（Ops Spec C-6，4 機隊去重）。Airports 列表標 ⭐ 區分官方航點。
+var _PL_STARLUX_APTS = {
+  RCTP:1,RCMQ:1, VHHH:1,VMMC:1,
+  RJAA:1,RJBB:1,RJBE:1,RJCC:1,RJCH:1,RJFF:1,RJFT:1,RJGG:1,RJOT:1,RJSS:1,ROAH:1,RORS:1,
+  RKPK:1, RPLC:1,RPLL:1,RPVM:1, VTBS:1,VTCC:1,
+  VVNB:1,VVPQ:1,VVTS:1,VVDN:1, WIII:1,WSSS:1,WMKP:1,WMKK:1,
+  KLAX:1,KONT:1,KPHX:1,KSEA:1,KSFO:1, PGUM:1, LKPR:1
+};
 // 把任一碼（ICAO/IATA）正規化成 canonical ICAO（查不到就原樣大寫）
 function _plCanonApt(code) {
   var c = String(code == null ? '' : code).toUpperCase().trim();
@@ -2841,17 +2856,23 @@ async function _plOpenPlaces() {
   await Promise.all([_plFetchAircraftEntries(), _plLoadAirports()]);
   _plRenderPlaces();
 }
-// 機場聚合列表（你飛過的機場 + 出發/抵達數），依航班數排序
-function _plAirportAgg() {
+// 機場聚合列表。mode='flown'（你飛過的，依航班數）｜'starlux'（全 37 星宇航點，含沒飛過的，依代碼）
+function _plAirportAgg(mode) {
   var map = {};
   function bump(code, dir) { var k = _plCanonApt(code); if (!k) return; if (!map[k]) map[k] = { key: k, dep: 0, arr: 0 }; map[k][dir]++; }
   _plPlacesEntries().forEach(function(e) { if (e.origin) bump(e.origin, 'dep'); if (e.dest) bump(e.dest, 'arr'); });
-  var list = Object.keys(map).map(function(k) {
-    var m = map[k]; m.total = m.dep + m.arr;
+  function decorate(k) {
+    var m = map[k] || { key: k, dep: 0, arr: 0 };
+    m.total = m.dep + m.arr;
     var info = _plAptInfo(k);
     m.full = info ? info.name : ''; m.city = info ? info.city : ''; m.cc = info ? info.cc : '';
     return m;
-  });
+  }
+  if (mode === 'starlux') {
+    // V2.0.02：全部 37 星宇航點（沒飛過的 count=0 也列），依 ICAO 排（區域聚集）
+    return Object.keys(_PL_STARLUX_APTS).map(decorate).sort(function(a, b) { return a.key.localeCompare(b.key); });
+  }
+  var list = Object.keys(map).map(decorate);
   list.sort(function(a, b) { return b.total - a.total || a.key.localeCompare(b.key); });
   return list;
 }
@@ -2861,10 +2882,11 @@ function _plAptListHtml(list, sel) {
   return list.map(function(m) {
     var on = (m.key === sel);
     var sub = [m.city, m.cc].filter(Boolean).join(' · ');
+    var star = _PL_STARLUX_APTS[m.key] ? '<span title="星宇定期航點 · Starlux scheduled" style="color:#f59e0b">⭐</span> ' : '';
     return '<div onclick="_plSelectAirport(\'' + _plJs(m.key) + '\')" style="background:' + (on ? 'rgba(59,130,246,.18)' : 'var(--card)') + ';border:1px solid ' + (on ? '#3b82f6' : 'transparent') + ';border-radius:8px;padding:9px 12px;margin-bottom:6px;cursor:pointer;display:flex;align-items:center;gap:10px">' +
       '<div style="min-width:54px;font-weight:800;font-size:1em">' + _plEsc(_plAptFmt(m.key)) + '</div>' +
       '<div style="flex:1;min-width:0">' +
-        '<div style="font-size:.78em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + _plEsc(m.full || '—') + '</div>' +
+        '<div style="font-size:.78em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + star + _plEsc(m.full || '—') + '</div>' +
         (sub ? '<div style="font-size:.64em;color:var(--muted)">' + _plEsc(sub) + '</div>' : '') +
       '</div>' +
       '<div style="text-align:right;font-size:.6em;color:var(--muted);white-space:nowrap;line-height:1.3">↗' + m.dep + ' ↘' + m.arr + '<br><b style="color:var(--text);font-size:1.5em">' + m.total + '</b></div>' +
@@ -2877,23 +2899,32 @@ function _plAptIsWide() { return (typeof window !== 'undefined' && window.innerW
 function _plRenderPlaces() {
   var c = document.getElementById('pilotlog-content');
   if (!c) return;
-  var list = _plAirportAgg();
+  var mode = _pl.aptMode || 'flown';
+  var list = _plAirportAgg(mode);
   var wide = _plAptIsWide();
   var sel = _pl.airportSel;
   if (sel && !list.some(function(m) { return m.key === sel; })) sel = null;
   if (wide && !sel && list.length) sel = list[0].key;
   _pl.airportSel = sel;
 
+  function modeTab(mo, lbl) {
+    var on = (mode === mo);
+    return '<button onclick="_plSetAptMode(\'' + mo + '\')" style="background:' + (on ? '#3b82f6' : 'transparent') + ';color:' + (on ? '#fff' : 'var(--muted)') + ';border:1px solid ' + (on ? '#3b82f6' : 'var(--border,#334155)') + ';border-radius:6px;padding:4px 10px;font-size:.72em;font-weight:600;cursor:pointer">' + lbl + '</button>';
+  }
   var header = '<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap">' +
     '<button onclick="_plRenderMain()" style="background:transparent;border:0;color:var(--text);font-size:1.2em;cursor:pointer">←</button>' +
     '<div style="font-size:1em;font-weight:700">🗺️ Airports</div>' +
+    modeTab('flown', '✈️ 飛過的') + modeTab('starlux', '⭐ 星宇') +
     '<div style="flex:1"></div>' +
     '<div style="font-size:.72em;color:var(--muted)">' + list.length + ' airports</div>' +
   '</div>';
+  var hint = (mode === 'starlux'
+    ? '星宇 37 個定期航點（含還沒飛過的）。點任一筆看資訊 / 衛星地圖 / 航班。'
+    : '你飛過的機場，依航班數排序。點任一筆看進出航班。');
 
   if (!wide) {
     c.innerHTML = '<div style="padding:10px 14px">' + header +
-      '<div style="font-size:.68em;color:var(--muted);margin-bottom:10px">你飛過的機場，依航班數排序。點任一筆看進出航班。<br>Airports you\'ve flown — tap to see flights.</div>' +
+      '<div style="font-size:.68em;color:var(--muted);margin-bottom:10px">' + hint + '</div>' +
       _plAptListHtml(list, null) + '</div>';
     return;
   }
@@ -2914,6 +2945,8 @@ function _plSelectAirport(key) {
   if (_plAptIsWide()) { _pl.airportSel = key; _plRenderPlaces(); }
   else { _plOpenPlaceDetail(key); }
 }
+// V2.0.02：切換「飛過的 / ⭐ 星宇航點」清單
+function _plSetAptMode(mode) { _pl.aptMode = mode; _pl.airportSel = null; _plRenderPlaces(); }
 // V1.3.39：機場個人筆記（Note）—— 先存本機 localStorage（server 同步版之後做）
 // V2.0.01（codex P2）：per-user key —— 同裝置多帳號 / 登出登入不會互相看到/蓋掉筆記
 function _plAptNoteKey() { return 'pilotlog_apt_notes_' + ((_pl.user && _pl.user.id) || 'anon'); }
