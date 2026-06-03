@@ -34,4 +34,9 @@ src/spa/js-roster-grid.js
 src/spa/js-subtab-reorder.js
 src/spa/js-weather.js
 src/spa/styles.js
+src/spa/js-airport-db.js
+src/pilot-log/*.js
 seed-test.cjs
+
+# OurAirports source CSV (dev-only, regenerate airport-db.js from it)
+_oa.csv

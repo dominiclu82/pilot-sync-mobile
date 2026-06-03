@@ -136,6 +136,10 @@ export async function ensureTables(): Promise<boolean> {
     // V1.3.28：position 加 SFO / FO（co-pilot 細分，都當 SIC 計）。inline CHECK 只對新表生效，既有 prod 表用 ALTER 換 constraint。
     await pool.query(`ALTER TABLE pilot_log_entries DROP CONSTRAINT IF EXISTS pilot_log_entries_position_check`).catch(() => {});
     await pool.query(`ALTER TABLE pilot_log_entries ADD CONSTRAINT pilot_log_entries_position_check CHECK (position IN ('PIC','SIC','SFO','FO','OBSERVER'))`).catch(() => {});
+    // V1.3.36：起飛/落地跑道（LogTen Departure/Arrival Runway 對應）+ 組員數（POB = crew_count + pax_count）。
+    await pool.query(`ALTER TABLE pilot_log_entries ADD COLUMN IF NOT EXISTS dep_rwy TEXT`).catch(() => {});
+    await pool.query(`ALTER TABLE pilot_log_entries ADD COLUMN IF NOT EXISTS arr_rwy TEXT`).catch(() => {});
+    await pool.query(`ALTER TABLE pilot_log_entries ADD COLUMN IF NOT EXISTS crew_count INT`).catch(() => {});
 
     await pool.query(`
       CREATE TABLE IF NOT EXISTS pilot_aircraft (

@@ -736,11 +736,12 @@ function _plRenderToolbar() {
       '<button onclick="_plOpenImport()" style="background:#6366f1;' + actBtn + '">📥 Import</button>' +
       '<button onclick="_plOpenAircraft()" style="background:#0ea5e9;' + actBtn + '">✈️ Aircraft</button>' +
       '<button onclick="_plOpenCrew()" style="background:#a855f7;' + actBtn + '">👥 Crew</button>' +
+      '<button onclick="_plOpenPlaces()" style="background:#f59e0b;' + actBtn + '">🗺️ Places</button>' +
       // V1.3.29：機場碼切換比照日夜間 —— 顯示「按了會切到的目標」
       '<button onclick="_plToggleAptFmt()" style="background:transparent;color:var(--muted);border:1px solid var(--border,#334155);border-radius:6px;padding:6px 10px;font-size:.72em;cursor:pointer" title="機場碼顯示切換：按一下切到另一種">🌐 ' + (_plAptFmtCur() === 'iata' ? 'ICAO' : 'IATA') + '</button>' +
       // V1.3.33：一鍵上鎖 / 解鎖全部航班
-      '<button onclick="_plLockAll(true)" style="background:transparent;color:var(--muted);border:1px solid var(--border,#334155);border-radius:6px;padding:6px 10px;font-size:.72em;cursor:pointer" title="一鍵上鎖全部航班">🔒 全鎖</button>' +
-      '<button onclick="_plLockAll(false)" style="background:transparent;color:var(--muted);border:1px solid var(--border,#334155);border-radius:6px;padding:6px 10px;font-size:.72em;cursor:pointer" title="一鍵解鎖全部航班">🔓 全開</button>' +
+      '<button onclick="_plLockAll(true)" style="background:transparent;color:var(--muted);border:1px solid var(--border,#334155);border-radius:6px;padding:6px 10px;font-size:.72em;cursor:pointer" title="一鍵上鎖全部航班 · Lock every flight">🔒 Lock all</button>' +
+      '<button onclick="_plLockAll(false)" style="background:transparent;color:var(--muted);border:1px solid var(--border,#334155);border-radius:6px;padding:6px 10px;font-size:.72em;cursor:pointer" title="一鍵解鎖全部航班 · Unlock every flight">🔓 Unlock all</button>' +
     '</div>' +
     '<div style="display:flex;flex-wrap:wrap;gap:4px;align-items:center">' +
       filterBtn('all', 'All') + filterBtn('done', '已完成 Done') +
@@ -969,7 +970,7 @@ function _plBlankEntry() {
     distance_nm: null, on_duty_utc: null, off_duty_utc: null, total_duty_minutes: null,
     crew: {}, approaches: [],
     day_takeoffs: 0, night_takeoffs: 0, day_landings: 0, night_landings: 0, autolands: 0,
-    pax_count: null, sid: '', star: '', remarks: '',
+    pax_count: null, crew_count: null, dep_rwy: '', arr_rwy: '', sid: '', star: '', remarks: '',
   };
 }
 
@@ -1035,6 +1036,7 @@ function _plEditorField(label, name, type, opts) {
   } else if (type === 'textarea') {
     input = '<textarea ' + attrs + ' rows="2">' + _plEsc(val) + '</textarea>';
   } else if (type === 'number') {
+    if (opts.readonly) attrs = 'id="ple-' + name + '" readonly tabindex="-1" style="width:100%;background:var(--card);color:var(--muted);border:1px solid var(--border,#334155);border-radius:6px;padding:6px 8px;font-size:.78em;font-weight:700"';
     input = '<input type="number" ' + attrs + ' value="' + _plEsc(val) + '" step="' + (opts.step || '1') + '">';
   } else if (type === 'date') {
     // 從 server 來的可能是 'YYYY-MM-DD' 純字串、'YYYY-MM-DDTHH:mm:ss.sssZ' ISO，
@@ -1262,12 +1264,60 @@ var _PL_IATA2ICAO = {
   YYZ: 'CYYZ', YVR: 'CYVR', LHR: 'EGLL', CDG: 'LFPG', AMS: 'EHAM', VIE: 'LOWW', BNE: 'YBBN',
 };
 var _PL_ICAO2IATA = (function() { var m = {}; for (var k in _PL_IATA2ICAO) m[_PL_IATA2ICAO[k]] = k; return m; })();
-// code（ICAO 或 IATA）→ 座標：先試 ICAO，再 IATA→ICAO
+
+// ── 全域機場資料庫（懶載入 ~4176 個機場；給 Places / From-To 名稱 / 全機場座標 & 碼換算） ──
+var _plAirportsP = null;
+function _plLoadAirports() {
+  if (window._PL_AIRPORTS) return Promise.resolve(window._PL_AIRPORTS);
+  if (_plAirportsP) return _plAirportsP;
+  _plAirportsP = new Promise(function(res) {
+    var s = document.createElement('script');
+    s.src = '/pilot-log/airport-db.js'; s.async = true;
+    s.onload = function() { _PL_GAPT_IDX = null; res(window._PL_AIRPORTS || []); };
+    s.onerror = function() { _plAirportsP = null; res([]); };   // 失敗可重試
+    (document.head || document.documentElement).appendChild(s);
+  });
+  return _plAirportsP;
+}
+var _PL_GAPT_IDX = null;   // code(ICAO|IATA) → [icao,iata,name,city,cc,lat,lon]
+function _plGAptIdx() {
+  if (_PL_GAPT_IDX) return _PL_GAPT_IDX;
+  var m = {}, arr = window._PL_AIRPORTS || [];
+  for (var i = 0; i < arr.length; i++) {
+    var a = arr[i];
+    if (a[0] && !m[a[0]]) m[a[0]] = a;   // ICAO
+    if (a[1] && !m[a[1]]) m[a[1]] = a;   // IATA
+  }
+  _PL_GAPT_IDX = m; return m;
+}
+// 機場詳情（名稱/城市/國家/座標）—— 需先 _plLoadAirports() 載入，否則回 null
+function _plAptInfo(code) {
+  var c = String(code == null ? '' : code).toUpperCase().trim();
+  if (!c || !window._PL_AIRPORTS) return null;
+  var idx = _plGAptIdx();
+  var a = idx[c] || (_PL_IATA2ICAO[c] && idx[_PL_IATA2ICAO[c]]);
+  if (!a) return null;
+  return { icao: a[0], iata: a[1], name: a[2], city: a[3], cc: a[4], lat: a[5], lon: a[6] };
+}
+// 機場顯示名稱（「City Name」風格，查無回空字串）
+function _plAptName(code) {
+  var i = _plAptInfo(code);
+  if (!i) return '';
+  if (i.city && i.name && i.name.indexOf(i.city) < 0) return i.city + ' · ' + i.name;
+  return i.name || i.city || '';
+}
+
+// code（ICAO 或 IATA）→ 座標：先試小表，再 IATA→ICAO，最後全域庫 fallback
 function _plApt(code) {
   var c = String(code == null ? '' : code).toUpperCase().trim();
   if (_PL_APT[c]) return _PL_APT[c];
   var icao = _PL_IATA2ICAO[c];
-  return icao ? _PL_APT[icao] : null;
+  if (icao && _PL_APT[icao]) return _PL_APT[icao];
+  if (window._PL_AIRPORTS) {   // 全域庫已載入 → 任何機場都查得到座標
+    var idx = _plGAptIdx(), g = idx[c] || (icao && idx[icao]);
+    if (g && g[5] != null && g[6] != null) return [g[5], g[6]];
+  }
+  return null;
 }
 // 顯示格式（使用者自選 icao/iata，預設 icao）→ 把任一碼轉成選的格式；查不到就原樣
 function _plAptFmt(code) {
@@ -1275,7 +1325,14 @@ function _plAptFmt(code) {
   if (!c) return c;
   var fmt = 'icao';
   try { fmt = localStorage.getItem('pilotlog_apt_fmt') || 'icao'; } catch (e) {}
-  return fmt === 'iata' ? (_PL_ICAO2IATA[c] || c) : (_PL_IATA2ICAO[c] || c);
+  if (fmt === 'iata') {
+    if (_PL_ICAO2IATA[c]) return _PL_ICAO2IATA[c];
+    if (window._PL_AIRPORTS) { var gi = _plGAptIdx()[c]; if (gi && gi[1]) return gi[1]; }
+    return c;
+  }
+  if (_PL_IATA2ICAO[c]) return _PL_IATA2ICAO[c];
+  if (window._PL_AIRPORTS) { var go = _plGAptIdx()[c]; if (go && go[0]) return go[0]; }
+  return c;
 }
 function _plAptFmtCur() { try { return localStorage.getItem('pilotlog_apt_fmt') || 'icao'; } catch (e) { return 'icao'; } }
 function _plToggleAptFmt() {
@@ -1510,7 +1567,40 @@ function _plRefilterTails() {
   }).join('');
 }
 // 每次 _plRenderEditor 重畫後重掛 input/change 監聽（DOM 換新）
+// V1.3.36：POB = Crew + Pax 自動加總（唯讀顯示）
+function _plPobSync() {
+  var pob = document.getElementById('ple-pob_display');
+  if (!pob) return;
+  var cv = parseInt((document.getElementById('ple-crew_count') || {}).value, 10);
+  var pv = parseInt((document.getElementById('ple-pax_count') || {}).value, 10);
+  if (isNaN(cv) && isNaN(pv)) { pob.value = ''; return; }
+  pob.value = (isNaN(cv) ? 0 : cv) + (isNaN(pv) ? 0 : pv);
+}
+// V1.3.36：From/To 機場名稱顯示（全域庫載入後才有名字）
+function _plUpdateAptNames() {
+  var row = document.getElementById('ple-aptname-row');
+  if (!row) return;
+  var o = (document.getElementById('ple-origin') || {}).value || '';
+  var d = (document.getElementById('ple-dest') || {}).value || '';
+  var on = _plAptName(o), dn = _plAptName(d);
+  if (!on && !dn) { row.innerHTML = ''; return; }
+  row.innerHTML =
+    (on ? '<b>' + _plEsc(o.toUpperCase()) + '</b> ' + _plEsc(on) : '') +
+    (on && dn ? '　→　' : '') +
+    (dn ? '<b>' + _plEsc(d.toUpperCase()) + '</b> ' + _plEsc(dn) : '');
+}
+
 function _plWireEditor() {
+  _plPobSync();                                   // 初始 POB（locked 也要顯示）
+  _plUpdateAptNames();
+  // codex P2：機場庫是非同步載入。庫到之前 _plApt() 查不到非硬編機場座標 → night/起降被算成空。
+  // 庫載入後除了補機場名，還要補算一次（只在仍是同一筆、未上鎖時；_plAutoCalcTimes 會尊重手動鎖值）。
+  var _wireEntryId = _pl.editing ? _pl.editing.id : null;
+  _plLoadAirports().then(function() {
+    if (!_pl.editing || _pl.editing.id !== _wireEntryId) return;   // 已換/關編輯器 → 不動
+    _plUpdateAptNames();
+    if (!_pl.editing.is_locked) _plAutoCalcTimes();
+  });
   // V1.3.08：上鎖的航班 — 所有編輯欄位 disabled；Lock 按鈕仍可用以解鎖
   if (_pl.editing && _pl.editing.is_locked) {
     ['input', 'select', 'textarea'].forEach(function(tag) {
@@ -1541,6 +1631,15 @@ function _plWireEditor() {
   ['origin', 'dest', 'flight_date'].forEach(function(n) {
     var el = document.getElementById('ple-' + n);
     if (el) el.addEventListener('input', _plAutoCalcTimes);
+  });
+  // V1.3.36：Crew/Pax 變更 → 重算 POB；origin/dest 變更 → 更新機場名稱列
+  ['crew_count', 'pax_count'].forEach(function(n) {
+    var el = document.getElementById('ple-' + n);
+    if (el) el.addEventListener('input', _plPobSync);
+  });
+  ['origin', 'dest'].forEach(function(n) {
+    var el = document.getElementById('ple-' + n);
+    if (el) el.addEventListener('input', _plUpdateAptNames);
   });
   // V1.3.23：LogTen / Wader 匯入帶來的 night / PIC / SIC 是「正本」（pilot 自己記的）→ 上鎖，
   // 標記為手動，之後就算編輯 OOOI / 航線也不會被自動重算蓋掉。Roster / manual 不鎖（要靠自動算）。
@@ -1624,7 +1723,9 @@ function _plRenderEditor(target) {
         _plFieldRow(2, _plEditorField('Sim Type（FFS/FTD）', 'sim_type', 'text') + _plEditorField('Sim Time', 'sim_minutes', 'hhmm-dur')) +
       '</div>' +
       _plFieldRow(2, _plEditorField('Date', 'flight_date', 'date') + _plEditorField('Flight #', 'flight_no', 'text')) +
-      '<div id="ple-route-row" style="display:' + (_plEntryType(e) === 'sim' ? 'none' : '') + '">' + _plFieldRow(2, _plEditorField('From (' + (_plAptFmtCur() === 'iata' ? 'IATA' : 'ICAO') + ')', 'origin', 'text', { fmt: _plAptFmt }) + _plEditorField('To (' + (_plAptFmtCur() === 'iata' ? 'IATA' : 'ICAO') + ')', 'dest', 'text', { fmt: _plAptFmt })) + '</div>' +
+      '<div id="ple-route-row" style="display:' + (_plEntryType(e) === 'sim' ? 'none' : '') + '">' + _plFieldRow(2, _plEditorField('From (' + (_plAptFmtCur() === 'iata' ? 'IATA' : 'ICAO') + ')', 'origin', 'text', { fmt: _plAptFmt }) + _plEditorField('To (' + (_plAptFmtCur() === 'iata' ? 'IATA' : 'ICAO') + ')', 'dest', 'text', { fmt: _plAptFmt })) +
+        '<div id="ple-aptname-row" style="font-size:.6em;color:var(--muted);margin:-4px 0 8px;line-height:1.4"></div></div>' +
+      _plFieldRow(2, _plEditorField('Dep Rwy', 'dep_rwy', 'text') + _plEditorField('Arr Rwy', 'arr_rwy', 'text')) +
       _plFieldRow(3, _plEditorField('Aircraft Type', 'aircraft_type', 'select', { options: typeOptions }) +
         _plEditorField('Tail #（清單來自 ✈️ Aircraft）', 'tail_no', 'select', { options: tailOptions }) +
         _plEditorField('Position', 'position', 'select', { options: ['', 'PIC', 'SIC', 'SFO', 'FO', 'OBSERVER'] })) +
@@ -1659,7 +1760,15 @@ function _plRenderEditor(target) {
       '<div style="font-size:.7em;font-weight:700;color:var(--muted);text-transform:uppercase;margin-bottom:8px">Take-offs / Landings</div>' +
       _plFieldRow(2, _plEditorField('Day T/O', 'day_takeoffs', 'number') + _plEditorField('Night T/O', 'night_takeoffs', 'number')) +
       _plFieldRow(2, _plEditorField('Day Ldg', 'day_landings', 'number') + _plEditorField('Night Ldg', 'night_landings', 'number')) +
-      _plFieldRow(2, _plEditorField('Autolands', 'autolands', 'number') + _plEditorField('Pax', 'pax_count', 'number')) +
+      _plFieldRow(1, _plEditorField('Autolands', 'autolands', 'number')) +
+    '</div>' +
+
+    // ── Persons / POB：Crew（含後艙空服）+ Pax → POB 機上總人數（自動加總）──
+    '<div style="margin-top:12px;background:var(--card);border-radius:10px;padding:12px">' +
+      '<div style="font-size:.7em;font-weight:700;color:var(--muted);text-transform:uppercase;margin-bottom:8px">Persons on Board · POB</div>' +
+      _plFieldRow(3, _plEditorField('Crew 組員', 'crew_count', 'number') + _plEditorField('Pax 乘客', 'pax_count', 'number') +
+        _plEditorField('POB 總人數', 'pob_display', 'number', { readonly: true })) +
+      '<div style="font-size:.6em;color:var(--muted);margin-top:4px">Crew 含後艙空服員（非上面組員姓名欄）。POB = Crew + Pax 自動加總。<br>Crew = total incl. cabin (not the named-crew fields). POB = Crew + Pax, auto-summed.</div>' +
     '</div>' +
 
     // ── Crew：駕駛艙 PIC / Crew2-4，客艙 CIC / OBS（V1.3.12；欄位名可在 Crew 頁自訂）──
@@ -1753,6 +1862,9 @@ async function _plSaveEntry() {
     night_landings: _plReadField('night_landings', 'number') || 0,
     autolands: _plReadField('autolands', 'number') || 0,
     pax_count: _plReadField('pax_count', 'number'),
+    crew_count: _plReadField('crew_count', 'number'),
+    dep_rwy: _plReadField('dep_rwy'),
+    arr_rwy: _plReadField('arr_rwy'),
     sid: _plReadField('sid'),
     star: _plReadField('star'),
     remarks: _plReadField('remarks'),
@@ -2526,6 +2638,13 @@ function _plToggleAircraftType(key) {
   _pl.aircraftCollapsed[key] = !collapsed;                  // 收合→展開(false)、展開→收合(true)
   _plRenderAircraftList();
 }
+// V1.3.36：機型子分組收合（預設展開 → render 用 ===true 才收合，這裡同義反轉）
+function _plToggleAircraftSubtype(key) {
+  _pl.aircraftCollapsed = _pl.aircraftCollapsed || {};
+  var collapsed = (_pl.aircraftCollapsed[key] === true);
+  _pl.aircraftCollapsed[key] = !collapsed;
+  _plRenderAircraftList();
+}
 
 async function _plOpenAircraft() {
   var c = document.getElementById('pilotlog-content');
@@ -2579,7 +2698,7 @@ function _plRenderAircraftList() {
   }
   var rows = '';
   if (_pl.aircraft.length === 0) {
-    rows = '<div style="text-align:center;color:var(--muted);padding:30px;font-size:.85em">機尾庫是空的。點 <b>+ Add Aircraft</b> 手動加，或從 <b>📥 Import</b> 上傳 LogTen Aircraft 檔。<br>No aircraft yet — tap <b>+ Add Aircraft</b>, or upload a LogTen Aircraft file via <b>📥 Import</b>.</div>';
+    rows = '<div style="text-align:center;color:var(--muted);padding:30px;font-size:.85em">機尾庫是空的。<b>📋 Pick from list</b>（台灣機隊一鍵加）、<b>✏️ Add manually</b>，或 <b>📥 Import</b> 上傳 LogTen Aircraft 檔。<br>No aircraft yet — 📋 pick from the built-in list, ✏️ add manually, or 📥 import a LogTen Aircraft file.</div>';
   } else {
     // V1.3.27：改依「公司（operator）」分組（user：之前按機型、且全展開）；預設全收合，tail 下標機型。
     var groups = {}, order = [];
@@ -2614,11 +2733,18 @@ function _plRenderAircraftList() {
       tOrder.sort(function(x, y) { return typeFlights(y) - typeFlights(x); });   // 飛最多的機型在前
       tOrder.forEach(function(tl) {
         var tlist = byType[tl];
-        rows += '<div style="display:flex;align-items:baseline;gap:6px;margin:8px 0 4px 4px">' +
+        // V1.3.36：機型子分組也可收合（key 用「公司|機型」；預設展開，明確收合才藏）
+        var tkey = 'T:' + gop + '|' + tl;
+        var tCollapsed = (_pl.aircraftCollapsed[tkey] === true);
+        var tArrow = tCollapsed ? '▶' : '▼';
+        rows += '<div onclick="_plToggleAircraftSubtype(\'' + _plJs(tkey) + '\')" ' +
+          'style="display:flex;align-items:baseline;gap:6px;margin:8px 0 4px 4px;cursor:pointer;user-select:none">' +
+          '<span style="font-size:.6em;color:var(--muted);width:12px;display:inline-block;text-align:center">' + tArrow + '</span>' +
           '<span style="font-size:.76em;font-weight:700;color:var(--accent)">' + _plEsc(tl) + '</span>' +
           '<span style="flex:1"></span>' +
           '<span style="font-size:.58em;color:var(--muted)">' + tlist.length + ' tail · ' + typeFlights(tl) + ' flights</span>' +
         '</div>';
+        rows += '<div style="display:' + (tCollapsed ? 'none' : 'block') + '">';
         tlist.sort(function(a, b) { return (tailCount[b.tail_no] || 0) - (tailCount[a.tail_no] || 0); });
         tlist.forEach(function(ac) {
           var count = tailCount[ac.tail_no] || 0;
@@ -2628,6 +2754,7 @@ function _plRenderAircraftList() {
             '<div style="font-size:.72em;color:var(--text);text-align:right;white-space:nowrap">' + count + ' flights</div>' +
           '</div>';
         });
+        rows += '</div>';   // close per-type collapsible wrapper
       });
       rows += '</div>';   // close per-company collapsible wrapper
     }
@@ -2642,11 +2769,115 @@ function _plRenderAircraftList() {
         '<button onclick="_plExportAircraftCsv()" style="background:transparent;color:var(--muted);border:1px solid var(--border,#334155);border-radius:6px;padding:5px 9px;font-size:.72em;cursor:pointer">⬇️ Aircraft</button>' +
         '<button onclick="_plExportTypesCsv()" style="background:transparent;color:var(--muted);border:1px solid var(--border,#334155);border-radius:6px;padding:5px 9px;font-size:.72em;cursor:pointer">⬇️ Types</button>' +
         // V1.3.35：從台灣機隊挑機（內建現役機隊，點選一鍵加入）
-        '<button onclick="_plOpenFleetPicker()" style="background:#6366f1;color:#fff;border:0;border-radius:6px;padding:6px 12px;font-size:.78em;font-weight:700;cursor:pointer">🇹🇼 從機隊</button>' +
-        '<button onclick="_plOpenAddAircraft()" style="background:#10b981;color:#fff;border:0;border-radius:6px;padding:6px 12px;font-size:.78em;font-weight:700;cursor:pointer">+ Add Aircraft</button>' +
+        '<button onclick="_plOpenFleetPicker()" title="從內建台灣機隊清單挑機加入" style="background:#6366f1;color:#fff;border:0;border-radius:6px;padding:6px 12px;font-size:.78em;font-weight:700;cursor:pointer">📋 Pick from list</button>' +
+        '<button onclick="_plOpenAddAircraft()" title="手動輸入一架新機（清單沒有的）" style="background:#10b981;color:#fff;border:0;border-radius:6px;padding:6px 12px;font-size:.78em;font-weight:700;cursor:pointer">✏️ Add manually</button>' +
       '</div>' +
       '<div style="font-size:.7em;color:var(--muted);margin-bottom:10px">依機型分組，共 ' + _pl.aircraft.length + ' 架；點任一筆查看用過這架的所有航班。<br>Grouped by type — tap a tail to see every flight on it.</div>' +
       rows +
+    '</div>';
+}
+
+// === SECTION: Places（V1.3.36）— 仿 LogTen「依機場查航班」══════════════════════
+// 把任一碼（ICAO/IATA）正規化成 canonical ICAO（查不到就原樣大寫）
+function _plCanonApt(code) {
+  var c = String(code == null ? '' : code).toUpperCase().trim();
+  if (!c) return '';
+  var info = _plAptInfo(c);
+  if (info && info.icao) return info.icao;
+  if (_PL_IATA2ICAO[c]) return _PL_IATA2ICAO[c];
+  return c;
+}
+// 列入 Places 的航班：只算「已飛」（排除未來班表草稿/未完成），非 SIM、且有起或訖。
+// codex P2：原本納入所有 scheduled legs → 匯入下個月班表後，沒去過的機場就冒出來。
+function _plPlacesEntries() {
+  return (_pl.aircraftEntries || []).filter(function(e) {
+    if (_plEntryType(e) === 'sim') return false;   // SIM 無機場
+    if (!_plEntryIsDone(e)) return false;          // 只算已飛
+    return !!(e.origin || e.dest);
+  });
+}
+async function _plOpenPlaces() {
+  var c = document.getElementById('pilotlog-content');
+  if (!c) return;
+  c.innerHTML = '<div style="text-align:center;color:var(--muted);padding:40px;font-size:.85em">載入機場… · Loading places…</div>';
+  await Promise.all([_plFetchAircraftEntries(), _plLoadAirports()]);
+  _plRenderPlaces();
+}
+function _plRenderPlaces() {
+  var c = document.getElementById('pilotlog-content');
+  if (!c) return;
+  var map = {};   // canon ICAO → {key, dep, arr}
+  function bump(code, dir) {
+    var k = _plCanonApt(code); if (!k) return;
+    if (!map[k]) map[k] = { key: k, dep: 0, arr: 0 };
+    map[k][dir]++;
+  }
+  _plPlacesEntries().forEach(function(e) {
+    if (e.origin) bump(e.origin, 'dep');
+    if (e.dest) bump(e.dest, 'arr');
+  });
+  var list = Object.keys(map).map(function(k) {
+    var m = map[k]; m.total = m.dep + m.arr;
+    var info = _plAptInfo(k);
+    m.full = info ? info.name : ''; m.city = info ? info.city : ''; m.cc = info ? info.cc : '';
+    return m;
+  });
+  list.sort(function(a, b) { return b.total - a.total || a.key.localeCompare(b.key); });
+
+  var rows;
+  if (list.length === 0) {
+    rows = '<div style="text-align:center;color:var(--muted);padding:30px;font-size:.85em">還沒有任何航班機場資料。 · No airports yet.</div>';
+  } else {
+    rows = list.map(function(m) {
+      var sub = [m.city, m.cc].filter(Boolean).join(' · ');
+      return '<div onclick="_plOpenPlaceDetail(\'' + _plJs(m.key) + '\')" style="background:var(--card);border-radius:8px;padding:10px 12px;margin-bottom:6px;cursor:pointer;display:flex;align-items:center;gap:10px">' +
+        '<div style="min-width:58px;font-weight:800;font-size:1.05em">' + _plEsc(_plAptFmt(m.key)) + '</div>' +
+        '<div style="flex:1;min-width:0">' +
+          '<div style="font-size:.8em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + _plEsc(m.full || '—') + '</div>' +
+          (sub ? '<div style="font-size:.66em;color:var(--muted)">' + _plEsc(sub) + '</div>' : '') +
+        '</div>' +
+        '<div style="text-align:right;font-size:.64em;color:var(--muted);white-space:nowrap;line-height:1.3">↗ ' + m.dep + ' · ↘ ' + m.arr + '<br><b style="color:var(--text);font-size:1.5em">' + m.total + '</b></div>' +
+      '</div>';
+    }).join('');
+  }
+  c.innerHTML =
+    '<div style="padding:10px 14px">' +
+      '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap">' +
+        '<button onclick="_plRenderMain()" style="background:transparent;border:0;color:var(--text);font-size:1.2em;cursor:pointer">←</button>' +
+        '<div style="font-size:1em;font-weight:700">🗺️ Places</div>' +
+        '<div style="flex:1"></div>' +
+        '<div style="font-size:.72em;color:var(--muted)">' + list.length + ' airports</div>' +
+      '</div>' +
+      '<div style="font-size:.7em;color:var(--muted);margin-bottom:10px">你飛過的機場，依航班數排序。↗ 出發 · ↘ 抵達。點任一筆查看進出這機場的所有航班。<br>Airports you\'ve flown, by frequency — tap one to see every flight to/from it.</div>' +
+      rows +
+    '</div>';
+}
+function _plOpenPlaceDetail(key) {
+  var c = document.getElementById('pilotlog-content');
+  if (!c) return;
+  var flights = _plPlacesEntries().filter(function(e) {
+    return _plCanonApt(e.origin) === key || _plCanonApt(e.dest) === key;
+  });
+  flights.sort(function(a, b) { return (b.flight_date || '').localeCompare(a.flight_date || ''); });
+  var info = _plAptInfo(key);
+  var disp = _plAptFmt(key);
+  var head = '<div style="background:var(--card);border-radius:8px;padding:12px;margin-bottom:10px;font-size:.78em">' +
+    '<div style="font-weight:700;font-size:1.1em">' + _plEsc(disp) +
+      (info && info.icao && info.iata ? ' <span style="color:var(--muted);font-size:.78em">' + _plEsc(info.icao) + ' / ' + _plEsc(info.iata) + '</span>' : '') + '</div>' +
+    (info ? '<div style="color:var(--muted);margin-top:4px">' + _plEsc([info.name, info.city, info.cc].filter(Boolean).join(' · ')) + '</div>' : '') +
+  '</div>';
+  var rows = flights.length === 0
+    ? '<div style="text-align:center;color:var(--muted);padding:30px;font-size:.85em">沒有航班。 · No flights.</div>'
+    : flights.map(_plRenderEntryRow).join('');
+  c.innerHTML =
+    '<div style="padding:10px 14px">' +
+      '<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">' +
+        '<button onclick="_plOpenPlaces()" style="background:transparent;border:0;color:var(--text);font-size:1.2em;cursor:pointer">←</button>' +
+        '<div style="font-size:1em;font-weight:700">' + _plEsc(disp) + ' / Flights</div>' +
+        '<div style="flex:1"></div>' +
+        '<div style="font-size:.72em;color:var(--muted)">' + flights.length + ' flights</div>' +
+      '</div>' +
+      head + rows +
     '</div>';
 }
 
@@ -2978,17 +3209,24 @@ async function _plSubmitAddAircraft() {
 
 // V1.3.35：台灣 6 航司「逐架現役」機隊（user 2026-06-03 提供，截自 xmyzl）。只給選機 picker 用，
 // 不參與推算（推算仍走 _PL_TW_REG 範圍，涵蓋退役機）。tail = B-xxxxx 後 5 碼。資料會過時，需可更新。
+// 連號區間 → 陣列（給內建機隊用連續機號範圍，省得逐個列、也不易打錯）
+function _plSeq(a, b) { var r = []; for (var i = a; i <= b; i++) r.push(i); return r; }
+// 星宇用「已配發機號完整範圍」（含尚未交機的預留號），picker 會標示未交機；其餘航司為現役機。
 var _PL_TW_FLEET = [
-  { op: 'Starlux', type: 'A321neo', code: 'A21N', tails: [58201,58202,58203,58204,58205,58206,58207,58208,58209,58210,58211,58212,58213] },
-  { op: 'Starlux', type: 'A330-900', code: 'A339', tails: [58301,58302,58303,58304,58305,58306,58307,58308] },
-  { op: 'Starlux', type: 'A350-900', code: 'A359', tails: [58501,58502,58503,58504,58505,58506,58507,58508,58509,58510] },
-  { op: 'Starlux', type: 'A350-1000', code: 'A35K', tails: [58551,58552] },
+  // inSvc = 目前已交機的最大機號（含以下為現役、超過為尚未交機的預留號，picker 以虛線標示）
+  { op: 'Starlux', type: 'A321neo', code: 'A21N', tails: _plSeq(58201, 58227), inSvc: 58213 },
+  { op: 'Starlux', type: 'A330-900', code: 'A339', tails: _plSeq(58301, 58311), inSvc: 58308 },
+  { op: 'Starlux', type: 'A350-900', code: 'A359', tails: _plSeq(58501, 58510), inSvc: 58510 },
+  { op: 'Starlux', type: 'A350-1000', code: 'A35K', tails: _plSeq(58551, 58568), inSvc: 58552 },
+  { op: 'Starlux', type: 'A350F', code: 'A35F', tails: _plSeq(58581, 58590), inSvc: 0 },
   { op: 'EVA Air', type: 'A321-200', code: 'A321', tails: [16208,16209,16211,16212,16213,16215,16216,16217,16218,16219,16220,16221,16222,16223,16225,16226,16227] },
-  { op: 'EVA Air', type: 'A330-300', code: 'A333', tails: [16331,16332,16333,16335,16336,16337,16338,16339,16340] },
-  { op: 'EVA Air', type: 'B777-300ER', code: 'B77W', tails: [16705,16706,16707,16708,16709,16710,16711,16712,16713,16715,16716,16717,16718,16719,16720,16721,16722,16723,16725,16726,16727,16728,16729,16730,16731,16732,16733,16735,16736,16737,16738,16739,16740] },
-  { op: 'EVA Air', type: 'B777F', code: 'B77F', tails: [16781,16782,16783,16785,16786,16787,16788,16789,16790] },
-  { op: 'EVA Air', type: 'B787-9', code: 'B789', tails: [17881,17882,17883,17885,17886,17887,17888,17889,17890] },
-  { op: 'EVA Air', type: 'B787-10', code: 'B78X', tails: [17801,17802,17803,17805,17806,17807,17808,17809,17810,17811,17812,17813,17815] },
+  // 長榮：依民航局「註冊編號法則」完整配發範圍（含尚未交機，picker 標 ⏳）。inSvc = 目前已交最大機號。
+  { op: 'EVA Air', type: 'A330-300', code: 'A333', tails: _plSeq(16331, 16340), inSvc: 16340 },
+  { op: 'EVA Air', type: 'A350-1000', code: 'A35K', tails: _plSeq(16501, 16527), inSvc: 16500 },
+  { op: 'EVA Air', type: 'B777-300ER', code: 'B77W', tails: _plSeq(16701, 16740), inSvc: 16740 },
+  { op: 'EVA Air', type: 'B777F', code: 'B77F', tails: _plSeq(16781, 16790), inSvc: 16790 },
+  { op: 'EVA Air', type: 'B787-9', code: 'B789', tails: _plSeq(17881, 17899), inSvc: 17890 },
+  { op: 'EVA Air', type: 'B787-10', code: 'B78X', tails: _plSeq(17801, 17819), inSvc: 17815 },
   { op: 'China Airlines', type: 'A321neo', code: 'A21N', tails: [18101,18102,18103,18105,18106,18107,18108,18109,18110,18111,18112,18115,18116,18117,18118,18120,18121,18122,18123] },
   { op: 'China Airlines', type: 'A330-300', code: 'A333', tails: [18306,18307,18308,18309,18311,18315,18316,18317,18358,18359,18360,18361] },
   { op: 'China Airlines', type: 'A350-900', code: 'A359', tails: [18901,18902,18903,18905,18906,18907,18908,18909,18910,18912,18915,18916,18917,18918,18919,18920] },
@@ -3008,6 +3246,18 @@ function _plFleetMake(type, code) {
   if (/^B/.test(type) || /^B/.test(code)) return 'Boeing';
   return '';
 }
+// V1.3.36：fleet picker 公司收合 —— 預設只展開星宇（Starlux），其他公司收合（user 是星宇機師）。
+function _plFleetOpCollapsed(op) {
+  _pl.fleetCollapsed = _pl.fleetCollapsed || {};
+  if (_pl.fleetCollapsed[op] === undefined) return op !== 'Starlux';   // 未設：星宇展開、其他收合
+  return _pl.fleetCollapsed[op];
+}
+function _plToggleFleetOp(op) {
+  _pl.fleetCollapsed = _pl.fleetCollapsed || {};
+  _pl.fleetCollapsed[op] = !_plFleetOpCollapsed(op);
+  _plOpenFleetPicker();
+}
+
 // V1.3.35：從台灣機隊挑機 → 一鍵加進自己的機尾庫（依公司 → 機型 → 點機尾）
 function _plOpenFleetPicker() {
   var c = document.getElementById('pilotlog-content');
@@ -3018,18 +3268,33 @@ function _plOpenFleetPicker() {
   var body = '';
   opOrder.forEach(function(op) {
     var total = byOp[op].reduce(function(s, f) { return s + f.tails.length; }, 0);
-    body += '<div style="font-size:.95em;font-weight:800;margin:16px 0 4px">' + _plEsc(op) + ' <span style="font-size:.62em;color:var(--muted);font-weight:400">· ' + total + ' 架</span></div>';
+    var opCollapsed = _plFleetOpCollapsed(op);   // V1.3.36：公司可收合，預設只星宇展開
+    body += '<div onclick="_plToggleFleetOp(\'' + _plJs(op) + '\')" style="display:flex;align-items:baseline;gap:8px;margin:16px 0 4px;cursor:pointer;user-select:none">' +
+      '<span style="font-size:.66em;color:var(--muted);width:14px;display:inline-block;text-align:center">' + (opCollapsed ? '▶' : '▼') + '</span>' +
+      '<span style="font-size:.95em;font-weight:800">' + _plEsc(op) + '</span>' +
+      '<span style="font-size:.62em;color:var(--muted)">· ' + total + ' 架</span></div>' +
+      '<div style="display:' + (opCollapsed ? 'none' : 'block') + '">';
     byOp[op].forEach(function(f) {
-      body += '<div style="font-size:.72em;font-weight:700;color:var(--accent);margin:8px 0 5px">' + _plEsc(f.type) + ' <span style="color:var(--muted);font-weight:400">· ' + f.tails.length + '</span></div>' +
+      // 機型小標：現役 / 含預留（未交機）數。inSvc 未設 = 全現役。
+      var delivered = f.inSvc != null ? f.tails.filter(function(n) { return n <= f.inSvc; }).length : f.tails.length;
+      var future = f.tails.length - delivered;
+      body += '<div style="font-size:.72em;font-weight:700;color:var(--accent);margin:8px 0 5px">' + _plEsc(f.type) +
+        ' <span style="color:var(--muted);font-weight:400">· ' + delivered + ' in svc' + (future > 0 ? ' · ' + future + ' reserved' : '') + '</span></div>' +
         '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:4px">';
       f.tails.forEach(function(n) {
         var tail = 'B-' + n;
-        body += have[tail.toUpperCase()]
-          ? '<span style="background:#10b981;color:#fff;border:1px solid #10b981;border-radius:6px;padding:6px 9px;font-size:.74em">✓ ' + tail + '</span>'
-          : '<button onclick="_plPickFleetAircraft(\'' + tail + '\',\'' + _plJs(f.op) + '\',\'' + _plJs(f.type) + '\',\'' + _plJs(f.code) + '\')" style="background:var(--card);color:var(--text);border:1px solid var(--border,#334155);border-radius:6px;padding:6px 9px;font-size:.74em;cursor:pointer">' + tail + '</button>';
+        var isFuture = (f.inSvc != null && n > f.inSvc);   // 尚未交機的預留機號
+        if (have[tail.toUpperCase()]) {
+          body += '<button onclick="_plUnpickFleetAircraft(\'' + tail + '\')" title="點一下可取消加入（剛加錯、且還沒有航班時）" style="background:#10b981;color:#fff;border:1px solid #10b981;border-radius:6px;padding:6px 9px;font-size:.74em;cursor:pointer">✓ ' + tail + '</button>';
+        } else if (isFuture) {
+          body += '<button onclick="_plPickFleetAircraft(\'' + tail + '\',\'' + _plJs(f.op) + '\',\'' + _plJs(f.type) + '\',\'' + _plJs(f.code) + '\')" title="尚未交機的預留機號 · Not yet delivered" style="background:transparent;color:var(--muted);border:1px dashed var(--border,#475569);border-radius:6px;padding:6px 9px;font-size:.74em;cursor:pointer">⏳ ' + tail + '</button>';
+        } else {
+          body += '<button onclick="_plPickFleetAircraft(\'' + tail + '\',\'' + _plJs(f.op) + '\',\'' + _plJs(f.type) + '\',\'' + _plJs(f.code) + '\')" style="background:var(--card);color:var(--text);border:1px solid var(--border,#334155);border-radius:6px;padding:6px 9px;font-size:.74em;cursor:pointer">' + tail + '</button>';
+        }
       });
       body += '</div>';
     });
+    body += '</div>';   // close per-company collapsible
   });
   c.innerHTML =
     '<div style="padding:10px 14px">' +
@@ -3037,7 +3302,7 @@ function _plOpenFleetPicker() {
         '<button onclick="_plOpenAircraft()" style="background:transparent;border:0;color:var(--text);font-size:1.2em;cursor:pointer">←</button>' +
         '<div style="font-size:1em;font-weight:700">🇹🇼 從機隊挑機 · Pick from fleet</div>' +
       '</div>' +
-      '<div style="font-size:.7em;color:var(--muted);margin-bottom:6px">台灣 6 家現役機隊。點一架加進你的機尾庫（綠色 ✓ = 已在庫）。退役機不在此清單，仍可用 + Add Aircraft 手動加。<br>Tap a tail to add it to your aircraft registry.</div>' +
+      '<div style="font-size:.7em;color:var(--muted);margin-bottom:6px">台灣 6 家機隊。點一架加進你的機尾庫（綠色 ✓ = 已在庫；<b>加錯再點 ✓ 可取消</b>，前提是還沒有航班）。<b>⏳ 虛線 = 尚未交機的預留機號</b>（清單含未來機，仍可先選入）。退役機不在此清單，可用 + Add Aircraft 手動加。<br>Tap to add; ✓ to remove (no-flights only); ⏳ dashed = reserved tail not yet delivered.</div>' +
       body +
     '</div>';
 }
@@ -3055,6 +3320,27 @@ async function _plPickFleetAircraft(tail, op, type, code) {
     var ej = await res.json().catch(function() { return {}; });
     _plToast('加入失敗：' + (ej.error || res.status), 'error');
   } catch (e) { _plToast('加入失敗', 'error'); }
+}
+// V1.3.36：取消加入（剛加錯）。本地先擋有航班的，後端再嚴格擋一次（409）。
+async function _plUnpickFleetAircraft(tail) {
+  var up = String(tail).toUpperCase();
+  var used = (_pl.aircraftEntries || []).some(function(e) {
+    return e.tail_no && String(e.tail_no).toUpperCase() === up;
+  });
+  if (used) { _plToast(tail + ' 已有航班紀錄，不能取消', 'error'); return; }
+  if (!confirm(tail + ' 從機尾庫移除？（剛加錯可移除；之後仍可從機隊再加回）')) return;
+  try {
+    var res = await _plApi('/api/pilot-log/aircraft/' + encodeURIComponent(tail), { method: 'DELETE' });
+    if (res.status === 200) {
+      await _plFetchAll();
+      _plToast('已移除 ' + tail);
+      _plOpenFleetPicker();   // 重畫，該 tail 變回可點加入
+      return;
+    }
+    var ej = await res.json().catch(function() { return {}; });
+    if (res.status === 409) { _plToast(tail + ' 已有 ' + (ej.flights || '') + ' 筆航班，不能取消', 'error'); return; }
+    _plToast('移除失敗：' + (ej.error || res.status), 'error');
+  } catch (e) { _plToast('移除失敗', 'error'); }
 }
 
 // === SECTION: crew（V1.0.11） ═══════════════════════════════════════════════════
@@ -4354,6 +4640,10 @@ async function pilotLogInit() {
 
   // 有待上傳就先同步（_plSync 排空後內部會 _plFetchAll 對帳）；無待上傳則為 no-op
   _plSync();
+
+  // codex P2：背景預載全域機場庫（~317KB，不擋首屏）。預載後主頁/Report 的 IATA↔ICAO 切換、
+  // 機場名稱、夜航座標才能涵蓋全世界機場，不必先進 Places/編輯器才生效。
+  try { _plLoadAirports(); } catch (e) {}
 }
 
 // V1.3：同步觸發點 — 一回連 / 切回前景就自動補送 outbox（只註冊一次）

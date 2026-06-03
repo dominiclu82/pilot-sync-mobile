@@ -48,11 +48,12 @@ import { importRoster } from './import-roster.js';
 import { getTotals, getRollingTotals, getByAircraftType, getOpeningBalance, getSimTotals } from './stats.js';
 import { loadCredentials } from '../config.js';
 import { getSpaPilotLogJs } from '../spa/js-pilot-log.js';
+import { getAirportDbJs } from '../spa/js-airport-db.js';
 
 // ── 版本（比照 CrewSync / Morning：每次推版必更新；SW cache 名稱跟著走） ────
 // 本機 preview build 會暫時加 -tNN 後綴方便對版；推正式版前拿掉只留乾淨版號。
-export const PILOT_LOG_VERSION = 'V1.3.35';
-const PILOT_LOG_CACHE = 'pilotlog-v1-3-35';
+export const PILOT_LOG_VERSION = 'V1.3.36';
+const PILOT_LOG_CACHE = 'pilotlog-v1-3-36';
 
 export const pilotLogRouter = express.Router();
 
@@ -335,6 +336,11 @@ if (document.readyState !== 'loading') pilotLogInit();
 function _renderPilotLogChangelog(): string {
   return `
     <div class="pl-cl-v">${PILOT_LOG_VERSION}</div>
+    <div class="pl-cl-txt">
+      <b>飛行明細升級（跑道 + POB）＋依機場查航班＋內建全球機場庫。</b><b>(1) 明細新欄位：</b>加 <b>Dep / Arr 跑道</b>（SIM/DHD 也能記）；新增「<b>POB 機上人數</b>」區——填 <b>Crew（含後艙空服）＋ Pax 自動算出 POB</b>；Pax 從起降區搬到這裡更合理。匯入班表會自動帶組員人數當 Crew 初值，你可自己改（重匯不會蓋掉你改的）。<b>(2) 🗺️ Places 依機場查航班：</b>工具列新增 Places，列出你<b>飛過的機場</b>（依航班數排序，↗ 出發 / ↘ 抵達），點任一機場看所有進出航班；只算已飛，未來班表不會混進來。<b>(3) 內建全球機場庫（約 4,200 個）：</b>編輯航班時 From / To <b>自動顯示機場名稱</b>；IATA ↔ ICAO 切換、夜航判斷現在<b>全世界機場都認得</b>。<b>(4) 機隊挑機可反悔：</b>從機隊加錯了，再點一下綠色 ✓ 可取消（前提是還沒有航班；已有航班的會擋住）。<b>(5) Aircraft 機型也可收合：</b>機尾庫的機型子分組現在也能各自收合。<br>
+      <b>Flight detail upgrade (runways + POB) + view flights by airport + built-in global airport database.</b> (1) Detail fields: added Dep / Arr runway (works for SIM/DHD too); a new POB section — enter Crew (incl. cabin) + Pax and POB is auto-summed; Pax moved here from the takeoffs/landings block. Roster import seeds the crew count (editable; re-import won't overwrite your edits). (2) 🗺️ Places: a new toolbar button lists the airports you've flown (by frequency, ↗ departures / ↘ arrivals); tap one to see every flight to/from it — flown flights only, future roster legs excluded. (3) Built-in global airport DB (~4,200): From/To now show airport names, and IATA↔ICAO switching plus night calc work for airports worldwide. (4) Fleet picker is reversible: tap a green ✓ to remove a tail you added by mistake (only if it has no flights yet). (5) Aircraft type sub-groups are now individually collapsible.
+    </div>
+    <div class="pl-cl-v old">V1.3.35</div>
     <div class="pl-cl-txt">
       <b>內建台灣機隊，一鍵挑機加進機尾庫。</b>✈️ Aircraft 頁多了「<b>🇹🇼 從機隊</b>」：列出台灣 6 家航司（星宇 / 長榮 / 華航 / 華信 / 立榮 / 虎航）的<b>現役機隊</b>，依公司 → 機型分組，<b>點一架就加進你的機尾庫</b>（自動帶公司 + 機型，不用手 key）。已在庫的標綠色 ✓。退役機不在這份現役清單，仍可用「+ Add Aircraft」手動加（你飛過的退役機，公司/機型一樣推算得出來）。<br>
       <b>Built-in Taiwan fleets — tap to add aircraft.</b> The ✈️ Aircraft page gains 🇹🇼 Pick from fleet: browse the current fleets of Taiwan's six carriers (Starlux / EVA / China Airlines / Mandarin / UNI / Tigerair) by airline → type, and tap a tail to add it to your registry (operator + type auto-filled). Already-added tails show a green ✓. Retired aircraft aren't in this current-fleet list — use "+ Add Aircraft" for those.
@@ -697,6 +703,13 @@ pilotLogRouter.get('/pilot-log/icon.svg', (_req, res) => {
   res.send(_PILOT_LOG_ICON_SVG);
 });
 
+// ── /pilot-log/airport-db.js — 全域機場資料庫（懶載入，~317KB，SW + 瀏覽器快取） ──
+pilotLogRouter.get('/pilot-log/airport-db.js', (_req, res) => {
+  res.setHeader('Content-Type', 'application/javascript; charset=utf-8');
+  res.setHeader('Cache-Control', 'public, max-age=604800'); // 7 天
+  res.send(getAirportDbJs());
+});
+
 // ── /pilot-log/sw.js — 獨立 Service Worker（scope: /pilot-log） ──────────────
 pilotLogRouter.get('/pilot-log/sw.js', (_req, res) => {
   res.setHeader('Content-Type', 'application/javascript');
@@ -946,7 +959,9 @@ const EDITABLE_FIELDS = [
   'on_duty_utc', 'off_duty_utc', 'total_duty_minutes',
   'crew', 'approaches',
   'day_takeoffs', 'night_takeoffs', 'day_landings', 'night_landings', 'autolands',
-  'pax_count', 'sid', 'star', 'remarks',
+  'pax_count', 'crew_count',                        // V1.3.36：crew_count（POB = crew_count + pax_count）
+  'dep_rwy', 'arr_rwy',                             // V1.3.36：起飛/落地跑道
+  'sid', 'star', 'remarks',
 ] as const;
 
 const JSONB_FIELDS = new Set(['crew', 'approaches']);
@@ -981,11 +996,23 @@ pilotLogRouter.post('/api/pilot-log/entries', requireAuth, async (req: AuthedReq
     p++;
   }
 
-  const r = await pool.query(
-    `INSERT INTO pilot_log_entries (${cols.join(',')}) VALUES (${placeholders.join(',')}) RETURNING *`,
-    vals
-  );
-  res.json({ entry: r.rows[0] });
+  try {
+    const r = await pool.query(
+      `INSERT INTO pilot_log_entries (${cols.join(',')}) VALUES (${placeholders.join(',')}) RETURNING *`,
+      vals
+    );
+    res.json({ entry: r.rows[0] });
+  } catch (e: any) {
+    // 修：原本無 try/catch — 任何約束/型別錯誤都變 500，client 把 5xx 當「暫時性」永遠重送 →
+    //     outbox 卡死（使用者回報「無法上傳」）。改成：23xxx 約束違反 / 22xxx 資料格式錯 = 永久性
+    //     → 回 400，client 丟出佇列 + toast，不再卡死；其餘（連線/資源）= 暫時性 → 維持 500 保留重送。
+    const code = e && e.code ? String(e.code) : '';
+    console.error('[pilot-log] entry insert failed:', code, e && e.message, '| fields:', cols.join(','));
+    if (code.startsWith('23') || code.startsWith('22')) {
+      return res.status(400).json({ error: 'invalid_entry', detail: e && e.message, code });
+    }
+    return res.status(500).json({ error: 'insert_failed' });
+  }
 });
 
 // ── Entries: update ──────────────────────────────────────────────────────────
@@ -1030,10 +1057,21 @@ pilotLogRouter.put('/api/pilot-log/entries/:id', requireAuth, async (req: Authed
   sets.push('updated_at = NOW()');
   vals.push(req.params.id, req.pilotUserId);
 
-  const r = await pool.query(
-    `UPDATE pilot_log_entries SET ${sets.join(', ')} WHERE id = $${p} AND user_id = $${p + 1} RETURNING *`,
-    vals
-  );
+  let r;
+  try {
+    r = await pool.query(
+      `UPDATE pilot_log_entries SET ${sets.join(', ')} WHERE id = $${p} AND user_id = $${p + 1} RETURNING *`,
+      vals
+    );
+  } catch (e: any) {
+    // 同 POST：約束/格式錯（23xxx/22xxx）→ 400（client 丟出佇列，不卡死永遠重送）；其餘 → 500 暫時性。
+    const code = e && e.code ? String(e.code) : '';
+    console.error('[pilot-log] entry update failed:', code, e && e.message, '| sets:', sets.join(','));
+    if (code.startsWith('23') || code.startsWith('22')) {
+      return res.status(400).json({ error: 'invalid_entry', detail: e && e.message, code });
+    }
+    return res.status(500).json({ error: 'update_failed' });
+  }
   if (r.rows.length === 0) return res.status(404).json({ error: 'not_found' });
   res.json({ entry: r.rows[0] });
 });
@@ -1528,6 +1566,32 @@ pilotLogRouter.put('/api/pilot-log/aircraft/:tail', requireAuth, async (req: Aut
   }
 });
 
+// V1.3.36：移除機尾庫的一架（給 fleet picker「加錯了取消」用）。
+// 安全閥：有航班用過這架（tail_no 對得到）→ 409 拒絕，避免孤立歷史航班；零航班才可刪。
+pilotLogRouter.delete('/api/pilot-log/aircraft/:tail', requireAuth, async (req: AuthedRequest, res) => {
+  const pool = getPool();
+  if (!pool || !(await ensureTables())) return res.status(503).json({ error: 'database_unavailable' });
+  const userId = req.pilotUserId!;
+  const tail_no = String(req.params.tail || '').trim().toUpperCase();
+  if (!tail_no) return res.status(400).json({ error: 'missing_tail_no' });
+  try {
+    const used = await pool.query(
+      `SELECT COUNT(*)::int AS n FROM pilot_log_entries WHERE user_id = $1 AND UPPER(tail_no) = $2`,
+      [userId, tail_no]
+    );
+    if (used.rows[0].n > 0) return res.status(409).json({ error: 'aircraft_in_use', flights: used.rows[0].n });
+    const r = await pool.query(
+      `DELETE FROM pilot_aircraft WHERE user_id = $1 AND UPPER(tail_no) = $2`,
+      [userId, tail_no]
+    );
+    if (r.rowCount === 0) return res.status(404).json({ error: 'not_found' });
+    res.json({ deleted: r.rowCount, ok: true });
+  } catch (e: any) {
+    console.error('[pilot-log] aircraft delete failed:', e.message);
+    res.status(500).json({ error: 'delete_failed' });
+  }
+});
+
 // ── Stats ────────────────────────────────────────────────────────────────────
 pilotLogRouter.get('/api/pilot-log/stats', requireAuth, async (req: AuthedRequest, res) => {
   const userId = req.pilotUserId!;
@@ -1678,8 +1742,43 @@ pilotLogRouter.get('/api/pilot-log/oops/stats', async (req, res) => {
       const w = await pool.query(`SELECT COALESCE(SUM(size),0)::bigint AS bytes FROM pg_ls_waldir()`);
       walBytes = Number(w.rows[0].bytes);
     } catch { /* 多數 Render 帳號無 pg_monitor → 拿不到 WAL，walBytes 留 0 */ }
-    const dbTotalBytes = allDbBytes + walBytes;   // ≈ Render「Storage used」
+    const dbTotalBytes = allDbBytes + walBytes;   // SQL 算得到的部分（資料 + 拿得到時的 WAL）
     const GB = 1024 * 1024 * 1024;
+
+    // V1.3.36：接 Render Metrics API 拿「真實磁碟用量」= 後台 Storage 那個數字（含 SQL 讀不到的 WAL/系統）。
+    // 設了 RENDER_API_KEY + RENDER_PG_ID（dpg-…）才啟用；抓不到就維持 SQL 估算、不影響其他資料。
+    let renderDiskBytes: number | null = null;
+    const _rKey = process.env.RENDER_API_KEY;
+    const _rId = process.env.RENDER_PG_ID;
+    if (_rKey && _rId) {
+      try {
+        const ctrl = new AbortController();
+        const _to = setTimeout(() => ctrl.abort(), 4000);
+        const startTime = new Date(now - 3600 * 1000).toISOString();
+        const endTime = new Date(now).toISOString();
+        const url = `https://api.render.com/v1/metrics/disk-usage?resource=${encodeURIComponent(_rId)}&startTime=${encodeURIComponent(startTime)}&endTime=${encodeURIComponent(endTime)}`;
+        const rr = await fetch(url, { headers: { Authorization: `Bearer ${_rKey}`, Accept: 'application/json' }, signal: ctrl.signal });
+        clearTimeout(_to);
+        if (rr.ok) {
+          const j: any = await rr.json();
+          // Render metrics 回 [{ values: [{ timestamp, value }, …] }, …] —— 取所有 series 最後一筆裡最大的（取最新值）
+          const series: any[] = Array.isArray(j) ? j : (j && Array.isArray(j.data) ? j.data : []);
+          let latest: number | null = null;
+          for (const s of series) {
+            const vals: any[] = (s && Array.isArray(s.values)) ? s.values : [];
+            if (vals.length) {
+              const v = vals[vals.length - 1];
+              if (v && typeof v.value === 'number') latest = Math.max(latest ?? 0, v.value);
+            }
+          }
+          renderDiskBytes = latest;
+        } else {
+          console.error('[pilot-log] render disk-usage API non-ok:', rr.status);
+        }
+      } catch (e: any) {
+        console.error('[pilot-log] render disk-usage fetch failed:', e && e.message);
+      }
+    }
     const topTablesRow = await pool.query(`
       SELECT relname AS name,
              pg_total_relation_size(relid)::bigint AS total_bytes,
@@ -1788,6 +1887,10 @@ pilotLogRouter.get('/api/pilot-log/oops/stats', async (req, res) => {
         wal_size_mb: Math.round(walBytes / 1024 / 1024 * 10) / 10,        // WAL（拿不到權限時為 0）
         db_used_pct_of_1gb: Math.round(dbTotalBytes / GB * 1000) / 10,
         db_free_mb_of_1gb: Math.round((GB - dbTotalBytes) / 1024 / 1024 * 10) / 10,
+        // V1.3.36：Render API 回的「真實磁碟用量」（= 後台 Storage，含 WAL/系統）。設了 env 才有值，否則 null。
+        render_disk_bytes: renderDiskBytes,
+        render_disk_mb: renderDiskBytes != null ? Math.round(renderDiskBytes / 1024 / 1024 * 10) / 10 : null,
+        render_disk_pct_of_1gb: renderDiskBytes != null ? Math.round(renderDiskBytes / GB * 1000) / 10 : null,
         restaurant_etc_size_mb: Math.round((dbTotalBytes - totalSize) / 1024 / 1024 * 10) / 10,  // 總量扣掉 pilot-log = 餐廳+晨報+其他+開銷
         growth,   // V1.2.07：成長速度 + 多久滿 1GB（需要歷史快照累積）
       },
@@ -1910,14 +2013,22 @@ async function load(){
 }
 function render(j){
   var s = j.summary || {}, b = j.breakdown || {};
-  var pct = s.db_used_pct_of_1gb || 0;
+  // V1.3.36：接了 Render API（render_disk_mb 有值）→ 顯示真實磁碟用量（= 後台 Storage）；否則 SQL 估算。
+  var hasRender = (s.render_disk_mb != null);
+  var pct = hasRender ? (s.render_disk_pct_of_1gb || 0) : (s.db_used_pct_of_1gb || 0);
+  var bigMB = hasRender ? s.render_disk_mb : s.db_total_size_mb;
+  var freeMB = hasRender ? (Math.round((1024 - s.render_disk_mb) * 10) / 10) : s.db_free_mb_of_1gb;
   var out = '';
   // 儲存總覽
-  out += '<div class="card"><div class="lbl">磁碟用量 / 1 GB（≈ Render Storage：全部 DB + WAL）</div>' +
-    '<div class="big">' + fmtMB(s.db_total_size_mb) + ' <span class="muted" style="font-size:.5em">/ 1024 MB · ' + pct + '%</span></div>' +
+  out += '<div class="card"><div class="lbl">磁碟用量 / 1 GB' + (hasRender ? '（Render 即時 · 真實磁碟）' : '（SQL 估算 · 讀不到 WAL）') + '</div>' +
+    '<div class="big">' + fmtMB(bigMB) + ' <span class="muted" style="font-size:.5em">/ 1024 MB · ' + pct + '%</span></div>' +
     '<div class="bar"><i style="width:' + Math.min(pct,100) + '%"></i></div>' +
-    '<div class="muted" style="font-size:.78em">剩餘 ' + fmtMB(s.db_free_mb_of_1gb) + '　·　資料 ' + fmtMB(s.all_db_size_mb) + ' + WAL ' + fmtMB(s.wal_size_mb) +
-    (s.wal_size_mb===0?'（WAL 無權限取得，數字會略低於 Render）':'') + '</div></div>';
+    '<div class="muted" style="font-size:.78em">' +
+    (hasRender
+      ? '剩餘 ' + fmtMB(freeMB) + '　·　來源 Render Metrics API（= 後台 Storage，含 WAL+系統）。其中資料庫資料 ' + fmtMB(s.all_db_size_mb) + ' MB，其餘為 WAL/系統開銷。'
+      : '剩餘 ' + fmtMB(freeMB) + '　·　資料 ' + fmtMB(s.all_db_size_mb) + ' + WAL ' + fmtMB(s.wal_size_mb) +
+        '（WAL 無權限取得，會比 Render 後台低 ~120MB；設 RENDER_API_KEY + RENDER_PG_ID 後顯示真實值）'
+    ) + '</div></div>';
   // 成長速度 / 滿載推估（V1.2.07）
   var g = s.growth || {};
   out += '<div class="card"><div class="lbl">成長速度 / 多久滿 1 GB</div>';

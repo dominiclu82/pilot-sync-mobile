@@ -365,16 +365,20 @@ export async function importRoster(
         [userId, sourceRef]
       );
 
+      // V1.3.36：班表帶的組員人數當 crew_count 初值（POB 用）。只在「新建」帶入，
+      // 之後使用者可自行編輯（含補後艙空服）；re-import 不覆寫，保留使用者改的值。
+      const crewCount = (f.crew && f.crew.length) ? f.crew.length : null;
+
       if (existing.rows.length === 0) {
         // 新 draft
         await pool.query(
           `INSERT INTO pilot_log_entries
            (id, user_id, source, source_ref, status, flight_date, flight_no, origin, dest,
-            position, std_utc, sta_utc, on_duty_utc, off_duty_utc, crew, is_deadhead, roster_month)
-           VALUES ($1, $2, 'roster', $3, 'draft', $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)`,
+            position, std_utc, sta_utc, on_duty_utc, off_duty_utc, crew, is_deadhead, roster_month, crew_count)
+           VALUES ($1, $2, 'roster', $3, 'draft', $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)`,
           [
             randomUUID(), userId, sourceRef, fDate, f.flightNo, f.origin, f.dest,
-            position, stdUtc, staUtc, onDuty, offDuty, crewJson ? JSON.stringify(crewJson) : null, isDeadhead, rosterMonth,
+            position, stdUtc, staUtc, onDuty, offDuty, crewJson ? JSON.stringify(crewJson) : null, isDeadhead, rosterMonth, crewCount,
           ]
         );
         result.inserted++;
