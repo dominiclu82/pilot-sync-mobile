@@ -52,8 +52,8 @@ import { getAirportDbJs } from '../spa/js-airport-db.js';
 
 // ── 版本（比照 CrewSync / Morning：每次推版必更新；SW cache 名稱跟著走） ────
 // 本機 preview build 會暫時加 -tNN 後綴方便對版；推正式版前拿掉只留乾淨版號。
-export const PILOT_LOG_VERSION = 'V2.1.01';
-const PILOT_LOG_CACHE = 'pilotlog-v2-1-01';
+export const PILOT_LOG_VERSION = 'V2.1.02';
+const PILOT_LOG_CACHE = 'pilotlog-v2-1-02';
 
 export const pilotLogRouter = express.Router();
 
@@ -337,6 +337,11 @@ if (document.readyState !== 'loading') pilotLogInit();
 function _renderPilotLogChangelog(): string {
   return `
     <div class="pl-cl-v">${PILOT_LOG_VERSION}</div>
+    <div class="pl-cl-txt">
+      <b>航班輸入更順手 + 跑道圖風分量不再重疊。</b><b>(1)</b> 日期欄改成可點日曆（iPhone/iPad 點了跳原生日期選擇器，不用手打）。<b>(2)</b> From/To 多了 37 個星宇航點下拉，可直接選、也能手打其他機場。<b>(3)</b> 跑道圖的逆風／側風分量改標在綠端附近，平行跑道不再互相重疊、也不壓住跑道與長寬。<br>
+      <b>Smoother flight entry + de-cluttered runway wind components.</b> (1) The date field is now a native date picker (tap to open the calendar on iPhone/iPad). (2) From/To gain a dropdown of the 37 Starlux airports — pick one or type any other. (3) Runway headwind/crosswind components now sit by the green into-wind end, so parallel runways no longer overlap each other or the runway/size labels.
+    </div>
+    <div class="pl-cl-v old">V2.1.01</div>
     <div class="pl-cl-txt">
       <b>跑道圖大進化 + 起降天氣一鍵看。</b><b>(1) 跑道畫在衛星圖上：</b>Airports 詳情的衛星地圖，依真實座標把每條跑道畫出來、標跑道號與長 × 寬，地圖自動縮放涵蓋所有跑道。<b>(2) 依即時風向標色：</b>抓該機場即時 METAR 風向，逆風端標綠、順風端標橘，每條跑道旁標逆風／側風分量，左上角風向箭頭（比照 AeroWeather）。<b>(3) flight detail 整合天氣：</b>編輯航班時 From/To 旁多了「⛅ WX + 跑道圖」鈕，一次看起降兩地的跑道圖 + METAR／TAF，跑道圖可收合（記住偏好）。<b>(4) 班表時間顯示當地時間：</b>Sched Out／In 輸入後，下方顯示當地時間與 UTC 時差。<b>(5) 離線也看得到跑道座向：</b>連不到衛星底圖時改用深色底 + 跑道線，任何機場離線都能看座向／長寬／跑道號。另：iPad 三欄寬度微調、POB 說明精簡。<br>
       <b>Runway maps leveled up + one-tap departure/arrival weather.</b> (1) Runways drawn on the map: the Airports satellite view draws each runway from real coordinates with its number and length × width, auto-zoomed to fit all runways. (2) Wind-coloured ends: live METAR wind colours the into-wind end green and the downwind end orange, with headwind/crosswind components beside each runway and a wind arrow (AeroWeather-style). (3) Weather in flight detail: a "⛅ WX + runway map" button by From/To opens both airports' runway maps + METAR/TAF at once; maps are collapsible (remembers your choice). (4) Local time for schedule: Sched Out/In show local time + UTC offset below the field. (5) Runway orientation offline: when the satellite tile can't load, a dark backdrop + runway lines still show orientation/size/numbers for any airport. Also: iPad three-column width tweak, trimmed POB hint.

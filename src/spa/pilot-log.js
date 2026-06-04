@@ -1066,7 +1066,7 @@ function _plEditorField(label, name, type, opts) {
         dateStr = '';
       }
     }
-    input = '<input ' + attrs + ' value="' + _plEsc(dateStr) + '" placeholder="YYYY-MM-DD" maxlength="10">';
+    input = '<input type="date" ' + attrs + ' value="' + _plEsc(dateStr) + '">';   // native 日曆（iPhone/iPad 點了跳日期選擇器）
   } else if (opts.listId) {
     // V2.0.01：datalist 下拉 + 持續顯示的 ▾ 提示（讓使用者知道可下拉選，也能手動輸入覆蓋）
     var dvalL = opts.fmt ? opts.fmt(val) : val;
@@ -1085,7 +1085,7 @@ function _plEditorField(label, name, type, opts) {
     ? '<div id="ple-' + name + '-local" style="font-size:.58em;color:#60a5fa;margin-top:2px;min-height:1.1em;letter-spacing:.3px"></div>'
     : '';
   return '<div style="margin-bottom:8px">' +
-    '<div style="font-size:.62em;color:var(--muted);margin-bottom:2px">' + _plEsc(label) + '</div>' +
+    '<div' + (opts.labelId ? ' id="' + opts.labelId + '"' : '') + ' style="font-size:.62em;color:var(--muted);margin-bottom:2px">' + _plEsc(label) + '</div>' +
     input + sub + '</div>';
 }
 // time-utc 欄位 → 當地時間提示：用 flight_date + HHMM(UTC) 組 UTC 時間，再依 origin/dest 機場時區換算。
@@ -1500,7 +1500,8 @@ function _plArrow(x1, y1, x2, y2, color, w) {
   return '<line x1="' + x1.toFixed(1) + '" y1="' + y1.toFixed(1) + '" x2="' + x2.toFixed(1) + '" y2="' + y2.toFixed(1) + '" stroke="' + color + '" stroke-width="' + w + '" stroke-linecap="round"/>' +
     '<polyline points="' + hx(0.5) + ',' + hy(0.5) + ' ' + x2.toFixed(1) + ',' + y2.toFixed(1) + ' ' + hx(-0.5) + ',' + hy(-0.5) + '" fill="none" stroke="' + color + '" stroke-width="' + w + '" stroke-linecap="round" stroke-linejoin="round"/>';
 }
-// 每條跑道的風分量：逆風(headwind 沿跑道指 favored 端、綠) + 側風(crosswind 垂直、橘)，標在跑道中段旁。
+// 每條跑道的風分量：逆風(headwind 沿跑道指 favored 端、綠) + 側風(crosswind 垂直、橘)。
+// 標在 favored(綠)端往內 26% 處、貼著跑道線 —— 平行跑道各自落在自己線上，不互相重疊、也不撞中間長寬。
 function _plRwyWindComp(x1, y1, x2, y2, hdgLe, wind) {
   if (!wind || wind.dir == null || wind.spd == null || wind.spd === 0) return '';
   var wd = wind.dir, sp = wind.spd;
@@ -1508,18 +1509,19 @@ function _plRwyWindComp(x1, y1, x2, y2, hdgLe, wind) {
   var hw = Math.round(sp * Math.cos((wd - favHdg) * Math.PI / 180));     // 逆風分量(kt)
   var xwS = sp * Math.sin((wd - favHdg) * Math.PI / 180);               // 側風分量(±)
   var xw = Math.abs(Math.round(xwS));
-  // favored 端 px（headwind 指向這端）
   var fx, fy, tx, ty;
   if (favHdg === hdgLe) { fx = x1; fy = y1; tx = x2; ty = y2; } else { fx = x2; fy = y2; tx = x1; ty = y1; }
-  var ux = fx - tx, uy = fy - ty, ul = Math.sqrt(ux * ux + uy * uy) || 1; ux /= ul; uy /= ul;   // 指 favored 端
-  var nx = -uy, ny = ux;   // 垂直跑道
-  var mx = (x1 + x2) / 2, my = (y1 + y2) / 2, sgn = xwS >= 0 ? 1 : -1;
-  var cx = mx + nx * 32 * sgn, cy = my + ny * 32 * sgn;   // 標到跑道側邊，避免擋線/長寬
-  var out = _plArrow(cx - ux * 10, cy - uy * 10, cx + ux * 10, cy + uy * 10, '#86efac', 2.5) +
-    '<text x="' + (cx + nx * 11 * sgn).toFixed(1) + '" y="' + (cy + ny * 11 * sgn).toFixed(1) + '" font-size="10" font-weight="800" fill="#86efac" stroke="#000" stroke-width="2" paint-order="stroke" text-anchor="middle" dominant-baseline="central">' + hw + '</text>';
+  var dx = tx - fx, dy = ty - fy, dl = Math.sqrt(dx * dx + dy * dy) || 1;
+  var ux = dx / dl, uy = dy / dl;        // 往中點方向（離 favored 端）
+  var nx = -uy, ny = ux, sgn = xwS >= 0 ? 1 : -1;
+  var px = fx + dx * 0.26, py = fy + dy * 0.26;   // favored 端往內 26%
+  // headwind：短綠箭頭沿跑道指 favored 端(-u) + 數字
+  var out = _plArrow(px, py, px - ux * 10, py - uy * 10, '#4ade80', 2.5) +
+    '<text x="' + (px - ux * 10 + nx * 7 * sgn).toFixed(1) + '" y="' + (py - uy * 10 + ny * 7 * sgn).toFixed(1) + '" font-size="9.5" font-weight="800" fill="#4ade80" stroke="#000" stroke-width="2" paint-order="stroke" text-anchor="middle" dominant-baseline="central">' + hw + '</text>';
+  // crosswind：短橘箭頭垂直 + 數字（偏移壓小避免伸進鄰道）
   if (xw > 0) {
-    out += _plArrow(cx, cy, cx + nx * 11 * sgn, cy + ny * 11 * sgn, '#fdba74', 2.5) +
-      '<text x="' + (cx + nx * 22 * sgn).toFixed(1) + '" y="' + (cy + ny * 22 * sgn).toFixed(1) + '" font-size="10" font-weight="800" fill="#fdba74" stroke="#000" stroke-width="2" paint-order="stroke" text-anchor="middle" dominant-baseline="central">' + xw + '</text>';
+    out += _plArrow(px, py, px + nx * 8 * sgn, py + ny * 8 * sgn, '#fb923c', 2.5) +
+      '<text x="' + (px + nx * 16 * sgn).toFixed(1) + '" y="' + (py + ny * 16 * sgn).toFixed(1) + '" font-size="9.5" font-weight="800" fill="#fb923c" stroke="#000" stroke-width="2" paint-order="stroke" text-anchor="middle" dominant-baseline="central">' + xw + '</text>';
   }
   return out;
 }
@@ -1655,8 +1657,24 @@ function _plToggleAptFmt() {
   try { localStorage.setItem('pilotlog_apt_fmt', next); } catch (e) {}
   _plToast('機場碼顯示：' + next.toUpperCase());
   // codex P2：編輯器開著時（iPad detail pane）只重畫列表，不動編輯器 —— 否則會丟未存的編輯。
-  if (_pl.editing) { if (document.getElementById('pl-list')) _plRenderList(); }
-  else _plRenderMain();
+  if (_pl.editing) {
+    if (document.getElementById('pl-list')) _plRenderList();
+    _plSyncRouteFmt();   // 但 From/To 要跟上新格式：轉換顯示值 + 更新 label + 重建下拉（codex P2 V2.1.02）
+  } else _plRenderMain();
+}
+// 編輯器開著時切換 IATA/ICAO → 只同步 From/To（其他欄位不動、不丟編輯）：轉碼 + 改 label + 重建星宇下拉。
+function _plSyncRouteFmt() {
+  var iata = _plAptFmtCur() === 'iata', tag = iata ? 'IATA' : 'ICAO';
+  [['origin', 'From'], ['dest', 'To']].forEach(function(p) {
+    var inp = document.getElementById('ple-' + p[0]);
+    if (inp && (inp.value || '').trim()) {
+      var info = _plAptInfo(inp.value.trim());
+      if (info) { var c = (iata && info.iata) ? info.iata : info.icao; if (c) inp.value = c; }
+    }
+    var lb = document.getElementById('ple-' + p[0] + '-label');
+    if (lb) lb.textContent = p[1] + ' (' + tag + ')';
+  });
+  _plUpdateAptLists();
 }
 
 // 太陽高度角（degrees）；driven by Julian day → ecliptic longitude → declination → hour angle
@@ -1917,11 +1935,27 @@ function _plUpdateRwyLists() {
   _plFillRwyList('ple-dep-rwy-list', (document.getElementById('ple-origin') || {}).value || '');
   _plFillRwyList('ple-arr-rwy-list', (document.getElementById('ple-dest') || {}).value || '');
 }
+// From/To 下拉：列 37 個星宇定期航點（碼依當前 IATA/ICAO 格式 + 城市/機場名），可下拉選也可手打其他機場。
+function _plFillAptList(listId) {
+  var dl = document.getElementById(listId); if (!dl) return;
+  var iata = _plAptFmtCur() === 'iata';
+  var opts = Object.keys(_PL_STARLUX_APTS).map(function(icao) {
+    var info = _plAptInfo(icao);
+    var code = (iata && info && info.iata) ? info.iata : icao;
+    return { code: code, nm: info ? (info.city || info.name || '') : '' };
+  }).filter(function(o) { return o.code; }).sort(function(a, b) { return a.code.localeCompare(b.code); });
+  dl.innerHTML = opts.map(function(o) { return '<option value="' + _plEsc(o.code) + '">' + _plEsc(o.nm) + '</option>'; }).join('');
+}
+function _plUpdateAptLists() {
+  _plFillAptList('ple-origin-aptlist');
+  _plFillAptList('ple-dest-aptlist');
+}
 
 function _plWireEditor() {
   _plPobSync();                                   // 初始 POB（locked 也要顯示）
   _plUpdateAptNames();
   _plUpdateRwyLists();                             // 初始跑道下拉（庫已載入時就有）
+  _plUpdateAptLists();                             // From/To 星宇 37 航點下拉
   // codex P2：機場庫是非同步載入。庫到之前 _plApt() 查不到非硬編機場座標 → night/起降被算成空。
   // 庫載入後除了補機場名 + 跑道下拉，還要補算一次（只在仍是同一筆、未上鎖時；_plAutoCalcTimes 會尊重手動鎖值）。
   var _wireEntryId = _pl.editing ? _pl.editing.id : null;
@@ -1929,6 +1963,7 @@ function _plWireEditor() {
     if (!_pl.editing || _pl.editing.id !== _wireEntryId) return;   // 已換/關編輯器 → 不動
     _plUpdateAptNames();
     _plUpdateRwyLists();
+    _plUpdateAptLists();
     if (!_pl.editing.is_locked) _plAutoCalcTimes();
   });
   // V1.3.08：上鎖的航班 — 所有編輯欄位 disabled；Lock 按鈕仍可用以解鎖
@@ -2062,7 +2097,7 @@ function _plRenderEditor(target) {
         _plFieldRow(2, _plEditorField('Sim Type（FFS/FTD）', 'sim_type', 'text') + _plEditorField('Sim Time', 'sim_minutes', 'hhmm-dur')) +
       '</div>' +
       _plFieldRow(2, _plEditorField('Date', 'flight_date', 'date') + _plEditorField('Flight #', 'flight_no', 'text')) +
-      '<div id="ple-route-row" style="display:' + (_plEntryType(e) === 'sim' ? 'none' : '') + '">' + _plFieldRow(2, _plEditorField('From (' + (_plAptFmtCur() === 'iata' ? 'IATA' : 'ICAO') + ')', 'origin', 'text', { fmt: _plAptFmt }) + _plEditorField('To (' + (_plAptFmtCur() === 'iata' ? 'IATA' : 'ICAO') + ')', 'dest', 'text', { fmt: _plAptFmt })) +
+      '<div id="ple-route-row" style="display:' + (_plEntryType(e) === 'sim' ? 'none' : '') + '">' + _plFieldRow(2, _plEditorField('From (' + (_plAptFmtCur() === 'iata' ? 'IATA' : 'ICAO') + ')', 'origin', 'text', { fmt: _plAptFmt, listId: 'ple-origin-aptlist', labelId: 'ple-origin-label', placeholder: '選星宇航點或輸入 · pick/type' }) + _plEditorField('To (' + (_plAptFmtCur() === 'iata' ? 'IATA' : 'ICAO') + ')', 'dest', 'text', { fmt: _plAptFmt, listId: 'ple-dest-aptlist', labelId: 'ple-dest-label', placeholder: '選星宇航點或輸入 · pick/type' })) +
         '<div id="ple-aptname-row" style="font-size:.6em;color:var(--muted);margin:-4px 0 8px;line-height:1.4"></div>' +
         '<button type="button" id="ple-wx-btn" onclick="_plToggleEditorWx()" style="background:none;border:none;color:#22c55e;font-size:.7em;font-weight:700;cursor:pointer;padding:0 0 6px">⛅ WX · METAR / TAF ▾</button>' +
         '<div id="ple-wx-panel" style="display:none;margin-bottom:8px"></div></div>' +
