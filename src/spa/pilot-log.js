@@ -1430,11 +1430,12 @@ function _plAptName(code) {
 }
 // V2.0.03：機場衛星地圖網址（Esri World Imagery 靜態圖）。詳情顯示 + 離線預快取共用同一個 URL
 // V2.0.04：縮小範圍（約 5×7km）讓跑道放大、座向看得清楚（飛行員在乎跑道方向）；解析度提高到 640×440
-// 衛星圖視野：以「涵蓋所有跑道」為主——算跑道端點範圍 → 置中 + 30% 邊距，
-// 維持圖框 640:440 的地面比例（經度跨度按 cos(lat) 補償），跑道座向才不會被拉斜。
+// 衛星圖視野：以「涵蓋所有跑道」為主——算跑道端點範圍 → 置中 + 30% 邊距。
+// ⚠️ bbox 的經緯度長寬比必須精確 = 圖檔 640:440，否則 Esri export 會自動微調 bbox 來配合圖檔比例
+// （ArcGIS 預設行為），導致跑道 overlay 對不準衛星圖（中高緯特別明顯）。所以這裡用純度數比例、不做 cos 補償。
 // 回傳 {lat, lon, halfLat, halfLon}；無跑道座標時退回機場座標 + 固定視野。
 function _plAptView(info) {
-  var ASPECT = 640 / 440, cosL = Math.cos((info.lat || 0) * Math.PI / 180) || 1;
+  var ASPECT = 640 / 440;
   var la = [], lo = [];
   (info.runways || []).forEach(function(r) {
     if (r[2] != null && r[3] != null) { la.push(r[2]); lo.push(r[3]); }
@@ -1446,12 +1447,12 @@ function _plAptView(info) {
     var loMin = Math.min.apply(null, lo), loMax = Math.max.apply(null, lo);
     cLat = (laMin + laMax) / 2; cLon = (loMin + loMax) / 2;
     var needLat = (laMax - laMin) / 2, needLon = (loMax - loMin) / 2;
-    halfLat = Math.max(needLat, needLon * cosL / ASPECT) * 1.3;   // 取較大的一軸 + 30% 邊距，跑道不貼邊
-    halfLat = Math.max(halfLat, 0.006);                           // 最小視野，單跑道小機場別放太大
+    halfLat = Math.max(needLat, needLon / ASPECT) * 1.3;   // 取較大的一軸 + 30% 邊距，跑道不貼邊
+    halfLat = Math.max(halfLat, 0.006);                    // 最小視野，單跑道小機場別放太大
   } else {
     halfLat = 0.022;
   }
-  return { lat: cLat, lon: cLon, halfLat: halfLat, halfLon: halfLat * ASPECT / cosL };
+  return { lat: cLat, lon: cLon, halfLat: halfLat, halfLon: halfLat * ASPECT };
 }
 function _plAptMapUrl(lat, lon, halfLat, halfLon) {
   var dLat = halfLat || 0.022, dLon = halfLon || 0.032;

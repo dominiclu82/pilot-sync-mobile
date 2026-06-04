@@ -52,8 +52,8 @@ import { getAirportDbJs } from '../spa/js-airport-db.js';
 
 // ── 版本（比照 CrewSync / Morning：每次推版必更新；SW cache 名稱跟著走） ────
 // 本機 preview build 會暫時加 -tNN 後綴方便對版；推正式版前拿掉只留乾淨版號。
-export const PILOT_LOG_VERSION = 'V2.1.03';
-const PILOT_LOG_CACHE = 'pilotlog-v2-1-03';
+export const PILOT_LOG_VERSION = 'V2.1.04';
+const PILOT_LOG_CACHE = 'pilotlog-v2-1-04';
 
 export const pilotLogRouter = express.Router();
 
@@ -337,6 +337,11 @@ if (document.readyState !== 'loading') pilotLogInit();
 function _renderPilotLogChangelog(): string {
   return `
     <div class="pl-cl-v">${PILOT_LOG_VERSION}</div>
+    <div class="pl-cl-txt">
+      <b>修正跑道圖對不準（不少機場跑道線歪斜）。</b>之前為了「高緯機場的圖不變形」加的<b>經度補償</b>，反而讓地圖範圍的長寬比跟圖檔不一致，Esri 會自動微調範圍配合圖檔，但跑道線仍照原始範圍畫 → 跑道線歪斜、對不準衛星圖（緯度越高越明顯）。改成<b>範圍長寬比直接 = 圖檔 640:440</b>，Esri 不再微調，跑道線回到貼齊真實跑道。<br>
+      <b>Fixed runway-overlay misalignment.</b> A longitude compensation (added to keep high-latitude maps undistorted) made the map extent ratio differ from the image, so Esri auto-adjusted the bbox while the runway lines were still drawn for the original extent — leaving them skewed off the real runways (worse at higher latitudes). The extent ratio now matches the image (640:440) exactly, so runway lines line up with the satellite imagery again.
+    </div>
+    <div class="pl-cl-v old">V2.1.03</div>
     <div class="pl-cl-txt">
       <b>日期選擇修正 + 班表變更改成直接刪。</b><b>(1)</b> 桌面點 Date 欄位<b>任何位置</b>就跳日曆（原本只有點右側小圖示才跳）；修正手機 Date／Flight# 等欄位在窄畫面溢出重疊。<b>(2)</b> 重新匯入班表時，本來要飛、後來改飛別班的舊航班<b>直接刪掉</b>（不再留灰色「已移除」狀態），換上新班；你已完成（飛過記錄）的航班與通訊錄組員都不動。<br>
       <b>Date picker fix + roster changes delete directly.</b> (1) On desktop, clicking anywhere in the Date field opens the calendar (previously only the small icon did); fixed Date/Flight# fields overflowing on narrow mobile screens. (2) Re-importing a roster now deletes old draft flights that were dropped or reassigned (no more grey "removed" state); your completed flights and address-book crew are untouched.

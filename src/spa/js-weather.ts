@@ -268,16 +268,31 @@ function setMetarMode(icao, showAll) {
   }
 }
 
+// 跑道圖收合（比照 roster / Pilot Log，狀態記 localStorage）。
+function _wxRwyMapCollapsed() {
+  try { return localStorage.getItem('crewsync_wxmap_collapsed') === '1'; } catch (e) { return false; }
+}
+function _wxToggleRwyMap() {
+  var c = !_wxRwyMapCollapsed();
+  try { localStorage.setItem('crewsync_wxmap_collapsed', c ? '1' : '0'); } catch (e) {}
+  var bodies = document.querySelectorAll('.wx-rwymap-body');
+  for (var i = 0; i < bodies.length; i++) bodies[i].style.display = c ? 'none' : '';
+  var arrows = document.querySelectorAll('.wx-rwymap-arrow');
+  for (var j = 0; j < arrows.length; j++) arrows[j].textContent = c ? '\\u25b8' : '\\u25be';
+}
 function _wxBuildDetailHtml(icao, metarLines, tafText, atisSections) {
   var noData = '<span style="color:var(--muted);font-style:italic">\\u7121\\u8cc7\\u6599</span>';
   wxMetarRawMap[icao] = metarLines;
   if (wxMetarShowAll[icao] === undefined) wxMetarShowAll[icao] = false;
   var cards = '';
-  // 跑道圖（依最新 METAR 風向標綠[逆風]/橘[順風]端 + 風分量 + 風向箭頭），比照 roster / Pilot Log。
+  // 跑道圖（依最新 METAR 風向標綠[逆風]/橘[順風]端 + 風分量 + 風向箭頭），比照 roster / Pilot Log。點標題可收合。
   if (typeof RwyMap !== 'undefined' && RwyMap.aptInfo(icao)) {
     if (metarLines && metarLines[0]) RwyMap.setWind(icao, RwyMap.parseWind(metarLines[0]));
     var _mh = RwyMap.html(icao);
-    if (_mh) cards += '<div class="atis-card"><div class="atis-card-title">\\ud83d\\uddfa\\ufe0f \\u8dd1\\u9053\\u5716 Runway</div>' + _mh + '</div>';
+    if (_mh) {
+      var _col = _wxRwyMapCollapsed();
+      cards += '<div class="atis-card"><div class="atis-card-title" style="cursor:pointer" onclick="_wxToggleRwyMap()">\\ud83d\\uddfa\\ufe0f \\u8dd1\\u9053\\u5716 Runway <span class="wx-rwymap-arrow" style="margin-left:auto">' + (_col ? '\\u25b8' : '\\u25be') + '</span></div><div class="wx-rwymap-body" style="display:' + (_col ? 'none' : '') + '">' + _mh + '</div></div>';
+    }
   }
   cards += buildMetarCard(icao);
   cards += '<div class="atis-card"><div class="atis-card-title">\\ud83d\\udcc5 TAF</div><pre>' + (tafText || noData) + '</pre></div>';

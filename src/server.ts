@@ -281,8 +281,7 @@ app.get('/apps', (_req, res) => {
   .tag { display:inline-block; background:#0a0e1a; border:1px solid #1f2a3d; border-radius:6px; padding:1px 7px; font-size:.92em; margin-right:4px; }
   .foot { text-align:center; color:#475569; font-size:.74em; margin-top:24px; }
 </style></head><body><div class="wrap">
-  <h1>✈️ H-Peak 飛行工具</h1>
-  <div class="sub">點開任一 App，再「加到主畫面」就能像獨立 App 一樣使用 · Tap an app, then add to Home Screen.</div>
+  <div class="sub" style="margin-top:6px">點開任一 App，再「加到主畫面」就能像獨立 App 一樣使用 · Tap an app, then add to Home Screen.</div>
   ${cards}
   <div class="install">
     <h2>📲 加到主畫面 · Add to Home Screen</h2>

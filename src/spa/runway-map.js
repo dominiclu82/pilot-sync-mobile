@@ -22,9 +22,11 @@
     return { icao: r[0], iata: r[1], name: r[2], city: r[3], lat: r[5], lon: r[6], tz: r[7] || '', runways: r[10] || [] };
   }
 
-  // 視野：涵蓋所有跑道、置中 + 30% 邊距，維持 640:440 地面比例（經度按 cos(lat) 補償，座向不歪）。
+  // 視野：涵蓋所有跑道、置中 + 30% 邊距。
+  // ⚠️ bbox 經緯度長寬比必須精確 = 圖檔 640:440，否則 Esri export 自動微調 bbox 配合圖檔比例 → 跑道對不準（中高緯明顯）。
+  // 所以用純度數比例、不做 cos 補償（跟 pilot-log.js 的 _plAptView 一致）。
   function view(info) {
-    var ASPECT = 640 / 440, cosL = Math.cos((info.lat || 0) * Math.PI / 180) || 1;
+    var ASPECT = 640 / 440;
     var la = [], lo = [];
     (info.runways || []).forEach(function (r) {
       if (r[2] != null && r[3] != null) { la.push(r[2]); lo.push(r[3]); }
@@ -36,10 +38,10 @@
       var loMin = Math.min.apply(null, lo), loMax = Math.max.apply(null, lo);
       cLat = (laMin + laMax) / 2; cLon = (loMin + loMax) / 2;
       var needLat = (laMax - laMin) / 2, needLon = (loMax - loMin) / 2;
-      halfLat = Math.max(needLat, needLon * cosL / ASPECT) * 1.3;
+      halfLat = Math.max(needLat, needLon / ASPECT) * 1.3;
       halfLat = Math.max(halfLat, 0.006);
     } else { halfLat = 0.022; }
-    return { lat: cLat, lon: cLon, halfLat: halfLat, halfLon: halfLat * ASPECT / cosL };
+    return { lat: cLat, lon: cLon, halfLat: halfLat, halfLon: halfLat * ASPECT };
   }
   function mapUrl(lat, lon, halfLat, halfLon) {
     var dLat = halfLat || 0.022, dLon = halfLon || 0.032;
