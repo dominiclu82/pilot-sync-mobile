@@ -1509,7 +1509,7 @@ export function getSpaHtmlBody(): string {
       <button class="tab-util-btn tab-install-btn" id="tab-install-btn" onclick="showInstallGuide()" style="display:none">
         <span>📲</span>安裝
       </button>
-      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer;text-decoration:underline" onclick="showAbout()">V8.0.44</span>
+      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer;text-decoration:underline" onclick="showAbout()">V8.0.45</span>
     </div>
   </div>
 </div>
@@ -1540,7 +1540,12 @@ export function getSpaHtmlBody(): string {
       <div style="color:var(--muted)">Best experience on iPad in landscape mode. Android devices may not display correctly.</div>
     </div>
     <div style="max-height:50vh;overflow-y:auto;-webkit-overflow-scrolling:touch;margin-bottom:10px">
-    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V8.0.44</div>
+    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V8.0.45</div>
+    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
+      <div>🛠️ <b>後台維護與安全性強化。</b>本次為背景維護與安全性更新，使用者操作與介面不變。</div>
+      <div>🛠️ <b>Backend maintenance &amp; security hardening.</b> Background maintenance and security update; nothing changes in how you use the app.</div>
+    </div>
+    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V8.0.44</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
       <div>🛠️ <b>修正跑道圖對不準 + Airport WX 跑道圖可收合。</b><b>(1)</b> 修正衛星圖上<b>跑道線歪斜對不準</b>（之前為高緯機場加的經度補償，讓地圖範圍比例跟圖檔不符、Esri 自動微調範圍所致）→ 範圍比例直接對齊圖檔 640:440，跑道線貼齊真實跑道。<b>(2)</b> Airport WX 的跑道圖可<b>點標題收合</b>（記憶偏好，比照 roster）。<b>(3)</b> /apps 入口頁移除頁面大標題。</div>
       <div>🛠️ <b>Fixed runway misalignment + collapsible runway map in Airport WX.</b> (1) Runway lines were skewed off the real runways (a longitude compensation made the extent ratio mismatch the image, so Esri auto-adjusted the bbox); the ratio now matches the image (640:440) and lines align. (2) The Airport WX runway map is collapsible (tap the title, remembers your choice). (3) Removed the page heading on /apps.</div>

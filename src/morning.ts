@@ -497,9 +497,9 @@ morningRouter.get('/morning', (_req, res) => {
 // ─── /morning/manifest.json ──────────────────────────────────────────
 morningRouter.get('/morning/manifest.json', (_req, res) => {
   res.json({
-    name: '晨報 Morning Report',
-    short_name: '晨報',
-    description: '每日天氣、股市、匯率、新聞一眼看完',
+    name: '今日 Today',
+    short_name: '今日',
+    description: '天氣、股市、匯率、新聞一眼看完',
     start_url: '/morning',
     scope: '/morning/',
     display: 'standalone',
@@ -511,7 +511,7 @@ morningRouter.get('/morning/manifest.json', (_req, res) => {
   });
 });
 
-// ─── /morning/icon.svg — 破曉藍金 ────────────────────────────────────
+// ─── /morning/icon.svg — 今日報紙 + 金色行情線 ───────────────────────
 morningRouter.get('/morning/icon.svg', (_req, res) => {
   res.setHeader('Content-Type', 'image/svg+xml');
   res.send(MORNING_ICON_SVG);
@@ -880,29 +880,24 @@ morningRouter.get('/api/morning-translate', async (req, res) => {
 const MORNING_ICON_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
   <defs>
     <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0%" stop-color="#2C3E5A"/>
-      <stop offset="60%" stop-color="#3E5B7E"/>
-      <stop offset="100%" stop-color="#F4A261"/>
+      <stop offset="0%" stop-color="#0B1428"/>
+      <stop offset="100%" stop-color="#1E2740"/>
     </linearGradient>
-    <radialGradient id="sun" cx="50%" cy="50%" r="50%">
-      <stop offset="0%" stop-color="#FFF4C2"/>
-      <stop offset="100%" stop-color="#F4C430"/>
-    </radialGradient>
   </defs>
   <rect width="512" height="512" fill="url(#bg)"/>
-  <circle cx="256" cy="210" r="85" fill="url(#sun)"/>
-  <circle cx="256" cy="210" r="115" fill="#F4C430" opacity="0.2"/>
-  <g transform="translate(256 320) rotate(-12)">
-    <rect x="-155" y="-42" width="310" height="84" rx="6" fill="#FDFCF5"/>
-    <ellipse cx="-155" cy="0" rx="10" ry="42" fill="#D8CEB0"/>
-    <ellipse cx="-155" cy="0" rx="5" ry="28" fill="#BFB292"/>
-    <ellipse cx="155" cy="0" rx="10" ry="42" fill="#D8CEB0"/>
-    <ellipse cx="155" cy="0" rx="5" ry="28" fill="#BFB292"/>
-    <rect x="-120" y="-25" width="240" height="8" rx="4" fill="#1F2D3D"/>
-    <rect x="-120" y="-8"  width="210" height="5" rx="2.5" fill="#6B7A8F"/>
-    <rect x="-120" y="4"   width="230" height="5" rx="2.5" fill="#6B7A8F"/>
-    <rect x="-120" y="16"  width="180" height="5" rx="2.5" fill="#6B7A8F"/>
-    <rect x="-20" y="-48" width="16" height="96" rx="3" fill="#E76F51" opacity="0.9"/>
+  <g transform="rotate(-3 256 256)">
+    <rect x="132" y="120" width="248" height="290" rx="14" fill="#FDFCF5"/>
+    <text x="256" y="180" text-anchor="middle" font-family="Georgia,'Noto Serif TC',serif" font-weight="800" font-size="56" fill="#1F2D3D">今日</text>
+    <rect x="156" y="198" width="200" height="4" fill="#1F2D3D"/>
+    <rect x="156" y="216" width="92" height="5" rx="2" fill="#9AA7B8"/>
+    <rect x="156" y="228" width="92" height="5" rx="2" fill="#9AA7B8"/>
+    <rect x="156" y="240" width="70" height="5" rx="2" fill="#9AA7B8"/>
+    <rect x="264" y="216" width="92" height="5" rx="2" fill="#9AA7B8"/>
+    <rect x="264" y="228" width="92" height="5" rx="2" fill="#9AA7B8"/>
+    <rect x="264" y="240" width="74" height="5" rx="2" fill="#9AA7B8"/>
+    <rect x="156" y="262" width="200" height="130" rx="6" fill="#0B1428"/>
+    <polyline points="168,360 200,338 230,348 262,308 296,322 330,276 344,288" fill="none" stroke="#F4C430" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+    <circle cx="344" cy="288" r="8" fill="#F4C430"/>
   </g>
 </svg>`;
 
@@ -917,9 +912,9 @@ function getMorningHtml() {
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="晨報">
+<meta name="apple-mobile-web-app-title" content="今日">
 <meta name="theme-color" content="#1E2740">
-<title>晨報 Morning Report</title>
+<title>今日 Today</title>
 <link rel="manifest" href="/morning/manifest.json">
 <link rel="icon" href="/morning/icon.svg">
 <link rel="apple-touch-icon" href="/morning/icon.svg">
@@ -1974,7 +1969,7 @@ body { padding-bottom: calc(64px + env(safe-area-inset-bottom, 0px)); }
 <!-- Bottom fixed tab navbar (V1.3.18: 比照 CrewSync 移到底部) -->
 <nav class="tab-nav">
   <div class="tab-links">
-    <a href="/morning" class="active">🌅 晨報</a>
+    <a href="/morning" class="active">📰 今日</a>
     <a href="/portfolio">📈 投資組合</a>
   </div>
   <div class="tab-controls">
@@ -1990,7 +1985,7 @@ body { padding-bottom: calc(64px + env(safe-area-inset-bottom, 0px)); }
   <div class="hdr">
     <div style="min-width:0;flex:1">
       <div class="hdr-title">
-        <span class="emoji">🌅</span><span id="hdr-user-title" onclick="changeUid()" style="cursor:pointer;text-decoration:underline dotted;text-underline-offset:3px">晨報</span>
+        <span class="emoji">📰</span><span id="hdr-user-title" onclick="changeUid()" style="cursor:pointer;text-decoration:underline dotted;text-underline-offset:3px">今日</span>
         <span class="ver" onclick="showAbout()">${MORNING_VERSION}</span>
       </div>
       <div class="hdr-date" id="hdr-date">—</div>
@@ -2034,10 +2029,10 @@ body { padding-bottom: calc(64px + env(safe-area-inset-bottom, 0px)); }
 <div class="modal-wrap" id="about-wrap" onclick="if(event.target===this)hideAbout()">
   <div class="modal">
     <button class="close" onclick="hideAbout()">✕</button>
-    <h3>🌅 晨報 Morning Report</h3>
+    <h3>📰 今日 Today</h3>
     <div style="font-size:.8em;color:var(--muted);margin-bottom:10px">
-      每日天氣、股市、匯率、新聞<br>
-      Daily weather, stocks, FX, news digest
+      天氣、股市、匯率、新聞，一眼看完<br>
+      Weather, stocks, FX &amp; news at a glance
     </div>
     <div style="font-size:.75em;color:var(--muted);line-height:1.6">
       資料來源 Sources:<br>
@@ -2049,6 +2044,11 @@ body { padding-bottom: calc(64px + env(safe-area-inset-bottom, 0px)); }
     </div>
     <hr style="border:none;border-top:1px solid var(--border);margin:12px 0">
     <div class="changelog-v">${MORNING_VERSION}</div>
+    <div class="changelog-txt">
+      <strong>[全域] App 改名「晨報」→「今日 Today」。</strong>這個 App 本來就不是會主動寄到你信箱的「報」，而是你自己打開、一眼掌握<b>天氣 / 股市 / 匯率 / 新聞</b>的個人面板，所以改名「今日」——跟旁邊的「投資組合」分頁配起來就是「今日 ｜ 投資組合」，一看就懂。功能完全沒變，只換名字與圖示標題。<br>
+      <strong>[Global] Renamed "Morning" → "Today".</strong> This app isn't a report mailed to you — it's a personal panel you open to see weather / stocks / FX / news at a glance, so it's now "Today", pairing naturally with the "Portfolio" tab. Nothing functional changed, only the name and titles.
+    </div>
+    <div class="changelog-v old">V2.0.03</div>
     <div class="changelog-txt">
       <strong>[晨報] 不再保留歷史紀錄。</strong>晨報原本每天每人各存一份完整 JSON（全台天氣 +
       新聞 + 農民曆 + ...），從不清理 → 已變 DB 第一名肥大來源。user 反映「歷史沒用、
@@ -2318,7 +2318,7 @@ body { padding-bottom: calc(64px + env(safe-area-inset-bottom, 0px)); }
       <div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--border)">
         <p style="margin-top:0">💼 持倉</p>
         <p style="font-size:.85em;color:var(--muted);line-height:1.5">
-          持倉編輯已搬到「投資組合」 PWA。在那邊加交易，總損益自動顯示在晨報頂部，<br>
+          持倉編輯已搬到「投資組合」 PWA。在那邊加交易，總損益自動顯示在今日頂部，<br>
           這邊 settings 不再 key qty / 成本。
         </p>
         <button type="button" onclick="location.href='/portfolio'">→ 去投資組合</button>
@@ -2337,7 +2337,7 @@ body { padding-bottom: calc(64px + env(safe-area-inset-bottom, 0px)); }
       <div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--border)">
         <p style="margin-top:0">💼 持倉</p>
         <p style="font-size:.85em;color:var(--muted);line-height:1.5">
-          持倉編輯已搬到「投資組合」 PWA。在那邊加交易，總損益自動顯示在晨報頂部，<br>
+          持倉編輯已搬到「投資組合」 PWA。在那邊加交易，總損益自動顯示在今日頂部，<br>
           這邊 settings 不再 key qty / 成本。
         </p>
         <button type="button" onclick="location.href='/portfolio'">→ 去投資組合</button>
@@ -2378,9 +2378,9 @@ body { padding-bottom: calc(64px + env(safe-area-inset-bottom, 0px)); }
 <!-- Nickname onboarding modal -->
 <div class="modal-wrap" id="nick-wrap" style="display:none">
   <div class="modal" style="max-width:360px">
-    <h3 style="margin-bottom:6px">🌅 晨報</h3>
+    <h3 style="margin-bottom:6px">📰 今日</h3>
     <div style="font-size:.85em;color:var(--muted);margin-bottom:14px;line-height:1.6">
-      幫你的晨報取個名字<br>
+      先取個暱稱<br>
       <span style="font-size:.85em">（重灌或換裝置時用同一個名字就能找回歷史）</span>
     </div>
     <input id="nick-input" type="text" maxlength="20" placeholder="你的暱稱 (2-20 字)" autocomplete="off"
@@ -2394,7 +2394,7 @@ body { padding-bottom: calc(64px + env(safe-area-inset-bottom, 0px)); }
 <div class="modal-wrap" id="date-wrap" onclick="if(event.target===this)hideDate()">
   <div class="modal">
     <button class="close" onclick="hideDate()">✕</button>
-    <h3>📅 歷史晨報</h3>
+    <h3>📅 歷史</h3>
     <div class="cal-hdr">
       <button class="cal-nav" id="cal-prev">◀</button>
       <div class="cal-title" id="cal-title">—</div>
@@ -2491,7 +2491,7 @@ function setUid(uid) {
 // User 明確要求保留本地自選快取，且資料跟著 uid 走 (跨裝置 sync via server)
 async function changeUid() {
   const cur = getUid();
-  const v = prompt('輸入你的暱稱（晨報跟投資組合共用）：', cur);
+  const v = prompt('輸入你的暱稱（今日跟投資組合共用）：', cur);
   if (v === null) return;
   const trimmed = v.trim();
   if (!trimmed || trimmed === cur) return;
@@ -4363,7 +4363,7 @@ async function loadAndRender(date) {
     const data = await fetchReport(date);
     renderReport(data);
   } catch (e) {
-    document.getElementById('root').innerHTML = '<div class="error">載入失敗：' + e.message + '<br><br>晨報資料尚未產生，請稍後再試。</div>';
+    document.getElementById('root').innerHTML = '<div class="error">載入失敗：' + e.message + '<br><br>今日資料尚未產生，請稍後再試。</div>';
   }
 }
 

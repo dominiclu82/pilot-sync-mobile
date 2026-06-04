@@ -29,6 +29,8 @@ import { getSpaFriendsJs } from './spa/js-friends.js';
 import { getSpaGroupsJs } from './spa/js-groups.js';
 import { morningRouter, startMorningCron } from './morning.js';
 import { pilotLogRouter } from './pilot-log/routes.js';
+import { requireAuth, AuthedRequest } from './pilot-log/auth.js';
+import { isOwnerUserId } from './pilot-log/beta.js';
 import { startPilotLogSnapshotCron } from './pilot-log/schema.js';
 import { portfolioRouter, startPortfolio } from './portfolio/routes.js';
 import FR24Pkg from 'flightradarapi';
@@ -247,7 +249,7 @@ app.get('/apps', (_req, res) => {
   const apps = [
     { icon: '🛬', name: 'CrewSync', href: '/main', cn: '班表同步 · 機場天氣 · 跑道圖 · 即時雷達', en: 'Roster · Weather · Runway maps · Live radar' },
     { icon: '📒', name: 'Pilot Log', href: '/pilot-log', cn: '電子飛行紀錄 · 自動帶班表 · 統計分析', en: 'Electronic logbook · roster import · analytics' },
-    { icon: '🌅', name: '晨報 Morning', href: '/morning', cn: '每日晨間簡報', en: 'Daily morning brief' },
+    { icon: '📰', name: '今日 Today', href: '/morning', cn: '新聞 · 天氣 · 投資速覽', en: 'News · Weather · Portfolio' },
   ];
   const cards = apps.map(a =>
     `<a class="app" href="${a.href}">
@@ -1175,8 +1177,11 @@ app.get('/debug/screenshot', (_req, res) => {
 });
 
 // ── Database admin endpoints ──────────────────────────────────────────────────
-app.get('/api/users', async (req, res) => {
-  if (req.query.pw !== 'qwertyui') return res.status(403).json({ error: 'Forbidden' });
+// V8.0.45：拿掉「密碼寫在網址」(?pw=) 的舊機制，改成 owner Google 登入後才看得到
+// （比照 /tower：Bearer token + isOwnerUserId）。一般用戶/外洩網址都拿不到。
+// 註：完整三 App 用戶總覽已整合進 /tower，這支端點保留作為 CrewSync 單獨查詢。
+app.get('/api/users', requireAuth, async (req: AuthedRequest, res) => {
+  if (!(await isOwnerUserId(req.pilotUserId || ''))) return res.status(403).json({ error: 'not_owner' });
   if (!_pool) return res.json({ error: 'No database' });
   try {
     const r = await _pool.query('SELECT email, name, rank, sharing, created_at, updated_at FROM cs_users ORDER BY created_at DESC');

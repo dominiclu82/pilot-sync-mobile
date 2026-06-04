@@ -52,8 +52,8 @@ import { getAirportDbJs } from '../spa/js-airport-db.js';
 
 // ── 版本（比照 CrewSync / Morning：每次推版必更新；SW cache 名稱跟著走） ────
 // 本機 preview build 會暫時加 -tNN 後綴方便對版；推正式版前拿掉只留乾淨版號。
-export const PILOT_LOG_VERSION = 'V2.1.04';
-const PILOT_LOG_CACHE = 'pilotlog-v2-1-04';
+export const PILOT_LOG_VERSION = 'V2.1.05';
+const PILOT_LOG_CACHE = 'pilotlog-v2-1-05';
 
 export const pilotLogRouter = express.Router();
 
@@ -337,6 +337,11 @@ if (document.readyState !== 'loading') pilotLogInit();
 function _renderPilotLogChangelog(): string {
   return `
     <div class="pl-cl-v">${PILOT_LOG_VERSION}</div>
+    <div class="pl-cl-txt">
+      <b>後台維護與安全性強化。</b>本次為背景維護與安全性更新，使用者操作與介面不變。<br>
+      <b>Backend maintenance &amp; security hardening.</b> Background maintenance and security update; nothing changes in how you use the app.
+    </div>
+    <div class="pl-cl-v old">V2.1.04</div>
     <div class="pl-cl-txt">
       <b>修正跑道圖對不準（不少機場跑道線歪斜）。</b>之前為了「高緯機場的圖不變形」加的<b>經度補償</b>，反而讓地圖範圍的長寬比跟圖檔不一致，Esri 會自動微調範圍配合圖檔，但跑道線仍照原始範圍畫 → 跑道線歪斜、對不準衛星圖（緯度越高越明顯）。改成<b>範圍長寬比直接 = 圖檔 640:440</b>，Esri 不再微調，跑道線回到貼齊真實跑道。<br>
       <b>Fixed runway-overlay misalignment.</b> A longitude compensation (added to keep high-latitude maps undistorted) made the map extent ratio differ from the image, so Esri auto-adjusted the bbox while the runway lines were still drawn for the original extent — leaving them skewed off the real runways (worse at higher latitudes). The extent ratio now matches the image (640:440) exactly, so runway lines line up with the satellite imagery again.
@@ -2027,9 +2032,10 @@ pilotLogRouter.get('/api/pilot-log/oops/users', requireAuth, async (req: AuthedR
 // 可查詢的後台 UI：一開頁就顯示 DB 用量 / 成長 / 各表 size / 匿名 user 統計。
 // 不需密碼（網址未對外連結 + 不回任何 email）；meta robots=noindex 不被搜尋。
 pilotLogRouter.get('/pilot-log/oops', (_req, res) => {
-  res.setHeader('Content-Type', 'text/html; charset=utf-8');
-  res.setHeader('Cache-Control', 'no-store');
-  res.send(`<!DOCTYPE html>
+  // V8.0.45：DB 用量總覽已整合進 /tower（需 owner Google 登入）。舊書籤 302 轉址過去。
+  res.redirect(302, '/tower');
+});
+const _OOPS_PAGE_RETIRED = `<!DOCTYPE html>
 <html lang="zh-Hant"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="robots" content="noindex">
@@ -2165,8 +2171,10 @@ function oRenderUsers(us){ if(!us.length){ el('ousers').innerHTML='<div class="m
 load();
 ologinInit();
 </script>
-</body></html>`);
-});
+</body></html>`;
+// TODO(V8.0.45)：舊 /pilot-log/oops DB-admin 頁已整合進 /tower（owner 登入），route 改 302 轉址。
+// 此頁 HTML 暫留備查（遵守「刪碼留 TODO」），確認 /tower 穩定後可移除整段 const。
+void _OOPS_PAGE_RETIRED;
 
 // ══ 🐵 封閉測試招募（monkey）════════════════════════════════════════════════
 // 招募頁 /monkey（刻意不放 /pilot-log 底下）；報名 / 名額 API；owner 後台 /monkey/admin。
@@ -2222,6 +2230,61 @@ pilotLogRouter.post('/api/pilot-log/monkey/admin/friend', requireAuth, async (re
 pilotLogRouter.delete('/api/pilot-log/monkey/admin/:id', requireAuth, async (req: AuthedRequest, res) => {
   if (!(await _plRequireOwner(req, res))) return;
   res.json({ ok: await removeApplicant(req.params.id) });
+});
+
+// ── 整合 owner 後台：跨 App 用戶總覽（owner Google 登入才看，含 PII；不放 pw 網址）──────
+// 一次查同一個 DB 的三個 App：Pilot Log（標 ⭐founder＝email 在報名名單裡＝創始測試者）、CrewSync、Morning。
+pilotLogRouter.get('/api/pilot-log/admin/all-users', requireAuth, async (req: AuthedRequest, res) => {
+  if (!(await _plRequireOwner(req, res))) return;
+  const pool = getPool();
+  // 比照其他 Pilot Log endpoint：先 ensureTables，避免全新/未初始化環境 SELECT 撞表不存在 → 500
+  if (!pool || !(await ensureTables())) return res.status(503).json({ error: 'database_unavailable' });
+  try {
+    const pilot = await pool.query(`
+      SELECT u.id, u.created_at, u.last_login_at, u.last_seen_at, u.last_import_at,
+        (SELECT array_agg(e.email ORDER BY e.is_primary DESC, e.linked_at) FROM pilot_user_emails e WHERE e.user_id = u.id) AS emails,
+        EXISTS(SELECT 1 FROM pilot_user_emails e JOIN pilot_beta_applicants a ON LOWER(a.email) = LOWER(e.email) WHERE e.user_id = u.id) AS founder,
+        (SELECT COUNT(*)::int FROM pilot_log_entries pe WHERE pe.user_id = u.id) AS entries,
+        (SELECT COUNT(*)::int FROM pilot_log_entries pe WHERE pe.user_id = u.id AND pe.in_utc IS NOT NULL) AS flown,
+        (SELECT json_build_object(
+           'roster', COUNT(*) FILTER (WHERE source = 'roster'),
+           'logten', COUNT(*) FILTER (WHERE source = 'logten'),
+           'wader',  COUNT(*) FILTER (WHERE source = 'wader'),
+           'manual', COUNT(*) FILTER (WHERE source = 'manual')
+         ) FROM pilot_log_entries pe WHERE pe.user_id = u.id) AS sources,
+        (SELECT COUNT(*)::int FROM pilot_aircraft pa WHERE pa.user_id = u.id) AS aircraft,
+        (SELECT COUNT(*)::int FROM crew c WHERE c.user_id = u.id) AS crew
+      FROM pilot_users u ORDER BY u.created_at DESC`);
+    const cs = await pool.query(`
+      SELECT email, name, nickname, rank, fleet, sharing, employee_id, (picture IS NOT NULL) AS has_pic,
+        created_at, updated_at,
+        (SELECT COUNT(*)::int FROM cs_rosters r WHERE r.employee_id = cs_users.employee_id) AS rosters
+      FROM cs_users ORDER BY created_at DESC`).catch(() => ({ rows: [] as any[] }));
+    // 隱私界線：只撈 user_id + 時間，不撈 prefs（內含 watchlist/holdings/portfolio_pin_hash 等私人內容）
+    const mr = await pool.query(
+      `SELECT user_id, updated_at FROM morning_prefs ORDER BY updated_at DESC`
+    ).catch(() => ({ rows: [] as any[] }));
+    // Groups：各群人數 / 類型(preset/custom) / 建立者 / 邀請碼 / 建立時間
+    const groups = await pool.query(`
+      SELECT g.id, g.name, g.type, g.created_by, g.invite_code, g.created_at,
+        (SELECT COUNT(*)::int FROM cs_group_members gm WHERE gm.group_id = g.id) AS members
+      FROM cs_groups g ORDER BY members DESC, g.created_at`).catch(() => ({ rows: [] as any[] }));
+    const sharingCount = cs.rows.filter((u: any) => u.sharing).length;   // friends = 有開分享(sharing=true)的人數
+    const dbsize = await pool.query(
+      `SELECT db_total_bytes, pilot_log_bytes, restaurant_etc_bytes, captured_at
+       FROM pilot_db_size_history ORDER BY captured_at DESC LIMIT 30`
+    ).catch(() => ({ rows: [] as any[] }));
+    res.json({
+      pilot: { count: pilot.rows.length, users: pilot.rows },
+      crewsync: { count: cs.rows.length, sharing: sharingCount, users: cs.rows },
+      morning: { count: mr.rows.length, users: mr.rows },
+      groups: { count: groups.rows.length, list: groups.rows },
+      // 整庫 / pilot-log / 餐廳+其他 大小快照（最新 + 最近 30 筆，前端算成長速度、推估到 1GB）
+      db: { latest: dbsize.rows[0] || null, history: dbsize.rows },
+    });
+  } catch (e: any) {
+    res.status(500).json({ error: e.message });
+  }
 });
 
 // ── 招募頁 /monkey ───────────────────────────────────────────────────────────
@@ -2538,6 +2601,271 @@ if(document.readyState!=='loading') mkInit();
 </script>
 </body>
 </html>`;
+}
+
+// ══ 🗼 整合 owner 後台 /tower ════════════════════════════════════════════════
+// owner Google 登入 → 一頁看三個 App 全部用戶（CrewSync / Pilot Log[⭐founder] / Morning）
+// + Groups + DB 用量（取代 /oops）。PWA（可加到主畫面）+ 重新整理鈕。含 PII，走 owner 驗證。
+pilotLogRouter.get('/tower', (_req, res) => {
+  res.setHeader('Content-Type', 'text/html; charset=utf-8');
+  res.setHeader('Cache-Control', 'no-store');
+  res.setHeader('X-Robots-Tag', 'noindex');
+  res.send(_renderTowerHtml());
+});
+pilotLogRouter.get('/tower/manifest.json', (_req, res) => {
+  res.setHeader('Content-Type', 'application/manifest+json; charset=utf-8');
+  res.json({
+    name: 'H-Peak Tower', short_name: 'Tower', start_url: '/tower', scope: '/tower',
+    display: 'standalone', background_color: '#0a0e1a', theme_color: '#0a0e1a',
+    icons: [{ src: '/tower/icon.svg', sizes: 'any', type: 'image/svg+xml', purpose: 'any maskable' }],
+  });
+});
+// ── /tower/icon.svg — Tower 專屬圖示（天際線 / skyline，跟 Pilot Log 記錄本區分）──
+const _TOWER_ICON_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="twrBg" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#0a0e1a"/><stop offset="100%" stop-color="#1e293b"/></linearGradient>
+    <linearGradient id="twrCv" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#60a5fa"/><stop offset="100%" stop-color="#3b82f6"/></linearGradient>
+  </defs>
+  <rect width="512" height="512" fill="url(#twrBg)"/>
+  <rect x="150" y="404" width="212" height="14" rx="7" fill="#1e3a5f"/>
+  <rect x="150" y="280" width="48" height="124" rx="8" fill="url(#twrCv)" opacity=".7"/>
+  <rect x="214" y="210" width="52" height="194" rx="8" fill="url(#twrCv)"/>
+  <rect x="282" y="248" width="48" height="156" rx="8" fill="url(#twrCv)" opacity=".82"/>
+  <rect x="334" y="312" width="34" height="92" rx="7" fill="url(#twrCv)" opacity=".55"/>
+  <rect x="232" y="170" width="16" height="44" fill="#cbd5e1"/>
+  <circle cx="240" cy="166" r="10" fill="#fbbf24"/>
+</svg>`;
+pilotLogRouter.get('/tower/icon.svg', (_req, res) => {
+  res.setHeader('Content-Type', 'image/svg+xml');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.send(_TOWER_ICON_SVG);
+});
+// ── /tower/sw.js — Tower 後台離線 SW（scope: /tower）──────────────────────────
+// 只快取殼（HTML/manifest/icon）讓離線開得起來；所有 /api 一律走網路（auth + PII 絕不快取）。
+pilotLogRouter.get('/tower/sw.js', (_req, res) => {
+  res.setHeader('Content-Type', 'application/javascript');
+  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+  res.setHeader('Service-Worker-Allowed', '/tower');
+  res.send(`
+const CACHE = 'tower-${PILOT_LOG_CACHE}';
+const SHELL = ['/tower', '/tower/manifest.json', '/tower/icon.svg'];
+self.addEventListener('install', e => {
+  e.waitUntil(caches.open(CACHE).then(c => Promise.all(SHELL.map(url =>
+    fetch(url, {cache:'no-store'}).then(r => c.put(url, r)).catch(()=>{})
+  ))));
+  self.skipWaiting();
+});
+self.addEventListener('activate', e => {
+  e.waitUntil(caches.keys().then(ks => Promise.all(
+    ks.filter(k => k.startsWith('tower-') && k !== CACHE).map(k => caches.delete(k))
+  )));
+  self.clients.claim();
+});
+self.addEventListener('fetch', e => {
+  if (e.request.method !== 'GET') return;
+  const u = new URL(e.request.url);
+  if (!u.pathname.startsWith('/tower')) return;          // 只接管 /tower 殼
+  e.respondWith(
+    caches.match(e.request).then(cached => {
+      const net = fetch(e.request).then(r => {
+        caches.open(CACHE).then(c => c.put(e.request, r.clone())).catch(()=>{});
+        return r;
+      }).catch(() => cached);
+      return cached || net;                               // 殼 cache 優先 + 背景更新
+    })
+  );
+});
+`);
+});
+
+function _renderTowerHtml(): string {
+  return `<!DOCTYPE html>
+<html lang="zh-Hant"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex"><meta name="theme-color" content="#0a0e1a">
+<link rel="manifest" href="/tower/manifest.json"><meta name="apple-mobile-web-app-capable" content="yes">
+<link rel="icon" href="/tower/icon.svg" type="image/svg+xml"><link rel="apple-touch-icon" href="/tower/icon.svg">
+<title>🗼 Tower · H-Peak 後台</title>
+<style>
+  :root{color-scheme:dark}*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  body{margin:0;background:#0a0e1a;color:#e2e8f0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Noto Sans TC',sans-serif;font-size:15px;line-height:1.45}
+  .wrap{max-width:1100px;margin:0 auto;padding:max(16px,env(safe-area-inset-top)) 16px 60px}
+  .top{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:14px}
+  h1{font-size:1.25em;margin:0}.who{color:#94a3b8;font-size:.78em}
+  .ghost{background:transparent;border:1px solid #334155;color:#cbd5e1;border-radius:8px;padding:6px 11px;font-size:.78em;font-weight:700;cursor:pointer}
+  .dash{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:14px}
+  .card{background:#111827;border:1px solid #1f2a3d;border-radius:12px;padding:12px 14px}
+  .card .lbl{color:#94a3b8;font-size:.72em;font-weight:700;letter-spacing:.3px}.card .big{font-size:1.7em;font-weight:800;margin-top:2px}
+  .card .sub{color:#64748b;font-size:.72em;margin-top:2px}.card .seg{display:flex;gap:10px;margin-top:6px;font-size:.74em}.card .seg b{color:#e2e8f0}
+  .g{color:#4ade80}.y{color:#fbbf24}.gray{color:#94a3b8}.blue{color:#60a5fa}
+  .bar{height:7px;background:#0a0e1a;border-radius:4px;overflow:hidden;margin-top:7px;border:1px solid #1f2a3d}.bar>i{display:block;height:100%;background:linear-gradient(90deg,#3b82f6,#60a5fa)}
+  .tabs{display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap}
+  .tab{background:#111827;border:1px solid #1f2a3d;border-radius:10px;padding:8px 14px;font-size:.85em;font-weight:700;cursor:pointer;color:#cbd5e1}
+  .tab.on{background:#1e3a5f;border-color:#3b82f6;color:#fff}.tab .n{color:#60a5fa}
+  .ctrl{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+  .ctrl input{flex:1;min-width:160px;background:#0a0e1a;border:1px solid #1f2a3d;border-radius:9px;padding:8px 11px;color:#e2e8f0;font-size:.85em}
+  .ctrl select{background:#0a0e1a;border:1px solid #1f2a3d;border-radius:9px;padding:8px 11px;color:#cbd5e1;font-size:.85em}
+  .dist{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+  .chip{background:#0a0e1a;border:1px solid #1f2a3d;border-radius:8px;padding:5px 10px;font-size:.76em;color:#94a3b8}.chip b{color:#e2e8f0}
+  .sec{display:none}.sec.on{display:block}
+  .sechdr{display:flex;align-items:baseline;gap:10px;margin:4px 0 10px;flex-wrap:wrap}.sechdr h2{font-size:1.05em;margin:0}.sechdr .cnt{color:#94a3b8;font-size:.82em}
+  .row{background:#111827;border:1px solid #1f2a3d;border-radius:12px;padding:12px 14px;margin-bottom:9px}
+  .r1{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .dot{width:9px;height:9px;border-radius:50%;flex-shrink:0}.dot.g{background:#22c55e}.dot.y{background:#fbbf24}.dot.gray{background:#475569}
+  .id{font-weight:700;font-size:.96em;word-break:break-all}.name{color:#cbd5e1;font-size:.85em}
+  .badge{font-size:.68em;font-weight:800;padding:1px 7px;border-radius:5px;letter-spacing:.3px}
+  .founder{background:#422006;color:#fcd34d;border:1px solid #92590e}.both{background:#1e1b4b;color:#c4b5fd;border:1px solid #4c1d95}
+  .rank{background:#0a0e1a;color:#93c5fd;border:1px solid #1e3a5f}.fleet{background:#0a0e1a;color:#86efac;border:1px solid #14532d}
+  .on2{background:#052e16;color:#4ade80;border:1px solid #166534}.preset{background:#1e1b4b;color:#c4b5fd;border:1px solid #4c1d95}.custom{background:#0a0e1a;color:#94a3b8;border:1px solid #334155}
+  .stats{display:flex;gap:14px;flex-wrap:wrap;margin-top:7px;font-size:.78em;color:#94a3b8}.stats b{color:#e2e8f0;font-weight:700}
+  .src{display:flex;gap:8px;flex-wrap:wrap;margin-top:6px;font-size:.73em}.src span{background:#0a0e1a;border:1px solid #1f2a3d;border-radius:5px;padding:1px 7px;color:#94a3b8}.src b{color:#cbd5e1}
+  .t{color:#64748b;font-size:.72em;margin-top:5px}.err{color:#fca5a5}#gsi{margin:14px 0}
+  .note{color:#64748b;font-size:.74em;margin-top:22px;line-height:1.6;border-top:1px solid #1f2a3d;padding-top:12px}
+</style></head><body><div class="wrap">
+  <div class="top"><h1>🗼 Tower</h1><div class="who"><span id="me"></span> <button class="ghost" id="reBtn" style="display:none" onclick="load()">🔄 重新整理</button> <button class="ghost" id="outBtn" style="display:none" onclick="logout()">登出</button></div></div>
+  <div id="msg" class="who" style="margin-bottom:10px"></div>
+  <div id="login" class="card"><div class="who" style="margin-bottom:6px">擁有者 Google 登入</div><div id="gsi"></div></div>
+  <div id="app" style="display:none"></div>
+  <div class="note" id="foot" style="display:none">🟢 今日 · 🟡 7天 · ⚪ 久未用。只給 owner 看，收集量+時間+身份+功能使用，不顯示任何私人內容（航班備註/組員姓名/班表內容/晨報細節都不撈）。</div>
+</div>
+<script>
+var T={token:null,clientId:null,data:null,db:null,tab:0,q:'',sort:'active'};
+function el(id){return document.getElementById(id);}
+function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
+function fmtDt(s){if(!s)return'—';var d=new Date(s);if(isNaN(d))return'—';return d.toISOString().slice(0,16).replace('T',' ');}
+function actDot(s){if(!s)return'gray';var days=(Date.now()-new Date(s).getTime())/864e5;return days<1?'g':days<7?'y':'gray';}
+function mb(b){return b==null?'—':(b/1048576).toFixed(b<10485760?1:0)+' MB';}
+async function cfg(){if(T.clientId)return T.clientId;try{var r=await fetch('/api/pilot-log/config');var j=await r.json();T.clientId=j.google_client_id;return T.clientId;}catch(e){return null;}}
+function gis(){if(window.google&&google.accounts&&google.accounts.id)return Promise.resolve();if(window._g)return window._g;window._g=new Promise(function(res,rej){var s=document.createElement('script');s.src='https://accounts.google.com/gsi/client';s.async=true;s.defer=true;s.onload=res;s.onerror=rej;document.head.appendChild(s);});return window._g;}
+async function initLogin(){var c=await cfg();if(!c){el('msg').innerHTML='<span class=err>Google 載入失敗</span>';return;}await gis();google.accounts.id.initialize({client_id:c,callback:onCred,auto_select:false});google.accounts.id.renderButton(el('gsi'),{theme:'filled_blue',size:'large',text:'signin_with',shape:'pill'});}
+async function onCred(resp){if(!resp||!resp.credential)return;el('msg').textContent='登入中…';var r=await fetch('/api/pilot-log/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({idToken:resp.credential})});if(!r.ok){el('msg').innerHTML='<span class=err>登入失敗</span>';return;}var j=await r.json();T.token=j.accessToken;try{localStorage.setItem('tower_tk',T.token);}catch(e){}load();}
+function logout(){T.token=null;try{localStorage.removeItem('tower_tk');}catch(e){}el('app').style.display='none';el('foot').style.display='none';el('login').style.display='';el('reBtn').style.display='none';el('outBtn').style.display='none';el('me').textContent='';el('msg').textContent='';}
+async function api(path){var r=await fetch(path,{headers:{'Authorization':'Bearer '+T.token}});if(r.status===401){logout();el('msg').innerHTML='<span class=err>登入過期，請重新登入</span>';throw new Error('401');}return r;}
+async function load(){
+  if(!T.token){try{T.token=localStorage.getItem('tower_tk');}catch(e){}if(!T.token){return;}}
+  el('msg').textContent='查詢中…';el('login').style.display='none';
+  try{
+    var r=await api('/api/pilot-log/admin/all-users');
+    if(r.status===403){el('msg').innerHTML='<span class=err>這個帳號不是擁有者</span>';el('login').style.display='';return;}
+    if(!r.ok){el('msg').innerHTML='<span class=err>查詢失敗 '+r.status+'</span>';return;}
+    T.data=await r.json();
+    try{var rs=await api('/api/pilot-log/oops/stats?limit=30');if(rs.ok)T.db=await rs.json();}catch(e){}
+    try{var ru=await api('/api/pilot-log/oops/users');if(ru.ok){var ju=await ru.json();T.dbusers=ju.users||[];}}catch(e){}
+    el('me').textContent='owner';el('reBtn').style.display='';el('outBtn').style.display='';el('foot').style.display='';el('msg').textContent='';
+    render();
+  }catch(e){}
+}
+function dash(){
+  var d=T.data,p=d.pilot,c=d.crewsync,m=d.morning,gp=d.groups;
+  function act(arr,key,days){var n=0,now=Date.now();arr.forEach(function(u){var t=u[key];if(t&&(now-new Date(t).getTime())/864e5<days)n++;});return n;}
+  var actToday=act(c.users,'updated_at',1)+act(p.users,'last_seen_at',1)+act(m.users,'updated_at',1);
+  var act7=act(c.users,'updated_at',7)+act(p.users,'last_seen_at',7)+act(m.users,'updated_at',7);
+  var act30=act(c.users,'updated_at',30)+act(p.users,'last_seen_at',30)+act(m.users,'updated_at',30);
+  var newToday=act(c.users,'created_at',1)+act(p.users,'created_at',1);
+  // 跨 app 重疊：pilot emails ∩ crewsync emails
+  var csSet={};c.users.forEach(function(u){if(u.email)csSet[u.email.toLowerCase()]=1;});
+  var overlap=p.users.filter(function(u){return(u.emails||[]).some(function(e){return csSet[(e||'').toLowerCase()];});}).length;
+  var db=T.db&&T.db.latest?T.db.latest:(d.db&&d.db.latest?d.db.latest:null);
+  var pct=db?Math.min(100,Math.round(db.db_total_bytes/10737418.24)):0;
+  return '<div class=dash>'+
+    '<div class=card><div class=lbl>總用戶</div><div class=big>'+(p.count+c.count+m.count)+'</div><div class=seg><span>🛬 <b>'+c.count+'</b></span><span>📒 <b>'+p.count+'</b></span><span>🌅 <b>'+m.count+'</b></span></div></div>'+
+    '<div class=card><div class=lbl>活躍人數</div><div class="big g">'+actToday+'</div><div class=seg><span class=g>今日 <b>'+actToday+'</b></span><span class=y>7天 <b>'+act7+'</b></span><span class=gray>30天 <b>'+act30+'</b></span></div></div>'+
+    '<div class=card><div class=lbl>今日新增</div><div class="big blue">+'+newToday+'</div></div>'+
+    '<div class=card><div class=lbl>跨 App 重疊</div><div class=big>'+overlap+'</div><div class=sub>CrewSync + Pilot Log</div></div>'+
+    (db?'<div class=card><div class=lbl>資料庫</div><div class=big>'+mb(db.db_total_bytes)+'<span style="font-size:.5em;color:#64748b"> / 1 GB</span></div><div class=bar><i style="width:'+pct+'%"></i></div><div class=sub>'+pct+'% · Pilot Log '+mb(db.pilot_log_bytes)+'</div></div>':'')+
+  '</div>';
+}
+function filt(arr,keys){var q=T.q.toLowerCase();if(!q)return arr;return arr.filter(function(u){return keys.some(function(k){var v=u[k];if(Array.isArray(v))v=v.join(' ');return String(v||'').toLowerCase().indexOf(q)>=0;});});}
+function render(){
+  var d=T.data;if(!d){return;}
+  var p=d.pilot,c=d.crewsync,m=d.morning,gp=d.groups;
+  var h=dash();
+  h+='<div class=tabs>'+
+    '<div class="tab'+(T.tab===0?' on':'')+'" onclick="setTab(0)">🛬 CrewSync <span class=n>· '+c.count+'</span></div>'+
+    '<div class="tab'+(T.tab===1?' on':'')+'" onclick="setTab(1)">📒 Pilot Log <span class=n>· '+p.count+'</span></div>'+
+    '<div class="tab'+(T.tab===2?' on':'')+'" onclick="setTab(2)">🌅 Morning <span class=n>· '+m.count+'</span></div>'+
+    '<div class="tab'+(T.tab===3?' on':'')+'" onclick="setTab(3)">👥 Groups <span class=n>· '+gp.count+'</span></div>'+
+    '<div class="tab'+(T.tab===4?' on':'')+'" onclick="setTab(4)">💾 DB</div>'+
+  '</div>';
+  if(T.tab<3){h+='<div class=ctrl><input placeholder="🔍 搜尋…" value="'+esc(T.q)+'" oninput="T.q=this.value;render()"></div>';}
+  if(T.tab===0)h+=secCrew(c);else if(T.tab===1)h+=secPilot(p,c);else if(T.tab===2)h+=secMorning(m);else if(T.tab===3)h+=secGroups(gp);else h+=secDb();
+  el('app').style.display='';el('app').innerHTML=h;
+}
+function secCrew(c){
+  var fl={},rk={},sh=0;c.users.forEach(function(u){if(u.fleet)fl[u.fleet]=(fl[u.fleet]||0)+1;if(u.rank)rk[u.rank]=(rk[u.rank]||0)+1;if(u.sharing)sh++;});
+  var flS=Object.keys(fl).map(function(k){return k+' '+fl[k];}).join(' / ')||'—';
+  var rkS=Object.keys(rk).map(function(k){return k+' '+rk[k];}).join(' / ')||'—';
+  var rows=filt(c.users,['email','name','nickname','employee_id']).map(function(u){
+    return '<div class=row><div class=r1><span class="dot '+actDot(u.updated_at)+'"></span><span class=id>'+esc(u.email)+'</span>'+(u.nickname||u.name?'<span class=name>'+esc(u.nickname||u.name)+'</span>':'')+(u.rank?'<span class="badge rank">'+esc(u.rank)+'</span>':'')+(u.fleet?'<span class="badge fleet">'+esc(u.fleet)+'</span>':'')+(u.sharing?'<span class="badge on2">分享開</span>':'')+'</div>'+
+      '<div class=stats><span>員編 <b>'+esc(u.employee_id||'—')+'</b></span><span>班表 <b>'+(u.rosters||0)+'</b> 個月</span><span>大頭照 <b>'+(u.has_pic?'有':'—')+'</b></span></div>'+
+      '<div class=t>加入 '+fmtDt(u.created_at)+' · 最後同步 '+fmtDt(u.updated_at)+'</div></div>';
+  }).join('');
+  return '<div class=dist><span class=chip>機隊 · '+esc(flS)+'</span><span class=chip>職級 · '+esc(rkS)+'</span><span class=chip>開分享 <b class=g>'+sh+'</b> / '+c.count+'</span></div>'+rows;
+}
+function secPilot(p,c){
+  var csSet={};c.users.forEach(function(u){if(u.email)csSet[u.email.toLowerCase()]=1;});
+  var fo=0;p.users.forEach(function(u){if(u.founder)fo++;});
+  var rows=filt(p.users,['emails']).map(function(u){
+    var em=(u.emails||[]).join(', ');var both=(u.emails||[]).some(function(e){return csSet[(e||'').toLowerCase()];});var s=u.sources||{};
+    return '<div class=row><div class=r1><span class="dot '+actDot(u.last_seen_at||u.last_login_at)+'"></span><span class=id>'+esc(em||u.id)+'</span>'+(u.founder?'<span class="badge founder">⭐ FOUNDER</span>':'')+(both?'<span class="badge both">＋CrewSync</span>':'')+'</div>'+
+      '<div class=stats><span>航班 <b>'+(u.entries||0)+'</b>（飛過 <b>'+(u.flown||0)+'</b>）</span><span>機隊 <b>'+(u.aircraft||0)+'</b></span><span>通訊錄 <b>'+(u.crew||0)+'</b></span></div>'+
+      '<div class=src><span>班表 <b>'+(s.roster||0)+'</b></span><span>LogTen <b>'+(s.logten||0)+'</b></span><span>Wader <b>'+(s.wader||0)+'</b></span><span>手動 <b>'+(s.manual||0)+'</b></span></div>'+
+      '<div class=t>註冊 '+fmtDt(u.created_at)+' · 最後登入 '+fmtDt(u.last_login_at)+' · 最後匯入 '+fmtDt(u.last_import_at)+'</div></div>';
+  }).join('');
+  return '<div class=dist><span class=chip>⭐ 創始 <b>'+fo+'</b> / '+p.count+'</span></div>'+rows;
+}
+function secMorning(m){
+  var rows=filt(m.users,['user_id']).map(function(u){
+    return '<div class=row><div class=r1><span class="dot '+actDot(u.updated_at)+'"></span><span class=id>'+esc(u.user_id)+'</span></div><div class=t>最後使用 '+fmtDt(u.updated_at)+'</div></div>';
+  }).join('');
+  return rows||'<div class=row><span class=gray>無資料</span></div>';
+}
+function secGroups(gp){
+  var rows=(gp.list||[]).map(function(g){
+    return '<div class=row><div class=r1><span class=id>'+esc(g.name)+'</span><span class="badge '+(g.type==='preset'?'preset':'custom')+'">'+(g.type==='preset'?'預設':'自訂')+'</span></div>'+
+      '<div class=stats><span>成員 <b>'+(g.members||0)+'</b> 人</span><span>建立者 <b>'+esc(g.created_by||'—')+'</b></span></div>'+
+      '<div class=t>邀請碼 '+esc(g.invite_code||'—')+' · 建立 '+fmtDt(g.created_at)+'</div></div>';
+  }).join('');
+  return rows||'<div class=row><span class=gray>無群組</span></div>';
+}
+function fmtMB(v){return v==null?'—':v+' MB';}
+function secDb(){
+  var s=T.db;if(!s){return '<div class=row><span class=gray>DB 統計載入中…</span></div>';}
+  var b=s.breakdown||{},g=s.growth||{},u=s.users||{},en=s.entries||{},rg=s.recent_growth||{},byS=en.by_status||{};
+  var pct=Math.min(100,Math.round(((s.all_db_size_mb||0)/1024)*100));
+  var h='<div class=dash>'+
+    '<div class=card><div class=lbl>整庫 / Disk</div><div class=big>'+fmtMB(s.all_db_size_mb)+'</div><div class=bar><i style="width:'+pct+'%"></i></div><div class=sub>'+pct+'% of 1 GB</div></div>'+
+    '<div class=card><div class=lbl>Pilot Log</div><div class=big>'+fmtMB(s.total_pilot_log_size_mb)+'</div></div>'+
+    '<div class=card><div class=lbl>餐廳+其他</div><div class=big>'+fmtMB(s.restaurant_etc_size_mb)+'</div></div>'+
+    (g.months_to_1gb!=null?'<div class=card><div class=lbl>多久滿 1GB</div><div class=big>'+(g.months_to_1gb===0?'⚠️已滿':'~'+g.months_to_1gb+' 月')+'</div><div class=sub>每天 +'+(g.per_day_total_mb!=null?g.per_day_total_mb:'—')+' MB · 滿載 '+(g.full_date_estimate||'—')+'</div></div>':'<div class=card><div class=lbl>成長</div><div class="big gray" style="font-size:1.1em">累積中</div><div class=sub>快照 '+(g.snapshot_count||0)+' 筆 / '+(g.history_days||0)+' 天</div></div>')+
+  '</div>';
+  // 使用者 / 航班 + 近期成長
+  h+='<div class=row><div class=stats><span>使用者 <b>'+(u.total||0)+'</b>（有資料 <b>'+(u.with_entries||0)+'</b> · 7天活躍 <b>'+(u.active_7d||0)+'</b>）</span></div>'+
+    '<div class=stats><span>航班總 <b>'+(en.total||0)+'</b>（confirmed <b>'+(byS.confirmed||0)+'</b> / draft <b>'+(byS.draft||0)+'</b>）</span></div>'+
+    '<div class=t>近 7 天 +'+(rg.new_users_7d||0)+' 人 / +'+(rg.new_entries_7d||0)+' 航班　·　近 30 天 +'+(rg.new_users_30d||0)+' 人 / +'+(rg.new_entries_30d||0)+' 航班</div></div>';
+  // 各表大小排行（含餐廳表）
+  var tt=b.top_tables_by_size||[];
+  if(tt.length){h+='<div class=sechdr><h2 style="font-size:.98em">各表大小排行</h2><span class=cnt>餐廳的表也在這</span></div>';
+    h+='<div class=row style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:.8em;font-variant-numeric:tabular-nums"><tr style="color:#94a3b8"><th style="text-align:left;padding:4px 6px">Table</th><th style="text-align:right;padding:4px 6px">Rows</th><th style="text-align:right;padding:4px 6px">MB</th></tr>'+
+      tt.map(function(t){return '<tr><td style="padding:3px 6px;border-top:1px solid #1f2a3d">'+esc(t.name)+'</td><td style="text-align:right;padding:3px 6px;border-top:1px solid #1f2a3d">'+(t.approx_rows!=null?t.approx_rows.toLocaleString():'—')+'</td><td style="text-align:right;padding:3px 6px;border-top:1px solid #1f2a3d">'+t.total_mb+'</td></tr>';}).join('')+'</table></div>';
+  }
+  // Top users（匿名排名）
+  var tu=b.top_users_by_entries||[];
+  if(tu.length){h+='<div class=sechdr><h2 style="font-size:.98em">Top users（匿名排名）</h2></div>';
+    h+='<div class=row><table style="width:100%;font-size:.8em;font-variant-numeric:tabular-nums"><tr style="color:#94a3b8"><th style="text-align:left">#</th><th style="text-align:right">Flights</th><th style="text-align:right">Aircraft</th></tr>'+
+      tu.map(function(x,i){return '<tr><td>#'+(i+1)+'</td><td style="text-align:right">'+x.entry_count+'</td><td style="text-align:right">'+x.aircraft_count+'</td></tr>';}).join('')+'</table></div>';
+  }
+  // 逐人用量（含 email，owner 才看）
+  var du=T.dbusers||[];
+  if(du.length){h+='<div class=sechdr><h2 style="font-size:.98em">逐人用量</h2><span class=cnt>誰佔多少空間 · 不讀內容</span></div>';
+    h+=du.map(function(x){var size=(x.mb>=0.1)?(x.mb+' MB'):(x.kb+' KB');return '<div class=row><div class=r1><span class=id>'+esc(x.email)+'</span></div><div class=stats><span>佔用 <b>'+size+'</b></span><span>航班 <b>'+x.entry_count+'</b></span><span>加入 '+esc(x.created_at||'—')+'</span></div></div>';}).join('');}
+  return h;
+}
+function setTab(i){T.tab=i;render();}
+if('serviceWorker' in navigator){navigator.serviceWorker.register('/tower/sw.js',{scope:'/tower'}).catch(function(){});}
+initLogin();load();
+</script>
+</body></html>`;
 }
 
 // ══ 🐵 owner 後台 /monkey/admin ══════════════════════════════════════════════

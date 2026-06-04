@@ -592,7 +592,7 @@ export function getPortfolioHtml(): string {
     <!-- Bottom fixed navbar: tabs (左) + function keys (右) -->
     <nav class="tab-nav">
       <div class="tab-links">
-        <a href="/morning">🌅 晨報</a>
+        <a href="/morning">📰 今日</a>
         <a href="/portfolio" class="active">📈 投資組合</a>
       </div>
       <div class="tab-controls">
@@ -943,7 +943,7 @@ function updateUidDisplay() {
 }
 function changeUid() {
   const cur = getUid();
-  const v = prompt('輸入你的暱稱（晨報跟投資組合共用）：', cur);
+  const v = prompt('輸入你的暱稱（今日跟投資組合共用）：', cur);
   if (v === null) return;
   const trimmed = v.trim();
   if (!trimmed) return;
