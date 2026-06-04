@@ -1029,7 +1029,7 @@ function _plEditorField(label, name, type, opts) {
   var e = _pl.editing;
   var val = e[name];
   if (val == null) val = '';
-  var attrs = 'id="ple-' + name + '" style="width:100%;background:var(--bg,#0a0e1a);color:var(--text);border:1px solid var(--border,#334155);border-radius:6px;padding:6px 8px;font-size:.78em"';
+  var attrs = 'id="ple-' + name + '" style="width:100%;box-sizing:border-box;background:var(--bg,#0a0e1a);color:var(--text);border:1px solid var(--border,#334155);border-radius:6px;padding:6px 8px;font-size:.78em"';
   var input;
   if (type === 'time-utc') {
     var oninp = opts.localOf ? ' oninput="_plUpdateSchedLocal(\'' + name + '\',\'' + opts.localOf + '\')"' : '';
@@ -1046,7 +1046,7 @@ function _plEditorField(label, name, type, opts) {
   } else if (type === 'textarea') {
     input = '<textarea ' + attrs + ' rows="2">' + _plEsc(val) + '</textarea>';
   } else if (type === 'number') {
-    if (opts.readonly) attrs = 'id="ple-' + name + '" readonly tabindex="-1" style="width:100%;background:var(--card);color:var(--muted);border:1px solid var(--border,#334155);border-radius:6px;padding:6px 8px;font-size:.78em;font-weight:700"';
+    if (opts.readonly) attrs = 'id="ple-' + name + '" readonly tabindex="-1" style="width:100%;box-sizing:border-box;background:var(--card);color:var(--muted);border:1px solid var(--border,#334155);border-radius:6px;padding:6px 8px;font-size:.78em;font-weight:700"';
     input = '<input type="number" ' + attrs + ' value="' + _plEsc(val) + '" step="' + (opts.step || '1') + '">';
   } else if (type === 'date') {
     // 從 server 來的可能是 'YYYY-MM-DD' 純字串、'YYYY-MM-DDTHH:mm:ss.sssZ' ISO，
@@ -1066,7 +1066,7 @@ function _plEditorField(label, name, type, opts) {
         dateStr = '';
       }
     }
-    input = '<input type="date" ' + attrs + ' value="' + _plEsc(dateStr) + '">';   // native 日曆（iPhone/iPad 點了跳日期選擇器）
+    input = '<input type="date" ' + attrs + ' value="' + _plEsc(dateStr) + '" onclick="try{this.showPicker()}catch(e){}">';   // 點欄位任何位置就跳日曆（桌面原本只有點右側小 icon 才跳；iPhone/iPad 本來就會跳）
   } else if (opts.listId) {
     // V2.0.01：datalist 下拉 + 持續顯示的 ▾ 提示（讓使用者知道可下拉選，也能手動輸入覆蓋）
     var dvalL = opts.fmt ? opts.fmt(val) : val;

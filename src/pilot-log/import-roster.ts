@@ -10,9 +10,9 @@
 //
 // status 邏輯：
 //   - 同 source_ref 已是 confirmed → skip（使用者已 finalize，不可覆蓋）
-//   - 同 source_ref 已是 draft / roster_removed → 更新欄位，重設 status=draft
+//   - 同 source_ref 已是 draft / roster_removed → 更新欄位，重設 status=draft（roster_removed 為舊資料相容）
 //   - 沒有同 source_ref → 建新 draft
-//   - 同期間內舊 draft 不在新 roster → 改 roster_removed（保留歷史）
+//   - 同期間內舊 draft 不在新 roster → 直接刪除（V2.1.03：本來要飛、後來改飛別班，舊的不留）
 //   - 舊 confirmed 不在新 roster → 保留 confirmed（使用者飛過了）
 
 import { randomUUID } from 'crypto';
@@ -442,9 +442,9 @@ export async function importRoster(
     } catch (e) { /* 個別組員寫入失敗略過 */ }
   }
 
-  // 這次有匯入的月份 draft 沒看到的 → roster_removed。
+  // 這次有匯入的月份內、舊 draft 沒在新班表 → 直接刪掉（V2.1.03：不再標 roster_removed）。
   // codex P2：必須「per-month」sweep — 若同步了 5/7 但沒同步 6，連續 dateRange 會把 6 月舊
-  // draft 全部誤標 removed。優先用 months（每月各自掃），沒給才退回單一 dateRange（舊行為）。
+  // draft 全部誤刪。優先用 months（每月各自掃），沒給才退回單一 dateRange（舊行為）。
   const sweeps: Array<{ month: string | null; start: string; end: string }> = [];
   if (months && months.length) {
     for (const ym of months) {
@@ -463,13 +463,29 @@ export async function importRoster(
   // roster_month，所以「6 月班表的 SEA→TPE 回程（flight_date 落在 7/1）」會被 6 月 sweep 正確掃到，
   // 又不會誤動到真正屬於 7 月班表的 draft（它 roster_month='2026-07'）。舊資料 roster_month 為 NULL
   // → 退回原本的 flight_date 區間掃（非邊界腿都涵蓋；下次重匯就會補上 roster_month、自動升級成精準掃）。
+  // 「純班表草稿」判定（codex P1）：draft ≠ 沒碰過 —— 使用者可在 draft 上補很多手動欄位但 status 仍是 draft。
+  // 只有「所有手動欄位都還是空 / 預設」的純草稿才能在班表變更時安全直接刪；只要動過任何一個一律保留，
+  // 避免誤刪在記錄中或已飛的航班。班表本來就帶的欄位（position/std/sta/duty/crew/deadhead/crew_count）不納入判定。
+  // 涵蓋全部手動欄位（schema 對照）：OOOI、機號、機型、時數(block/air/night/pic/sic)、距離、duty分鐘、
+  // approaches、起降(day/night takeoffs+landings)、autolands、pax、SID/STAR、remarks、pilot_flying。
+  const UNTOUCHED =
+    "out_utc IS NULL AND off_utc IS NULL AND on_utc IS NULL AND in_utc IS NULL" +
+    " AND COALESCE(tail_no,'')='' AND COALESCE(aircraft_type,'')='' AND COALESCE(remarks,'')=''" +
+    " AND COALESCE(sid,'')='' AND COALESCE(star,'')=''" +
+    " AND block_minutes IS NULL AND air_minutes IS NULL AND night_minutes IS NULL" +
+    " AND pic_minutes IS NULL AND sic_minutes IS NULL AND distance_nm IS NULL" +
+    " AND total_duty_minutes IS NULL AND pax_count IS NULL AND pilot_flying IS NULL AND approaches IS NULL" +
+    " AND COALESCE(day_takeoffs,0)=0 AND COALESCE(night_takeoffs,0)=0" +
+    " AND COALESCE(day_landings,0)=0 AND COALESCE(night_landings,0)=0 AND COALESCE(autolands,0)=0";
   for (const sw of sweeps) {
+    // 班表變更：這次匯入的月份內，舊「純草稿」不在新班表 → 直接刪掉（不留「已移除」狀態；動過的保留）。
     const r = sw.month
       ? await pool.query(
-          `UPDATE pilot_log_entries SET status = 'roster_removed', updated_at = NOW()
+          `DELETE FROM pilot_log_entries
            WHERE user_id = $1
              AND source = 'roster'
              AND status = 'draft'
+             AND ${UNTOUCHED}
              AND NOT (source_ref = ANY($5::text[]))
              AND (
                roster_month = $2
@@ -478,10 +494,11 @@ export async function importRoster(
           [userId, sw.month, sw.start, sw.end, seenRefs]
         )
       : await pool.query(
-          `UPDATE pilot_log_entries SET status = 'roster_removed', updated_at = NOW()
+          `DELETE FROM pilot_log_entries
            WHERE user_id = $1
              AND source = 'roster'
              AND status = 'draft'
+             AND ${UNTOUCHED}
              AND flight_date >= $2 AND flight_date <= $3
              AND NOT (source_ref = ANY($4::text[]))`,
           [userId, sw.start, sw.end, seenRefs]
@@ -496,6 +513,16 @@ export async function importRoster(
     await pool.query(
       `DELETE FROM pilot_log_entries
        WHERE user_id = $1 AND source = 'roster' AND status = 'draft' AND flight_date < DATE '2000-01-01'`,
+      [userId]
+    );
+  } catch (e) { /* 清理失敗不該擋住整個匯入 */ }
+
+  // V2.1.03：roster_removed 狀態已停用（班表變更改成直接刪）。清掉舊版殘留的 roster_removed，
+  // 但只刪「純草稿」的（沒手動痕跡）；舊版若把使用者編輯過的航班標成 roster_removed → 原狀保留、不刪也不動
+  // （codex P2：不要無條件復活成 draft，否則匯入任一月份會把跨月、刻意移除的舊編輯紀錄又叫回 active 清單）。
+  try {
+    await pool.query(
+      `DELETE FROM pilot_log_entries WHERE user_id = $1 AND source = 'roster' AND status = 'roster_removed' AND ${UNTOUCHED}`,
       [userId]
     );
   } catch (e) { /* 清理失敗不該擋住整個匯入 */ }

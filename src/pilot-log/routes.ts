@@ -52,8 +52,8 @@ import { getAirportDbJs } from '../spa/js-airport-db.js';
 
 // ── 版本（比照 CrewSync / Morning：每次推版必更新；SW cache 名稱跟著走） ────
 // 本機 preview build 會暫時加 -tNN 後綴方便對版；推正式版前拿掉只留乾淨版號。
-export const PILOT_LOG_VERSION = 'V2.1.02';
-const PILOT_LOG_CACHE = 'pilotlog-v2-1-02';
+export const PILOT_LOG_VERSION = 'V2.1.03';
+const PILOT_LOG_CACHE = 'pilotlog-v2-1-03';
 
 export const pilotLogRouter = express.Router();
 
@@ -337,6 +337,11 @@ if (document.readyState !== 'loading') pilotLogInit();
 function _renderPilotLogChangelog(): string {
   return `
     <div class="pl-cl-v">${PILOT_LOG_VERSION}</div>
+    <div class="pl-cl-txt">
+      <b>日期選擇修正 + 班表變更改成直接刪。</b><b>(1)</b> 桌面點 Date 欄位<b>任何位置</b>就跳日曆（原本只有點右側小圖示才跳）；修正手機 Date／Flight# 等欄位在窄畫面溢出重疊。<b>(2)</b> 重新匯入班表時，本來要飛、後來改飛別班的舊航班<b>直接刪掉</b>（不再留灰色「已移除」狀態），換上新班；你已完成（飛過記錄）的航班與通訊錄組員都不動。<br>
+      <b>Date picker fix + roster changes delete directly.</b> (1) On desktop, clicking anywhere in the Date field opens the calendar (previously only the small icon did); fixed Date/Flight# fields overflowing on narrow mobile screens. (2) Re-importing a roster now deletes old draft flights that were dropped or reassigned (no more grey "removed" state); your completed flights and address-book crew are untouched.
+    </div>
+    <div class="pl-cl-v old">V2.1.02</div>
     <div class="pl-cl-txt">
       <b>航班輸入更順手 + 跑道圖風分量不再重疊。</b><b>(1)</b> 日期欄改成可點日曆（iPhone/iPad 點了跳原生日期選擇器，不用手打）。<b>(2)</b> From/To 多了 37 個星宇航點下拉，可直接選、也能手打其他機場。<b>(3)</b> 跑道圖的逆風／側風分量改標在綠端附近，平行跑道不再互相重疊、也不壓住跑道與長寬。<br>
       <b>Smoother flight entry + de-cluttered runway wind components.</b> (1) The date field is now a native date picker (tap to open the calendar on iPhone/iPad). (2) From/To gain a dropdown of the 37 Starlux airports — pick one or type any other. (3) Runway headwind/crosswind components now sit by the green into-wind end, so parallel runways no longer overlap each other or the runway/size labels.
