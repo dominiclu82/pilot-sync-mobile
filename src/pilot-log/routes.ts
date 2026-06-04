@@ -52,8 +52,8 @@ import { getAirportDbJs } from '../spa/js-airport-db.js';
 
 // ── 版本（比照 CrewSync / Morning：每次推版必更新；SW cache 名稱跟著走） ────
 // 本機 preview build 會暫時加 -tNN 後綴方便對版；推正式版前拿掉只留乾淨版號。
-export const PILOT_LOG_VERSION = 'V2.0.03';
-const PILOT_LOG_CACHE = 'pilotlog-v2-0-03';
+export const PILOT_LOG_VERSION = 'V2.1.01';
+const PILOT_LOG_CACHE = 'pilotlog-v2-1-01';
 
 export const pilotLogRouter = express.Router();
 
@@ -337,6 +337,11 @@ if (document.readyState !== 'loading') pilotLogInit();
 function _renderPilotLogChangelog(): string {
   return `
     <div class="pl-cl-v">${PILOT_LOG_VERSION}</div>
+    <div class="pl-cl-txt">
+      <b>跑道圖大進化 + 起降天氣一鍵看。</b><b>(1) 跑道畫在衛星圖上：</b>Airports 詳情的衛星地圖，依真實座標把每條跑道畫出來、標跑道號與長 × 寬，地圖自動縮放涵蓋所有跑道。<b>(2) 依即時風向標色：</b>抓該機場即時 METAR 風向，逆風端標綠、順風端標橘，每條跑道旁標逆風／側風分量，左上角風向箭頭（比照 AeroWeather）。<b>(3) flight detail 整合天氣：</b>編輯航班時 From/To 旁多了「⛅ WX + 跑道圖」鈕，一次看起降兩地的跑道圖 + METAR／TAF，跑道圖可收合（記住偏好）。<b>(4) 班表時間顯示當地時間：</b>Sched Out／In 輸入後，下方顯示當地時間與 UTC 時差。<b>(5) 離線也看得到跑道座向：</b>連不到衛星底圖時改用深色底 + 跑道線，任何機場離線都能看座向／長寬／跑道號。另：iPad 三欄寬度微調、POB 說明精簡。<br>
+      <b>Runway maps leveled up + one-tap departure/arrival weather.</b> (1) Runways drawn on the map: the Airports satellite view draws each runway from real coordinates with its number and length × width, auto-zoomed to fit all runways. (2) Wind-coloured ends: live METAR wind colours the into-wind end green and the downwind end orange, with headwind/crosswind components beside each runway and a wind arrow (AeroWeather-style). (3) Weather in flight detail: a "⛅ WX + runway map" button by From/To opens both airports' runway maps + METAR/TAF at once; maps are collapsible (remembers your choice). (4) Local time for schedule: Sched Out/In show local time + UTC offset below the field. (5) Runway orientation offline: when the satellite tile can't load, a dark backdrop + runway lines still show orientation/size/numbers for any airport. Also: iPad three-column width tweak, trimmed POB hint.
+    </div>
+    <div class="pl-cl-v old">V2.0.03</div>
     <div class="pl-cl-txt">
       <b>✈️ 37 個星宇航點的衛星地圖 → 飛機上離線也看得到。</b>第一次有網路打開 App 時，會在<b>背景</b>把 37 個星宇定期航點的衛星地圖<b>預先抓進手機</b>，存在一個<b>「改版也不會清掉」的永久快取</b>，並請求瀏覽器持久化（避免被系統清除）。之後就算<b>飛機上離線</b>，這 37 個機場的衛星地圖照樣看得到。其他全球機場（非星宇 37）維持線上即時抓。整批約 6MB，存在你裝置、<b>不佔我們的資料庫</b>。<br>
       <b>Offline satellite maps for the 37 Starlux airports.</b> On the first online launch, the app prefetches the satellite maps for the 37 Starlux scheduled airports into a persistent cache (survives app updates) and requests persistent storage, so they stay viewable offline (e.g. in-flight). Other airports worldwide still load live. ~6MB, stored on your device — not in our database.
