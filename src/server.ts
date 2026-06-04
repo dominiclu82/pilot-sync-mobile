@@ -281,13 +281,18 @@ app.get('/apps', (_req, res) => {
   .tag { display:inline-block; background:#0a0e1a; border:1px solid #1f2a3d; border-radius:6px; padding:1px 7px; font-size:.92em; margin-right:4px; }
   .foot { text-align:center; color:#475569; font-size:.74em; margin-top:24px; }
 </style></head><body><div class="wrap">
-  <div class="sub" style="margin-top:6px">點開任一 App，再「加到主畫面」就能像獨立 App 一樣使用 · Tap an app, then add to Home Screen.</div>
+  <div class="sub" style="margin-top:6px">點開任一 App，再「加到主畫面」就能像獨立 App 一樣使用。<br><span style="color:#64748b">Tap an app, then add it to your Home Screen.</span></div>
+  <div style="background:#2a1e08;border:1px solid #92590e;color:#fcd34d;border-radius:12px;padding:11px 14px;font-size:.8em;margin:0 0 18px;line-height:1.55">⚠️ 目前介面針對 <b>iPhone / iPad</b> 最佳化，<b>Android 裝置畫面可能會跑版</b>，建議用 iPhone / iPad 開啟。<br><span style="color:#a8a29e">Optimized for iPhone / iPad — layout may break on Android. Please use an iPhone / iPad.</span></div>
   ${cards}
+  <a class="app" href="https://line.me/ti/g2/ArAw4k1D9vXEAMtBsButFLzSFjXzEvFXfKHQ2A?utm_source=invitation" target="_blank" rel="noopener" style="border-color:#16a34a66">
+    <div class="ico">💬</div>
+    <div class="meta"><div class="nm">加入社群</div><div class="dz">回報 Bug · 提建議 · 可匿名留言</div><div class="dz en">Join the community · report bugs (anonymous OK)</div></div>
+    <div class="go" style="color:#22c55e">加入 ›</div>
+  </a>
   <div class="install">
     <h2>📲 加到主畫面 · Add to Home Screen</h2>
     <p><span class="tag">iPhone</span><b>Safari</b> 開啟 → 點底部 <b>分享 ⬆️</b> → <b>加入主畫面</b></p>
     <p><span class="tag">Android</span><b>Chrome</b> 開啟 → 右上 <b>⋮</b> → <b>安裝應用程式 / 加到主畫面</b></p>
-    <p style="color:#64748b;margin-top:10px">三個 App 都在同一個網域，地圖等快取會互相共用、不重複下載。</p>
   </div>
   <div class="foot">H-Peak · oops.h-peak.com</div>
 </div></body></html>`);
