@@ -240,6 +240,60 @@ app.get('/share', (_req, res) => {
   res.send(getSPAHtml(undefined, ['sync']));
 });
 
+// ── App 入口頁（給 LINE 社群置頂用：一頁拿到三個 App + 加到主畫面教學）────────────────
+app.get('/apps', (_req, res) => {
+  res.setHeader('Content-Type', 'text/html; charset=utf-8');
+  res.setHeader('Cache-Control', 'no-store');
+  const apps = [
+    { icon: '🛬', name: 'CrewSync', href: '/main', cn: '班表同步 · 機場天氣 · 跑道圖 · 即時雷達', en: 'Roster · Weather · Runway maps · Live radar' },
+    { icon: '📒', name: 'Pilot Log', href: '/pilot-log', cn: '電子飛行紀錄 · 自動帶班表 · 統計分析', en: 'Electronic logbook · roster import · analytics' },
+    { icon: '🌅', name: '晨報 Morning', href: '/morning', cn: '每日晨間簡報', en: 'Daily morning brief' },
+  ];
+  const cards = apps.map(a =>
+    `<a class="app" href="${a.href}">
+       <div class="ico">${a.icon}</div>
+       <div class="meta"><div class="nm">${a.name}</div><div class="dz">${a.cn}</div><div class="dz en">${a.en}</div></div>
+       <div class="go">開啟 ›</div>
+     </a>`).join('');
+  res.send(`<!DOCTYPE html><html lang="zh-Hant"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>H-Peak 飛行工具 · Apps</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  body { margin:0; background:#0a0e1a; color:#e2e8f0; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Noto Sans TC",sans-serif; line-height:1.5; }
+  .wrap { max-width:560px; margin:0 auto; padding:28px 18px 40px; }
+  h1 { font-size:1.5em; margin:8px 0 2px; }
+  .sub { color:#94a3b8; font-size:.86em; margin-bottom:22px; }
+  .app { display:flex; align-items:center; gap:14px; background:#111827; border:1px solid #1f2a3d; border-radius:14px; padding:16px; margin-bottom:12px; text-decoration:none; color:inherit; transition:border-color .15s,transform .1s; }
+  .app:active { transform:scale(.985); }
+  .app:hover { border-color:#3b82f6; }
+  .ico { font-size:2.1em; width:52px; height:52px; display:flex; align-items:center; justify-content:center; background:#0a0e1a; border-radius:12px; flex-shrink:0; }
+  .meta { flex:1; min-width:0; }
+  .nm { font-weight:800; font-size:1.08em; }
+  .dz { color:#94a3b8; font-size:.78em; }
+  .dz.en { color:#64748b; font-size:.72em; }
+  .go { color:#3b82f6; font-weight:700; font-size:.85em; flex-shrink:0; }
+  .install { margin-top:26px; background:#111827; border:1px solid #1f2a3d; border-radius:14px; padding:16px 18px; }
+  .install h2 { font-size:.95em; margin:0 0 10px; color:#e2e8f0; }
+  .install p { margin:6px 0; font-size:.84em; color:#cbd5e1; }
+  .install b { color:#fff; }
+  .tag { display:inline-block; background:#0a0e1a; border:1px solid #1f2a3d; border-radius:6px; padding:1px 7px; font-size:.92em; margin-right:4px; }
+  .foot { text-align:center; color:#475569; font-size:.74em; margin-top:24px; }
+</style></head><body><div class="wrap">
+  <h1>✈️ H-Peak 飛行工具</h1>
+  <div class="sub">點開任一 App，再「加到主畫面」就能像獨立 App 一樣使用 · Tap an app, then add to Home Screen.</div>
+  ${cards}
+  <div class="install">
+    <h2>📲 加到主畫面 · Add to Home Screen</h2>
+    <p><span class="tag">iPhone</span><b>Safari</b> 開啟 → 點底部 <b>分享 ⬆️</b> → <b>加入主畫面</b></p>
+    <p><span class="tag">Android</span><b>Chrome</b> 開啟 → 右上 <b>⋮</b> → <b>安裝應用程式 / 加到主畫面</b></p>
+    <p style="color:#64748b;margin-top:10px">三個 App 都在同一個網域，地圖等快取會互相共用、不重複下載。</p>
+  </div>
+  <div class="foot">H-Peak · oops.h-peak.com</div>
+</div></body></html>`);
+});
+
 // ── Privacy Policy & Terms ───────────────────────────────────────────────────
 const _legalPageStyle = `
   body{background:#111;color:#e0e0e0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;margin:0;padding:24px;max-width:720px;margin:0 auto;line-height:1.7;font-size:15px}
@@ -531,7 +585,7 @@ self.addEventListener('install', e => {
   self.skipWaiting();
 });
 self.addEventListener('activate', e => {
-  e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k=>k!==CACHE).map(k=>caches.delete(k)))));
+  e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k=>k!==CACHE && k!=='plapt-maps').map(k=>caches.delete(k)))));
   self.clients.claim();
 });
 const _offlinePage = '<html><body style="background:#111;color:#aaa;display:flex;align-items:center;justify-content:center;height:100vh;font-family:sans-serif"><div style="text-align:center"><h2>Offline</h2><p>Please connect to the internet and reload.</p></div></body></html>';
@@ -539,6 +593,12 @@ self.addEventListener('fetch', e => {
   if (e.request.method !== 'GET') return;
   const u = new URL(e.request.url);
   if (u.pathname.startsWith('/api/')) return;
+  // 衛星圖（Esri）→ 永久快取 plapt-maps（cache-first）：跟 Pilot Log 用同一個 cache + 同網址，
+  // 直接命中已預抓的 37 星宇機場底圖；CrewSync 看過的其他機場也順手存起來，下次/離線秒出。activate 不清這個 cache。
+  if (u.hostname === 'server.arcgisonline.com') {
+    e.respondWith(caches.open('plapt-maps').then(c => c.match(e.request).then(hit => hit || fetch(e.request).then(r => { c.put(e.request, r.clone()); return r; }))));
+    return;
+  }
   e.respondWith(
     fetch(e.request).then(r => {
       caches.open(CACHE).then(c => c.put(e.request, r.clone()));

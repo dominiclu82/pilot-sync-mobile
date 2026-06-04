@@ -1509,7 +1509,7 @@ export function getSpaHtmlBody(): string {
       <button class="tab-util-btn tab-install-btn" id="tab-install-btn" onclick="showInstallGuide()" style="display:none">
         <span>📲</span>安裝
       </button>
-      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer;text-decoration:underline" onclick="showAbout()">V8.0.42</span>
+      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer;text-decoration:underline" onclick="showAbout()">V8.0.43</span>
     </div>
   </div>
 </div>
@@ -1540,7 +1540,12 @@ export function getSpaHtmlBody(): string {
       <div style="color:var(--muted)">Best experience on iPad in landscape mode. Android devices may not display correctly.</div>
     </div>
     <div style="max-height:50vh;overflow-y:auto;-webkit-overflow-scrolling:touch;margin-bottom:10px">
-    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V8.0.42</div>
+    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V8.0.43</div>
+    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
+      <div>🗺️ <b>跑道圖擴大到 Airport WX + 所有 Ops Spec 機場底圖永久快取 + App 入口頁。</b><b>(1)</b> 在 Airport WX 點機場看 METAR/TAF 時，上方加一張<b>跑道圖</b>（依即時風向標綠[逆風]/橘[順風]端 + 逆風/側風分量 + 風向箭頭，比照 Pilot Log）。<b>(2)</b> 開 App 背景把<b>所有 Ops Spec 機場</b>的衛星底圖預抓進<b>永久快取</b>（跟 Pilot Log 同網域共用、改版也不清）→ 看過沒看過、離線都秒出。<b>(3)</b> 新增 App 入口頁 <code>/apps</code>：一頁拿到 CrewSync / Pilot Log / 晨報 + 加到主畫面教學（可貼社群置頂）。</div>
+      <div>🗺️ <b>Runway maps in Airport WX + all Ops Spec tiles cached permanently + app hub.</b> (1) Airport WX now shows a runway map above METAR/TAF (green/orange ends by live wind + head/crosswind components + arrow, same as Pilot Log). (2) On launch, all Ops Spec airport satellite tiles are prefetched into a persistent cache (shared with Pilot Log on the same domain, survives updates) — instant on re-open or offline. (3) New app hub at <code>/apps</code>: CrewSync / Pilot Log / Morning on one page with an add-to-home-screen guide (pin it in your community).</div>
+    </div>
+    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V8.0.42</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
       <div>🛬 班表的 <b>WX</b> 展開後，起降兩地各多一張<b>跑道圖</b>（比照 Pilot Log）：依真實座標畫出每條跑道、標跑道號與長 × 寬，依<b>即時 METAR 風向</b>把<b>逆風端標綠、順風端標橘</b>，每條跑道旁標逆風／側風分量，左上角加風向箭頭。跑道圖可<b>收合</b>（記住偏好）。</div>
       <div>🛬 Expanding a flight's <b>WX</b> in the roster now shows a <b>runway map</b> for both departure and arrival (same as Pilot Log): each runway drawn from real coordinates with its number and length × width, ends coloured <b>green (into-wind) / orange (downwind)</b> by live METAR wind, headwind/crosswind components beside each runway, and a wind arrow. Maps are <b>collapsible</b> (remembers your choice).</div>

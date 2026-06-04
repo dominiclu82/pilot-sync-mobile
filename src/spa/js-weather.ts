@@ -250,7 +250,7 @@ function buildMetarCard(icao) {
       + '<button onclick="setMetarMode(\\'' + icao + '\\',true)" class="metar-mode-btn' + (showAll ? ' active' : '') + '">6\\u5c0f\\u6642</button>'
       + '</div>'
     : '';
-  return '<div class="atis-card"><div class="atis-card-title" style="display:flex;align-items:center">\\ud83c\\udf24\\ufe0f METAR'
+  return '<div class="atis-card" id="wx-metar-card"><div class="atis-card-title" style="display:flex;align-items:center">\\ud83c\\udf24\\ufe0f METAR'
     + toggleBtns + '</div><pre>' + displayText + '</pre></div>';
 }
 
@@ -260,11 +260,11 @@ function setMetarMode(icao, showAll) {
   if (wxSelectedIcao !== icao) return;
   var content = document.getElementById('wx-detail-content');
   if (!content) return;
-  var firstCard = content.querySelector('.atis-card');
-  if (firstCard) {
+  var metarCard = document.getElementById('wx-metar-card');   // 精準換 METAR 卡：跑道圖卡現在排在 METAR 前，不能盲取第一張 .atis-card（codex P1）
+  if (metarCard && metarCard.parentNode) {
     var tmp = document.createElement('div');
     tmp.innerHTML = buildMetarCard(icao);
-    content.replaceChild(tmp.firstChild, firstCard);
+    metarCard.parentNode.replaceChild(tmp.firstChild, metarCard);
   }
 }
 
@@ -272,7 +272,14 @@ function _wxBuildDetailHtml(icao, metarLines, tafText, atisSections) {
   var noData = '<span style="color:var(--muted);font-style:italic">\\u7121\\u8cc7\\u6599</span>';
   wxMetarRawMap[icao] = metarLines;
   if (wxMetarShowAll[icao] === undefined) wxMetarShowAll[icao] = false;
-  var cards = buildMetarCard(icao);
+  var cards = '';
+  // 跑道圖（依最新 METAR 風向標綠[逆風]/橘[順風]端 + 風分量 + 風向箭頭），比照 roster / Pilot Log。
+  if (typeof RwyMap !== 'undefined' && RwyMap.aptInfo(icao)) {
+    if (metarLines && metarLines[0]) RwyMap.setWind(icao, RwyMap.parseWind(metarLines[0]));
+    var _mh = RwyMap.html(icao);
+    if (_mh) cards += '<div class="atis-card"><div class="atis-card-title">\\ud83d\\uddfa\\ufe0f \\u8dd1\\u9053\\u5716 Runway</div>' + _mh + '</div>';
+  }
+  cards += buildMetarCard(icao);
   cards += '<div class="atis-card"><div class="atis-card-title">\\ud83d\\udcc5 TAF</div><pre>' + (tafText || noData) + '</pre></div>';
   var atisOnly = atisSections.filter(function(s) {
     var t = s.title.toLowerCase(); return !t.includes('metar') && !t.includes('taf');
@@ -355,6 +362,34 @@ function _wxLoadDetailCache() {
 _wxLoadDetailCache();
 
 var _wxAllRegions = ['taiwan','hkmacao','japan','korea','philippines','thailand','vietnam','seasia','usa','pacific','canada','europe'];
+
+// V8.0.43：開 App 背景把「所有 Ops Spec 機場」的衛星底圖預抓進永久快取（plapt-maps，跟 Pilot Log 共用、
+// 同網域同網址）→ 看過沒看過、離線都秒出。要等 SW 控制頁面才抓（否則不經 SW、存不進永久快取）。
+var _wxMapsPrefetched = false;
+function _wxPrefetchAllMaps() {
+  if (_wxMapsPrefetched || typeof RwyMap === 'undefined' || !window._PL_AIRPORTS || typeof _wxFleetData === 'undefined') return;
+  var go = function() {
+    if (_wxMapsPrefetched) return;
+    _wxMapsPrefetched = true;
+    var seen = {}, icaos = [];
+    _wxAllRegions.forEach(function(reg) {
+      Object.keys(_wxFleetData).forEach(function(fleet) {
+        ((_wxFleetData[fleet] || {})[reg] || []).forEach(function(a) {
+          if (a && a.icao && !seen[a.icao]) { seen[a.icao] = 1; icaos.push(a.icao); }
+        });
+      });
+    });
+    RwyMap.prefetch(icaos);
+  };
+  var sw = navigator.serviceWorker;
+  if (!sw) { go(); return; }
+  if (sw.controller) { go(); return; }
+  (sw.ready || Promise.resolve()).then(function() {
+    if (sw.controller) go();
+    else { try { sw.addEventListener('controllerchange', go, { once: true }); } catch (e) { go(); } }
+  }).catch(go);
+}
+setTimeout(function() { try { _wxPrefetchAllMaps(); } catch (e) {} }, 4000);
 
 /* ── shared batch refresh core ── */
 /* btn can be a DOM element or a string (element ID) — re-queried each time to survive re-renders */

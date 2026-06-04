@@ -159,8 +159,18 @@
     var html = overlay(info, view(info), windCache[icao] || null);
     for (var i = 0; i < svgs.length; i++) svgs[i].innerHTML = html;
   }
+  // 預抓一批機場的衛星底圖進永久快取（SW 攔 Esri 存 plapt-maps）。呼叫端負責先等 SW 控制頁面。
+  function prefetch(codes) {
+    if (!window._PL_AIRPORTS || !codes) return;
+    codes.forEach(function (code) {
+      var info = aptInfo(code); if (!info || info.lat == null || info.lon == null) return;
+      var v = view(info);
+      try { fetch(mapUrl(v.lat, v.lon, v.halfLat, v.halfLon), { mode: 'no-cors' }); } catch (e) {}
+    });
+    if (navigator.storage && navigator.storage.persist) { try { navigator.storage.persist(); } catch (e) {} }
+  }
   window.RwyMap = {
-    html: mapHtml, parseWind: parseWind, applyWind: applyWind, aptInfo: aptInfo,
+    html: mapHtml, parseWind: parseWind, applyWind: applyWind, aptInfo: aptInfo, prefetch: prefetch,
     setWind: function (icao, w) { if (icao) windCache[icao] = w; }
   };
 })();
