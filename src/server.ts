@@ -259,7 +259,7 @@ app.get('/apps', (_req, res) => {
      </a>`).join('');
   res.send(`<!DOCTYPE html><html lang="zh-Hant"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>H-Peak 飛行工具 · Apps</title>
+<title>Apps</title>
 <style>
   :root { color-scheme: dark; }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -296,7 +296,7 @@ app.get('/apps', (_req, res) => {
     <p><span class="tag">iPhone</span><b>Safari</b> 開啟 → 點底部 <b>分享 ⬆️</b> → <b>加入主畫面</b></p>
     <p><span class="tag">Android</span><b>Chrome</b> 開啟 → 右上 <b>⋮</b> → <b>安裝應用程式 / 加到主畫面</b></p>
   </div>
-  <div class="foot">H-Peak · oops.h-peak.com</div>
+  <div class="foot">oops.h-peak.com</div>
 </div></body></html>`);
 });
 

@@ -2045,6 +2045,11 @@ body { padding-bottom: calc(64px + env(safe-area-inset-bottom, 0px)); }
     <hr style="border:none;border-top:1px solid var(--border);margin:12px 0">
     <div class="changelog-v">${MORNING_VERSION}</div>
     <div class="changelog-txt">
+      <strong>[今日] 投資未實現損益標註講清楚。</strong>頂部那條「投資未實現損益」<b>本來就是台股＋美股的合計</b>（美股換成台幣再加總），但底下小字只寫「美股部位換算」，害人以為台股沒被算進去。改成「<b>台股＋美股合計，美股以 USD/TWD ⋯ 換算</b>」講清楚。<b>數字計算本身完全沒變</b>，只是把標註講明白。<br>
+      <strong>[Today] Clarified the unrealized P&amp;L caption.</strong> The top "unrealized P&amp;L" was always the combined TW + US total (US converted to TWD), but the caption only mentioned the US conversion — making it look US-only. It now reads "TW + US combined, US converted at USD/TWD ⋯". The figure itself is unchanged; only the caption is clearer.
+    </div>
+    <div class="changelog-v old">V2.0.04</div>
+    <div class="changelog-txt">
       <strong>[全域] App 改名「晨報」→「今日 Today」。</strong>這個 App 本來就不是會主動寄到你信箱的「報」，而是你自己打開、一眼掌握<b>天氣 / 股市 / 匯率 / 新聞</b>的個人面板，所以改名「今日」——跟旁邊的「投資組合」分頁配起來就是「今日 ｜ 投資組合」，一看就懂。功能完全沒變，只換名字與圖示標題。<br>
       <strong>[Global] Renamed "Morning" → "Today".</strong> This app isn't a report mailed to you — it's a personal panel you open to see weather / stocks / FX / news at a glance, so it's now "Today", pairing naturally with the "Portfolio" tab. Nothing functional changed, only the name and titles.
     </div>
@@ -5204,9 +5209,16 @@ async function loadPortfolioSummary() {
     valueEl.textContent = sign + fmtNum(pnl) + ' (' + sign + pct.toFixed(1) + '%)';
     // 標註用了 USD/TWD 即期 rate 換匯，提示這是 approximation (不含買進當時 FX gain since purchase)
     const hasUs = holdings.some(h => h.market === 'US');
+    const hasTw = holdings.some(h => h.market === 'TW');
     const noteEl = document.getElementById('ps-fx-note');
     if (noteEl) {
-      noteEl.textContent = hasUs ? '美股部位 × USD/TWD ' + fxUsdTwd.toFixed(2) + ' 換算' : '';
+      // 釐清：這個數字是「台股＋美股」合計（美股換成台幣再加總），不是只算美股。
+      // 之前只寫「美股部位 × USD/TWD 換算」害 user 以為台股沒被算進去。
+      noteEl.textContent = (hasTw && hasUs)
+        ? '台股＋美股合計，美股以 USD/TWD ' + fxUsdTwd.toFixed(2) + ' 換算成台幣'
+        : hasUs ? '美股以 USD/TWD ' + fxUsdTwd.toFixed(2) + ' 換算成台幣'
+        : hasTw ? '台股合計'
+        : '';
     }
     banner.hidden = false;
   } catch (e) {

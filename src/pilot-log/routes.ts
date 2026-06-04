@@ -52,8 +52,8 @@ import { getAirportDbJs } from '../spa/js-airport-db.js';
 
 // ── 版本（比照 CrewSync / Morning：每次推版必更新；SW cache 名稱跟著走） ────
 // 本機 preview build 會暫時加 -tNN 後綴方便對版；推正式版前拿掉只留乾淨版號。
-export const PILOT_LOG_VERSION = 'V2.1.05';
-const PILOT_LOG_CACHE = 'pilotlog-v2-1-05';
+export const PILOT_LOG_VERSION = 'V2.1.06';
+const PILOT_LOG_CACHE = 'pilotlog-v2-1-06';
 
 export const pilotLogRouter = express.Router();
 
@@ -337,6 +337,11 @@ if (document.readyState !== 'loading') pilotLogInit();
 function _renderPilotLogChangelog(): string {
   return `
     <div class="pl-cl-v">${PILOT_LOG_VERSION}</div>
+    <div class="pl-cl-txt">
+      <b>後台小修正。</b>背景維護更新，使用者操作與介面不變。<br>
+      <b>Minor backend fix.</b> Background maintenance update; nothing changes in how you use the app.
+    </div>
+    <div class="pl-cl-v old">V2.1.05</div>
     <div class="pl-cl-txt">
       <b>後台維護與安全性強化。</b>本次為背景維護與安全性更新，使用者操作與介面不變。<br>
       <b>Backend maintenance &amp; security hardening.</b> Background maintenance and security update; nothing changes in how you use the app.
@@ -2830,8 +2835,10 @@ function secGroups(gp){
 }
 function fmtMB(v){return v==null?'—':v+' MB';}
 function secDb(){
-  var s=T.db;if(!s){return '<div class=row><span class=gray>DB 統計載入中…</span></div>';}
-  var b=s.breakdown||{},g=s.growth||{},u=s.users||{},en=s.entries||{},rg=s.recent_growth||{},byS=en.by_status||{};
+  var raw=T.db;if(!raw){return '<div class=row><span class=gray>DB 統計載入中…</span></div>';}
+  // /oops/stats 結構：摘要數字在 raw.summary 底下、表排行在 top-level raw.breakdown
+  var s=raw.summary||{};
+  var b=raw.breakdown||{},g=s.growth||{},u=s.users||{},en=s.entries||{},rg=s.recent_growth||{},byS=en.by_status||{};
   var pct=Math.min(100,Math.round(((s.all_db_size_mb||0)/1024)*100));
   var h='<div class=dash>'+
     '<div class=card><div class=lbl>整庫 / Disk</div><div class=big>'+fmtMB(s.all_db_size_mb)+'</div><div class=bar><i style="width:'+pct+'%"></i></div><div class=sub>'+pct+'% of 1 GB</div></div>'+
