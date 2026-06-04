@@ -23,6 +23,8 @@ import { getSpaCrewRestJs } from './spa/js-crew-rest.js';
 import { getSpaOvertimeJs } from './spa/js-overtime.ts';
 import { getSpaSubtabReorderJs } from './spa/js-subtab-reorder.js';
 import { getSpaRosterGridJs } from './spa/js-roster-grid.js';
+import { getAirportDbJs } from './spa/js-airport-db.js';
+import { getSpaRunwayMapJs } from './spa/js-runway-map.js';
 import { getSpaFriendsJs } from './spa/js-friends.js';
 import { getSpaGroupsJs } from './spa/js-groups.js';
 import { morningRouter, startMorningCron } from './morning.js';
@@ -1899,6 +1901,8 @@ ${getSpaBriefingCardJs()}
 ${getSpaCrewRestJs()}
 ${getSpaOvertimeJs()}
 ${getSpaSubtabReorderJs()}
+${getAirportDbJs()}
+${getSpaRunwayMapJs()}
 ${getSpaRosterGridJs()}
 ${getSpaFriendsJs()}
 ${getSpaGroupsJs()}

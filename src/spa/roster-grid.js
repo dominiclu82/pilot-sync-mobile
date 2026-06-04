@@ -636,49 +636,58 @@ function _rgFetchWxOne(icao) {
     .catch(function() { return { metar: '', taf: '' }; });
 }
 
+// 跑道圖收合（比照 Pilot Log flight detail 的 WX 跑道圖，狀態記 localStorage）。
+function _rgRwyMapCollapsed() {
+  try { return localStorage.getItem('crewsync_rg_rwymap_collapsed') === '1'; } catch (e) { return false; }
+}
+function _rgToggleRwyMap() {
+  var c = !_rgRwyMapCollapsed();
+  try { localStorage.setItem('crewsync_rg_rwymap_collapsed', c ? '1' : '0'); } catch (e) {}
+  var maps = document.querySelectorAll('.rg-wxmap'), btns = document.querySelectorAll('.rg-wxmap-btn');
+  for (var i = 0; i < maps.length; i++) maps[i].style.display = c ? 'none' : '';
+  for (var j = 0; j < btns.length; j++) btns[j].textContent = '🗺️ 跑道圖 ' + (c ? '▸' : '▾');
+}
+function _rgRwyMapBlock(icao) {
+  if (typeof RwyMap === 'undefined' || !icao) return '';
+  var h = RwyMap.html(icao);
+  if (!h) return '';
+  var c = _rgRwyMapCollapsed();
+  return '<button type="button" class="rg-wxmap-btn" onclick="_rgToggleRwyMap()" style="background:none;border:none;color:#60a5fa;font-size:1em;font-weight:700;cursor:pointer;padding:2px 0">🗺️ 跑道圖 ' + (c ? '▸' : '▾') + '</button>' +
+    '<div class="rg-wxmap" style="display:' + (c ? 'none' : '') + '">' + h + '</div>';
+}
+// WX 欄＝機場碼 + 可收合跑道圖（風向綠橘 + 風分量）+ METAR + TAF。
+function _rgWxCol(iata, icao, wx) {
+  var h = '<div style="flex:1 1 240px;min-width:0;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 10px;text-align:left;word-break:break-word">';
+  h += '<div style="font-weight:700;font-size:1.05em;color:var(--text);margin-bottom:6px">' + iata + '</div>';
+  h += _rgRwyMapBlock(icao);
+  if (wx.metar) h += '<div style="font-weight:700;color:#22c55e;margin-bottom:2px">METAR</div><div style="line-height:1.4;margin-bottom:6px">' + wx.metar + '</div>';
+  if (wx.taf) h += '<div style="font-weight:700;color:#22c55e;margin-bottom:2px">TAF</div><div style="line-height:1.4">' + wx.taf.replace(/\n/g, '<br>') + '</div>';
+  if (!wx.metar && !wx.taf) h += '<div style="color:var(--muted)">No WX data</div>';
+  return h + '</div>';
+}
 function _rgFetchWxBoth(originIata, destIata, wxId) {
   var panel = document.getElementById(wxId);
   if (!panel) return;
   // Toggle
   if (panel.style.display !== 'none') { panel.style.display = 'none'; return; }
 
-  var icaoOrig = _rgIataToIcao[originIata.toUpperCase()] || originIata.toUpperCase();
-  var icaoDest = _rgIataToIcao[destIata.toUpperCase()] || destIata.toUpperCase();
+  // 機場碼→ICAO：優先用全球機場庫（RwyMap）查真 ICAO，否則退回小表 / 原碼。
+  var hasRM = typeof RwyMap !== 'undefined';
+  var infoO = hasRM ? RwyMap.aptInfo(originIata) : null, infoD = hasRM ? RwyMap.aptInfo(destIata) : null;
+  var keyO = infoO ? infoO.icao : (_rgIataToIcao[originIata.toUpperCase()] || originIata.toUpperCase());
+  var keyD = infoD ? infoD.icao : (_rgIataToIcao[destIata.toUpperCase()] || destIata.toUpperCase());
 
   panel.style.display = 'block';
-  panel.style.cssText = 'display:flex;gap:8px;padding:10px 16px;border-top:1px solid var(--dim);font-size:.78em;color:var(--text)';
+  panel.style.cssText = 'display:flex;flex-wrap:wrap;gap:8px;padding:10px 16px;border-top:1px solid var(--dim);font-size:.78em;color:var(--text)';
   panel.innerHTML = '<div style="flex:1;text-align:center;color:var(--muted)">載入中...</div>';
 
-  Promise.all([_rgFetchWxOne(icaoOrig), _rgFetchWxOne(icaoDest)]).then(function(results) {
+  Promise.all([_rgFetchWxOne(keyO), _rgFetchWxOne(keyD)]).then(function(results) {
     var origWx = results[0], destWx = results[1];
-    var html = '';
-    // Origin column
-    html += '<div style="flex:1;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 10px;text-align:left;word-break:break-word">';
-    html += '<div style="font-weight:700;font-size:1.05em;color:var(--text);margin-bottom:6px">' + originIata + '</div>';
-    if (origWx.metar) {
-      html += '<div style="font-weight:700;color:#22c55e;margin-bottom:2px">METAR</div>';
-      html += '<div style="line-height:1.4;margin-bottom:6px">' + origWx.metar + '</div>';
+    if (hasRM) {   // 先存風向 → 跑道圖 render 時直接上綠橘色 + 風分量
+      RwyMap.setWind(keyO, RwyMap.parseWind(origWx.metar));
+      RwyMap.setWind(keyD, RwyMap.parseWind(destWx.metar));
     }
-    if (origWx.taf) {
-      html += '<div style="font-weight:700;color:#22c55e;margin-bottom:2px">TAF</div>';
-      html += '<div style="line-height:1.4">' + origWx.taf.replace(/\n/g, '<br>') + '</div>';
-    }
-    if (!origWx.metar && !origWx.taf) html += '<div style="color:var(--muted)">No WX data</div>';
-    html += '</div>';
-    // Dest column
-    html += '<div style="flex:1;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 10px;text-align:left;word-break:break-word">';
-    html += '<div style="font-weight:700;font-size:1.05em;color:var(--text);margin-bottom:6px">' + destIata + '</div>';
-    if (destWx.metar) {
-      html += '<div style="font-weight:700;color:#22c55e;margin-bottom:2px">METAR</div>';
-      html += '<div style="line-height:1.4;margin-bottom:6px">' + destWx.metar + '</div>';
-    }
-    if (destWx.taf) {
-      html += '<div style="font-weight:700;color:#22c55e;margin-bottom:2px">TAF</div>';
-      html += '<div style="line-height:1.4">' + destWx.taf.replace(/\n/g, '<br>') + '</div>';
-    }
-    if (!destWx.metar && !destWx.taf) html += '<div style="color:var(--muted)">No WX data</div>';
-    html += '</div>';
-    panel.innerHTML = html;
+    panel.innerHTML = _rgWxCol(originIata, keyO, origWx) + _rgWxCol(destIata, keyD, destWx);
   });
 }
 

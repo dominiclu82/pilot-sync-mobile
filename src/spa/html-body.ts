@@ -1509,7 +1509,7 @@ export function getSpaHtmlBody(): string {
       <button class="tab-util-btn tab-install-btn" id="tab-install-btn" onclick="showInstallGuide()" style="display:none">
         <span>📲</span>安裝
       </button>
-      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer;text-decoration:underline" onclick="showAbout()">V8.0.41</span>
+      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer;text-decoration:underline" onclick="showAbout()">V8.0.42</span>
     </div>
   </div>
 </div>
@@ -1540,7 +1540,12 @@ export function getSpaHtmlBody(): string {
       <div style="color:var(--muted)">Best experience on iPad in landscape mode. Android devices may not display correctly.</div>
     </div>
     <div style="max-height:50vh;overflow-y:auto;-webkit-overflow-scrolling:touch;margin-bottom:10px">
-    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V8.0.41</div>
+    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V8.0.42</div>
+    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
+      <div>🛬 班表的 <b>WX</b> 展開後，起降兩地各多一張<b>跑道圖</b>（比照 Pilot Log）：依真實座標畫出每條跑道、標跑道號與長 × 寬，依<b>即時 METAR 風向</b>把<b>逆風端標綠、順風端標橘</b>，每條跑道旁標逆風／側風分量，左上角加風向箭頭。跑道圖可<b>收合</b>（記住偏好）。</div>
+      <div>🛬 Expanding a flight's <b>WX</b> in the roster now shows a <b>runway map</b> for both departure and arrival (same as Pilot Log): each runway drawn from real coordinates with its number and length × width, ends coloured <b>green (into-wind) / orange (downwind)</b> by live METAR wind, headwind/crosswind components beside each runway, and a wind arrow. Maps are <b>collapsible</b> (remembers your choice).</div>
+    </div>
+    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V8.0.41</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
       <div>🗂️ 同步班表時，多存一份<b>完整班表（含組員）</b>到雲端私有表，給 <b>Pilot Log</b> app 直接帶班表用。解決把 CrewSync 與 Pilot Log 各自加到 iPad 主畫面後、變成兩個獨立 App 不共用瀏覽器儲存、Pilot Log 抓不到班表的問題。這份是<b>你自己的、不會分享給朋友/群組</b>（跟「分享班表」功能完全分開、不剃組員）。沿用方式：在 Pilot Log 按 Import Roster 前，先在這裡<b>重新同步一次</b>當月（及想補登的月份），且兩邊用<b>同一個 Google 帳號</b>。</div>
       <div>🗂️ On each roster sync, a full copy (incl. crew) is now saved to a private cloud table for the <b>Pilot Log</b> app to import directly — fixing the case where CrewSync and Pilot Log are added to the iPad home screen as two separate apps that don't share browser storage, so Pilot Log couldn't find the roster. This copy is <b>yours only, never shared</b> to friends/groups (entirely separate from the Share feature, crew not stripped). To use it: re-sync the month(s) here once before pressing Import Roster in Pilot Log, and use the <b>same Google account</b> on both.</div>
