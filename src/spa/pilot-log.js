@@ -1141,7 +1141,27 @@ function _plEditorField(label, name, type, opts) {
         dateStr = '';
       }
     }
-    input = '<input type="date" ' + attrs + ' value="' + _plEsc(dateStr) + '" onclick="try{this.showPicker()}catch(e){}">';   // 點欄位任何位置就跳日曆（桌面原本只有點右側小 icon 才跳；iPhone/iPad 本來就會跳）
+    // V2.2.05：自訂日期欄 —— 上層 readonly 顯示純數字 YYYY-MM-DD（避免 iOS 中文長格式「2026年6月5日」
+    // 撐出格子壓到 Flight#）；底層透明原生 <input type=date>（id 維持 ple-<name>，點了照樣跳 iOS 原生日曆）。
+    input = '<div style="position:relative">' +
+      '<input id="ple-' + name + '-disp" readonly tabindex="-1" value="' + _plEsc(dateStr) + '" placeholder="YYYY-MM-DD" ' +
+        'style="width:100%;box-sizing:border-box;background:var(--bg,#0a0e1a);color:var(--text);border:1px solid var(--border,#334155);border-radius:6px;padding:6px 8px;font-size:.78em">' +
+      '<input type="date" id="ple-' + name + '" value="' + _plEsc(dateStr) + '" ' +
+        'onclick="try{this.showPicker()}catch(e){}" oninput="_plDateSync(\'' + name + '\')" onchange="_plDateSync(\'' + name + '\')" ' +
+        'style="position:absolute;inset:0;width:100%;height:100%;opacity:0;border:0;margin:0;padding:0;color:transparent;background:transparent">' +
+      '</div>';
+  } else if (opts.aptSide) {
+    // V2.2.05：From/To 自訂下拉（取代 iPhone 不穩的原生 datalist）。候選＝星宇 37 航點，點一下一定跳、
+    // 打字即時篩；手動輸入照常（含星宇以外機場，只是那些不會有候選）。
+    var dvalA = opts.fmt ? opts.fmt(val) : val;
+    var attrsA = attrs.replace('padding:6px 8px', 'padding:6px 26px 6px 8px');
+    var side = opts.aptSide;
+    input = '<div style="position:relative">' +
+      '<input ' + attrsA + ' autocomplete="off" value="' + _plEsc(dvalA) + '" placeholder="' + _plEsc(opts.placeholder || '選或輸入 · pick or type') + '"' +
+        ' onfocus="_plAptDropdown(\'' + side + '\')" oninput="_plAptDropdown(\'' + side + '\')" onblur="_plAptDDClose(\'' + side + '\')">' +
+      '<span style="position:absolute;right:9px;top:50%;transform:translateY(-50%);pointer-events:none;color:var(--muted);font-size:.8em">▾</span>' +
+      '<div id="ple-' + side + '-dd" style="display:none;position:absolute;left:0;right:0;top:calc(100% + 2px);z-index:60;max-height:190px;overflow-y:auto;background:var(--card,#0f172a);border:1px solid var(--border,#334155);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.45)"></div>' +
+      '</div>';
   } else if (opts.listId) {
     // V2.0.01：datalist 下拉 + 持續顯示的 ▾ 提示（讓使用者知道可下拉選，也能手動輸入覆蓋）
     var dvalL = opts.fmt ? opts.fmt(val) : val;
@@ -2035,8 +2055,69 @@ function _plFillAptList(listId) {
   dl.innerHTML = opts.map(function(o) { return '<option value="' + _plEsc(o.code) + '">' + _plEsc(o.nm) + '</option>'; }).join('');
 }
 function _plUpdateAptLists() {
+  // V2.2.05 起 From/To 改用 _plAptDropdown 自訂下拉，原生 datalist 已不存在 → 這兩個呼叫變成 no-op
+  // （_plFillAptList 內 getElementById 找不到就早退）。保留不刪，避免動到其他呼叫點。
   _plFillAptList('ple-origin-aptlist');
   _plFillAptList('ple-dest-aptlist');
+}
+
+// V2.2.05：自訂日期欄 —— 底層原生 <input type=date> 改值時，同步上層顯示的純數字 YYYY-MM-DD。
+function _plDateSync(name) {
+  var disp = document.getElementById('ple-' + name + '-disp');
+  var src = document.getElementById('ple-' + name);
+  if (disp && src) disp.value = src.value;
+}
+
+// V2.2.05：From/To 自訂下拉候選 = 星宇 37 航點（碼依當前 IATA/ICAO 格式 + 城市/機場名）。
+function _plAptCandidates() {
+  var iata = _plAptFmtCur() === 'iata';
+  return Object.keys(_PL_STARLUX_APTS).map(function(icao) {
+    var info = _plAptInfo(icao);
+    var code = (iata && info && info.iata) ? info.iata : icao;
+    return { code: code, nm: info ? (info.city || info.name || '') : '' };
+  }).filter(function(o) { return o.code; }).sort(function(a, b) { return a.code.localeCompare(b.code); });
+}
+function _plAptDropdown(side) {
+  var inp = document.getElementById('ple-' + side);
+  var dd = document.getElementById('ple-' + side + '-dd');
+  if (!inp || !dd) return;
+  var q = (inp.value || '').trim().toUpperCase();
+  var cands = _plAptCandidates();
+  var list;
+  if (!q) {
+    list = cands;   // 空 → 全列（聚焦就看得到 37 個）
+  } else {
+    // 代碼「開頭」符合的排前面（打 R → RCTP/RJAA…），城市/機場名「包含」的排後面（打 Tokyo 也能篩）
+    var pref = [], byName = [];
+    cands.forEach(function(o) {
+      if (o.code.toUpperCase().indexOf(q) === 0) pref.push(o);
+      else if (o.nm && o.nm.toUpperCase().indexOf(q) >= 0) byName.push(o);
+    });
+    list = pref.concat(byName);
+  }
+  if (!list.length) { dd.style.display = 'none'; return; }
+  dd.innerHTML = list.map(function(o) {
+    // onmousedown + preventDefault：在 input blur 之前選取，避免下拉先被關掉（iPhone/桌面都穩）
+    return '<div onmousedown="event.preventDefault();_plAptPick(\'' + side + '\',\'' + _plEsc(o.code) + '\')" ' +
+      'style="padding:7px 10px;cursor:pointer;font-size:.8em;border-bottom:1px solid var(--border,#1e293b)">' +
+      '<b style="letter-spacing:.5px">' + _plEsc(o.code) + '</b>' +
+      (o.nm ? ' <span style="color:var(--muted)">' + _plEsc(o.nm) + '</span>' : '') + '</div>';
+  }).join('');
+  dd.style.display = 'block';
+}
+function _plAptPick(side, code) {
+  var inp = document.getElementById('ple-' + side);
+  if (inp) {
+    inp.value = code;
+    inp.dispatchEvent(new Event('input', { bubbles: true }));   // 觸發大寫/夜航/機場名等既有連動（會順帶重開下拉）
+  }
+  // 連動跑完後再關 —— 上面的 input 事件會再呼叫 _plAptDropdown 重開，故必須在這之後關掉，確保選完是收合的
+  var dd = document.getElementById('ple-' + side + '-dd');
+  if (dd) dd.style.display = 'none';
+}
+function _plAptDDClose(side) {
+  // 延遲關閉，讓 option 的 onmousedown 先觸發（blur 比 click 早）
+  setTimeout(function() { var dd = document.getElementById('ple-' + side + '-dd'); if (dd) dd.style.display = 'none'; }, 150);
 }
 
 function _plWireEditor() {
@@ -2185,7 +2266,7 @@ function _plRenderEditor(target) {
         _plFieldRow(2, _plEditorField('Sim Type（FFS/FTD）', 'sim_type', 'text') + _plEditorField('Sim Time', 'sim_minutes', 'hhmm-dur')) +
       '</div>' +
       _plFieldRow(2, _plEditorField('Date', 'flight_date', 'date') + _plEditorField('Flight #', 'flight_no', 'text')) +
-      '<div id="ple-route-row" style="display:' + (_plEntryType(e) === 'sim' ? 'none' : '') + '">' + _plFieldRow(2, _plEditorField('From (' + (_plAptFmtCur() === 'iata' ? 'IATA' : 'ICAO') + ')', 'origin', 'text', { fmt: _plAptFmt, listId: 'ple-origin-aptlist', labelId: 'ple-origin-label', placeholder: '選星宇航點或輸入 · pick/type' }) + _plEditorField('To (' + (_plAptFmtCur() === 'iata' ? 'IATA' : 'ICAO') + ')', 'dest', 'text', { fmt: _plAptFmt, listId: 'ple-dest-aptlist', labelId: 'ple-dest-label', placeholder: '選星宇航點或輸入 · pick/type' })) +
+      '<div id="ple-route-row" style="display:' + (_plEntryType(e) === 'sim' ? 'none' : '') + '">' + _plFieldRow(2, _plEditorField('From (' + (_plAptFmtCur() === 'iata' ? 'IATA' : 'ICAO') + ')', 'origin', 'text', { fmt: _plAptFmt, aptSide: 'origin', labelId: 'ple-origin-label', placeholder: '選星宇航點或輸入 · pick/type' }) + _plEditorField('To (' + (_plAptFmtCur() === 'iata' ? 'IATA' : 'ICAO') + ')', 'dest', 'text', { fmt: _plAptFmt, aptSide: 'dest', labelId: 'ple-dest-label', placeholder: '選星宇航點或輸入 · pick/type' })) +
         '<div id="ple-aptname-row" style="font-size:.6em;color:var(--muted);margin:-4px 0 8px;line-height:1.4"></div>' +
         '<button type="button" id="ple-wx-btn" onclick="_plToggleEditorWx()" style="background:none;border:none;color:#22c55e;font-size:.7em;font-weight:700;cursor:pointer;padding:0 0 6px">⛅ WX · METAR / TAF ▾</button>' +
         '<div id="ple-wx-panel" style="display:none;margin-bottom:8px"></div></div>' +

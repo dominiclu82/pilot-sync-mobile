@@ -53,8 +53,8 @@ import { getAirportDbJs } from '../spa/js-airport-db.js';
 
 // ── 版本（比照 CrewSync / Morning：每次推版必更新；SW cache 名稱跟著走） ────
 // 本機 preview build 會暫時加 -tNN 後綴方便對版；推正式版前拿掉只留乾淨版號。
-export const PILOT_LOG_VERSION = 'V2.2.04';
-const PILOT_LOG_CACHE = 'pilotlog-v2-2-04';
+export const PILOT_LOG_VERSION = 'V2.2.05';
+const PILOT_LOG_CACHE = 'pilotlog-v2-2-05';
 
 export const pilotLogRouter = express.Router();
 
@@ -341,6 +341,11 @@ if (document.readyState !== 'loading') pilotLogInit();
 function _renderPilotLogChangelog(): string {
   return `
     <div class="pl-cl-v">${PILOT_LOG_VERSION}</div>
+    <div class="pl-cl-txt">
+      <b>✏️ 編輯器小修：</b>日期欄改純數字（不再壓到 Flight#）；From/To 機場下拉更穩、點一下就跳、打字即時篩，手動輸入照常。<br>
+      <b>✏️ Editor fixes:</b> Date shows plain numeric (no overflow into Flight#); From/To airport dropdown is more reliable — taps open it, type to filter, manual entry preserved.
+    </div>
+    <div class="pl-cl-v old">V2.2.04</div>
     <div class="pl-cl-txt">
       <b>🌍 3D 地球夜晚不再模糊 ＋ ✈️ 動態航跡從台灣飛出去。</b><b>(1)</b> Earth 拉遠有日夜＋城市燈，放大自動切回清楚的白天衛星圖（仿 Apple），夜面放大不再糊。<b>(2)</b> 動態光點凡經台灣的航線一律從台灣飛出去。<br>
       <b>🌍 Sharper night view on 3D Earth + ✈️ animated routes depart from Taiwan.</b> (1) Earth shows day/night + city lights when zoomed out, auto-switches to a clear daytime map up close (Apple-style). (2) Animated route lights now fly outward from the Taiwan end.
