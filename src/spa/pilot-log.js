@@ -681,9 +681,10 @@ async function _plDeleteAccount() {
 // V1.2：網路失敗時 catch 起來、保留現有 _pl 資料（可能來自 IDB 快取）、設 OFFLINE 旗標；
 // 不讓網路掛掉的 throw 把 caller 炸掉。成功時順手寫一份進 IDB。
 async function _plFetchAll() {
-  var q = '';
-  // V1.3.08：filter 改成 client-side（all/past/future/removed 不對應 server status）— fetch 抓全部
-  // q stays ''
+  // V1.3.08：filter 改成 client-side（all/past/future/removed 不對應 server status）— 要抓「全部」entries。
+  // V2.2.07 修大 bug：原本 q='' 沒帶 limit → server 預設只回最近 200 筆，飛行筆數多的人看不到 2024 以前的
+  //   航班（總時數正常是因為 stats 是 server 端全量算）。改帶 limit=all → server 不加 LIMIT，整本全載、無上限。
+  var q = '?limit=all';
   try {
     var [eRes, sRes, aRes, qRes, atRes, cRes, mRes] = await Promise.all([
       _plApi('/api/pilot-log/entries' + q),
@@ -3264,9 +3265,9 @@ async function _plUploadAddressBook() {
 // + Add Aircraft：手動加新機（公司新交機等）
 
 // 獨立 fetch：撈完整 entries（不過主頁 filter、不分頁），給 Aircraft 列表 / drill-down 用
-// 主頁 _pl.entries 受 filter + 200 limit 影響，counts 跟 drill-down 不能用它
+// 主頁 _pl.entries 受 filter 影響，counts 跟 drill-down 用這份獨立全量快照
 async function _plFetchAircraftEntries() {
-  // 用 limit=50000（server 端剛調的上限），覆蓋任何真實飛行員職涯範圍。
+  // V2.2.07：用 limit=all（server 不加 LIMIT）整本全載，無上限。
   // V1.3.26：已知離線就別等網路 —— 離線時 fetch 會卡很久才失敗（Report/Analyze 一直 Loading…）。
   // navigator 明確離線 → 直接用既有快取（IDB 已載）+ 標離線，秒回。
   if (!_plOnline()) {
@@ -3276,7 +3277,7 @@ async function _plFetchAircraftEntries() {
   }
   // V1.2：網路掛掉保留既有快照（可能來自 IDB），設 OFFLINE 旗標；成功就寫一份回 IDB。
   try {
-    var res = await _plApi('/api/pilot-log/entries?limit=50000');
+    var res = await _plApi('/api/pilot-log/entries?limit=all');
     if (!res.ok) {
       if (!_pl.aircraftEntries) _pl.aircraftEntries = [];
       return;
@@ -3313,7 +3314,7 @@ async function _plOpenAircraft() {
   // Loading state（避免空白）
   c.innerHTML = '<div style="text-align:center;color:var(--muted);padding:40px;font-size:.85em">載入機尾庫… · Loading aircraft…</div>';
   // 同時拉 aircraft 清單跟完整 entries（兩者各自獨立、可並行）
-  await Promise.all([_plFetchAll(), _plFetchAircraftEntries()]);
+  await _plFetchAll(); _pl.aircraftEntries = _pl.entries;   // V2.2.07：_plFetchAll 已用 limit=all 載全本 → 共用，免再抓一次（codex P2 修重複下載）
   _plRenderAircraftList();
 }
 
@@ -4142,7 +4143,7 @@ async function _plOpenCrew() {
   if (!c) return;
   c.innerHTML = '<div style="text-align:center;color:var(--muted);padding:40px;font-size:.85em">載入 crew… · Loading crew…</div>';
   // 同時拉 crew 跟完整 entries（兩者各自獨立、可並行）
-  await Promise.all([_plFetchAll(), _plFetchAircraftEntries()]);
+  await _plFetchAll(); _pl.aircraftEntries = _pl.entries;   // V2.2.07：_plFetchAll 已用 limit=all 載全本 → 共用，免再抓一次（codex P2 修重複下載）
   _plRenderCrewList();
 }
 
@@ -4613,7 +4614,7 @@ async function _plRenderAnalyze() {
   _plShowTabBar(true);
   _plHighlightTab('analyze');
   c.innerHTML = '<div style="text-align:center;color:var(--muted);padding:40px;font-size:.85em">Loading stats…</div>';
-  await Promise.all([_plFetchAll(), _plFetchAircraftEntries()]);
+  await _plFetchAll(); _pl.aircraftEntries = _pl.entries;   // V2.2.07：_plFetchAll 已用 limit=all 載全本 → 共用，免再抓一次（codex P2 修重複下載）
   if (!_pl.user) { _plRenderLogin(); return; }   // fetch 中 session 失效 → 回登入（codex fast P1）
   _plRenderAnalyzeContent();
 }

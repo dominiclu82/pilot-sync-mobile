@@ -8,6 +8,8 @@
 import { getPool } from './schema.js';
 import { listTransactionsForSymbol, listUserSymbols } from './queries.js';
 import { calcOverall, type PortfolioTxn } from './holdings.js';
+import { fetchUsdTwdRate } from '../morning-builder.js';
+import { getCachedUsdTwdFromMorningReport } from '../morning.js';
 
 interface YahooHistoryPoint {
   date: string;       // 'YYYY-MM-DD'
@@ -106,6 +108,20 @@ export async function backfillUser(userId: string, days: number): Promise<{ back
     cur.setUTCDate(cur.getUTCDate() + 1);
   }
 
+  // 台股=TWD、美股=USD，換成台幣後再合計（修 codex P1：原本混幣相加 → 圖表/歷史錯）。
+  // 歷史回填用「當前」USD/TWD 匯率近似（逐日歷史匯率為日後精修項）；抓不到且持有美股就放棄回填，避免存混幣錯值。
+  const hasUs = symbols.some(s => s.market === 'US');
+  let usdTwd: number | null = null;
+  if (hasUs) {
+    usdTwd = await getCachedUsdTwdFromMorningReport();
+    if (usdTwd == null) usdTwd = await fetchUsdTwdRate();
+    if (usdTwd == null || !isFinite(usdTwd) || usdTwd <= 0) {
+      console.warn(`[portfolio] backfillUser ${userId}: USD/TWD 匯率抓不到且持有美股 → 略過回填（避免存混幣錯值）`);
+      return { backfilled: 0, symbols: symbols.length, range: { from: '', to: '' } };
+    }
+  }
+  const fxOf = (market: 'TW' | 'US'): number => (market === 'US' ? (usdTwd as number) : 1);
+
   // 4. Replay txns + 用該日 close price 算 portfolio value
   // 「最後一個已知 close」cache，跨日 fallback (週末 / 假日 yahoo 沒資料)
   const lastClose: Record<string, number> = {};
@@ -126,15 +142,16 @@ export async function backfillUser(userId: string, days: number): Promise<{ back
         const txns = txnsPerSymbol[key].filter(t => t.txn_date <= dateStr);
         const overall = calcOverall(txns);
         if (!overall) continue;
-        totalRealized += overall.realizedPnl;
-        totalDividend += overall.totalDividend;
+        const fx = fxOf(market);
+        totalRealized += overall.realizedPnl * fx;
+        totalDividend += overall.totalDividend * fx;
         if (overall.qty <= 0) continue;
-        totalCost += overall.costBasis;
+        totalCost += overall.costBasis * fx;
         // 該日 close → fallback 用最後已知 close → fallback avgCost
         const todayClose = histPerSymbol[key].get(dateStr);
         if (todayClose != null) lastClose[key] = todayClose;
         const usePrice = todayClose ?? lastClose[key] ?? overall.avgCost;
-        totalValue += overall.qty * usePrice;
+        totalValue += overall.qty * usePrice * fx;
       }
 
       await client.query(

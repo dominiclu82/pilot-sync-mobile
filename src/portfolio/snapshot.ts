@@ -6,7 +6,8 @@
 import { getPool } from './schema.js';
 import { listTransactionsForSymbol, listUserSymbols } from './queries.js';
 import { calcOverall } from './holdings.js';
-import { cnyesBatch } from '../morning-builder.js';
+import { cnyesBatch, fetchUsdTwdRate } from '../morning-builder.js';
+import { getCachedUsdTwdFromMorningReport } from '../morning.js';
 
 /**
  * 抓所有需要報價的 symbols → 一次性 batch fetch 報價 → 回 map
@@ -55,6 +56,19 @@ export async function snapshotUser(userId: string, dateStr: string): Promise<{ u
   // 抓所有 symbols 報價
   const quotes = await fetchQuotesMap(symbols);
 
+  // 台股=TWD、美股=USD，全部換成台幣後再合計（修 codex P1：原本混幣直接相加，混 US/TW 的人快照與圖表會錯）。
+  const hasUs = symbols.some(s => s.market === 'US');
+  let usdTwd: number | null = null;
+  if (hasUs) {
+    usdTwd = await getCachedUsdTwdFromMorningReport();
+    if (usdTwd == null) usdTwd = await fetchUsdTwdRate();
+    if (usdTwd == null || !isFinite(usdTwd) || usdTwd <= 0) {
+      console.warn(`[portfolio] snapshotUser ${userId}: USD/TWD 匯率抓不到且持有美股 → 跳過今日快照（避免存進混幣錯值）`);
+      return null;
+    }
+  }
+  const fxOf = (market: 'TW' | 'US'): number => (market === 'US' ? (usdTwd as number) : 1);
+
   let totalValue = 0;
   let totalCost = 0;
   let totalRealized = 0;
@@ -64,17 +78,15 @@ export async function snapshotUser(userId: string, dateStr: string): Promise<{ u
     const txns = await listTransactionsForSymbol(userId, symbol, market);
     const overall = calcOverall(txns);
     if (!overall) continue;
-    totalRealized += overall.realizedPnl;
-    totalDividend += overall.totalDividend;
+    const fx = fxOf(market);
+    totalRealized += overall.realizedPnl * fx;
+    totalDividend += overall.totalDividend * fx;
     if (overall.qty <= 0) continue;  // 已全賣
-    totalCost += overall.costBasis;
+    totalCost += overall.costBasis * fx;
     const price = quotes[`${market}:${symbol}`]?.price;
-    if (typeof price === 'number') {
-      totalValue += overall.qty * price;
-    } else {
-      // 抓不到報價 fallback 用 avgCost (保守估，避免 totalValue 為 0)
-      totalValue += overall.qty * overall.avgCost;
-    }
+    // 抓不到報價 fallback 用 avgCost (保守估，避免 totalValue 為 0)
+    const unit = typeof price === 'number' ? price : overall.avgCost;
+    totalValue += overall.qty * unit * fx;
   }
 
   // Upsert (同 user / 同日只一筆)

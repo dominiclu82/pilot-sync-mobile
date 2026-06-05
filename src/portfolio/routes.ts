@@ -350,6 +350,31 @@ portfolioRouter.patch('/api/portfolio/transaction/:id', pinGate, async (req, res
 
   if (Object.keys(update).length === 0) return res.status(400).json({ error: 'nothing_to_update' });
 
+  // 編輯交易也要防超賣（比照 POST 的 date-aware 檢查）— codex P1。
+  // 先讀出原交易拿到 symbol/market/type，再用「編輯後的值」驗證；計算可賣量時排除被編輯的這筆自己。
+  try {
+    const existingTxn = (await listTransactions(userId)).find(t => t.id === id);
+    if (!existingTxn) return res.status(404).json({ error: 'not_found' });
+    if (existingTxn.txn_type === 'sell') {
+      const newDate = update.txn_date ?? existingTxn.txn_date;
+      const newQty = update.qty ?? existingTxn.qty;
+      const others = (await listTransactionsForSymbol(userId, existingTxn.symbol, existingTxn.market))
+        .filter(t => t.id !== id && t.txn_date <= newDate);
+      const overall = calcOverall(others);
+      const currentQty = overall ? overall.qty : 0;
+      if (newQty > currentQty) {
+        return res.status(400).json({
+          error: 'sell_exceeds_holding',
+          current_qty: currentQty,
+          attempted_sell_qty: newQty,
+          as_of_date: newDate,
+        });
+      }
+    }
+  } catch (e: any) {
+    return res.status(500).json({ error: e.message });
+  }
+
   try {
     const txn = await updateTransaction(userId, id, update);
     if (!txn) return res.status(404).json({ error: 'not_found' });

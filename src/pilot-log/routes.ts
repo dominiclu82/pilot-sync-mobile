@@ -53,8 +53,8 @@ import { getAirportDbJs } from '../spa/js-airport-db.js';
 
 // ── 版本（比照 CrewSync / Morning：每次推版必更新；SW cache 名稱跟著走） ────
 // 本機 preview build 會暫時加 -tNN 後綴方便對版；推正式版前拿掉只留乾淨版號。
-export const PILOT_LOG_VERSION = 'V2.2.06';
-const PILOT_LOG_CACHE = 'pilotlog-v2-2-06';
+export const PILOT_LOG_VERSION = 'V2.2.07';
+const PILOT_LOG_CACHE = 'pilotlog-v2-2-07';
 
 export const pilotLogRouter = express.Router();
 
@@ -244,6 +244,9 @@ body {
 }
 .pl-offline-bar.show { display: block; }
 body.pl-offline { padding-top: calc(env(safe-area-inset-top) + 28px); }
+/* 沉浸式地圖是 position:fixed;top:0，不吃 body padding → 離線時 OFFLINE 橫幅會蓋住地圖右上的
+   Save／日期等浮動控制項。離線時把整個地圖容器下移一個橫幅高度，控制項就全部讓開。 */
+body.pl-offline #pl-map-full { top: calc(env(safe-area-inset-top) + 28px); }
 </style>
 <script>
 /* 早期套用主題 + 字級，避免 FOUC（在 content render 前先讀 localStorage） */
@@ -341,6 +344,11 @@ if (document.readyState !== 'loading') pilotLogInit();
 function _renderPilotLogChangelog(): string {
   return `
     <div class="pl-cl-v">${PILOT_LOG_VERSION}</div>
+    <div class="pl-cl-txt">
+      <b>🐛 修大 bug：記錄本現在會載入「全部」航班</b>（原本只載最近 200 筆，飛行多的人看不到舊航班；總時數一直是對的）。另外離線提示橫幅不再擋住地圖右上的按鈕。<br>
+      <b>🐛 Big fix: the logbook now loads ALL flights</b> (it used to load only the latest 200, hiding older flights for high-time pilots; total hours were always correct). Also, the offline banner no longer covers the map’s top-right buttons.
+    </div>
+    <div class="pl-cl-v old">V2.2.06</div>
     <div class="pl-cl-txt">
       <b>🛬 跑道也比照辦理：</b>Dep/Arr Rwy 換成自訂下拉，點一下就跳、候選自動跟著 From/To 機場、打字即時篩，手動輸入照常。<br>
       <b>🛬 Runway pickers too:</b> Dep/Arr Rwy now use the same reliable dropdown — taps open it, options follow the From/To airport, type to filter, manual entry preserved.
@@ -1060,10 +1068,12 @@ pilotLogRouter.get('/api/pilot-log/entries', requireAuth, async (req: AuthedRequ
   const status = typeof req.query.status === 'string' ? req.query.status : '';
   const from = typeof req.query.from === 'string' ? req.query.from : '';
   const to = typeof req.query.to === 'string' ? req.query.to : '';
-  // limit 上限放寬到 50000，讓 Aircraft / Crew 列表頁能一次撈完整 entries 做 client-side aggregation
-  // （主頁列表預設仍用 200，UI 會分頁；只有 Aircraft 頁會用大 limit）。
-  // 50000 足夠任何真實飛行員職涯範圍（典型 30 年 ~ 30k 筆）。超過時應走 server-side 聚合。
-  const limit = Math.min(parseInt(String(req.query.limit || '200'), 10) || 200, 50000);
+  // 記錄本要看得到「全部」航班，不該被人為上限砍掉（漏掉飛行＝錯）。
+  // limit='all'（或 '0'）→ 不加 LIMIT，回該 user 全部（WHERE user_id 已限定只有本人資料，量受真實職涯上限）。
+  // 其餘情況維持數字 limit（預設 200）+ offset，保留給未來分頁；不再硬上限 50000。
+  const limitRaw = String(req.query.limit ?? '').trim();
+  const unlimited = limitRaw === 'all' || limitRaw === '0';
+  const limit = unlimited ? null : (parseInt(limitRaw, 10) || 200);
   const offset = Math.max(parseInt(String(req.query.offset || '0'), 10) || 0, 0);
 
   const conds: string[] = ['user_id = $1'];
@@ -1077,12 +1087,21 @@ pilotLogRouter.get('/api/pilot-log/entries', requireAuth, async (req: AuthedRequ
   if (to && /^\d{4}-\d{2}-\d{2}$/.test(to)) {
     params.push(to); conds.push(`flight_date <= $${params.length}`);
   }
-  params.push(limit, offset);
+
+  let limitClause: string;
+  if (unlimited) {
+    // 無 LIMIT；若有帶 offset 仍套用（主列表用不到，但保留語意）
+    if (offset > 0) { params.push(offset); limitClause = `OFFSET $${params.length}`; }
+    else { limitClause = ''; }
+  } else {
+    params.push(limit, offset);
+    limitClause = `LIMIT $${params.length - 1} OFFSET $${params.length}`;
+  }
 
   const r = await pool.query(
     `SELECT * FROM pilot_log_entries WHERE ${conds.join(' AND ')}
      ORDER BY flight_date DESC, COALESCE(std_utc, out_utc, off_utc, on_utc, in_utc) DESC NULLS LAST
-     LIMIT $${params.length - 1} OFFSET $${params.length}`,
+     ${limitClause}`,
     params
   );
   res.json({ entries: r.rows, count: r.rowCount });
