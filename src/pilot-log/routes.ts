@@ -53,8 +53,8 @@ import { getAirportDbJs } from '../spa/js-airport-db.js';
 
 // ── 版本（比照 CrewSync / Morning：每次推版必更新；SW cache 名稱跟著走） ────
 // 本機 preview build 會暫時加 -tNN 後綴方便對版；推正式版前拿掉只留乾淨版號。
-export const PILOT_LOG_VERSION = 'V2.2.02';
-const PILOT_LOG_CACHE = 'pilotlog-v2-2-02';
+export const PILOT_LOG_VERSION = 'V2.2.03';
+const PILOT_LOG_CACHE = 'pilotlog-v2-2-03';
 
 export const pilotLogRouter = express.Router();
 
@@ -341,6 +341,11 @@ if (document.readyState !== 'loading') pilotLogInit();
 function _renderPilotLogChangelog(): string {
   return `
     <div class="pl-cl-v">${PILOT_LOG_VERSION}</div>
+    <div class="pl-cl-txt">
+      <b>🗺️ 地圖體驗修正。</b><b>(1)</b> 控制項（Map／Earth、統計、日期）改成<b>穩定浮在地圖最上層</b>，不再被地圖蓋住。<b>(2)</b> 日期區間移到<b>右上角</b>，並新增 <b>近30天 / 近90天</b> 快捷。<b>(3)</b> Earth 的航跡改成 <b>[靜態｜動態]</b> 雙格鈕（按你要的那個），<b>動態</b>時有光點<b>沿著航線流動</b>。<b>(4)</b> 2D 縮放鈕移到右下，不再擋到上方控制項。<br>
+      <b>🗺️ Map UX fixes.</b> (1) Controls (Map/Earth, stats, date) now <b>stay reliably on top</b> of the map instead of being covered. (2) The date-range moved to the <b>top-right</b>, with new <b>last-30-day / last-90-day</b> shortcuts. (3) Earth route style is now a <b>[Static｜Animated]</b> two-button toggle (tap the one you want); <b>Animated</b> shows a light <b>flowing along each route</b>. (4) The 2D zoom buttons moved to the bottom-right so they no longer overlap the top controls.
+    </div>
+    <div class="pl-cl-v old">V2.2.02</div>
     <div class="pl-cl-txt">
       <b>🌍 3D 地球大升級（Cesium）＋ 🗺️ 沉浸式地圖 ＋ 編輯器排版修正。</b><b>(1)</b> Map 分頁的 <b>Earth</b> 換成可<b>放大看細節的衛星地球</b>，還有<b>真實日夜光照＋夜面城市燈</b>（依當下時間）；引擎只在打開時下載、之後永久快取。<b>(2)</b> 地圖改成<b>全版沉浸式</b>：地圖佔滿整頁、控制項（Map／Earth、Save、統計）<b>半透明浮在地圖上</b>；2D 衛星圖、<b>航線變細變淡</b>不再糊住地圖、<b>地名放大才浮出</b>、可選<b>動態／靜態航跡</b>、可篩<b>日期區間</b>。<b>(3)</b> 編輯器：手機版 <b>CREW</b> 六列對齊一致（沒填名字的格子不再變大）、<b>OOOI</b> 由四格擠一排改成<b>2×2</b>（iPad 不變）。<br>
       <b>🌍 3D Earth upgrade (Cesium) + 🗺️ immersive map + editor layout fixes.</b> (1) The <b>Earth</b> view now streams <b>satellite tiles you can zoom into</b>, with <b>real day/night lighting and city lights</b> (by current time); the engine downloads only on first open, then stays cached. (2) The map is now <b>full-screen immersive</b> — controls (Map/Earth, Save, stats) <b>float over the map</b>; thinner translucent routes, place-name labels appear on zoom-in, animated/static route toggle, and a date-range filter. (3) Editor: phone <b>CREW</b> rows align consistently (empty slots no longer widen), and <b>OOOI</b> changed from four cramped boxes to <b>2×2</b> (iPad unchanged).

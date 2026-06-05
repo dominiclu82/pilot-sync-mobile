@@ -5046,21 +5046,24 @@ function _plClearMapRange() { _pl.mapFrom = null; _pl.mapTo = null; _plDisposeGl
 function _plMapRangeRow(rr) {
   var di = 'background:var(--input-bg);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:5px 7px;font-size:.72em';
   var now = new Date();
+  var ymd = function(d) { return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2); };
+  var today = ymd(now);
   var ytd = now.getFullYear() + '-01-01';
-  var today = now.getFullYear() + '-' + ('0' + (now.getMonth() + 1)).slice(-2) + '-' + ('0' + now.getDate()).slice(-2);
+  // codex P2：用日曆運算（不是毫秒相減）—— DST 時區午夜後相減會掉到前一天、多算一天。
+  var d30 = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 29);
+  var d90 = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 89);
   var d12 = new Date(now.getFullYear(), now.getMonth() - 11, 1);
   var from12 = d12.getFullYear() + '-' + ('0' + (d12.getMonth() + 1)).slice(-2) + '-01';
-  var active = (rr.from || rr.to);
   var chip = function(label, fromV, toV) {
     var on = rr.from === fromV && rr.to === toV;
     return '<button onclick="_pl.mapFrom=' + (fromV ? '\'' + fromV + '\'' : 'null') + ';_pl.mapTo=' + (toV ? '\'' + toV + '\'' : 'null') + ';_plDisposeGlobe();_plRenderMapTabContent()" ' +
       'style="background:' + (on ? 'var(--accent)' : 'transparent') + ';color:' + (on ? '#fff' : 'var(--muted)') + ';border:1px solid var(--border);border-radius:6px;padding:5px 9px;font-size:.66em;font-weight:700;cursor:pointer;white-space:nowrap">' + label + '</button>';
   };
-  return '<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:10px">' +
+  return '<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">' +
     '<input type="date" value="' + _plEsc(rr.from) + '" onchange="_plSetMapFrom(this.value)" style="' + di + ';flex:1;min-width:116px">' +
     '<span style="color:var(--muted);font-size:.72em">→</span>' +
     '<input type="date" value="' + _plEsc(rr.to) + '" onchange="_plSetMapTo(this.value)" style="' + di + ';flex:1;min-width:116px">' +
-    chip('全部 All', null, null) + chip('今年', ytd, today) + chip('近12月', from12, today) +
+    chip('全部 All', null, null) + chip('近30天', ymd(d30), today) + chip('近90天', ymd(d90), today) + chip('今年', ytd, today) + chip('近12月', from12, today) +
   '</div>';
 }
 
@@ -5182,10 +5185,16 @@ function _plRenderMapTabContent() {
   var iconBtn = function(onclick, label, extra) {
     return '<button onclick="' + onclick + '" style="' + PILL + ';color:#fff;padding:7px 11px;font-size:.74em;font-weight:700;cursor:pointer;white-space:nowrap;' + (extra || '') + '">' + label + '</button>';
   };
+  // 航跡切換做成跟 Map/Earth 一樣的「雙格段控」（按你要的那個，當前高亮），預設靜態。只在 Earth 顯示。
   var arcBtn = '';
   if (view === 'globe') {
     var arc = _plMapArc();
-    arcBtn = iconBtn('_plSetMapArc(\'' + (arc === 'animated' ? 'static' : 'animated') + '\')', arc === 'animated' ? '✦ 動態' : '― 靜態');
+    var aseg = function(id, label) {
+      var on = arc === id;
+      return '<button onclick="_plSetMapArc(\'' + id + '\')" style="padding:6px 11px;border:0;border-radius:10px;font-size:.72em;font-weight:700;cursor:pointer;-webkit-appearance:none;' +
+        (on ? 'background:var(--accent);color:#fff' : 'background:transparent;color:rgba(255,255,255,.8)') + '">' + label + '</button>';
+    };
+    arcBtn = '<div style="display:flex;gap:3px;padding:3px;' + PILL + '">' + aseg('static', '靜態') + aseg('animated', '動態') + '</div>';
   }
   var rangeActive = (rr.from || rr.to);
   // 浮層：上排控制 + 統計藥丸 + 可收合日期面板
@@ -5202,11 +5211,14 @@ function _plRenderMapTabContent() {
         '</div>' +
       '</div>' +
       '<div id="pl-flown-stats" style="pointer-events:auto"></div>' +
-      '<div id="pl-map-range-panel" style="pointer-events:auto;display:' + (rangeActive ? 'block' : 'none') + ';' + PILL + ';padding:9px 11px;max-width:360px">' + _plMapRangeRow(rr) + '</div>' +
+      // 日期區間面板：靠右開（右上空間大），跟右上的 📅 鈕對齊
+      '<div id="pl-map-range-panel" style="pointer-events:auto;align-self:flex-end;display:' + (rangeActive ? 'block' : 'none') + ';' + PILL + ';padding:9px 11px;max-width:340px">' + _plMapRangeRow(rr) + '</div>' +
     '</div>';
   c.innerHTML =
     '<div id="pl-map-full" style="position:fixed;top:0;left:0;right:0;bottom:calc(56px + env(safe-area-inset-bottom));background:' + hostBg + ';overflow:hidden">' +
-      '<div id="' + hostId + '" style="position:absolute;top:0;left:0;right:0;bottom:0">' +
+      // z-index:0 → 給地圖一個獨立堆疊層，把 Leaflet 內部高 z-index（圖磚/控制項 200~1000）關在裡面，
+      // 才不會爬到下面 overlay(z-index:10) 之上把切換鈕/日期區間蓋掉。地圖永遠在最底層。
+      '<div id="' + hostId + '" style="position:absolute;top:0;left:0;right:0;bottom:0;z-index:0">' +
         _plMapMsg(entries.length ? '載入中… Loading…' : emptyMsg) +
       '</div>' +
       overlay +
@@ -5354,10 +5366,12 @@ function _plInitFlownMap(geo) {
     if (_pl.tab !== 'map' || (_pl.mapView || 'map') !== 'map') return;
     var h = document.getElementById('pl-map-host');
     if (!h || !window.L) { if (h) h.innerHTML = _plMapMsg('地圖載入失敗<br>Map failed to load'); return; }
-    h.innerHTML = '<div id="pl-lmap" style="width:100%;height:100%"></div>';
+    h.innerHTML = '<div id="pl-lmap" style="width:100%;height:100%;background:#0b0f1a"></div>';   // 深底，載入時不露 Leaflet 預設灰
     _plEnsureMapLblCss();
     var L = window.L;
-    var map = L.map('pl-lmap', { worldCopyJump: true, attributionControl: false, zoomControl: true, minZoom: 1 }).setView([20, 100], 2);
+    // zoomControl 移到右下 —— 左上/左下會擋到浮層的切換鈕與統計，右下角最空。
+    var map = L.map('pl-lmap', { worldCopyJump: true, attributionControl: false, zoomControl: false, minZoom: 1 }).setView([20, 100], 2);
+    L.control.zoom({ position: 'bottomright' }).addTo(map);
     // Esri World Imagery 衛星圖（跟跑道圖同源）。crossOrigin 讓 Save Image 可截圖。
     L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 18, crossOrigin: true }).addTo(map);
     // 「飛行作業區中心」= 所有機場的環狀平均經度。把機場點 + 航線整條都平移進這個中心框
@@ -5466,17 +5480,32 @@ function _plInitGlobe(geo) {
           try { nl.dayAlpha = 0.0; nl.nightAlpha = 1.0; nl.brightness = 1.6; } catch (e) {}
         }).catch(function() {});
     } catch (e) {}
-    // 航線（測地線大圓，Cesium 原生處理換日線）
-    geo.routes.forEach(function(r) {
+    // 航線（測地線大圓，Cesium 原生處理換日線）。動態時時鐘要跑，光點才會沿線移動。
+    try { viewer.clock.shouldAnimate = animated; } catch (e) {}
+    var clockStart = C.JulianDate.clone(viewer.clock.currentTime);
+    geo.routes.forEach(function(r, idx) {
       var w = Math.min(0.8 + r.count * 0.12, 2.2);
-      var mat = animated
-        ? new C.PolylineGlowMaterialProperty({ glowPower: 0.22, taperPower: 1, color: C.Color.fromCssColorString('#7dd3fc') })
-        : C.Color.fromCssColorString('#e0f2fe').withAlpha(0.55);
       try {
+        // 底線（動態時淡一點，讓移動光點更突出）
         viewer.entities.add({ polyline: {
           positions: C.Cartesian3.fromDegreesArray([r.aLon, r.aLat, r.bLon, r.bLat]),
-          width: w, arcType: C.ArcType.GEODESIC, material: mat
+          width: w, arcType: C.ArcType.GEODESIC,
+          material: C.Color.fromCssColorString('#e0f2fe').withAlpha(animated ? 0.32 : 0.55)
         } });
+        // 動態：一顆發光點沿著大圓「光影移動」（各線錯開相位），靜態則沒有。
+        if (animated) {
+          var gd = new C.EllipsoidGeodesic(C.Cartographic.fromDegrees(r.aLon, r.aLat), C.Cartographic.fromDegrees(r.bLon, r.bLat));
+          var phase = (idx % 8) / 8;
+          viewer.entities.add({
+            position: new C.CallbackProperty(function(time) {
+              var s = C.JulianDate.secondsDifference(time, clockStart);
+              var t = (((s / 4) + phase) % 1 + 1) % 1;   // 0→1 沿線跑，週期 4 秒
+              var cg = gd.interpolateUsingFraction(t);
+              return C.Cartesian3.fromRadians(cg.longitude, cg.latitude, 8000);
+            }, false),
+            point: { pixelSize: 6, color: C.Color.fromCssColorString('#a5f3fc'), outlineColor: C.Color.WHITE.withAlpha(0.6), outlineWidth: 1 }
+          });
+        }
       } catch (e) {}
     });
     // 機場（紅點白圈 + 地名標籤；標籤用 distanceDisplayCondition 近看(<2000km)才顯示）
