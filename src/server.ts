@@ -248,7 +248,7 @@ app.get('/apps', (_req, res) => {
   res.setHeader('Cache-Control', 'no-store');
   const apps = [
     { icon: '🛬', name: 'CrewSync', href: '/main', cn: '班表同步 · 機場天氣 · 跑道圖 · 即時雷達', en: 'Roster · Weather · Runway maps · Live radar' },
-    { icon: '📒', name: 'Pilot Log', href: '/pilot-log', cn: '電子飛行紀錄 · 自動帶班表 · 統計分析', en: 'Electronic logbook · roster import · analytics' },
+    { icon: '📒', name: 'Pilot Log', href: '/pilot-log', cn: '電子飛行紀錄 · 班表匯入 · 統計分析', en: 'Electronic logbook · roster import · analytics' },
     { icon: '📰', name: '今日 Today', href: '/morning', cn: '新聞 · 天氣 · 投資速覽', en: 'News · Weather · Portfolio' },
   ];
   const cards = apps.map(a =>

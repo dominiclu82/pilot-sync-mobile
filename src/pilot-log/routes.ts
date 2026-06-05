@@ -52,8 +52,8 @@ import { getAirportDbJs } from '../spa/js-airport-db.js';
 
 // ── 版本（比照 CrewSync / Morning：每次推版必更新；SW cache 名稱跟著走） ────
 // 本機 preview build 會暫時加 -tNN 後綴方便對版；推正式版前拿掉只留乾淨版號。
-export const PILOT_LOG_VERSION = 'V2.1.06';
-const PILOT_LOG_CACHE = 'pilotlog-v2-1-06';
+export const PILOT_LOG_VERSION = 'V2.1.07';
+const PILOT_LOG_CACHE = 'pilotlog-v2-1-07';
 
 export const pilotLogRouter = express.Router();
 
@@ -337,6 +337,11 @@ if (document.readyState !== 'loading') pilotLogInit();
 function _renderPilotLogChangelog(): string {
   return `
     <div class="pl-cl-v">${PILOT_LOG_VERSION}</div>
+    <div class="pl-cl-txt">
+      <b>後台小修正。</b>背景維護更新，使用者操作與介面不變。<br>
+      <b>Minor backend fix.</b> Background maintenance update; nothing changes in how you use the app.
+    </div>
+    <div class="pl-cl-v old">V2.1.06</div>
     <div class="pl-cl-txt">
       <b>後台小修正。</b>背景維護更新，使用者操作與介面不變。<br>
       <b>Minor backend fix.</b> Background maintenance update; nothing changes in how you use the app.
@@ -2770,14 +2775,19 @@ function dash(){
   // 跨 app 重疊：pilot emails ∩ crewsync emails
   var csSet={};c.users.forEach(function(u){if(u.email)csSet[u.email.toLowerCase()]=1;});
   var overlap=p.users.filter(function(u){return(u.emails||[]).some(function(e){return csSet[(e||'').toLowerCase()];});}).length;
-  var db=T.db&&T.db.latest?T.db.latest:(d.db&&d.db.latest?d.db.latest:null);
-  var pct=db?Math.min(100,Math.round(db.db_total_bytes/10737418.24)):0;
+  // 整庫優先用 Render 即時真實磁碟（含 WAL/系統），讀不到退回 DB 內容快照
+  var sm=(T.db&&T.db.summary)?T.db.summary:null;
+  var snap=(d.db&&d.db.latest)?d.db.latest:null;
+  var diskBytes=null,plBytes=null,pct=0;
+  if(sm&&sm.render_disk_mb!=null){diskBytes=sm.render_disk_mb*1048576;plBytes=(sm.total_pilot_log_size_mb||0)*1048576;pct=Math.min(100,Math.round(sm.render_disk_pct_of_1gb||0));}
+  else if(sm&&sm.all_db_size_mb!=null){diskBytes=sm.all_db_size_mb*1048576;plBytes=(sm.total_pilot_log_size_mb||0)*1048576;pct=Math.min(100,Math.round(sm.db_used_pct_of_1gb||(sm.all_db_size_mb/1024*100)));}
+  else if(snap){diskBytes=snap.db_total_bytes;plBytes=snap.pilot_log_bytes;pct=Math.min(100,Math.round(snap.db_total_bytes/10737418.24));}
   return '<div class=dash>'+
     '<div class=card><div class=lbl>總用戶</div><div class=big>'+(p.count+c.count+m.count)+'</div><div class=seg><span>🛬 <b>'+c.count+'</b></span><span>📒 <b>'+p.count+'</b></span><span>🌅 <b>'+m.count+'</b></span></div></div>'+
     '<div class=card><div class=lbl>活躍人數</div><div class="big g">'+actToday+'</div><div class=seg><span class=g>今日 <b>'+actToday+'</b></span><span class=y>7天 <b>'+act7+'</b></span><span class=gray>30天 <b>'+act30+'</b></span></div></div>'+
     '<div class=card><div class=lbl>今日新增</div><div class="big blue">+'+newToday+'</div></div>'+
     '<div class=card><div class=lbl>跨 App 重疊</div><div class=big>'+overlap+'</div><div class=sub>CrewSync + Pilot Log</div></div>'+
-    (db?'<div class=card><div class=lbl>資料庫</div><div class=big>'+mb(db.db_total_bytes)+'<span style="font-size:.5em;color:#64748b"> / 1 GB</span></div><div class=bar><i style="width:'+pct+'%"></i></div><div class=sub>'+pct+'% · Pilot Log '+mb(db.pilot_log_bytes)+'</div></div>':'')+
+    (diskBytes!=null?'<div class=card><div class=lbl>資料庫</div><div class=big>'+mb(diskBytes)+'<span style="font-size:.5em;color:#64748b"> / 1 GB</span></div><div class=bar><i style="width:'+pct+'%"></i></div><div class=sub>'+pct+'% · Pilot Log '+mb(plBytes)+'</div></div>':'')+
   '</div>';
 }
 function filt(arr,keys){var q=T.q.toLowerCase();if(!q)return arr;return arr.filter(function(u){return keys.some(function(k){var v=u[k];if(Array.isArray(v))v=v.join(' ');return String(v||'').toLowerCase().indexOf(q)>=0;});});}
@@ -2839,9 +2849,12 @@ function secDb(){
   // /oops/stats 結構：摘要數字在 raw.summary 底下、表排行在 top-level raw.breakdown
   var s=raw.summary||{};
   var b=raw.breakdown||{},g=s.growth||{},u=s.users||{},en=s.entries||{},rg=s.recent_growth||{},byS=en.by_status||{};
-  var pct=Math.min(100,Math.round(((s.all_db_size_mb||0)/1024)*100));
+  // 整庫優先顯示 Render 即時真實磁碟（含 WAL+系統開銷），讀不到才退回 SQL 估算的 DB 內容大小
+  var hasRender=(s.render_disk_mb!=null);
+  var diskMB=hasRender?s.render_disk_mb:(s.all_db_size_mb||0);
+  var pct=Math.min(100,Math.round(hasRender?(s.render_disk_pct_of_1gb||0):(s.db_used_pct_of_1gb||((s.all_db_size_mb||0)/1024*100))));
   var h='<div class=dash>'+
-    '<div class=card><div class=lbl>整庫 / Disk</div><div class=big>'+fmtMB(s.all_db_size_mb)+'</div><div class=bar><i style="width:'+pct+'%"></i></div><div class=sub>'+pct+'% of 1 GB</div></div>'+
+    '<div class=card><div class=lbl>整庫 / Disk'+(hasRender?'（真實磁碟）':'（估算）')+'</div><div class=big>'+fmtMB(diskMB)+'</div><div class=bar><i style="width:'+pct+'%"></i></div><div class=sub>'+pct+'% of 1 GB'+(hasRender?' · 含 WAL/系統，DB 內容 '+fmtMB(s.all_db_size_mb):'')+'</div></div>'+
     '<div class=card><div class=lbl>Pilot Log</div><div class=big>'+fmtMB(s.total_pilot_log_size_mb)+'</div></div>'+
     '<div class=card><div class=lbl>餐廳+其他</div><div class=big>'+fmtMB(s.restaurant_etc_size_mb)+'</div></div>'+
     (g.months_to_1gb!=null?'<div class=card><div class=lbl>多久滿 1GB</div><div class=big>'+(g.months_to_1gb===0?'⚠️已滿':'~'+g.months_to_1gb+' 月')+'</div><div class=sub>每天 +'+(g.per_day_total_mb!=null?g.per_day_total_mb:'—')+' MB · 滿載 '+(g.full_date_estimate||'—')+'</div></div>':'<div class=card><div class=lbl>成長</div><div class="big gray" style="font-size:1.1em">累積中</div><div class=sub>快照 '+(g.snapshot_count||0)+' 筆 / '+(g.history_days||0)+' 天</div></div>')+
