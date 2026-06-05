@@ -42,6 +42,7 @@ import {
 import { getPool, ensureTables, PILOT_LOG_TABLES, insertDbSizeSnapshotIfDue } from './schema.js';
 import { importLogtenFlights, importLogtenAircraft } from './import-logten.js';
 import { importWader } from './import-wader.js';
+import { importLogatp } from './import-logatp.js';
 import { importLogtenAddressBook } from './import-addressbook.js';
 import { importLogtenAircraftTypes } from './import-aircraft-types.js';
 import { importRoster } from './import-roster.js';
@@ -52,8 +53,8 @@ import { getAirportDbJs } from '../spa/js-airport-db.js';
 
 // ── 版本（比照 CrewSync / Morning：每次推版必更新；SW cache 名稱跟著走） ────
 // 本機 preview build 會暫時加 -tNN 後綴方便對版；推正式版前拿掉只留乾淨版號。
-export const PILOT_LOG_VERSION = 'V2.1.08';
-const PILOT_LOG_CACHE = 'pilotlog-v2-1-08';
+export const PILOT_LOG_VERSION = 'V2.1.09';
+const PILOT_LOG_CACHE = 'pilotlog-v2-1-09';
 
 export const pilotLogRouter = express.Router();
 
@@ -337,6 +338,11 @@ if (document.readyState !== 'loading') pilotLogInit();
 function _renderPilotLogChangelog(): string {
   return `
     <div class="pl-cl-v">${PILOT_LOG_VERSION}</div>
+    <div class="pl-cl-txt">
+      <b>🆕 新增 Log ATP 2 匯入 ＋ 🔍 記錄本搜尋 ＋ 👥 手機 CREW 排版。</b><b>(1)</b> Import 多一個「<b>Log ATP 2</b>」來源 —— 把你的 Log ATP 2 紀錄帶進來（時間視為 UTC、夜航、PIC/SIC、組員一次到位；班號保留航空代碼、機尾統一格式；<b>跟現有紀錄自動防重</b>）。<b>(2)</b> 記錄本上方加<b>搜尋框</b>，即時找 航班號 / 組員 / 機場 / 機尾。<b>(3)</b> <b>手機版</b>的 CREW 組員欄改成一列一個、名字全寬，長名不再被截斷（iPad 維持原樣）。<b>(4)</b> 同日多段航班照<b>實際起飛時間</b>排序；機隊挑機小修。<br>
+      <b>🆕 Log ATP 2 import + 🔍 logbook search + 👥 roomier crew fields on phones.</b> (1) Import gains a <b>Log ATP 2</b> source — brings in your flights (OOOI as UTC, night, PIC/SIC, crew; flight numbers keep their airline code, tails normalized; <b>auto-deduped</b> against existing entries). (2) A <b>search box</b> on the logbook filters by flight no. / crew / airport / tail in real time. (3) On phones, crew fields are one-per-row so long names aren't truncated (iPad unchanged). (4) Same-day sectors now sort by actual departure time; minor fleet-picker tidy-up.
+    </div>
+    <div class="pl-cl-v old">V2.1.08</div>
     <div class="pl-cl-txt">
       <b>帳號選單 ＋ 會員身分 ＋ 登入說明。</b><b>(1)</b> 點右上角你的 <b>email ▾</b> 跳出帳號選單，裡面有你的<b>會員身分（⭐ 創始會員 / 一般會員）</b>、登出、永久刪除帳號 —— 登出不再裸露在工具列、不會誤按。創始會員＝當初封測的朋友，名單已凍結。<b>(2)</b> 登入畫面加說明：登入只是把紀錄綁在你帳號做<b>跨裝置同步＋雲端備份</b>，只取得 email、<b>不會讀你的信箱／雲端硬碟／通訊錄</b>。<br>
       <b>Account menu + membership + sign-in note.</b> (1) Tap your <b>email ▾</b> (top-right) for an account menu: your <b>membership (⭐ Founder / Member)</b>, logout, and delete account — logout is no longer loose in the toolbar. Founders are the original beta testers (list now frozen). (2) The sign-in screen explains login only links your logbook for <b>cross-device sync &amp; cloud backup</b>; we only get your email — never your inbox, Drive or contacts.
@@ -1030,7 +1036,7 @@ pilotLogRouter.get('/api/pilot-log/entries', requireAuth, async (req: AuthedRequ
 
   const r = await pool.query(
     `SELECT * FROM pilot_log_entries WHERE ${conds.join(' AND ')}
-     ORDER BY flight_date DESC, std_utc DESC NULLS LAST
+     ORDER BY flight_date DESC, COALESCE(std_utc, out_utc, off_utc, on_utc, in_utc) DESC NULLS LAST
      LIMIT $${params.length - 1} OFFSET $${params.length}`,
     params
   );
@@ -1323,6 +1329,15 @@ pilotLogRouter.post('/api/pilot-log/import/wader', requireAuth, async (req: Auth
   if (!text) return res.status(400).json({ error: 'empty_body' });
   const dryRun = req.query.dryRun === '1' || req.query.dryRun === 'true';
   const r = await importWader(req.pilotUserId!, text, { dryRun });
+  res.json(r);
+});
+
+// V2.1.09：LogATP 2 logbook CSV 匯入（OOOI/UTC + 班號代碼保留 + 機尾正規化 + 跨來源防重）
+pilotLogRouter.post('/api/pilot-log/import/logatp', requireAuth, async (req: AuthedRequest, res) => {
+  const text = typeof req.body === 'string' ? req.body : '';
+  if (!text) return res.status(400).json({ error: 'empty_body' });
+  const dryRun = req.query.dryRun === '1' || req.query.dryRun === 'true';
+  const r = await importLogatp(req.pilotUserId!, text, { dryRun });
   res.json(r);
 });
 
@@ -2275,12 +2290,11 @@ pilotLogRouter.get('/api/pilot-log/admin/all-users', requireAuth, async (req: Au
         EXISTS(SELECT 1 FROM pilot_user_emails e JOIN pilot_beta_applicants a ON LOWER(a.email) = LOWER(e.email) WHERE e.user_id = u.id) AS founder,
         (SELECT COUNT(*)::int FROM pilot_log_entries pe WHERE pe.user_id = u.id) AS entries,
         (SELECT COUNT(*)::int FROM pilot_log_entries pe WHERE pe.user_id = u.id AND pe.in_utc IS NOT NULL) AS flown,
-        (SELECT json_build_object(
-           'roster', COUNT(*) FILTER (WHERE source = 'roster'),
-           'logten', COUNT(*) FILTER (WHERE source = 'logten'),
-           'wader',  COUNT(*) FILTER (WHERE source = 'wader'),
-           'manual', COUNT(*) FILTER (WHERE source = 'manual')
-         ) FROM pilot_log_entries pe WHERE pe.user_id = u.id) AS sources,
+        -- V2.1.09：來源細項改「資料驅動」（動態 GROUP BY source）—— 以後加任何 logbook 來源
+        -- Tower 自動就有，不用再手改。前端用 label 對照表顯示（沒對到就顯示原始 key）。
+        (SELECT COALESCE(json_object_agg(source, cnt), '{}'::json)
+           FROM (SELECT source, COUNT(*)::int AS cnt FROM pilot_log_entries pe WHERE pe.user_id = u.id GROUP BY source) s
+         ) AS sources,
         (SELECT COUNT(*)::int FROM pilot_aircraft pa WHERE pa.user_id = u.id) AS aircraft,
         (SELECT COUNT(*)::int FROM crew c WHERE c.user_id = u.id) AS crew
       FROM pilot_users u ORDER BY u.created_at DESC`);
@@ -2289,9 +2303,12 @@ pilotLogRouter.get('/api/pilot-log/admin/all-users', requireAuth, async (req: Au
         created_at, updated_at,
         (SELECT COUNT(*)::int FROM cs_rosters r WHERE r.employee_id = cs_users.employee_id) AS rosters
       FROM cs_users ORDER BY created_at DESC`).catch(() => ({ rows: [] as any[] }));
-    // 隱私界線：只撈 user_id + 時間，不撈 prefs（內含 watchlist/holdings/portfolio_pin_hash 等私人內容）
+    // 隱私界線：只撈 user_id + 時間，不撈 prefs（內含 watchlist/holdings/portfolio_pin_hash 等私人內容）。
+    // V2.1.09：用 last_seen_at（開 app 時間）當「最後使用」，沒有才退 updated_at（改設定時間）—— 別名成
+    // updated_at，前端顯示與活躍計算（都讀 updated_at）自動拿到正確值，不必改前端。
     const mr = await pool.query(
-      `SELECT user_id, updated_at FROM morning_prefs ORDER BY updated_at DESC`
+      `SELECT user_id, COALESCE(last_seen_at, updated_at) AS updated_at FROM morning_prefs
+       ORDER BY COALESCE(last_seen_at, updated_at) DESC NULLS LAST`
     ).catch(() => ({ rows: [] as any[] }));
     // Groups：各群人數 / 類型(preset/custom) / 建立者 / 邀請碼 / 建立時間
     const groups = await pool.query(`
@@ -2761,7 +2778,8 @@ function _renderTowerHtml(): string {
 var T={token:null,clientId:null,data:null,db:null,tab:0,q:'',sort:'active'};
 function el(id){return document.getElementById(id);}
 function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
-function fmtDt(s){if(!s)return'—';var d=new Date(s);if(isNaN(d))return'—';return d.toISOString().slice(0,16).replace('T',' ');}
+// V2.1.09：Tower 時間維持 UTC，但加 Zulu「Z」標示時區（飛行員一看就懂 = UTC）。
+function fmtDt(s){if(!s)return'—';var d=new Date(s);if(isNaN(d))return'—';return d.toISOString().slice(0,16).replace('T',' ')+'Z';}
 function actDot(s){if(!s)return'gray';var days=(Date.now()-new Date(s).getTime())/864e5;return days<1?'g':days<7?'y':'gray';}
 function mb(b){return b==null?'—':(b/1048576).toFixed(b<10485760?1:0)+' MB';}
 async function cfg(){if(T.clientId)return T.clientId;try{var r=await fetch('/api/pilot-log/config');var j=await r.json();T.clientId=j.google_client_id;return T.clientId;}catch(e){return null;}}
@@ -2836,6 +2854,11 @@ function secCrew(c){
   }).join('');
   return '<div class=dist><span class=chip>機隊 · '+esc(flS)+'</span><span class=chip>職級 · '+esc(rkS)+'</span><span class=chip>開分享 <b class=g>'+sh+'</b> / '+c.count+'</span></div>'+rows;
 }
+// 來源細項顯示（資料驅動）：label 對照表給友善名稱；沒對到的來源（未來新增）顯示原始 key，
+// 所以後端加新來源、Tower 自動就有。順序固定走 SRC_ORDER，其餘未知 key 排後面。
+var SRC_LABELS={roster:'班表',logten:'LogTen',wader:'Wader',logatp:'Log ATP 2',manual:'手動'};
+var SRC_ORDER=['roster','logten','wader','logatp','manual'];
+function srcHtml(s){s=s||{};var seen={};var out=SRC_ORDER.map(function(k){seen[k]=1;return '<span>'+(SRC_LABELS[k]||k)+' <b>'+(s[k]||0)+'</b></span>';});Object.keys(s).forEach(function(k){if(!seen[k])out.push('<span>'+esc(k)+' <b>'+s[k]+'</b></span>');});return out.join('');}
 function secPilot(p,c){
   var csSet={};c.users.forEach(function(u){if(u.email)csSet[u.email.toLowerCase()]=1;});
   var fo=0;p.users.forEach(function(u){if(u.founder)fo++;});
@@ -2843,7 +2866,7 @@ function secPilot(p,c){
     var em=(u.emails||[]).join(', ');var both=(u.emails||[]).some(function(e){return csSet[(e||'').toLowerCase()];});var s=u.sources||{};
     return '<div class=row><div class=r1><span class="dot '+actDot(u.last_seen_at||u.last_login_at)+'"></span><span class=id>'+esc(em||u.id)+'</span>'+(u.founder?'<span class="badge founder">⭐ FOUNDER</span>':'')+(both?'<span class="badge both">＋CrewSync</span>':'')+'</div>'+
       '<div class=stats><span>航班 <b>'+(u.entries||0)+'</b>（飛過 <b>'+(u.flown||0)+'</b>）</span><span>機隊 <b>'+(u.aircraft||0)+'</b></span><span>通訊錄 <b>'+(u.crew||0)+'</b></span></div>'+
-      '<div class=src><span>班表 <b>'+(s.roster||0)+'</b></span><span>LogTen <b>'+(s.logten||0)+'</b></span><span>Wader <b>'+(s.wader||0)+'</b></span><span>手動 <b>'+(s.manual||0)+'</b></span></div>'+
+      '<div class=src>'+srcHtml(s)+'</div>'+
       '<div class=t>註冊 '+fmtDt(u.created_at)+' · 最後登入 '+fmtDt(u.last_login_at)+' · 最後匯入 '+fmtDt(u.last_import_at)+'</div></div>';
   }).join('');
   return '<div class=dist><span class=chip>⭐ 創始 <b>'+fo+'</b> / '+p.count+'</span></div>'+rows;
