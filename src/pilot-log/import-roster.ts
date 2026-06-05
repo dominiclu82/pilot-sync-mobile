@@ -17,6 +17,7 @@
 
 import { randomUUID } from 'crypto';
 import { getPool, ensureTables } from './schema.js';
+import { normFlightNoKey } from './tw-fleet.js';   // V2.2.00：跨來源班號正規化（JX031 vs 031 視為同班）
 
 interface RosterCrewMember {
   position?: string;
@@ -55,6 +56,7 @@ export interface ImportRosterResult {
   marked_removed: number;
   crew_added?: number;   // V1.3.12：自動加進通訊錄的組員數
   skipped_existing?: number;   // V2.0.02：同航班已有「已完成」紀錄（LogTen/手動）→ 略過不重複建草稿
+  crew_filled?: number;   // V2.2.00：把班表組員/POB/position「只補空缺」補進已完成航班的筆數
 }
 
 function normalizePosition(raw?: string): 'PIC' | 'SIC' | 'OBSERVER' | null {
@@ -298,7 +300,7 @@ export async function importRoster(
   }
 
   const result: ImportRosterResult = {
-    inserted: 0, updated: 0, skipped_confirmed: 0, marked_removed: 0, crew_added: 0, skipped_existing: 0,
+    inserted: 0, updated: 0, skipped_confirmed: 0, marked_removed: 0, crew_added: 0, skipped_existing: 0, crew_filled: 0,
   };
 
   const seenRefs: string[] = [];
@@ -350,6 +352,10 @@ export async function importRoster(
       const staUtc = parseCrewSyncUtc(f.arrTimeUtc, ctx);
       const position = normalizePosition(f.position || f.workCode);
       const crewJson = extractCrew(f.crew, selfIds, position);
+      // V1.3.36：班表帶的組員人數當 crew_count 初值（POB 用）。只在「新建」帶入，
+      // 之後使用者可自行編輯（含補後艙空服）；re-import 不覆寫，保留使用者改的值。
+      // V2.2.00（codex P1）：宣告提前到這裡 —— 下方跨來源補組員分支會用到，原本在分支之後宣告 → TDZ。
+      const crewCount = (f.crew && f.crew.length) ? f.crew.length : null;
       // V1.3.12：DHD（搭便機 positioning）→ 標 deadhead，照建 entry 但飛時/PIC/night 全不計
       const isDeadhead = /DHD|DEADHEAD|POSITIONING/i.test((f.position || '') + ' ' + (f.workCode || ''));
       // V1.3.12：蒐集要進通訊錄的組員（去重）
@@ -366,18 +372,40 @@ export async function importRoster(
         [userId, sourceRef]
       );
 
-      // V2.0.02（codex P1）：跨來源查重 —— 不管 roster 這邊有沒有都查。同一天+班號+起降若已有「已完成」
-      // 紀錄（LogTen/手動，confirmed 或有實際落地 in_utc），就不要 roster 草稿重複：既有 roster draft/removed
-      // 直接刪掉（完成版取代）、沒有就不建。confirmed 的 roster 不動（使用者已親自確認）。
+      // V2.0.02（codex P1）：跨來源查重 —— 不管 roster 這邊有沒有都查。同一天+起降若已有「已完成」
+      // 紀錄（LogTen/手動/LogATP，confirmed 或有實際落地 in_utc），就不要 roster 草稿重複：既有 roster
+      // draft/removed 直接刪掉（完成版取代）、沒有就不建。confirmed 的 roster 不動（使用者已親自確認）。
+      // V2.2.00：班號改用「正規化比對」—— 抓同日同起降的候選列，JS 端用 normFlightNoKey 比，
+      // 跨格式才認得出同一班（roster 'JX031' vs LogTen '031' vs LogATP 'JX31' → 同班）。
+      // 命中時把班表帶的「組員 / POB / position」只補空缺（COALESCE / 既有槽優先）到那筆已完成航班，
+      // 補上 logbook 來源常缺的加強組員、CIC、觀察員、後艙人數（不洗掉使用者既有資料）。
       {
-        const dup = await pool.query(
-          `SELECT id FROM pilot_log_entries
-           WHERE user_id = $1 AND flight_date = $2 AND flight_no = $3 AND origin = $4 AND dest = $5
-             AND source <> 'roster' AND (status = 'confirmed' OR in_utc IS NOT NULL)
-           LIMIT 1`,
-          [userId, fDate, f.flightNo, f.origin, f.dest]
+        const cand = await pool.query(
+          `SELECT id, flight_no, crew, position, crew_count FROM pilot_log_entries
+           WHERE user_id = $1 AND flight_date = $2 AND origin = $3 AND dest = $4
+             AND source <> 'roster' AND (status = 'confirmed' OR in_utc IS NOT NULL)`,
+          [userId, fDate, f.origin, f.dest]
         );
-        if (dup.rows.length > 0) {
+        const fnKey = normFlightNoKey(f.flightNo);
+        const dupRow = fnKey ? cand.rows.find((r: any) => normFlightNoKey(r.flight_no) === fnKey) : null;
+        if (dupRow) {
+          // V2.2.00：補組員 / POB / position 到已完成航班 —— 只補空缺，不覆蓋。
+          //  crew：JSONB 合併 `班表 || 既有`，既有槽（使用者 / logbook 已有的）勝出，只補既有沒有的槽。
+          //  position / crew_count：COALESCE(既有, 班表)，原本是空白才用班表補。
+          if (crewJson || crewCount != null || position) {
+            try {
+              await pool.query(
+                `UPDATE pilot_log_entries SET
+                   crew = CASE WHEN $2::jsonb IS NULL THEN crew ELSE $2::jsonb || COALESCE(crew, '{}'::jsonb) END,
+                   position = COALESCE(position, $3),
+                   crew_count = COALESCE(crew_count, $4),
+                   updated_at = NOW()
+                 WHERE id = $1`,
+                [dupRow.id, crewJson ? JSON.stringify(crewJson) : null, position, crewCount]
+              );
+              result.crew_filled = (result.crew_filled || 0) + 1;
+            } catch (e) { /* 補組員失敗不擋整個匯入 */ }
+          }
           if (existing.rows.length > 0 && existing.rows[0].status !== 'confirmed') {
             await pool.query('DELETE FROM pilot_log_entries WHERE id = $1', [existing.rows[0].id]);
           }
@@ -385,10 +413,6 @@ export async function importRoster(
           continue;
         }
       }
-
-      // V1.3.36：班表帶的組員人數當 crew_count 初值（POB 用）。只在「新建」帶入，
-      // 之後使用者可自行編輯（含補後艙空服）；re-import 不覆寫，保留使用者改的值。
-      const crewCount = (f.crew && f.crew.length) ? f.crew.length : null;
 
       if (existing.rows.length === 0) {
         // 新 draft

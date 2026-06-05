@@ -53,8 +53,8 @@ import { getAirportDbJs } from '../spa/js-airport-db.js';
 
 // ── 版本（比照 CrewSync / Morning：每次推版必更新；SW cache 名稱跟著走） ────
 // 本機 preview build 會暫時加 -tNN 後綴方便對版；推正式版前拿掉只留乾淨版號。
-export const PILOT_LOG_VERSION = 'V2.1.09';
-const PILOT_LOG_CACHE = 'pilotlog-v2-1-09';
+export const PILOT_LOG_VERSION = 'V2.2.01';
+const PILOT_LOG_CACHE = 'pilotlog-v2-2-01';
 
 export const pilotLogRouter = express.Router();
 
@@ -274,6 +274,9 @@ body.pl-offline { padding-top: calc(env(safe-area-inset-top) + 28px); }
   <button class="pl-tab-btn pl-tab-active" id="plTabBtn-logbook" onclick="switchPlTab('logbook',this)">
     <span class="pl-tab-icon">📒</span>Logbook
   </button>
+  <button class="pl-tab-btn" id="plTabBtn-map" onclick="switchPlTab('map',this)">
+    <span class="pl-tab-icon">🗺️</span>Map
+  </button>
   <button class="pl-tab-btn" id="plTabBtn-report" onclick="switchPlTab('report',this)">
     <span class="pl-tab-icon">📄</span>Report
   </button>
@@ -338,6 +341,11 @@ if (document.readyState !== 'loading') pilotLogInit();
 function _renderPilotLogChangelog(): string {
   return `
     <div class="pl-cl-v">${PILOT_LOG_VERSION}</div>
+    <div class="pl-cl-txt">
+      <b>🗺️ 全新「Map」分頁 ＋ 🧹 清除更安全 ＋ 🗑️ 刪除帳號分離。</b><b>(1)</b> 底部多一個 <b>Map</b> 分頁，把你飛過的航線畫在真實地圖上 —— <b>2D 衛星實景圖</b>與 <b>3D 立體地球</b>（Map / Earth 切換）、大圓航線、雙指縮放、<b>Save Image</b> 一鍵存圖；統計機場數 / 航線數 / 國家數 / 主場 / 最遠航線（跨換日線航線正確繪製）。<b>(2)</b> 清除資料：<b>未勾選任何項目時刪除鈕變灰不可按</b>，說明補上英文。<b>(3)</b> <b>刪除帳號移出帳號選單</b>（不再貼在登出下面、避免誤觸），改至「版本 ⓘ → Danger Zone」（雙重確認）。<b>(4)</b> 班表匯入會把<b>組員 / 機上人數補進已完成的航班</b>（只補空缺、不覆蓋你已填的）。<br>
+      <b>🗺️ New "Map" tab + 🧹 safer wipe + 🗑️ delete-account separated.</b> (1) A new <b>Map</b> tab plots every route you've flown — <b>2D satellite map</b> and <b>3D globe</b> (Map / Earth toggle), great-circle routes, pinch-zoom, one-tap <b>Save Image</b>; stats for airports / routes / countries / main base / longest leg (dateline-crossing routes drawn correctly). (2) Data wipe: the delete button now <b>stays disabled until a category is ticked</b>, with English labels added. (3) <b>Delete-account moved out of the account menu</b> (no longer next to logout) to "version ⓘ → Danger Zone" (double confirm). (4) Roster import now <b>fills crew / persons-on-board into completed flights</b> (empty fields only, never overwrites your edits).
+    </div>
+    <div class="pl-cl-v old">V2.1.09</div>
     <div class="pl-cl-txt">
       <b>🆕 新增 Log ATP 2 匯入 ＋ 🔍 記錄本搜尋 ＋ 👥 手機 CREW 排版。</b><b>(1)</b> Import 多一個「<b>Log ATP 2</b>」來源 —— 把你的 Log ATP 2 紀錄帶進來（時間視為 UTC、夜航、PIC/SIC、組員一次到位；班號保留航空代碼、機尾統一格式；<b>跟現有紀錄自動防重</b>）。<b>(2)</b> 記錄本上方加<b>搜尋框</b>，即時找 航班號 / 組員 / 機場 / 機尾。<b>(3)</b> <b>手機版</b>的 CREW 組員欄改成一列一個、名字全寬，長名不再被截斷（iPad 維持原樣）。<b>(4)</b> 同日多段航班照<b>實際起飛時間</b>排序；機隊挑機小修。<br>
       <b>🆕 Log ATP 2 import + 🔍 logbook search + 👥 roomier crew fields on phones.</b> (1) Import gains a <b>Log ATP 2</b> source — brings in your flights (OOOI as UTC, night, PIC/SIC, crew; flight numbers keep their airline code, tails normalized; <b>auto-deduped</b> against existing entries). (2) A <b>search box</b> on the logbook filters by flight no. / crew / airport / tail in real time. (3) On phones, crew fields are one-per-row so long names aren't truncated (iPad unchanged). (4) Same-day sectors now sort by actual departure time; minor fleet-picker tidy-up.
