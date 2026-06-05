@@ -15,7 +15,7 @@ import { APP_VERSION } from './version.js';
 
 // V2.0.0: 統一版號 — 跟 Portfolio 共用 APP_VERSION。MORNING_VERSION alias 保留向後相容
 export const MORNING_VERSION = APP_VERSION;
-const MORNING_CACHE = 'morning-v1-3-10';
+const MORNING_CACHE = 'morning-v1-3-11';
 
 // ─── Postgres ────────────────────────────────────────────────────────
 let _pgPool: pg.Pool | null = null;
@@ -835,13 +835,23 @@ morningRouter.post('/api/morning-report/refresh-partial', async (req, res) => {
     if (!prefs) return res.status(404).json({ error: 'no_prefs' });
     const today = todayTaipei();
     const existing = (await getReportByDate(userId, today)) || {};
-    // 只抓該區塊
-    const opts: any = {};
-    if (section === 'weather') opts.wxLocs = prefs.wx || [];
-    if (section === 'stocks_tw') opts.twCodes = prefs.tw || [];
-    if (section === 'stocks_us') opts.usCodes = prefs.us || [];
-    if (section === 'fx') opts.fxPairs = prefs.fx || [];
-    const value = await fetchSection(section, opts);
+    // 天氣改由前端「手機自己抓」（繞開 Render 共用 IP 的 Open-Meteo 限流）：
+    // 若 body 帶 data 陣列 → 伺服器只負責存、不再自己 call Open-Meteo。
+    const clientData = req.body && req.body.data;
+    let value: any;
+    if (section === 'weather' && Array.isArray(clientData)
+        && clientData.length <= 300
+        && clientData.every((w: any) => w && typeof w.name === 'string')) {
+      value = clientData;
+    } else {
+      // 其餘區塊（股票/匯率）+ 天氣沒帶 data 的退路：照舊伺服器抓
+      const opts: any = {};
+      if (section === 'weather') opts.wxLocs = prefs.wx || [];
+      if (section === 'stocks_tw') opts.twCodes = prefs.tw || [];
+      if (section === 'stocks_us') opts.usCodes = prefs.us || [];
+      if (section === 'fx') opts.fxPairs = prefs.fx || [];
+      value = await fetchSection(section, opts);
+    }
     const nowIso = new Date().toISOString();
     const merged: any = { ...existing, date: today, generated_at: nowIso };
     merged[section] = value;
@@ -2044,6 +2054,11 @@ body { padding-bottom: calc(64px + env(safe-area-inset-bottom, 0px)); }
     </div>
     <hr style="border:none;border-top:1px solid var(--border);margin:12px 0">
     <div class="changelog-v">${MORNING_VERSION}</div>
+    <div class="changelog-txt">
+      <strong>[今日] 天氣改由手機直接抓，解決一直「重抓失敗」。</strong>以前大家按 🔄 都透過伺服器抓天氣、全擠在同一個對外 IP 被限流（429）；現在改成你手機自己抓，用自己的網路就不會被卡。每天早上的自動更新不變。<br>
+      <strong>[Today] Weather now refreshes directly from your device, fixing the recurring "refresh failed".</strong> Previously every 🔄 went through the server's shared IP and hit rate limits (429); now it fetches from your own device, so it's no longer blocked. The daily morning update is unchanged.
+    </div>
+    <div class="changelog-v old">V2.0.05</div>
     <div class="changelog-txt">
       <strong>[今日] 投資未實現損益標註講清楚。</strong>頂部那條「投資未實現損益」<b>本來就是台股＋美股的合計</b>（美股換成台幣再加總），但底下小字只寫「美股部位換算」，害人以為台股沒被算進去。改成「<b>台股＋美股合計，美股以 USD/TWD ⋯ 換算</b>」講清楚。<b>數字計算本身完全沒變</b>，只是把標註講明白。<br>
       <strong>[Today] Clarified the unrealized P&amp;L caption.</strong> The top "unrealized P&amp;L" was always the combined TW + US total (US converted to TWD), but the caption only mentioned the US conversion — making it look US-only. It now reads "TW + US combined, US converted at USD/TWD ⋯". The figure itself is unchanged; only the caption is clearer.
@@ -5228,6 +5243,108 @@ async function loadPortfolioSummary() {
 // 載入後 trigger 一次 (page load); refresh 時也 trigger
 loadPortfolioSummary();
 
+// 手機自己抓天氣：瀏覽器直連 Open-Meteo，繞開 Render 共用 IP 的 429 限流。
+// 回傳格式跟伺服器端 fetchWeather 完全一致（renderWx 不必改）。
+// 注意：瀏覽器不能自訂 User-Agent header（會被擋/觸發 preflight），所以這裡 fetch 不帶 header。
+async function fetchAirQualityClient(locs) {
+  if (!locs || locs.length === 0) return [];
+  try {
+    const lats = locs.map(l => l.lat).join(',');
+    const lons = locs.map(l => l.lon).join(',');
+    const params = new URLSearchParams({
+      latitude: lats, longitude: lons, current: 'us_aqi,pm2_5', timezone: 'Asia/Taipei',
+    });
+    const r = await fetch('https://air-quality-api.open-meteo.com/v1/air-quality?' + params.toString());
+    if (!r.ok) return locs.map(() => ({ aqi: null, pm25: null }));
+    const data = await r.json();
+    const arr = Array.isArray(data) ? data : [data];
+    return locs.map((_, i) => {
+      const d = arr[i];
+      if (!d || !d.current) return { aqi: null, pm25: null };
+      return {
+        aqi: d.current.us_aqi != null ? Math.round(d.current.us_aqi) : null,
+        pm25: d.current.pm2_5 != null ? Math.round(d.current.pm2_5) : null,
+      };
+    });
+  } catch (e) {
+    return locs.map(() => ({ aqi: null, pm25: null }));
+  }
+}
+
+async function fetchWeatherClient(locs) {
+  if (!locs || locs.length === 0) return [];
+  const lats = locs.map(l => l.lat).join(',');
+  const lons = locs.map(l => l.lon).join(',');
+  const fParams = new URLSearchParams({
+    latitude: lats, longitude: lons,
+    current: 'temperature_2m,apparent_temperature,relative_humidity_2m,wind_speed_10m,wind_direction_10m,weather_code',
+    daily: 'weather_code,temperature_2m_max,temperature_2m_min,sunrise,sunset,uv_index_max',
+    wind_speed_unit: 'kn', timezone: 'Asia/Taipei', forecast_days: '7',
+  });
+  const fUrl = 'https://api.open-meteo.com/v1/forecast?' + fParams.toString();
+  // 8 秒 timeout + 1 次 retry（比照伺服器端容錯）
+  let r = null, lastErr = null;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const ctrl = new AbortController();
+    const tid = setTimeout(() => ctrl.abort(), 8000);
+    try {
+      r = await fetch(fUrl, { signal: ctrl.signal });
+      clearTimeout(tid);
+      if (!r.ok) throw new Error('open-meteo HTTP ' + r.status);
+      break;
+    } catch (e) {
+      clearTimeout(tid); lastErr = e; r = null;
+      if (attempt < 1) await new Promise(res => setTimeout(res, 1500));
+    }
+  }
+  if (!r) throw lastErr || new Error('open-meteo fetch failed');
+  const airArr = await fetchAirQualityClient(locs).catch(() => locs.map(() => ({ aqi: null, pm25: null })));
+  const data = await r.json();
+  const arr = Array.isArray(data) ? data : [data];
+  return locs.map((loc, i) => {
+    const d = arr[i];
+    const air = airArr[i] || { aqi: null, pm25: null };
+    if (!d || !d.current) return { name: loc.name, aqi: air.aqi, pm25: air.pm25, _error: 'no_data' };
+    const c = d.current;
+    const daily = d.daily || {};
+    const forecast = [];
+    const nDays = Math.min(7, (daily.time || []).length);
+    for (let j = 0; j < nDays; j++) {
+      const dateStr = daily.time[j];
+      let label;
+      if (j === 0) label = '今';
+      else if (j === 1) label = '明';
+      else {
+        const parts = String(dateStr).split('-').map(Number);
+        const dt = new Date(Date.UTC(parts[0], parts[1] - 1, parts[2]));
+        label = ['日','一','二','三','四','五','六'][dt.getUTCDay()];
+      }
+      forecast.push({
+        day: label,
+        code: daily.weather_code ? daily.weather_code[j] : null,
+        tmax: daily.temperature_2m_max ? daily.temperature_2m_max[j] : null,
+        tmin: daily.temperature_2m_min ? daily.temperature_2m_min[j] : null,
+      });
+    }
+    const hm = (iso) => iso ? iso.split('T')[1] : '—';
+    return {
+      name: loc.name,
+      temp: c.temperature_2m,
+      feels: c.apparent_temperature,
+      humidity: c.relative_humidity_2m,
+      wind: c.wind_speed_10m != null ? Math.round(c.wind_speed_10m) : null,
+      windDir: c.wind_direction_10m != null ? Math.round(c.wind_direction_10m) : null,
+      uv: daily.uv_index_max ? Math.round(daily.uv_index_max[0]) : null,
+      code: c.weather_code,
+      sunrise: hm((daily.sunrise || [])[0] || ''),
+      sunset: hm((daily.sunset || [])[0] || ''),
+      aqi: air.aqi,
+      pm25: air.pm25,
+      forecast,
+    };
+  });
+}
+
 // 🔄 個別區塊重抓（只換該區塊 DOM，保留捲動位置跟其他區塊）
 async function refreshPartial(section) {
   const secIdMap = { weather: 'sec-wx', stocks_tw: 'sec-stw', stocks_us: 'sec-sus', fx: 'sec-fx' };
@@ -5237,18 +5354,50 @@ async function refreshPartial(section) {
   const origText = btn ? btn.textContent : '';
   if (btn) { btn.textContent = '…'; btn.disabled = true; }
   try {
-    const r = await apiFetch('/api/morning-report/refresh-partial', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ section }),
-    });
-    const j = await r.json();
-    if (!r.ok) {
-      alert('重抓失敗：' + (j.error || '未知錯誤'));
-      return;
+    let data;
+    if (section === 'weather') {
+      // 天氣改成「手機自己抓」：瀏覽器直連 Open-Meteo（繞開 Render 共用 IP 的 429）。
+      try {
+        const locs = getActiveWxLocs();
+        const weather = await fetchWeatherClient(locs);
+        const nowIso = new Date().toISOString();
+        data = { weather, weather_fetched_at: nowIso };
+        // 存回伺服器（只存、不再 call Open-Meteo）→ 重開/換裝置仍在。
+        // keepalive：使用者抓完馬上重開/關頁時，瀏覽器仍會把這個存檔請求送完（codex P2）。
+        apiFetch('/api/morning-report/refresh-partial', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          keepalive: true,
+          body: JSON.stringify({ section: 'weather', data: weather }),
+        }).catch(() => {});   // 存檔失敗不影響畫面（畫面已用剛抓到的資料渲染）
+      } catch (clientErr) {
+        // 手機直抓失敗（網路過濾 / 隱私工具 / 暫時性錯誤）→ 退回伺服器抓，保留舊行為當後路（codex P1）。
+        const r = await apiFetch('/api/morning-report/refresh-partial', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ section: 'weather' }),
+        });
+        const j = await r.json();
+        if (!r.ok) {
+          alert('重抓失敗：' + (j.error || '未知錯誤'));
+          return;
+        }
+        data = await fetchReport();
+      }
+    } else {
+      const r = await apiFetch('/api/morning-report/refresh-partial', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ section }),
+      });
+      const j = await r.json();
+      if (!r.ok) {
+        alert('重抓失敗：' + (j.error || '未知錯誤'));
+        return;
+      }
+      // 只抓回整份 report，只換該區塊 body，不動其他區塊 → 捲動位置不變
+      data = await fetchReport();
     }
-    // 只抓回整份 report，只換該區塊 body，不動其他區塊 → 捲動位置不變
-    const data = await fetchReport();
     const secBody = secEl ? secEl.querySelector('.sec-b') : null;
     if (!secBody) return;
     // 順便更新該 section 的時間戳

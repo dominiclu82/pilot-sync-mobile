@@ -77,11 +77,11 @@ async function run() {
     assert(html.includes('Morning Report'), '頁面缺少 Morning Report 副標');
   });
 
-  await check('GET /morning/manifest.json → 200 + 晨報 name', async () => {
+  await check('GET /morning/manifest.json → 200 + 今日 name', async () => {
     const res = await fetch(`${BASE}/morning/manifest.json`);
     assert(res.ok, `manifest returned ${res.status}`);
     const j: any = await res.json();
-    assert(j.name && j.name.includes('晨報'), 'manifest name 缺少「晨報」');
+    assert(j.name && j.name.includes('今日'), 'manifest name 缺少「今日」');  // V2.0.04 改名「晨報」→「今日 Today」
     assert(j.start_url === '/morning', `start_url 錯誤: ${j.start_url}`);
     assert(j.scope === '/morning/', `scope 錯誤: ${j.scope}`);
   });
@@ -284,7 +284,7 @@ async function run() {
     const m1 = await (await fetch(`${BASE}/manifest.json`)).json() as any;
     const m2 = await (await fetch(`${BASE}/morning/manifest.json`)).json() as any;
     assert(m1.name === 'CrewSync', 'CrewSync manifest name 不對');
-    assert(m2.name && m2.name.includes('晨報'), '晨報 manifest name 不對');
+    assert(m2.name && m2.name.includes('今日'), '今日 manifest name 不對');  // V2.0.04 改名「晨報」→「今日 Today」
     assert(m1.scope !== m2.scope, 'manifest scope 應獨立');
   });
 
