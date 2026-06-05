@@ -1162,6 +1162,18 @@ function _plEditorField(label, name, type, opts) {
       '<span style="position:absolute;right:9px;top:50%;transform:translateY(-50%);pointer-events:none;color:var(--muted);font-size:.8em">▾</span>' +
       '<div id="ple-' + side + '-dd" style="display:none;position:absolute;left:0;right:0;top:calc(100% + 2px);z-index:60;max-height:190px;overflow-y:auto;background:var(--card,#0f172a);border:1px solid var(--border,#334155);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.45)"></div>' +
       '</div>';
+  } else if (opts.rwySide) {
+    // V2.2.05：跑道（Dep/Arr Rwy）比照 From/To 換自訂下拉，取代 iPhone 不穩的原生 datalist。
+    // 候選＝對應機場（origin→Dep / dest→Arr）的跑道號，聚焦/打字時即時依當前機場算；手動輸入照常。
+    var dvalR = val;
+    var attrsR = attrs.replace('padding:6px 8px', 'padding:6px 26px 6px 8px');
+    var rwSide = opts.rwySide;
+    input = '<div style="position:relative">' +
+      '<input ' + attrsR + ' autocomplete="off" value="' + _plEsc(dvalR) + '"' + (opts.placeholder ? ' placeholder="' + _plEsc(opts.placeholder) + '"' : '') +
+        ' onfocus="_plRwyDropdown(\'' + name + '\',\'' + rwSide + '\')" oninput="_plRwyDropdown(\'' + name + '\',\'' + rwSide + '\')" onblur="_plRwyDDClose(\'' + name + '\')">' +
+      '<span style="position:absolute;right:9px;top:50%;transform:translateY(-50%);pointer-events:none;color:var(--muted);font-size:.8em">▾</span>' +
+      '<div id="ple-' + name + '-dd" style="display:none;position:absolute;left:0;right:0;top:calc(100% + 2px);z-index:60;max-height:190px;overflow-y:auto;background:var(--card,#0f172a);border:1px solid var(--border,#334155);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.45)"></div>' +
+      '</div>';
   } else if (opts.listId) {
     // V2.0.01：datalist 下拉 + 持續顯示的 ▾ 提示（讓使用者知道可下拉選，也能手動輸入覆蓋）
     var dvalL = opts.fmt ? opts.fmt(val) : val;
@@ -2040,6 +2052,8 @@ function _plFillRwyList(listId, code) {
   dl.innerHTML = idents.map(function(id) { return '<option value="' + _plEsc(id) + '"></option>'; }).join('');
 }
 function _plUpdateRwyLists() {
+  // V2.2.05 起 Dep/Arr Rwy 改用 _plRwyDropdown 自訂下拉（候選即時依當前 From/To 算），
+  // 原生 datalist 已移除 → 這兩個呼叫變成 no-op（_plFillRwyList 找不到元素就早退）。保留不刪。
   _plFillRwyList('ple-dep-rwy-list', (document.getElementById('ple-origin') || {}).value || '');
   _plFillRwyList('ple-arr-rwy-list', (document.getElementById('ple-dest') || {}).value || '');
 }
@@ -2118,6 +2132,37 @@ function _plAptPick(side, code) {
 function _plAptDDClose(side) {
   // 延遲關閉，讓 option 的 onmousedown 先觸發（blur 比 click 早）
   setTimeout(function() { var dd = document.getElementById('ple-' + side + '-dd'); if (dd) dd.style.display = 'none'; }, 150);
+}
+
+// V2.2.05：跑道自訂下拉（取代原生 datalist）。候選＝對應機場（origin→Dep / dest→Arr）的跑道號，
+// 即時依當前 From/To 算（改了機場跑道跟著變）。name = dep_rwy / arr_rwy；side = origin / dest。
+function _plRwyDropdown(name, side) {
+  var inp = document.getElementById('ple-' + name);
+  var dd = document.getElementById('ple-' + name + '-dd');
+  if (!inp || !dd) return;
+  var code = (document.getElementById('ple-' + side) || {}).value || '';
+  var info = _plAptInfo(code);
+  var rwys = (info && info.runways) || [];
+  var idents = [];   // runways 為 [le,he,...] tuple → 展平成跑道號清單
+  rwys.forEach(function(r) { if (r[0]) idents.push(r[0]); if (r[1]) idents.push(r[1]); });
+  var q = (inp.value || '').trim().toUpperCase();
+  var list = q ? idents.filter(function(id) { return id.toUpperCase().indexOf(q) === 0; }) : idents;
+  if (!list.length) { dd.style.display = 'none'; return; }   // 查無機場/跑道 → 不擋手動輸入
+  dd.innerHTML = list.map(function(id) {
+    return '<div onmousedown="event.preventDefault();_plRwyPick(\'' + name + '\',\'' + _plEsc(id) + '\')" ' +
+      'style="padding:7px 10px;cursor:pointer;font-size:.8em;border-bottom:1px solid var(--border,#1e293b)">' +
+      '<b style="letter-spacing:.5px">' + _plEsc(id) + '</b></div>';
+  }).join('');
+  dd.style.display = 'block';
+}
+function _plRwyPick(name, ident) {
+  var inp = document.getElementById('ple-' + name);
+  if (inp) { inp.value = ident; inp.dispatchEvent(new Event('input', { bubbles: true })); }
+  var dd = document.getElementById('ple-' + name + '-dd');
+  if (dd) dd.style.display = 'none';   // 連動跑完後再關，確保選完是收合的
+}
+function _plRwyDDClose(name) {
+  setTimeout(function() { var dd = document.getElementById('ple-' + name + '-dd'); if (dd) dd.style.display = 'none'; }, 150);
 }
 
 function _plWireEditor() {
@@ -2336,8 +2381,8 @@ function _plRenderEditor(target) {
     // ── Other：SID+STAR / Remarks ──
     '<div style="margin-top:12px;background:var(--card);border-radius:10px;padding:12px">' +
       '<div style="font-size:.7em;font-weight:700;color:var(--muted);text-transform:uppercase;margin-bottom:8px">Other</div>' +
-      _plFieldRow(2, _plEditorField('Dep Rwy', 'dep_rwy', 'text', { listId: 'ple-dep-rwy-list' }) + _plEditorField('SID', 'sid', 'text')) +
-      _plFieldRow(2, _plEditorField('STAR', 'star', 'text') + _plEditorField('Arr Rwy', 'arr_rwy', 'text', { listId: 'ple-arr-rwy-list' })) +
+      _plFieldRow(2, _plEditorField('Dep Rwy', 'dep_rwy', 'text', { rwySide: 'origin' }) + _plEditorField('SID', 'sid', 'text')) +
+      _plFieldRow(2, _plEditorField('STAR', 'star', 'text') + _plEditorField('Arr Rwy', 'arr_rwy', 'text', { rwySide: 'dest' })) +
       _plEditorField('Remarks', 'remarks', 'textarea') +
     '</div>' +
 

@@ -53,8 +53,8 @@ import { getAirportDbJs } from '../spa/js-airport-db.js';
 
 // ── 版本（比照 CrewSync / Morning：每次推版必更新；SW cache 名稱跟著走） ────
 // 本機 preview build 會暫時加 -tNN 後綴方便對版；推正式版前拿掉只留乾淨版號。
-export const PILOT_LOG_VERSION = 'V2.2.05';
-const PILOT_LOG_CACHE = 'pilotlog-v2-2-05';
+export const PILOT_LOG_VERSION = 'V2.2.06';
+const PILOT_LOG_CACHE = 'pilotlog-v2-2-06';
 
 export const pilotLogRouter = express.Router();
 
@@ -341,6 +341,11 @@ if (document.readyState !== 'loading') pilotLogInit();
 function _renderPilotLogChangelog(): string {
   return `
     <div class="pl-cl-v">${PILOT_LOG_VERSION}</div>
+    <div class="pl-cl-txt">
+      <b>🛬 跑道也比照辦理：</b>Dep/Arr Rwy 換成自訂下拉，點一下就跳、候選自動跟著 From/To 機場、打字即時篩，手動輸入照常。<br>
+      <b>🛬 Runway pickers too:</b> Dep/Arr Rwy now use the same reliable dropdown — taps open it, options follow the From/To airport, type to filter, manual entry preserved.
+    </div>
+    <div class="pl-cl-v old">V2.2.05</div>
     <div class="pl-cl-txt">
       <b>✏️ 編輯器小修：</b>日期欄改純數字（不再壓到 Flight#）；From/To 機場下拉更穩、點一下就跳、打字即時篩，手動輸入照常。<br>
       <b>✏️ Editor fixes:</b> Date shows plain numeric (no overflow into Flight#); From/To airport dropdown is more reliable — taps open it, type to filter, manual entry preserved.
