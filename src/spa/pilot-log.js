@@ -5461,7 +5461,11 @@ function _plInitGlobe(geo) {
     } catch (e) { h.innerHTML = _plMapMsg('地球初始化失敗<br>' + _plEsc(e.message || '')); return; }
     _plGlobeInst = viewer;
     var scene = viewer.scene;
-    try { scene.globe.enableLighting = true; } catch (e) {}     // 日夜光照（依真實時間算太陽位置）
+    // V2.2.04：仿 Apple 自動切換 —— 拉遠看整顆地球時開日夜光照 + 城市燈（有氛圍）；放大過門檻
+    // 自動關掉、切回清楚的白天衛星圖（街道級細節只有白天資料，近看必是白天圖）。實作在下方 camera 監聽。
+    var PL_NIGHT_HI = 3.0e6;    // 鏡頭離地高於此（公尺）= 日夜陰影 + 城市燈；低於此 = 純白天清楚圖
+    var _plNightLayer = null;   // 城市燈疊圖參照（async 載入後才有），近看時 hide
+    try { scene.globe.enableLighting = true; } catch (e) {}    // 初始遠景先開，camera 監聽會依高度自動調
     try { scene.highDynamicRange = false; } catch (e) {}
     try { scene.globe.showGroundAtmosphere = true; } catch (e) {}
     try { viewer.cesiumWidget.creditContainer.style.display = 'none'; } catch (e) {}   // 隱藏 logo 列（保留地圖供應商不影響）
@@ -5471,18 +5475,35 @@ function _plInitGlobe(geo) {
         .then(function(prov) { if (_plGlobeInst === viewer) try { viewer.imageryLayers.addImageryProvider(prov); } catch (e) {} })
         .catch(function() {});
     } catch (e) {}
-    // 夜面城市燈：整張 night-lights 疊圖，只在暗面顯示（dayAlpha=0 / nightAlpha=1）→ 日夜 + 城市燈像 ATP2
+    // 夜面城市燈（earth-night.jpg）：解析度低、放大會糊，所以只在「拉遠」時顯示，近看由 camera 監聽 hide。
     try {
       C.SingleTileImageryProvider.fromUrl('https://unpkg.com/three-globe/example/img/earth-night.jpg')
         .then(function(np) {
           if (_plGlobeInst !== viewer) return;
-          var nl = viewer.imageryLayers.addImageryProvider(np);
-          try { nl.dayAlpha = 0.0; nl.nightAlpha = 1.0; nl.brightness = 1.6; } catch (e) {}
+          _plNightLayer = viewer.imageryLayers.addImageryProvider(np);
+          try { _plNightLayer.dayAlpha = 0.0; _plNightLayer.nightAlpha = 1.0; _plNightLayer.brightness = 1.6; } catch (e) {}
+          try { _plNightLayer.show = (viewer.camera.positionCartographic.height > PL_NIGHT_HI); } catch (e) {}
         }).catch(function() {});
+    } catch (e) {}
+    // 依鏡頭高度自動切換日夜：遠 = 日夜陰影 + 城市燈；近 = 純白天清楚衛星圖（仿 Apple）
+    try {
+      viewer.camera.percentageChanged = 0.05;   // 較敏感：門檻附近的小幅縮放也能觸發 changed
+      var _plApplyDayNight = function() {
+        var far = true;
+        try { far = viewer.camera.positionCartographic.height > PL_NIGHT_HI; } catch (e) {}
+        try { scene.globe.enableLighting = far; } catch (e) {}
+        if (_plNightLayer) { try { _plNightLayer.show = far; } catch (e) {} }
+      };
+      viewer.camera.changed.addEventListener(_plApplyDayNight);
+      viewer.camera.moveEnd.addEventListener(_plApplyDayNight);   // 保險：小縮放沒觸發 changed 時，移動一結束一定補判一次（修 codex P2：避免卡在邊界狀態）
+      _plApplyDayNight();
     } catch (e) {}
     // 航線（測地線大圓，Cesium 原生處理換日線）。動態時時鐘要跑，光點才會沿線移動。
     try { viewer.clock.shouldAnimate = animated; } catch (e) {}
     var clockStart = C.JulianDate.clone(viewer.clock.currentTime);
+    // 本站群＝所有台灣機場（國碼 TW 或 ICAO 以 RC 開頭，如 RCTP/RCSS/RCKH/RCMQ）。光點一律從台灣端飛出去。
+    var _plTW = {};
+    try { geo.airports.forEach(function(a) { if (a.cc === 'TW' || /^RC/.test(a.icao || a.code || '')) _plTW[a.code] = 1; }); } catch (e) {}
     geo.routes.forEach(function(r, idx) {
       var w = Math.min(0.8 + r.count * 0.12, 2.2);
       try {
@@ -5494,7 +5515,13 @@ function _plInitGlobe(geo) {
         } });
         // 動態：一顆發光點沿著大圓「光影移動」（各線錯開相位），靜態則沒有。
         if (animated) {
-          var gd = new C.EllipsoidGeodesic(C.Cartographic.fromDegrees(r.aLon, r.aLat), C.Cartographic.fromDegrees(r.bLon, r.bLat));
+          // 光點固定「從台灣飛出去」：台灣端當起點。台↔台航線則以桃園(RCTP)為起點。
+          var sLon = r.aLon, sLat = r.aLat, eLon = r.bLon, eLat = r.bLat;
+          var aTW = _plTW[r.a], bTW = _plTW[r.b], rev = false;
+          if (bTW && !aTW) rev = true;                                         // 台灣在 b 端 → 反向，從台灣飛出
+          else if (aTW && bTW && r.b === 'RCTP' && r.a !== 'RCTP') rev = true; // 台↔台 → 從桃園出發
+          if (rev) { sLon = r.bLon; sLat = r.bLat; eLon = r.aLon; eLat = r.aLat; }
+          var gd = new C.EllipsoidGeodesic(C.Cartographic.fromDegrees(sLon, sLat), C.Cartographic.fromDegrees(eLon, eLat));
           var phase = (idx % 8) / 8;
           viewer.entities.add({
             position: new C.CallbackProperty(function(time) {

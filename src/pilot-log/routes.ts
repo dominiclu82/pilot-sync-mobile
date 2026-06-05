@@ -53,8 +53,8 @@ import { getAirportDbJs } from '../spa/js-airport-db.js';
 
 // ── 版本（比照 CrewSync / Morning：每次推版必更新；SW cache 名稱跟著走） ────
 // 本機 preview build 會暫時加 -tNN 後綴方便對版；推正式版前拿掉只留乾淨版號。
-export const PILOT_LOG_VERSION = 'V2.2.03';
-const PILOT_LOG_CACHE = 'pilotlog-v2-2-03';
+export const PILOT_LOG_VERSION = 'V2.2.04';
+const PILOT_LOG_CACHE = 'pilotlog-v2-2-04';
 
 export const pilotLogRouter = express.Router();
 
@@ -341,6 +341,11 @@ if (document.readyState !== 'loading') pilotLogInit();
 function _renderPilotLogChangelog(): string {
   return `
     <div class="pl-cl-v">${PILOT_LOG_VERSION}</div>
+    <div class="pl-cl-txt">
+      <b>🌍 3D 地球夜晚不再模糊 ＋ ✈️ 動態航跡從台灣飛出去。</b><b>(1)</b> Earth 拉遠有日夜＋城市燈，放大自動切回清楚的白天衛星圖（仿 Apple），夜面放大不再糊。<b>(2)</b> 動態光點凡經台灣的航線一律從台灣飛出去。<br>
+      <b>🌍 Sharper night view on 3D Earth + ✈️ animated routes depart from Taiwan.</b> (1) Earth shows day/night + city lights when zoomed out, auto-switches to a clear daytime map up close (Apple-style). (2) Animated route lights now fly outward from the Taiwan end.
+    </div>
+    <div class="pl-cl-v old">V2.2.03</div>
     <div class="pl-cl-txt">
       <b>🗺️ 地圖體驗修正。</b><b>(1)</b> 控制項（Map／Earth、統計、日期）改成<b>穩定浮在地圖最上層</b>，不再被地圖蓋住。<b>(2)</b> 日期區間移到<b>右上角</b>，並新增 <b>近30天 / 近90天</b> 快捷。<b>(3)</b> Earth 的航跡改成 <b>[靜態｜動態]</b> 雙格鈕（按你要的那個），<b>動態</b>時有光點<b>沿著航線流動</b>。<b>(4)</b> 2D 縮放鈕移到右下，不再擋到上方控制項。<br>
       <b>🗺️ Map UX fixes.</b> (1) Controls (Map/Earth, stats, date) now <b>stay reliably on top</b> of the map instead of being covered. (2) The date-range moved to the <b>top-right</b>, with new <b>last-30-day / last-90-day</b> shortcuts. (3) Earth route style is now a <b>[Static｜Animated]</b> two-button toggle (tap the one you want); <b>Animated</b> shows a light <b>flowing along each route</b>. (4) The 2D zoom buttons moved to the bottom-right so they no longer overlap the top controls.
