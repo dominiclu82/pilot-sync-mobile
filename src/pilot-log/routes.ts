@@ -52,8 +52,8 @@ import { getAirportDbJs } from '../spa/js-airport-db.js';
 
 // ── 版本（比照 CrewSync / Morning：每次推版必更新；SW cache 名稱跟著走） ────
 // 本機 preview build 會暫時加 -tNN 後綴方便對版；推正式版前拿掉只留乾淨版號。
-export const PILOT_LOG_VERSION = 'V2.1.07';
-const PILOT_LOG_CACHE = 'pilotlog-v2-1-07';
+export const PILOT_LOG_VERSION = 'V2.1.08';
+const PILOT_LOG_CACHE = 'pilotlog-v2-1-08';
 
 export const pilotLogRouter = express.Router();
 
@@ -337,6 +337,11 @@ if (document.readyState !== 'loading') pilotLogInit();
 function _renderPilotLogChangelog(): string {
   return `
     <div class="pl-cl-v">${PILOT_LOG_VERSION}</div>
+    <div class="pl-cl-txt">
+      <b>帳號選單 ＋ 會員身分 ＋ 登入說明。</b><b>(1)</b> 點右上角你的 <b>email ▾</b> 跳出帳號選單，裡面有你的<b>會員身分（⭐ 創始會員 / 一般會員）</b>、登出、永久刪除帳號 —— 登出不再裸露在工具列、不會誤按。創始會員＝當初封測的朋友，名單已凍結。<b>(2)</b> 登入畫面加說明：登入只是把紀錄綁在你帳號做<b>跨裝置同步＋雲端備份</b>，只取得 email、<b>不會讀你的信箱／雲端硬碟／通訊錄</b>。<br>
+      <b>Account menu + membership + sign-in note.</b> (1) Tap your <b>email ▾</b> (top-right) for an account menu: your <b>membership (⭐ Founder / Member)</b>, logout, and delete account — logout is no longer loose in the toolbar. Founders are the original beta testers (list now frozen). (2) The sign-in screen explains login only links your logbook for <b>cross-device sync &amp; cloud backup</b>; we only get your email — never your inbox, Drive or contacts.
+    </div>
+    <div class="pl-cl-v old">V2.1.07</div>
     <div class="pl-cl-txt">
       <b>後台小修正。</b>背景維護更新，使用者操作與介面不變。<br>
       <b>Minor backend fix.</b> Background maintenance update; nothing changes in how you use the app.
@@ -935,7 +940,21 @@ pilotLogRouter.get('/api/pilot-log/me', requireAuth, async (req: AuthedRequest, 
     [userId]
   );
   if (u.rows.length === 0) return res.status(404).json({ error: 'user_not_found' });
-  res.json({ user: u.rows[0], emails: emails.rows, crew_labels: u.rows[0].crew_labels || null });
+  // 創始會員：綁定的任一 email 在「凍結的封測名單」(pilot_beta_applicants) 裡 = ⭐ 創始會員，否則一般會員。
+  // 開放後沒人再報名 → 名單天然凍結成當初那 12 人；用「綁定全部 email」比對，換 email 登入也認得出。
+  let isFounder = false;
+  try {
+    const f = await pool.query(
+      `SELECT EXISTS(
+         SELECT 1 FROM pilot_user_emails e
+         JOIN pilot_beta_applicants a ON LOWER(a.email) = LOWER(e.email)
+         WHERE e.user_id = $1
+       ) AS founder`,
+      [userId]
+    );
+    isFounder = !!f.rows[0]?.founder;
+  } catch { /* pilot_beta_applicants 不存在/查詢失敗 → 當一般會員 */ }
+  res.json({ user: u.rows[0], emails: emails.rows, crew_labels: u.rows[0].crew_labels || null, isFounder });
 });
 
 // V1.3.12：crew 欄位顯示名稱自訂（CIC=JX、EVA=CP…）。只收 6 個白名單 key、每個 ≤ 24 字。

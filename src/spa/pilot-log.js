@@ -67,6 +67,7 @@ function _plClearSession() {
     localStorage.removeItem(_PL_LS_RT);
     localStorage.removeItem(_PL_LS_UID);
     localStorage.removeItem(_PL_LS_EMAIL);
+    localStorage.removeItem('pilotlog_is_founder');   // 別讓下一個登入的人看到上一個人的會員身分（codex P3）
   } catch (e) {}
   _pl.accessToken = null;
   _pl.refreshToken = null;
@@ -611,6 +612,36 @@ async function _plLogout() {
   _plRender();
 }
 
+// 帳號選單（點右上角 email 跳出）：顯示會員身分 + 登出 + 刪帳號。
+function _plTierLabel() {
+  var f = _pl.user ? _pl.user.isFounder : undefined;
+  if (f === undefined || f === null) {            // 還沒從 /me 載到 → 看 localStorage 快取（離線也能顯示）
+    try { var c = localStorage.getItem('pilotlog_is_founder'); if (c === '1') f = true; else if (c === '0') f = false; } catch (e) {}
+  }
+  if (f === true) return '⭐ 創始會員 Founder';
+  if (f === false) return '一般會員 Member';
+  return '…';
+}
+function _plToggleAcctMenu(e) {
+  if (e) e.stopPropagation();
+  var m = document.getElementById('pl-acct-menu');
+  if (!m) return;
+  var show = (m.style.display === 'none' || !m.style.display);
+  m.style.display = show ? 'block' : 'none';
+  if (show) {
+    var tEl = document.getElementById('pl-acct-tier');
+    if (tEl) tEl.textContent = _plTierLabel();    // 開選單當下刷新身分（萬一剛載好）
+    setTimeout(function () { document.addEventListener('click', _plCloseAcctMenu); }, 0);
+  } else {
+    document.removeEventListener('click', _plCloseAcctMenu);
+  }
+}
+function _plCloseAcctMenu() {
+  var m = document.getElementById('pl-acct-menu');
+  if (m) m.style.display = 'none';
+  document.removeEventListener('click', _plCloseAcctMenu);
+}
+
 // 永久刪除帳號（Apple App Store 5.1.1(v) 強制要求 in-app 刪帳號功能）
 // CASCADE 會清掉 emails / sessions / log entries / aircraft，無法復原
 async function _plDeleteAccount() {
@@ -668,6 +699,9 @@ async function _plFetchAll() {
       var mj = await mRes.json();
       _pl.crewLabels = (mj && mj.crew_labels) || null;
       try { localStorage.setItem('pilotlog_crew_labels', JSON.stringify(_pl.crewLabels || {})); } catch (e) {}
+      // 會員身分（⭐ 創始會員 / 一般會員）— 帳號選單顯示用，順便存 localStorage 給離線
+      if (_pl.user) _pl.user.isFounder = !!(mj && mj.isFounder);
+      try { localStorage.setItem('pilotlog_is_founder', (mj && mj.isFounder) ? '1' : '0'); } catch (e) {}
     }
     // codex fast P1：fetch 過程中如果 token 過期 + refresh/cookie 真的失效，_plApi 內部會清
     // session（_pl.user=null）。此時不能假裝成功，否則 caller 會繼續顯示「沒授權但有快取」的 stale UI。
@@ -746,8 +780,6 @@ function _plRenderToolbar() {
     '<div style="display:flex;flex-wrap:wrap;gap:4px;align-items:center">' +
       filterBtn('all', 'All') + filterBtn('done', '已完成 Done') +
       filterBtn('open', '未完成 Open') +
-      '<div style="flex:1;min-width:8px"></div>' +
-      '<button onclick="_plLogout()" style="background:transparent;color:var(--muted);border:0;font-size:.7em;cursor:pointer">Logout</button>' +
     '</div>' +
   '</div>';
 }
@@ -916,7 +948,19 @@ function _plRenderMain() {
       '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;gap:8px">' +
         '<div style="font-size:1em;font-weight:700;white-space:nowrap">📒 Logbook</div>' +
         '<div id="pl-sync-status" style="font-size:.65em;flex:1;text-align:center"></div>' +
-        '<div style="font-size:.65em;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:45%">' + _plEsc(email) + '</div>' +
+        '<div style="position:relative;max-width:48%;flex-shrink:0">' +
+          '<div onclick="_plToggleAcctMenu(event)" title="帳號" style="display:flex;align-items:center;justify-content:flex-end;gap:3px;font-size:.65em;color:var(--muted);white-space:nowrap;cursor:pointer">' +
+            '<span style="overflow:hidden;text-overflow:ellipsis">' + _plEsc(email) + '</span><span style="opacity:.6">▾</span>' +
+          '</div>' +
+          '<div id="pl-acct-menu" style="display:none;position:absolute;right:0;top:100%;margin-top:6px;min-width:200px;background:var(--bg-elev,#1a1f2e);border:1px solid var(--border,#334155);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.45);z-index:60;overflow:hidden;text-align:left">' +
+            '<div style="padding:10px 14px;border-bottom:1px solid var(--border,#334155)">' +
+              '<div style="font-size:.72em;color:var(--muted);word-break:break-all">' + _plEsc(email) + '</div>' +
+              '<div id="pl-acct-tier" style="font-size:.78em;font-weight:700;margin-top:3px">' + _plTierLabel() + '</div>' +
+            '</div>' +
+            '<button onclick="_plLogout()" style="display:block;width:100%;text-align:left;background:transparent;color:var(--text);border:0;padding:11px 14px;font-size:.82em;cursor:pointer">🚪 登出 Logout</button>' +
+            '<button onclick="_plDeleteAccount()" style="display:block;width:100%;text-align:left;background:transparent;color:#f87171;border:0;border-top:1px solid var(--border,#334155);padding:11px 14px;font-size:.82em;cursor:pointer">🗑️ 永久刪除帳號 Delete account</button>' +
+          '</div>' +
+        '</div>' +
       '</div>' +
       '<div id="pl-toolbar">' + _plRenderToolbar() + '</div>' +
       '<div class="pl-split">' +
@@ -953,6 +997,10 @@ function _plRenderLogin() {
         '飛行記錄本：跨裝置、永久保存。<br>用 Google 帳號登入即可開始；換公司也能繼續用同一本 logbook。' +
       '</div>' +
       '<div id="pl-gsi-btn" style="margin-top:8px"></div>' +
+      '<div style="font-size:.7em;color:var(--muted);max-width:320px;line-height:1.6;margin-top:6px;opacity:.85">' +
+        '🔒 登入只是把紀錄<b>綁在你帳號、跨裝置同步＋雲端備份</b>；只取得 email 辨識身分，<b>不會讀取你的信箱、雲端硬碟或通訊錄</b>。<br>' +
+        '<span style="opacity:.75">Sign-in only links your logbook to your account for sync &amp; backup. We just get your email — never your inbox, Drive or contacts.</span>' +
+      '</div>' +
     '</div>';
   _plInitSignIn();
 }
