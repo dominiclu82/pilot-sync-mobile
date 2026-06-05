@@ -1393,7 +1393,9 @@ function _plCrewField(key, e) {
   // 這樣「沒被改過 → 沿用舊員編」的判斷仍成立（name === name0），不會弄丟 eid 連結。
   var dispName = _plCrewDisplayName(val);
   var inputCss = 'background:var(--bg,#0a0e1a);color:var(--text);border:1px solid var(--border,#334155);border-radius:6px;padding:6px 8px;font-size:.78em';
-  var editBtn = '<button type="button" id="ple-crewedit-' + key + '" onclick="_plQuickEditCrewSlot(\'' + key + '\')" title="編輯 / 新增此聯絡人 Edit / add contact" style="flex:0 0 auto;background:transparent;border:1px solid var(--border,#334155);border-radius:6px;color:var(--text);font-size:.85em;padding:0 7px;cursor:pointer;display:' + (dispName ? 'inline-block' : 'none') + '">✏️</button>';
+  // V2.2.02：✏️ 一律「佔位」—— 沒名字時用 visibility:hidden（不是 display:none），
+  // 否則名字格 flex:1 會膨脹，造成空列名字格比較大、rank 被擠掉、六列寬度不一致（畫面很怪）。
+  var editBtn = '<button type="button" id="ple-crewedit-' + key + '" onclick="_plQuickEditCrewSlot(\'' + key + '\')" title="編輯 / 新增此聯絡人 Edit / add contact" style="flex:0 0 auto;background:transparent;border:1px solid var(--border,#334155);border-radius:6px;color:var(--text);font-size:.85em;padding:0 7px;cursor:pointer;visibility:' + (dispName ? 'visible' : 'hidden') + '">✏️</button>';
   var hidden = '<input type="hidden" id="ple-crewid-' + key + '" value="' + _plEsc(val.eid) + '">' +
     '<input type="hidden" id="ple-crewname0-' + key + '" value="' + _plEsc(dispName) + '">';   // 原始名字：判斷名字有沒有被改過，改過就不沿用舊員編
   // V2.1.09：iPad（寬螢幕）維持原本 label-above 緊湊版（搭配 2-per-row，不動）。
@@ -1407,10 +1409,11 @@ function _plCrewField(key, e) {
       '</div>' + hidden + '</div>';
   }
   // 手機：LogTen 式 —— 標籤靠左、名字吃滿整列（一列一個），長名不再被截斷。職級與 ✏️ 收右邊。
-  return '<div style="display:flex;align-items:center;gap:6px;margin-bottom:6px">' +
-    '<div style="flex:0 0 64px;font-size:.66em;color:var(--muted);text-align:right;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + _plEsc(label) + '">' + _plEsc(label) + '</div>' +
+  // V2.2.02：label 欄 64→46px（左邊不再留空、把空間還給名字），rank 50→52px（"RANK"/職級顯示得完整）。
+  return '<div style="display:flex;align-items:center;gap:5px;margin-bottom:6px">' +
+    '<div style="flex:0 0 46px;font-size:.62em;color:var(--muted);text-align:right;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + _plEsc(label) + '">' + _plEsc(label) + '</div>' +
     '<input id="ple-crew-' + key + '" list="ple-crew-dl" placeholder="name" oninput="_plCrewSlotInput(\'' + key + '\')" style="flex:1;min-width:0;' + inputCss + '" value="' + _plEsc(dispName) + '">' +
-    '<input id="ple-crewrank-' + key + '" placeholder="rank" style="flex:0 0 auto;width:50px;text-transform:uppercase;' + inputCss + '" value="' + _plEsc(val.rank) + '">' +
+    '<input id="ple-crewrank-' + key + '" placeholder="rank" style="flex:0 0 auto;width:52px;text-transform:uppercase;' + inputCss + '" value="' + _plEsc(val.rank) + '">' +
     editBtn + hidden + '</div>';
 }
 
@@ -1418,7 +1421,7 @@ function _plCrewField(key, e) {
 function _plCrewSlotInput(key) {
   var nameEl = document.getElementById('ple-crew-' + key);
   var btn = document.getElementById('ple-crewedit-' + key);
-  if (btn) btn.style.display = (nameEl && (nameEl.value || '').trim()) ? 'inline-block' : 'none';
+  if (btn) btn.style.visibility = (nameEl && (nameEl.value || '').trim()) ? 'visible' : 'hidden';   // V2.2.02：佔位不變，只切可見
 }
 
 // ── V1.3.05：機場座標 + 太陽角度，給手動新增航班自動算 night time / 日夜起降 ─────────
@@ -2197,8 +2200,12 @@ function _plRenderEditor(target) {
       _plFieldSub('Scheduled') +
       _plFieldRow(2, _plEditorField('Sched Out', 'std_utc', 'time-utc', { localOf: 'origin' }) + _plEditorField('Sched In', 'sta_utc', 'time-utc', { localOf: 'dest' })) +
       _plFieldSub('Actual · OOOI') +
-      _plFieldRow(4, _plEditorField('Out', 'out_utc', 'time-utc') + _plEditorField('Off', 'off_utc', 'time-utc') +
-        _plEditorField('On', 'on_utc', 'time-utc') + _plEditorField('In', 'in_utc', 'time-utc')) +
+      // V2.2.02：OOOI —— iPad 維持 4 欄一排；手機改 2×2（4 欄太擠、placeholder「HHMM UTC」被切）。
+      (_plWide()
+        ? _plFieldRow(4, _plEditorField('Out', 'out_utc', 'time-utc') + _plEditorField('Off', 'off_utc', 'time-utc') +
+            _plEditorField('On', 'on_utc', 'time-utc') + _plEditorField('In', 'in_utc', 'time-utc'))
+        : _plFieldRow(2, _plEditorField('Out', 'out_utc', 'time-utc') + _plEditorField('Off', 'off_utc', 'time-utc')) +
+          _plFieldRow(2, _plEditorField('On', 'on_utc', 'time-utc') + _plEditorField('In', 'in_utc', 'time-utc'))) +
       _plFieldSub('Duty') +
       _plFieldRow(2, _plEditorField('On Duty', 'on_duty_utc', 'time-utc') + _plEditorField('Off Duty', 'off_duty_utc', 'time-utc')) +
     '</div>' +
@@ -5019,26 +5026,42 @@ function _plRenderAnalyzeContent() {
 // 獨立底部分頁。把飛過的機場標在真實地圖、機場間畫大圓航線。2D=Leaflet+Esri 衛星圖、
 // 3D=globe.gl（藍色彈珠地球）。引擎只在打開時才從 CDN 懶載入，離線時優雅退場。Save Image 匯出 PNG。
 
-// Map/Earth 切換 + Save Image（仿 ATP2）
-function _plMapTabBar(view) {
-  var seg = function(id, label) {
-    var on = view === id;
-    return '<button onclick="_plSetMapView(\'' + id + '\')" style="padding:7px 16px;border:0;border-radius:7px;font-size:.8em;font-weight:700;cursor:pointer;-webkit-appearance:none;' +
-      (on ? 'background:var(--accent);color:#fff' : 'background:transparent;color:var(--muted)') + '">' + label + '</button>';
-  };
-  return '<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:10px">' +
-    '<div style="display:flex;gap:3px;background:var(--bar-bg-soft);border-radius:9px;padding:3px">' +
-      seg('map', '🗺️ Map') + seg('globe', '🌐 Earth') +
-    '</div>' +
-    '<button id="pl-map-save" onclick="_plSaveMapImage()" style="background:transparent;color:var(--text);border:1px solid var(--border,#334155);border-radius:8px;padding:7px 12px;font-size:.76em;font-weight:700;cursor:pointer;white-space:nowrap">📷 Save Image</button>' +
-  '</div>';
-}
+// 航跡顯示偏好（globe 用）：'static'（預設，實線不動）/ 'animated'（流動虛線）
+function _plMapArc() { try { return localStorage.getItem('pilotlog_map_arc') === 'animated' ? 'animated' : 'static'; } catch (e) { return 'static'; } }
+function _plSetMapArc(v) { try { localStorage.setItem('pilotlog_map_arc', v); } catch (e) {} _plDisposeGlobe(); _plRenderMapTabContent(); }
 
 function _plSetMapView(v) {
   if ((_pl.mapView || 'map') === v) return;
   _plDisposeGlobe();                 // 離開 3D 先釋放 WebGL，避免重複開啟洩漏 context
   _pl.mapView = v;
   _plRenderMapTabContent();
+}
+
+// V2.2.02：地圖日期區間（空 = 全部）。
+function _plMapRange() { return { from: _pl.mapFrom || '', to: _pl.mapTo || '' }; }
+function _plSetMapFrom(v) { _pl.mapFrom = v || null; _plDisposeGlobe(); _plRenderMapTabContent(); }
+function _plSetMapTo(v) { _pl.mapTo = v || null; _plDisposeGlobe(); _plRenderMapTabContent(); }
+function _plClearMapRange() { _pl.mapFrom = null; _pl.mapTo = null; _plDisposeGlobe(); _plRenderMapTabContent(); }
+// 區間列：From → To + 快捷（今年 / 近12月 / 全部）。仿 Report 的 date 區間樣式。
+function _plMapRangeRow(rr) {
+  var di = 'background:var(--input-bg);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:5px 7px;font-size:.72em';
+  var now = new Date();
+  var ytd = now.getFullYear() + '-01-01';
+  var today = now.getFullYear() + '-' + ('0' + (now.getMonth() + 1)).slice(-2) + '-' + ('0' + now.getDate()).slice(-2);
+  var d12 = new Date(now.getFullYear(), now.getMonth() - 11, 1);
+  var from12 = d12.getFullYear() + '-' + ('0' + (d12.getMonth() + 1)).slice(-2) + '-01';
+  var active = (rr.from || rr.to);
+  var chip = function(label, fromV, toV) {
+    var on = rr.from === fromV && rr.to === toV;
+    return '<button onclick="_pl.mapFrom=' + (fromV ? '\'' + fromV + '\'' : 'null') + ';_pl.mapTo=' + (toV ? '\'' + toV + '\'' : 'null') + ';_plDisposeGlobe();_plRenderMapTabContent()" ' +
+      'style="background:' + (on ? 'var(--accent)' : 'transparent') + ';color:' + (on ? '#fff' : 'var(--muted)') + ';border:1px solid var(--border);border-radius:6px;padding:5px 9px;font-size:.66em;font-weight:700;cursor:pointer;white-space:nowrap">' + label + '</button>';
+  };
+  return '<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:10px">' +
+    '<input type="date" value="' + _plEsc(rr.from) + '" onchange="_plSetMapFrom(this.value)" style="' + di + ';flex:1;min-width:116px">' +
+    '<span style="color:var(--muted);font-size:.72em">→</span>' +
+    '<input type="date" value="' + _plEsc(rr.to) + '" onchange="_plSetMapTo(this.value)" style="' + di + ';flex:1;min-width:116px">' +
+    chip('全部 All', null, null) + chip('今年', ytd, today) + chip('近12月', from12, today) +
+  '</div>';
 }
 
 // 把 entries 聚合成 { airports[], routes[], stats }。機場座標查 _plAptInfo（需機場庫已載入）。
@@ -5111,21 +5134,6 @@ function _plGreatCircle(lat1, lon1, lat2, lon2) {
   return pts;
 }
 
-// 統計小卡（機場數 / 航線數 / 國家數 / 主場 / 最遠）
-function _plFlownStatsHtml(geo) {
-  var s = geo.stats;
-  var chip = function(label, val) {
-    return '<div style="flex:1;min-width:74px;background:var(--bar-bg-soft);border-radius:9px;padding:8px 10px;text-align:center">' +
-      '<div style="font-size:1.1em;font-weight:800;font-variant-numeric:tabular-nums">' + val + '</div>' +
-      '<div style="font-size:.58em;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-top:2px">' + label + '</div></div>';
-  };
-  var top = s.top ? (s.top.iata || s.top.code) : '—';
-  var far = s.far ? (s.far.nm.toLocaleString() + ' nm') : '—';
-  return '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px">' +
-    chip('Airports', s.airports) + chip('Routes', s.routes) + chip('Countries', s.countries) +
-    chip('Main Base', _plEsc(top)) + chip('Longest', far) + '</div>';
-}
-
 function _plMapMsg(txt) {
   return '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--muted);font-size:.85em;text-align:center;padding:24px">' + txt + '</div>';
 }
@@ -5144,7 +5152,7 @@ async function _plRenderMapTab() {
   _plRenderMapTabContent();
 }
 
-// Map 分頁內容外殼（Map/Earth toggle + Save + stats + host），然後初始化對應引擎。
+// Map 分頁內容：全版沉浸式地圖 + 浮層控制（仿 ATP2）。
 // ⚠️ 機場座標要靠 window._PL_AIRPORTS（懶載入）才查得到 → 一律先 _plLoadAirports() 再建 geo，
 // 否則庫沒載入時 _plBuildFlownGeo 會回 0 個機場、誤顯示「無機場」。
 function _plRenderMapTabContent() {
@@ -5152,28 +5160,67 @@ function _plRenderMapTabContent() {
   if (!c) return;
   if (_pl.tab !== 'map') return;   // 防 race：切走後過期的 async render 不可覆蓋新分頁
   var view = _pl.mapView || 'map';
+  var rr = _plMapRange();
   var entries = (_pl.aircraftEntries || []).filter(function(e) {
     if (e.is_deadhead || e.status === 'roster_removed') return false;
-    return !!e.in_utc;
+    if (!e.in_utc) return false;
+    var fd = String(e.flight_date || '').slice(0, 10);   // 日期區間篩選（空 = 全部）
+    if (rr.from && fd < rr.from) return false;
+    if (rr.to && fd > rr.to) return false;
+    return true;
   });
   var hostId = view === 'globe' ? 'pl-globe-host' : 'pl-map-host';
   var hostBg = view === 'globe' ? '#05070d' : '#0b0f1a';
-  c.innerHTML =
-    '<div style="padding:10px 14px">' +
-      '<div style="font-size:1em;font-weight:700;margin-bottom:9px">🗺️ Map</div>' +
-      _plMapTabBar(view) +
-      '<div id="pl-flown-stats">' + (entries.length ? '' : '') + '</div>' +
-      '<div id="' + hostId + '" style="width:100%;height:min(66vh,640px);min-height:340px;border-radius:12px;overflow:hidden;background:' + hostBg + ';border:1px solid var(--border)">' +
-        _plMapMsg(entries.length ? '載入中… Loading…' : '尚無已完成的航班<br>No completed flights yet') +
+  var emptyMsg = (rr.from || rr.to) ? '此區間內沒有航班<br>No flights in this range' : '尚無已完成的航班<br>No completed flights yet';
+  // 半透明浮層藥丸樣式（毛玻璃）
+  var PILL = 'background:rgba(13,18,30,0.66);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);border:1px solid rgba(255,255,255,0.13);border-radius:13px;box-shadow:0 4px 18px rgba(0,0,0,.35)';
+  var seg = function(id, label) {
+    var on = view === id;
+    return '<button onclick="_plSetMapView(\'' + id + '\')" style="padding:6px 14px;border:0;border-radius:10px;font-size:.78em;font-weight:700;cursor:pointer;-webkit-appearance:none;' +
+      (on ? 'background:var(--accent);color:#fff' : 'background:transparent;color:rgba(255,255,255,.8)') + '">' + label + '</button>';
+  };
+  var iconBtn = function(onclick, label, extra) {
+    return '<button onclick="' + onclick + '" style="' + PILL + ';color:#fff;padding:7px 11px;font-size:.74em;font-weight:700;cursor:pointer;white-space:nowrap;' + (extra || '') + '">' + label + '</button>';
+  };
+  var arcBtn = '';
+  if (view === 'globe') {
+    var arc = _plMapArc();
+    arcBtn = iconBtn('_plSetMapArc(\'' + (arc === 'animated' ? 'static' : 'animated') + '\')', arc === 'animated' ? '✦ 動態' : '― 靜態');
+  }
+  var rangeActive = (rr.from || rr.to);
+  // 浮層：上排控制 + 統計藥丸 + 可收合日期面板
+  var overlay =
+    '<div style="position:absolute;top:calc(env(safe-area-inset-top) + 10px);left:10px;right:10px;z-index:10;display:flex;flex-direction:column;gap:8px;pointer-events:none">' +
+      '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">' +
+        '<div style="display:flex;gap:8px;align-items:center;pointer-events:auto">' +
+          '<div style="display:flex;gap:3px;padding:3px;' + PILL + '">' + seg('map', '🗺️ Map') + seg('globe', '🌐 Earth') + '</div>' +
+          arcBtn +
+        '</div>' +
+        '<div style="display:flex;gap:8px;align-items:center;pointer-events:auto">' +
+          iconBtn('_plToggleMapRange()', '📅' + (rangeActive ? ' •' : ''), rangeActive ? 'color:var(--accent)' : '') +
+          iconBtn('_plSaveMapImage()', '📷 Save') +
+        '</div>' +
       '</div>' +
-      '<div style="font-size:.6em;color:var(--muted);text-align:center;margin-top:7px">只統計已完成（有實際抵達時間）的航班 · Completed flights only</div>' +
+      '<div id="pl-flown-stats" style="pointer-events:auto"></div>' +
+      '<div id="pl-map-range-panel" style="pointer-events:auto;display:' + (rangeActive ? 'block' : 'none') + ';' + PILL + ';padding:9px 11px;max-width:360px">' + _plMapRangeRow(rr) + '</div>' +
     '</div>';
+  c.innerHTML =
+    '<div id="pl-map-full" style="position:fixed;top:0;left:0;right:0;bottom:calc(56px + env(safe-area-inset-bottom));background:' + hostBg + ';overflow:hidden">' +
+      '<div id="' + hostId + '" style="position:absolute;top:0;left:0;right:0;bottom:0">' +
+        _plMapMsg(entries.length ? '載入中… Loading…' : emptyMsg) +
+      '</div>' +
+      overlay +
+    '</div>';
+  // codex P2：每次 render 都先 bump 序號（含「空區間」這條提早 return 的路徑），讓任何更新的 render
+  // 立刻讓先前還在飛的 _plLoadAirports().then 失效 —— 否則切到空區間時，舊的非空結果會蓋回來。
+  var seq = (_pl.mapRenderSeq = (_pl.mapRenderSeq || 0) + 1);
   if (!entries.length) return;
   _plLoadAirports().then(function() {
+    if (seq !== _pl.mapRenderSeq) return;
     if (_pl.tab !== 'map' || (_pl.mapView || 'map') !== view) return;
     var geo = _plBuildFlownGeo(entries);
     var sc = document.getElementById('pl-flown-stats');
-    if (sc) sc.innerHTML = _plFlownStatsHtml(geo);
+    if (sc) sc.innerHTML = _plFlownStatsPill(geo);
     if (!geo.airports.length) {
       var h0 = document.getElementById(hostId);
       if (h0) h0.innerHTML = _plMapMsg('尚無可繪製的機場座標<br>No mappable airports yet');
@@ -5185,6 +5232,28 @@ function _plRenderMapTabContent() {
     var h0 = document.getElementById(hostId);
     if (h0) h0.innerHTML = _plMapMsg('機場庫載入失敗<br>Airport database failed to load');
   });
+}
+
+// 收合/展開日期面板（不重畫地圖，避免重新初始化閃爍）
+function _plToggleMapRange() {
+  var p = document.getElementById('pl-map-range-panel');
+  if (p) p.style.display = (p.style.display === 'none' || !p.style.display) ? 'block' : 'none';
+}
+
+// 統計藥丸（半透明、浮在地圖上、過寬可橫向捲）
+function _plFlownStatsPill(geo) {
+  var s = geo.stats;
+  var PILL = 'background:rgba(13,18,30,0.66);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);border:1px solid rgba(255,255,255,0.13);border-radius:13px;box-shadow:0 4px 18px rgba(0,0,0,.35)';
+  var item = function(label, val) {
+    return '<div style="text-align:center;padding:3px 11px;white-space:nowrap"><div style="font-size:.98em;font-weight:800;font-variant-numeric:tabular-nums;color:#fff">' + val + '</div>' +
+      '<div style="font-size:.5em;color:rgba(255,255,255,.65);text-transform:uppercase;letter-spacing:.5px;margin-top:1px">' + label + '</div></div>';
+  };
+  var sep = '<div style="width:1px;align-self:stretch;background:rgba(255,255,255,.16);margin:5px 0"></div>';
+  var top = s.top ? (s.top.iata || s.top.code) : '—';
+  var far = s.far ? (s.far.nm.toLocaleString() + ' nm') : '—';
+  return '<div style="display:inline-flex;align-items:center;max-width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch;' + PILL + ';padding:3px 4px">' +
+    item('Airports', s.airports) + sep + item('Routes', s.routes) + sep + item('Countries', s.countries) + sep + item('Base', _plEsc(top)) + sep + item('Longest', far) +
+  '</div>';
 }
 
 // Save Image：把目前地圖／地球輸出成 PNG 下載（仿 ATP2）。
@@ -5199,10 +5268,9 @@ async function _plSaveMapImage() {
   };
   try {
     if (view === 'globe') {
-      var gh = document.getElementById('pl-globe-host');
-      var cv = gh && gh.querySelector('canvas');
-      if (!cv) { _plToast('地球尚未就緒', 'error'); return; }
-      if (_plGlobeInst) { try { _plGlobeInst.renderer().render(_plGlobeInst.scene(), _plGlobeInst.camera()); } catch (e) {} }
+      if (!_plGlobeInst || (_plGlobeInst.isDestroyed && _plGlobeInst.isDestroyed())) { _plToast('地球尚未就緒', 'error'); return; }
+      try { _plGlobeInst.render(); } catch (e) {}   // 確保最新一幀畫進 buffer 才截
+      var cv = _plGlobeInst.scene.canvas;
       dl(cv.toDataURL('image/png'));
       _plToast('已存成圖片');
       return;
@@ -5254,30 +5322,40 @@ function _plLoadLeaflet() {
   });
   return _plLeafletP;
 }
-var _plGlobeP = null;
-function _plLoadGlobe() {
-  if (window.Globe) return Promise.resolve();
-  if (_plGlobeP) return _plGlobeP;
-  _plGlobeP = new Promise(function(res, rej) {
+// 3D Earth 用 CesiumJS（衛星圖磚串流＝放大有街道級細節 ＋ 日夜光照 ＋ 城市夜燈，仿 ATP2）。
+// 引擎較大（~3MB），只在打開 Earth 時才抓；並在 Service Worker 做永久快取（routes.ts），抓過一次就常駐。
+var _plCesiumP = null;
+function _plLoadCesium() {
+  if (window.Cesium) return Promise.resolve();
+  if (_plCesiumP) return _plCesiumP;
+  // codex P2：釘死精確版本（不用 @1 浮動 tag）—— plcdn 是永久 cache-first，浮動 tag 會讓使用者
+  // 永遠卡在第一次抓到的版本。要升級 Cesium 就改這個版號（新網址＝新 cache 條目，自動換新）。
+  var BASE = 'https://unpkg.com/cesium@1.142.0/Build/Cesium/';
+  window.CESIUM_BASE_URL = BASE;   // Cesium 的 worker/wasm/資產相對此路徑載入
+  _plCesiumP = new Promise(function(res, rej) {
+    var css = document.createElement('link');
+    css.rel = 'stylesheet'; css.href = BASE + 'Widgets/widgets.css';
+    document.head.appendChild(css);
     var s = document.createElement('script');
-    s.src = 'https://unpkg.com/globe.gl';
+    s.src = BASE + 'Cesium.js';
     s.onload = function() { res(); };
-    s.onerror = function() { _plGlobeP = null; rej(new Error('globe')); };
+    s.onerror = function() { _plCesiumP = null; rej(new Error('cesium')); };
     document.head.appendChild(s);
   });
-  return _plGlobeP;
+  return _plCesiumP;
 }
 
 // 2D Leaflet：Esri 衛星實景圖 + 機場點 + 大圓航線（仿 ATP2）
 function _plInitFlownMap(geo) {
   var host = document.getElementById('pl-map-host');
   if (!host) return;
-  if (!window.L && !_plOnline()) { host.innerHTML = _plMapMsg('離線無法載入地圖<br>Map needs a connection'); return; }
+  // codex P2（一致）：不早退，讓已永久快取的 Leaflet 離線也能載；真的載不到走 .catch。
   _plLoadLeaflet().then(function() {
     if (_pl.tab !== 'map' || (_pl.mapView || 'map') !== 'map') return;
     var h = document.getElementById('pl-map-host');
     if (!h || !window.L) { if (h) h.innerHTML = _plMapMsg('地圖載入失敗<br>Map failed to load'); return; }
     h.innerHTML = '<div id="pl-lmap" style="width:100%;height:100%"></div>';
+    _plEnsureMapLblCss();
     var L = window.L;
     var map = L.map('pl-lmap', { worldCopyJump: true, attributionControl: false, zoomControl: true, minZoom: 1 }).setView([20, 100], 2);
     // Esri World Imagery 衛星圖（跟跑道圖同源）。crossOrigin 讓 Save Image 可截圖。
@@ -5291,21 +5369,30 @@ function _plInitFlownMap(geo) {
     var near = function(lon) { return lon + 360 * Math.round((meanLon - lon) / 360); };
     var bounds = [];
     geo.routes.forEach(function(r) {
-      var w = Math.min(1.4 + r.count * 0.4, 4.5);
+      var w = Math.min(0.6 + r.count * 0.12, 1.8);           // 細線（仿 ATP2），密集航網才不會糊成一坨
       var off = near(r.aLon) - r.aLon;                       // 整條線平移到中心框（起點對齊）
       var line = _plGreatCircle(r.aLat, r.aLon, r.bLat, r.bLon).map(function(p) { return [p[0], p[1] + off]; });
-      L.polyline(line, { color: '#ffffff', weight: w, opacity: 0.85 }).addTo(map);   // 衛星圖上白線最清楚
+      L.polyline(line, { color: '#e0f2fe', weight: w, opacity: 0.5 }).addTo(map);   // 淡藍白、半透明，不搶戲
     });
     geo.airports.forEach(function(a) {
       var ll = [a.lat, near(a.lon)];
       bounds.push(ll);
-      var rad = Math.min(3.5 + Math.sqrt(a.visits), 9);
-      L.circleMarker(ll, { radius: rad, color: '#ffffff', weight: 1.6, fillColor: '#f43f5e', fillOpacity: 0.95 })  // 紅點白圈，衛星圖上跳出來
+      var rad = Math.min(2.4 + Math.sqrt(a.visits) * 0.7, 6.5);   // 點縮小，不擋圖
+      var mk = L.circleMarker(ll, { radius: rad, color: '#ffffff', weight: 1.3, fillColor: '#f43f5e', fillOpacity: 0.95 })  // 紅點白圈，衛星圖上跳出來
         .addTo(map)
         .bindPopup('<b>' + _plEsc(a.iata || a.code) + '</b> <span style="opacity:.6">' + _plEsc(a.icao || '') + '</span><br>' +
           _plEsc(a.city || a.name || '') + '<br>' + a.visits + ' 次 · visits');
+      // 地名標籤：常駐 tooltip，但用 CSS 在 zoom 夠近才顯示（遠看不顯示，避免一堆文字漂浮）。
+      mk.bindTooltip(_plEsc(a.city || a.iata || a.code), { permanent: true, direction: 'right', offset: [5, 0], className: 'pl-maplbl' });
     });
     if (bounds.length) map.fitBounds(bounds, { padding: [28, 28], maxZoom: 6 });
+    // 依 zoom 切換地名顯示：zoom 夠近(>=5)才把標籤顯示出來。
+    var LBL_ZOOM = 5;
+    var syncLbls = function() {
+      var el = document.getElementById('pl-lmap');
+      if (el) el.classList.toggle('pl-lbls-on', map.getZoom() >= LBL_ZOOM);
+    };
+    map.on('zoomend', syncLbls); syncLbls();
     setTimeout(function() { try { map.invalidateSize(); } catch (e) {} }, 120);
   }).catch(function() {
     var h = document.getElementById('pl-map-host');
@@ -5313,61 +5400,113 @@ function _plInitFlownMap(geo) {
   });
 }
 
-// 3D globe.gl：Earth 材質 + 機場點 + 大圓弧
-var _plGlobeInst = null;
+// 地名標籤樣式（注入一次）：衛星圖上白字描黑邊、無底框；預設隱藏，地圖縮放夠近(.pl-lbls-on)才顯示。
+function _plEnsureMapLblCss() {
+  if (document.getElementById('pl-maplbl-css')) return;
+  var st = document.createElement('style');
+  st.id = 'pl-maplbl-css';
+  st.textContent =
+    '.pl-maplbl.leaflet-tooltip{background:transparent;border:none;box-shadow:none;color:#fff;font-weight:700;font-size:10px;' +
+    'text-shadow:0 0 3px #000,0 0 3px #000,0 0 3px #000;padding:0;white-space:nowrap;display:none}' +
+    '.pl-maplbl.leaflet-tooltip:before{display:none}' +
+    '#pl-lmap.pl-lbls-on .pl-maplbl.leaflet-tooltip{display:block}';
+  document.head.appendChild(st);
+}
+
+// 3D Earth：CesiumJS Viewer（衛星圖磚 + 日夜光照 + 城市夜燈 + 測地線航線 + 近看才顯示地名）
+var _plGlobeInst = null;   // Cesium Viewer
 function _plDisposeGlobe() {
   if (_plGlobeInst) {
-    try { if (_plGlobeInst._destructor) _plGlobeInst._destructor(); } catch (e) {}
-    try { _plGlobeInst.pauseAnimation && _plGlobeInst.pauseAnimation(); } catch (e) {}
+    try { if (!(_plGlobeInst.isDestroyed && _plGlobeInst.isDestroyed())) _plGlobeInst.destroy(); } catch (e) {}
     _plGlobeInst = null;
   }
-  // codex P3：一併移除 resize listener，避免反覆進出 Earth 累積殘留全域監聽
-  if (_plGlobeResize) { try { window.removeEventListener('resize', _plGlobeResize); } catch (e) {} _plGlobeResize = null; }
 }
 function _plInitGlobe(geo) {
   var host = document.getElementById('pl-globe-host');
   if (!host) return;
-  if (!window.Globe && !_plOnline()) { host.innerHTML = _plMapMsg('離線無法載入地球<br>Globe needs a connection'); return; }
-  _plLoadGlobe().then(function() {
+  // codex P2：不在這裡用 _plOnline() 早退 —— 引擎已永久快取在 SW(plcdn) 時，離線重開也要能從快取載入。
+  // 真的離線又沒快取，_plLoadCesium() 的 script onerror 會 reject → 走下面 .catch 顯示需連網。
+  host.innerHTML = _plMapMsg('載入 3D 地球中…<br>Loading 3D Earth…');
+  _plLoadCesium().then(function() {
     if (_pl.tab !== 'map' || (_pl.mapView || 'map') !== 'globe') return;
     var h = document.getElementById('pl-globe-host');
-    if (!h || !window.Globe) { if (h) h.innerHTML = _plMapMsg('地球載入失敗<br>Globe failed to load'); return; }
-    h.innerHTML = '';
-    var arcs = geo.routes.map(function(r) { return { startLat: r.aLat, startLng: r.aLon, endLat: r.bLat, endLng: r.bLon }; });
-    var pts = geo.airports.map(function(a) { return { lat: a.lat, lng: a.lon, code: a.iata || a.code, city: a.city || a.name || '', visits: a.visits }; });
+    if (!h || !window.Cesium) { if (h) h.innerHTML = _plMapMsg('地球載入失敗<br>Earth failed to load'); return; }
+    var C = window.Cesium;
     _plDisposeGlobe();
-    // preserveDrawingBuffer:true → Save Image 才抓得到 WebGL canvas 內容
-    var g = window.Globe({ rendererConfig: { preserveDrawingBuffer: true, antialias: true } })(h)
-      .globeImageUrl('https://unpkg.com/three-globe/example/img/earth-blue-marble.jpg')
-      .bumpImageUrl('https://unpkg.com/three-globe/example/img/earth-topology.png')
-      .backgroundColor('rgba(0,0,0,0)')
-      .width(h.clientWidth).height(h.clientHeight)
-      .atmosphereColor('#7dd3fc').atmosphereAltitude(0.18)
-      .pointsData(pts).pointColor(function() { return '#f43f5e'; })
-      .pointAltitude(0.01).pointRadius(0.3)
-      .pointLabel(function(d) { return '<div style="font:12px -apple-system,sans-serif;background:rgba(10,14,26,.9);color:#e2e8f0;padding:4px 7px;border-radius:6px"><b>' + d.code + '</b> · ' + d.city + '<br>' + d.visits + ' visits</div>'; })
-      .arcsData(arcs)
-      .arcColor(function() { return ['rgba(255,255,255,0.85)', 'rgba(255,255,255,0.25)']; })
-      .arcStroke(0.5).arcAltitudeAutoScale(0.45)
-      .arcDashLength(0.55).arcDashGap(0.25).arcDashAnimateTime(3500);
-    try { g.controls().autoRotate = true; g.controls().autoRotateSpeed = 0.5; } catch (e) {}
-    if (geo.stats.top) { try { g.pointOfView({ lat: geo.stats.top.lat, lng: geo.stats.top.lon, altitude: 2.2 }, 0); } catch (e) {} }
-    _plGlobeInst = g;
-    // 視窗變動時重設尺寸
-    var onResize = function() {
-      if (_pl.tab !== 'map' || (_pl.mapView || 'map') !== 'globe' || !_plGlobeInst) return;
-      var hh = document.getElementById('pl-globe-host');
-      if (hh) { try { _plGlobeInst.width(hh.clientWidth).height(hh.clientHeight); } catch (e) {} }
-    };
-    window.removeEventListener('resize', _plGlobeResize || function() {});
-    _plGlobeResize = onResize;
-    window.addEventListener('resize', onResize);
+    h.innerHTML = '<div id="pl-cesium" style="position:absolute;top:0;left:0;right:0;bottom:0"></div>';
+    var animated = _plMapArc() === 'animated';
+    try { C.Ion.defaultAccessToken = ''; } catch (e) {}   // 不用 Cesium ion（改用免費 Esri 衛星圖 + 橢球地形）
+    var viewer;
+    try {
+      viewer = new C.Viewer('pl-cesium', {
+        baseLayer: false, baseLayerPicker: false, timeline: false, animation: false, geocoder: false,
+        homeButton: false, sceneModePicker: false, navigationHelpButton: false, fullscreenButton: false,
+        infoBox: false, selectionIndicator: false, requestRenderMode: false,
+        contextOptions: { webgl: { preserveDrawingBuffer: true } }   // 截圖（Save Image）才抓得到內容
+      });
+    } catch (e) { h.innerHTML = _plMapMsg('地球初始化失敗<br>' + _plEsc(e.message || '')); return; }
+    _plGlobeInst = viewer;
+    var scene = viewer.scene;
+    try { scene.globe.enableLighting = true; } catch (e) {}     // 日夜光照（依真實時間算太陽位置）
+    try { scene.highDynamicRange = false; } catch (e) {}
+    try { scene.globe.showGroundAtmosphere = true; } catch (e) {}
+    try { viewer.cesiumWidget.creditContainer.style.display = 'none'; } catch (e) {}   // 隱藏 logo 列（保留地圖供應商不影響）
+    // 衛星圖（Esri World Imagery，免費、無金鑰、跟 2D 同源）
+    try {
+      C.ArcGisMapServerImageryProvider.fromUrl('https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer')
+        .then(function(prov) { if (_plGlobeInst === viewer) try { viewer.imageryLayers.addImageryProvider(prov); } catch (e) {} })
+        .catch(function() {});
+    } catch (e) {}
+    // 夜面城市燈：整張 night-lights 疊圖，只在暗面顯示（dayAlpha=0 / nightAlpha=1）→ 日夜 + 城市燈像 ATP2
+    try {
+      C.SingleTileImageryProvider.fromUrl('https://unpkg.com/three-globe/example/img/earth-night.jpg')
+        .then(function(np) {
+          if (_plGlobeInst !== viewer) return;
+          var nl = viewer.imageryLayers.addImageryProvider(np);
+          try { nl.dayAlpha = 0.0; nl.nightAlpha = 1.0; nl.brightness = 1.6; } catch (e) {}
+        }).catch(function() {});
+    } catch (e) {}
+    // 航線（測地線大圓，Cesium 原生處理換日線）
+    geo.routes.forEach(function(r) {
+      var w = Math.min(0.8 + r.count * 0.12, 2.2);
+      var mat = animated
+        ? new C.PolylineGlowMaterialProperty({ glowPower: 0.22, taperPower: 1, color: C.Color.fromCssColorString('#7dd3fc') })
+        : C.Color.fromCssColorString('#e0f2fe').withAlpha(0.55);
+      try {
+        viewer.entities.add({ polyline: {
+          positions: C.Cartesian3.fromDegreesArray([r.aLon, r.aLat, r.bLon, r.bLat]),
+          width: w, arcType: C.ArcType.GEODESIC, material: mat
+        } });
+      } catch (e) {}
+    });
+    // 機場（紅點白圈 + 地名標籤；標籤用 distanceDisplayCondition 近看(<2000km)才顯示）
+    geo.airports.forEach(function(a) {
+      var px = Math.min(5 + Math.sqrt(a.visits) * 1.4, 11);
+      try {
+        viewer.entities.add({
+          position: C.Cartesian3.fromDegrees(a.lon, a.lat),
+          point: { pixelSize: px, color: C.Color.fromCssColorString('#f43f5e'), outlineColor: C.Color.WHITE, outlineWidth: 1.4 },
+          label: {
+            text: a.city || a.iata || a.code,
+            font: 'bold 13px -apple-system, "Segoe UI", sans-serif',
+            fillColor: C.Color.WHITE, outlineColor: C.Color.BLACK, outlineWidth: 3,
+            style: C.LabelStyle.FILL_AND_OUTLINE, pixelOffset: new C.Cartesian2(9, 0),
+            horizontalOrigin: C.HorizontalOrigin.LEFT, verticalOrigin: C.VerticalOrigin.CENTER,
+            distanceDisplayCondition: new C.DistanceDisplayCondition(0, 2.0e6)   // 近看才顯示地名
+          }
+        });
+      } catch (e) {}
+    });
+    // 鏡頭定位到主場上空
+    try {
+      var t = geo.stats.top || geo.airports[0];
+      if (t) viewer.camera.setView({ destination: C.Cartesian3.fromDegrees(t.lon, t.lat, 1.4e7) });
+    } catch (e) {}
   }).catch(function() {
     var h = document.getElementById('pl-globe-host');
-    if (h) h.innerHTML = _plMapMsg('地球載入失敗<br>Globe failed to load');
+    if (h) h.innerHTML = _plMapMsg('地球載入失敗（需連網）<br>Earth failed to load');
   });
 }
-var _plGlobeResize = null;
 
 // === SECTION: report（currency + 區間總表 + 匯出）═══════════════════════════
 // 全新 tab。資料用完整快照 _pl.aircraftEntries 計算。currency 僅供參考、非官方判定。

@@ -53,8 +53,8 @@ import { getAirportDbJs } from '../spa/js-airport-db.js';
 
 // ── 版本（比照 CrewSync / Morning：每次推版必更新；SW cache 名稱跟著走） ────
 // 本機 preview build 會暫時加 -tNN 後綴方便對版；推正式版前拿掉只留乾淨版號。
-export const PILOT_LOG_VERSION = 'V2.2.01';
-const PILOT_LOG_CACHE = 'pilotlog-v2-2-01';
+export const PILOT_LOG_VERSION = 'V2.2.02';
+const PILOT_LOG_CACHE = 'pilotlog-v2-2-02';
 
 export const pilotLogRouter = express.Router();
 
@@ -341,6 +341,11 @@ if (document.readyState !== 'loading') pilotLogInit();
 function _renderPilotLogChangelog(): string {
   return `
     <div class="pl-cl-v">${PILOT_LOG_VERSION}</div>
+    <div class="pl-cl-txt">
+      <b>🌍 3D 地球大升級（Cesium）＋ 🗺️ 沉浸式地圖 ＋ 編輯器排版修正。</b><b>(1)</b> Map 分頁的 <b>Earth</b> 換成可<b>放大看細節的衛星地球</b>，還有<b>真實日夜光照＋夜面城市燈</b>（依當下時間）；引擎只在打開時下載、之後永久快取。<b>(2)</b> 地圖改成<b>全版沉浸式</b>：地圖佔滿整頁、控制項（Map／Earth、Save、統計）<b>半透明浮在地圖上</b>；2D 衛星圖、<b>航線變細變淡</b>不再糊住地圖、<b>地名放大才浮出</b>、可選<b>動態／靜態航跡</b>、可篩<b>日期區間</b>。<b>(3)</b> 編輯器：手機版 <b>CREW</b> 六列對齊一致（沒填名字的格子不再變大）、<b>OOOI</b> 由四格擠一排改成<b>2×2</b>（iPad 不變）。<br>
+      <b>🌍 3D Earth upgrade (Cesium) + 🗺️ immersive map + editor layout fixes.</b> (1) The <b>Earth</b> view now streams <b>satellite tiles you can zoom into</b>, with <b>real day/night lighting and city lights</b> (by current time); the engine downloads only on first open, then stays cached. (2) The map is now <b>full-screen immersive</b> — controls (Map/Earth, Save, stats) <b>float over the map</b>; thinner translucent routes, place-name labels appear on zoom-in, animated/static route toggle, and a date-range filter. (3) Editor: phone <b>CREW</b> rows align consistently (empty slots no longer widen), and <b>OOOI</b> changed from four cramped boxes to <b>2×2</b> (iPad unchanged).
+    </div>
+    <div class="pl-cl-v old">V2.2.01</div>
     <div class="pl-cl-txt">
       <b>🗺️ 全新「Map」分頁 ＋ 🧹 清除更安全 ＋ 🗑️ 刪除帳號分離。</b><b>(1)</b> 底部多一個 <b>Map</b> 分頁，把你飛過的航線畫在真實地圖上 —— <b>2D 衛星實景圖</b>與 <b>3D 立體地球</b>（Map / Earth 切換）、大圓航線、雙指縮放、<b>Save Image</b> 一鍵存圖；統計機場數 / 航線數 / 國家數 / 主場 / 最遠航線（跨換日線航線正確繪製）。<b>(2)</b> 清除資料：<b>未勾選任何項目時刪除鈕變灰不可按</b>，說明補上英文。<b>(3)</b> <b>刪除帳號移出帳號選單</b>（不再貼在登出下面、避免誤觸），改至「版本 ⓘ → Danger Zone」（雙重確認）。<b>(4)</b> 班表匯入會把<b>組員 / 機上人數補進已完成的航班</b>（只補空缺、不覆蓋你已填的）。<br>
       <b>🗺️ New "Map" tab + 🧹 safer wipe + 🗑️ delete-account separated.</b> (1) A new <b>Map</b> tab plots every route you've flown — <b>2D satellite map</b> and <b>3D globe</b> (Map / Earth toggle), great-circle routes, pinch-zoom, one-tap <b>Save Image</b>; stats for airports / routes / countries / main base / longest leg (dateline-crossing routes drawn correctly). (2) Data wipe: the delete button now <b>stays disabled until a category is ticked</b>, with English labels added. (3) <b>Delete-account moved out of the account menu</b> (no longer next to logout) to "version ⓘ → Danger Zone" (double confirm). (4) Roster import now <b>fills crew / persons-on-board into completed flights</b> (empty fields only, never overwrites your edits).
@@ -817,10 +822,22 @@ self.addEventListener('fetch', e => {
   const u = new URL(e.request.url);
   // V2.0.03：衛星地圖（Esri）→ 獨立永久快取 plapt-maps（不以 pilotlog- 開頭 → activate 不清）。
   //   cache-first：預抓過/看過的離線可用；沒有就網路抓並存。飛機上離線也看得到星宇航點地圖。
-  if (u.hostname === 'server.arcgisonline.com') {
+  //   V2.2.02：3D Earth（Cesium）的衛星圖磚走 services.arcgisonline.com，一併納入同一份永久快取。
+  if (u.hostname === 'server.arcgisonline.com' || u.hostname === 'services.arcgisonline.com') {
     e.respondWith(
       caches.open('plapt-maps').then(c => c.match(e.request).then(hit =>
-        hit || fetch(e.request).then(r => { c.put(e.request, r.clone()).catch(()=>{}); return r; }).catch(() => hit)
+        hit || fetch(e.request).then(r => { if (r && (r.ok || r.type === 'opaque')) c.put(e.request, r.clone()).catch(()=>{}); return r; }).catch(() => hit)
+      ))
+    );
+    return;
+  }
+  // V2.2.02：3D Earth 引擎/函式庫（Cesium ~3MB、Leaflet、html2canvas、夜燈貼圖…都從 unpkg）→
+  //   獨立永久快取 plcdn（不以 pilotlog- 開頭 → activate 不清）。有網路抓一次後常駐，省去每次重抓。
+  //   codex P2：只快取成功(2xx)或 opaque(跨來源 no-cors)回應 → 不把 404/500/攔截頁存進去毒化快取。
+  if (u.hostname === 'unpkg.com') {
+    e.respondWith(
+      caches.open('plcdn').then(c => c.match(e.request).then(hit =>
+        hit || fetch(e.request).then(r => { if (r && (r.ok || r.type === 'opaque')) c.put(e.request, r.clone()).catch(()=>{}); return r; }).catch(() => hit)
       ))
     );
     return;
