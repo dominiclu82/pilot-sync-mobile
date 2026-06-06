@@ -73,8 +73,8 @@ async function run() {
     const res = await fetch(`${BASE}/morning`);
     assert(res.ok, `/morning returned ${res.status}`);
     const html = await res.text();
-    assert(html.includes('晨報'), '頁面缺少「晨報」標題');
-    assert(html.includes('Morning Report'), '頁面缺少 Morning Report 副標');
+    assert(html.includes('今日'), '頁面缺少「今日」標題');        // V2.0.04 改名「晨報」→「今日 Today」
+    assert(html.includes('Today'), '頁面缺少 Today 副標');        // 同上：舊測試抓 'Morning Report' 已過時
   });
 
   await check('GET /morning/manifest.json → 200 + 今日 name', async () => {

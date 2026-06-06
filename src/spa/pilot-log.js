@@ -157,6 +157,7 @@ function switchPlTab(tab, btn) {
   else if (tab === 'report') _plRenderReport();
   else if (tab === 'map') _plRenderMapTab();
   else _plRenderMain();
+  _plRenderYearIndex();   // codex P2：切頁時收起/更新年份索引（非 logbook 會隱藏）
   window.scrollTo(0, 0);
 }
 
@@ -417,6 +418,55 @@ function _plSetOffline(off) {
   var bar = document.getElementById('pl-offline-bar');
   if (bar) bar.classList.toggle('show', !!off);
   document.body.classList.toggle('pl-offline', !!off);
+  _plApplyOfflineMapShift();   // V2.2.08：離線時把沉浸式地圖下移，避免 OFFLINE 橫幅擋住浮動控制項
+  _plManageReconnectProbe(!!off);   // V2.2.08：離線時開始主動探線（iOS 的 online 事件常不觸發 → 橫幅卡住）
+}
+// V2.2.08：離線時每 15 秒主動探一次線（打 /me 帶 timeout）。一旦成功就當作連回線 → 清橫幅 + 重抓當前頁。
+// 不靠 window 'online' 事件（iOS PWA 上常不觸發，導致連回線了橫幅還在、要重開 App）。
+function _plManageReconnectProbe(off) {
+  try {
+    if (off) {
+      if (_pl._reconnTimer) return;
+      _pl._reconnTimer = setInterval(function () {
+        if (!document.body.classList.contains('pl-offline')) { _plManageReconnectProbe(false); return; }
+        if (_pl._reconnProbing) return;   // 上一個探測還在飛 → 跳過，避免堆疊
+        _pl._reconnProbing = true;
+        _plApi('/api/pilot-log/me')
+          .then(function (res) { if (res && res.ok) _plReconnected(); })
+          .catch(function () {})
+          .finally(function () { _pl._reconnProbing = false; });
+      }, 6000);   // 每 6 秒探一次 → 連回線最多 6 秒就清橫幅（離線時 fetch 多半瞬間失敗、成本低）
+    } else if (_pl._reconnTimer) {
+      clearInterval(_pl._reconnTimer); _pl._reconnTimer = null; _pl._reconnProbing = false;
+    }
+  } catch (e) {}
+}
+// 連回線：清離線狀態 + 補送離線期間改動 + 重抓當前頁（不打斷編輯中）。
+function _plReconnected() {
+  if (!document.body.classList.contains('pl-offline')) return;
+  _plSetOffline(false);              // 清橫幅 + 停探線 + 還原地圖位移
+  try { _plSync(); } catch (e) {}    // 補送離線期間排進 outbox 的改動
+  if (_pl.editing) return;           // 編輯中就只清狀態，不重載（避免丟草稿）
+  try {
+    if (_pl.tab === 'analyze') _plRenderAnalyze();
+    else if (_pl.tab === 'report') _plRenderReport();
+    else if (_pl.tab === 'map') _plRenderMapTab();
+    else _plFetchAll().then(function () { if (_pl.tab === 'logbook' && !_pl.editing) _plRenderList(); });
+  } catch (e) {}
+}
+// V2.2.08：地圖 #pl-map-full 是 inline top:0（外部 CSS 蓋不過），離線時用 JS 直接設 inline top，
+// 依實際橫幅高度把整張地圖（含掛在裡面的控制項 overlay）下移；連線時還原 top:0。
+function _plApplyOfflineMapShift() {
+  var mapFull = document.getElementById('pl-map-full');
+  if (!mapFull) return;   // 不在地圖頁就略過（之後切到地圖頁 render 時會再呼叫一次）
+  var off = document.body.classList.contains('pl-offline');
+  if (off) {
+    var bar = document.getElementById('pl-offline-bar');
+    var h = (bar && bar.offsetHeight) ? bar.offsetHeight : 28;   // 量實際橫幅高（含換行）
+    mapFull.style.top = 'calc(env(safe-area-inset-top) + ' + h + 'px)';
+  } else {
+    mapFull.style.top = '0';
+  }
 }
 
 // === SECTION: utils ═════════════════════════════════════════════════════════
@@ -485,15 +535,28 @@ async function _plApi(path, opts) {
     opts.headers['Content-Type'] = opts.headers['Content-Type'] || 'application/json';
     opts.body = JSON.stringify(opts.body);
   }
-  var res = await fetch(path, opts);
+  var res = await _plFetchTimeout(path, opts);
   if (res.status === 401 && _pl.refreshToken) {
     var ok = await _plTryRefresh();
     if (ok) {
       opts.headers['Authorization'] = 'Bearer ' + _pl.accessToken;
-      res = await fetch(path, opts);
+      res = await _plFetchTimeout(path, opts);
     }
   }
   return res;
+}
+// V2.2.08：帶 timeout 的 fetch —— iOS PWA 飛航模式下 navigator.onLine 常仍回 true，沒 timeout 的話
+// fetch 會永久 hang（Map/Report 一直卡「Loading…」、離線旗標也沒設）。逾時就 abort → throw，
+// 讓 caller 走離線快取 + 設 OFFLINE。預設 10 秒。
+function _plFetchTimeout(path, opts, ms) {
+  ms = ms || 8000;   // V2.2.08：8 秒（搭配快取優先，幾乎不會乾等到逾時；僅首次無快取又離線時當後盾）
+  if (typeof AbortController === 'undefined') return fetch(path, opts);
+  var ctrl = new AbortController();
+  var tid = setTimeout(function () { ctrl.abort(); }, ms);
+  var o = {};
+  for (var k in opts) { if (Object.prototype.hasOwnProperty.call(opts, k)) o[k] = opts[k]; }
+  o.signal = ctrl.signal;
+  return fetch(path, o).finally(function () { clearTimeout(tid); });
 }
 
 // === SECTION: auth ══════════════════════════════════════════════════════════
@@ -875,8 +938,8 @@ function _plRenderEntryRow(e) {
     ? '<div style="font-size:.7em;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + _plEsc(crewNames) + '</div>'
     : '';
 
-  return '<div class="pl-row' + selCls + '" onclick="_plOpenEditor(\'' + e.id + '\')" ' +
-    'style="background:var(--card);border-radius:10px;padding:10px 12px;margin-bottom:8px;cursor:pointer;display:flex;gap:12px;align-items:stretch">' +
+  return '<div class="pl-row' + selCls + '" data-yr="' + (/^\d{4}/.test(ds) ? ds.slice(0, 4) : '') + '" onclick="_plOpenEditor(\'' + e.id + '\')" ' +
+    'style="background:var(--card);border-radius:10px;padding:10px 12px;margin-bottom:8px;cursor:pointer;display:flex;gap:12px;align-items:stretch;scroll-margin-top:70px">' +
     '<div style="flex:0 0 4px;background:' + statusColor + ';border-radius:3px"></div>' +
     '<div style="flex:0 0 50px;padding-top:1px">' +
       '<div style="font-size:1.85em;font-weight:800;line-height:.9">' + dayNum + '</div>' +
@@ -918,9 +981,88 @@ function _plRenderList() {
         ? '尚無紀錄。點 <b>+ New Entry</b> 新增，或 <b>📥 Import</b> 匯入 LogTen Pro 資料。<br>No entries yet — tap <b>+ New Entry</b>, or <b>📥 Import</b> your LogTen Pro data.'
         : '此分類無紀錄。<br>No entries in this filter.') +
     '</div>';
+    _plRenderYearIndex();
     return;
   }
   c.innerHTML = shown.map(_plRenderEntryRow).join('');
+  _plRenderYearIndex();
+}
+
+// V2.2.08：通訊錄式右側年份索引 —— 常駐、一眼看到整個職涯跨度、可點可滑（滑動時中央放大泡泡顯示年份）。
+// 借 iPhone 通訊錄 A–Z 索引那套，解決 LogTen 細條難點的問題。window 捲動，索引 position:fixed 貼 list pane 右緣。
+function _plYearBubble(yr) {
+  var b = document.getElementById('pl-year-bubble');
+  if (yr == null) { if (b) b.style.display = 'none'; return; }
+  if (!b) {
+    b = document.createElement('div');
+    b.id = 'pl-year-bubble';
+    b.style.cssText = 'position:fixed;z-index:56;left:50%;top:50%;transform:translate(-50%,-50%);' +
+      'background:rgba(15,23,42,.92);color:#fff;font-weight:800;font-size:2.6em;padding:14px 28px;border-radius:18px;' +
+      'box-shadow:0 10px 34px rgba(0,0,0,.55);pointer-events:none;letter-spacing:1px';
+    document.body.appendChild(b);
+  }
+  b.textContent = yr;
+  b.style.display = 'block';
+}
+function _plYearIndexEl() {
+  var el = document.getElementById('pl-year-index');
+  if (el) return el;
+  el = document.createElement('div');
+  el.id = 'pl-year-index';
+  el.style.cssText = 'position:fixed;z-index:55;display:none;flex-direction:column;justify-content:space-between;' +
+    'align-items:center;padding:6px 5px;top:50%;transform:translateY(-50%);touch-action:none;cursor:pointer;' +
+    'user-select:none;-webkit-user-select:none;-webkit-tap-highlight-color:transparent';
+  var onMove = function (clientY) {
+    var yrs = el._yrs || [];
+    if (!yrs.length) return;
+    var r = el.getBoundingClientRect();
+    var frac = (clientY - r.top) / Math.max(1, r.height);
+    var i = Math.max(0, Math.min(yrs.length - 1, Math.floor(frac * yrs.length)));
+    var yr = yrs[i];
+    _plYearBubble(yr);
+    var row = document.querySelector('#pl-list [data-yr="' + yr + '"]');
+    if (row) row.scrollIntoView({ block: 'start' });
+  };
+  el.addEventListener('pointerdown', function (e) {
+    e.preventDefault();
+    try { el.setPointerCapture(e.pointerId); } catch (_e) {}
+    el._drag = true; onMove(e.clientY);
+  });
+  el.addEventListener('pointermove', function (e) { if (el._drag) { e.preventDefault(); onMove(e.clientY); } });
+  var end = function () { el._drag = false; _plYearBubble(null); };
+  el.addEventListener('pointerup', end);
+  el.addEventListener('pointercancel', end);
+  document.body.appendChild(el);
+  // 視窗尺寸/轉向變化 → 重新定位（只在 logbook 時）
+  try {
+    window.addEventListener('resize', function () { if (_pl.tab === 'logbook') _plRenderYearIndex(); });
+    window.addEventListener('orientationchange', function () { setTimeout(function () { if (_pl.tab === 'logbook') _plRenderYearIndex(); }, 250); });
+  } catch (_e) {}
+  return el;
+}
+function _plRenderYearIndex() {
+  var el = _plYearIndexEl();
+  var list = document.getElementById('pl-list');
+  // 只在 logbook 列表畫面顯示（切到別頁 / 編輯中 / #pl-list 不在 → 收起來）。codex P2：含編輯器與其他分頁。
+  if (_pl.tab !== 'logbook' || !list || _pl.editing) { el.style.display = 'none'; _plYearBubble(null); return; }
+  var rows = list.querySelectorAll('[data-yr]');
+  var yrs = [], seen = {};
+  for (var i = 0; i < rows.length; i++) {
+    var y = rows[i].getAttribute('data-yr');
+    if (y && !seen[y]) { seen[y] = 1; yrs.push(y); }
+  }
+  if (yrs.length < 2) { el.style.display = 'none'; return; }   // 只有一年 → 沒必要
+  el._yrs = yrs;
+  el.innerHTML = yrs.map(function (y) {
+    return '<span style="font-size:.6em;font-weight:700;color:var(--muted);line-height:1.05;padding:1px 0;pointer-events:none;font-variant-numeric:tabular-nums">’' + y.slice(2) + '</span>';
+  }).join('');
+  // 貼齊 list pane 右緣（iPhone 滿版 → 視窗右緣；iPad split → 左側列表的右緣）
+  var pane = document.querySelector('.pl-list-pane');
+  var rightInset = 3;
+  if (pane) { var pr = pane.getBoundingClientRect(); rightInset = Math.max(3, window.innerWidth - pr.right + 3); }
+  el.style.right = rightInset + 'px';
+  el.style.height = Math.max(120, Math.min(window.innerHeight - 200, yrs.length * 26)) + 'px';
+  el.style.display = 'flex';
 }
 
 async function _plSetFilter(f) {
@@ -971,7 +1113,9 @@ function _plRenderMain() {
   _plHighlightTab('logbook');
   var email = (_pl.user && _pl.user.primaryEmail) || '';
   c.innerHTML =
-    '<div style="padding:10px 14px">' +
+    '<div>' +
+      // V2.2.08：整個頂部（標題 email + 工具列）固定 —— 長列表滑到哪都能搜尋/篩選/+New（option B）。
+      '<div class="pl-topstack" style="position:sticky;top:0;z-index:40;background:var(--bg,#0a0e1a);padding:10px 14px 8px">' +
       '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;gap:8px">' +
         '<div style="font-size:1em;font-weight:700;white-space:nowrap">📒 Logbook</div>' +
         '<div id="pl-sync-status" style="font-size:.65em;flex:1;text-align:center"></div>' +
@@ -991,7 +1135,8 @@ function _plRenderMain() {
         '</div>' +
       '</div>' +
       '<div id="pl-toolbar">' + _plRenderToolbar() + '</div>' +
-      '<div class="pl-split">' +
+      '</div>' +   // close .pl-topstack（固定頂部）
+      '<div class="pl-split" style="padding:0 14px">' +
         '<div class="pl-list-pane"><div id="pl-list"></div></div>' +
         '<div class="pl-detail-pane" id="pl-detail-pane">' + _plDetailPlaceholder() + '</div>' +
       '</div>' +
@@ -1077,6 +1222,7 @@ function _plOpenEditor(id) {
     _plRenderList();                    // 重畫列表套用 .pl-row-sel highlight
   } else {
     _plRenderEditor();
+    _plRenderYearIndex();   // codex P2：iPhone 全螢幕編輯器替換內容 → 收起年份索引（guard 認 _pl.editing/#pl-list 不在）
   }
 }
 
@@ -3423,6 +3569,7 @@ function _plRenderAircraftList() {
   }
   c.innerHTML =
     '<div style="padding:10px 14px">' +
+      '<div class="pl-stickhead">' +
       '<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap">' +
         '<button onclick="_plRenderMain()" style="background:transparent;border:0;color:var(--text);font-size:1.2em;cursor:pointer">←</button>' +
         '<div style="font-size:1em;font-weight:700">✈️ Aircraft</div>' +
@@ -3433,6 +3580,7 @@ function _plRenderAircraftList() {
         // V1.3.35：從台灣機隊挑機（內建現役機隊，點選一鍵加入）
         '<button onclick="_plOpenFleetPicker()" title="從內建台灣機隊清單挑機加入" style="background:#6366f1;color:#fff;border:0;border-radius:6px;padding:6px 12px;font-size:.78em;font-weight:700;cursor:pointer">📋 Pick from list</button>' +
         '<button onclick="_plOpenAddAircraft()" title="手動輸入一架新機（清單沒有的）" style="background:#10b981;color:#fff;border:0;border-radius:6px;padding:6px 12px;font-size:.78em;font-weight:700;cursor:pointer">✏️ Add manually</button>' +
+      '</div>' +
       '</div>' +
       '<div style="font-size:.7em;color:var(--muted);margin-bottom:10px">依機型分組，共 ' + _pl.aircraft.length + ' 架；點任一筆查看用過這架的所有航班。<br>Grouped by type — tap a tail to see every flight on it.</div>' +
       rows +
@@ -4250,6 +4398,7 @@ function _plRenderCrewList() {
   var term = (_plCrewSearchTerm || '');
   c.innerHTML =
     '<div style="padding:10px 14px">' +
+      '<div class="pl-stickhead">' +
       '<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap">' +
         '<button onclick="_plRenderMain()" style="background:transparent;border:0;color:var(--text);font-size:1.2em;cursor:pointer">←</button>' +
         '<div style="font-size:1em;font-weight:700">👥 Crew</div>' +
@@ -4257,6 +4406,7 @@ function _plRenderCrewList() {
         // V1.3.32：匯出通訊錄 CSV
         '<button onclick="_plExportCrewCsv()" style="background:transparent;color:var(--muted);border:1px solid var(--border,#334155);border-radius:6px;padding:5px 9px;font-size:.72em;cursor:pointer">⬇️ Export</button>' +
         '<div style="font-size:.7em;color:var(--muted)">共 ' + _pl.crew.length + ' 人</div>' +
+      '</div>' +
       '</div>' +
       _plCrewLabelsEditor() +
       '<input id="pl-crew-search" type="search" placeholder="搜尋名字 / ID..." value="' + _plEsc(term) + '" ' +
@@ -5139,8 +5289,10 @@ function _plRenderAnalyzeContent() {
       '@media(max-width:760px){.pl-an-wrap{flex-direction:column}.pl-an-left{flex:none}}' +
     '</style>' +
     '<div style="padding:10px 14px">' +
+      '<div class="pl-stickhead">' +
       '<div style="margin-bottom:12px">' +
         '<div style="font-size:1em;font-weight:700">📊 Analyze</div>' +
+      '</div>' +
       '</div>' +
       '<div class="pl-an-wrap">' +
         '<div class="pl-an-left">' + leftHtml + '</div>' +
@@ -5276,10 +5428,20 @@ async function _plRenderMapTab() {
   if (!_pl.user) { _plRenderLogin(); return; }
   _plShowTabBar(true);
   _plHighlightTab('map');
-  c.innerHTML = '<div style="text-align:center;color:var(--muted);padding:40px;font-size:.85em">Loading map…</div>';
-  await _plFetchAircraftEntries();
-  if (!_pl.user) { _plRenderLogin(); return; }   // fetch 中 session 失效 → 回登入
-  _plRenderMapTabContent();
+  // V2.2.08：快取優先 —— 手機裡有資料就立刻畫（飛航/慢網秒開、不乾等），背景再 refresh。
+  // 只有「從沒載過、沒任何快取」時才顯示 Loading 並等網路。
+  if (_pl.aircraftEntries && _pl.aircraftEntries.length) {
+    _plRenderMapTabContent();
+    _plFetchAircraftEntries().then(function () {
+      if (!_pl.user) { _plRenderLogin(); return; }   // codex P1：背景 fetch 期間 token 失效 → 回登入，別重畫快取私資料
+      if (_pl.tab === 'map' && !_pl.editing) _plRenderMapTabContent();
+    });
+  } else {
+    c.innerHTML = '<div style="text-align:center;color:var(--muted);padding:40px;font-size:.85em">Loading map…</div>';
+    await _plFetchAircraftEntries();
+    if (!_pl.user) { _plRenderLogin(); return; }   // fetch 中 session 失效 → 回登入
+    _plRenderMapTabContent();
+  }
 }
 
 // Map 分頁內容：全版沉浸式地圖 + 浮層控制（仿 ATP2）。
@@ -5350,6 +5512,7 @@ function _plRenderMapTabContent() {
       '</div>' +
       overlay +
     '</div>';
+  _plApplyOfflineMapShift();   // V2.2.08：剛建好 pl-map-full，若目前離線就立刻下移讓開橫幅
   // codex P2：每次 render 都先 bump 序號（含「空區間」這條提早 return 的路徑），讓任何更新的 render
   // 立刻讓先前還在飛的 _plLoadAirports().then 失效 —— 否則切到空區間時，舊的非空結果會蓋回來。
   var seq = (_pl.mapRenderSeq = (_pl.mapRenderSeq || 0) + 1);
@@ -5701,10 +5864,19 @@ async function _plRenderReport() {
   if (!_pl.user) { _plRenderLogin(); return; }
   _plShowTabBar(true);
   _plHighlightTab('report');
-  c.innerHTML = '<div style="text-align:center;color:var(--muted);padding:40px;font-size:.85em">Loading report…</div>';
-  await _plFetchAircraftEntries();
-  if (!_pl.user) { _plRenderLogin(); return; }   // fetch 中 session 失效 → 回登入（codex fast P1）
-  _plRenderReportContent();
+  // V2.2.08：快取優先（同 Map）—— 有快取就立刻畫、背景 refresh；只有完全沒快取才 Loading 等網路。
+  if (_pl.aircraftEntries && _pl.aircraftEntries.length) {
+    _plRenderReportContent();
+    _plFetchAircraftEntries().then(function () {
+      if (!_pl.user) { _plRenderLogin(); return; }   // codex P1：背景 fetch 期間 token 失效 → 回登入
+      if (_pl.tab === 'report' && !_pl.editing) _plRenderReportContent();
+    });
+  } else {
+    c.innerHTML = '<div style="text-align:center;color:var(--muted);padding:40px;font-size:.85em">Loading report…</div>';
+    await _plFetchAircraftEntries();
+    if (!_pl.user) { _plRenderLogin(); return; }   // fetch 中 session 失效 → 回登入（codex fast P1）
+    _plRenderReportContent();
+  }
 }
 
 // 取目前區間（預設今年初 → 今天）
@@ -5831,8 +6003,10 @@ function _plRenderReportContent() {
 
   c.innerHTML =
     '<div style="padding:10px 14px">' +
+      '<div class="pl-stickhead">' +
       '<div style="margin-bottom:10px">' +
         '<div style="font-size:1em;font-weight:700">📄 Report</div>' +
+      '</div>' +
       '</div>' +
       recencyHtml +
       '<hr style="border:none;border-top:1px solid var(--border);margin:6px 0">' +
@@ -5981,10 +6155,15 @@ async function pilotLogInit() {
 // V1.3：同步觸發點 — 一回連 / 切回前景就自動補送 outbox（只註冊一次）
 function _plRegisterSyncTriggers() {
   try {
-    window.addEventListener('online', function() { _plSetOffline(false); _plSync(); });
+    window.addEventListener('online', function() { _plReconnected(); });
     window.addEventListener('offline', function() { _plSetOffline(true); _plRenderSyncStatus(); });
     document.addEventListener('visibilitychange', function() {
-      if (document.visibilityState === 'visible' && _plOnline() && _pl.outbox.length) _plSync();
+      if (document.visibilityState !== 'visible') return;
+      // V2.2.08：回前景時若還標離線，主動探一次（iOS online 事件常不觸發）→ 通了就清橫幅 + 重抓
+      if (document.body.classList.contains('pl-offline')) {
+        _plApi('/api/pilot-log/me').then(function(res){ if (res && res.ok) _plReconnected(); }).catch(function(){});
+      }
+      if (_plOnline() && _pl.outbox.length) _plSync();
     });
   } catch (e) {}
 }

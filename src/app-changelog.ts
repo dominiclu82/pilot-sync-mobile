@@ -5,9 +5,21 @@
 // 版號全部保留可追溯；冗長的工程細節不進使用者介面（git commit 有完整紀錄）。
 // 新增版次：在陣列「最上面」加一條即可，兩個分頁自動同步。
 
+// 社群連結（單一來源；三個 app 共用同一顆）。只顯示文字、網址藏在連結裡，點了直接開 LINE。
+export const COMMUNITY_URL = 'https://line.me/ti/g2/ArAw4k1D9vXEAMtBsButFLzSFjXzEvFXfKHQ2A';
+export function renderCommunityLink(): string {
+  return '<a href="' + COMMUNITY_URL + '" target="_blank" rel="noopener noreferrer" '
+    + 'style="display:block;text-align:center;margin:0 0 12px;padding:10px 12px;background:#06C755;'
+    + 'color:#fff;font-weight:700;font-size:.9em;border-radius:8px;text-decoration:none;letter-spacing:.3px">'
+    + '💬 加入社群 · Money 回報區</a>';
+}
+
 export interface ChangelogEntry { v: string; zh: string; en: string; }
 
 export const APP_CHANGELOG: ChangelogEntry[] = [
+  { v: 'V2.0.08',
+    zh: '[全域] 關於頁最上方加入社群連結（Money 回報區），點一下直接到 LINE。',
+    en: '[Global] Added a community link at the top of About (Money 回報區) — tap to open LINE.' },
   { v: 'V2.0.07',
     zh: '[投資] 編輯賣出交易也防超賣；台股／美股快照先換成台幣再合計（修正混幣）。',
     en: '[Portfolio] Editing a sell now blocks overselling; daily snapshots convert US→TWD before totaling (mixed-currency fix).' },
@@ -31,9 +43,9 @@ export const APP_CHANGELOG: ChangelogEntry[] = [
     en: '[Global] Earlier: Today (weather/stocks/FX/news panel) and Portfolio (ledger/avg-cost/holdings views/PIN) were each built out.' },
 ];
 
-/** 產生 About modal 用的更新日誌 HTML。最新一條正常色、其餘灰色；只用 inline style + --border/--muted（兩分頁都有）。 */
+/** 產生 About modal 用的更新日誌 HTML。最頂端帶社群連結，其下每版一行（最新色、其餘灰）。 */
 export function renderAppChangelog(): string {
-  return APP_CHANGELOG.map((e: ChangelogEntry, i: number): string => {
+  return renderCommunityLink() + APP_CHANGELOG.map((e: ChangelogEntry, i: number): string => {
     const head = i === 0
       ? 'font-weight:700;margin-bottom:4px'
       : 'font-weight:700;margin-bottom:4px;color:var(--muted)';

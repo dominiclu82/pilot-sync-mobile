@@ -45,6 +45,7 @@ import { importWader } from './import-wader.js';
 import { importLogatp } from './import-logatp.js';
 import { importLogtenAddressBook } from './import-addressbook.js';
 import { importLogtenAircraftTypes } from './import-aircraft-types.js';
+import { renderCommunityLink } from '../app-changelog.js';
 import { importRoster } from './import-roster.js';
 import { getTotals, getRollingTotals, getByAircraftType, getOpeningBalance, getSimTotals } from './stats.js';
 import { loadCredentials } from '../config.js';
@@ -53,8 +54,8 @@ import { getAirportDbJs } from '../spa/js-airport-db.js';
 
 // ── 版本（比照 CrewSync / Morning：每次推版必更新；SW cache 名稱跟著走） ────
 // 本機 preview build 會暫時加 -tNN 後綴方便對版；推正式版前拿掉只留乾淨版號。
-export const PILOT_LOG_VERSION = 'V2.2.07';
-const PILOT_LOG_CACHE = 'pilotlog-v2-2-07';
+export const PILOT_LOG_VERSION = 'V2.2.08';
+const PILOT_LOG_CACHE = 'pilotlog-v2-2-08';
 
 export const pilotLogRouter = express.Router();
 
@@ -103,7 +104,7 @@ export function _renderPilotLogHtml(): string {
   --shadow: 0 -1px 0 var(--border);
 }
 * { box-sizing: border-box; }
-html { font-size: 15px; }
+html { font-size: 15px; overscroll-behavior: none; }   /* V2.2.08：關掉視窗回彈（所有分頁）；body 也有，雙保險 */
 body {
   margin: 0; padding: 0;
   background: var(--bg); color: var(--text);
@@ -179,7 +180,7 @@ body {
     flex: 1.25 1 0;
     position: sticky; top: 8px;
     max-height: calc(100dvh - 84px - env(safe-area-inset-bottom));
-    overflow-y: auto; -webkit-overflow-scrolling: touch;
+    overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: none;
     background: var(--card); border-radius: 12px;
     border: 1px solid var(--border);
   }
@@ -244,9 +245,12 @@ body {
 }
 .pl-offline-bar.show { display: block; }
 body.pl-offline { padding-top: calc(env(safe-area-inset-top) + 28px); }
-/* 沉浸式地圖是 position:fixed;top:0，不吃 body padding → 離線時 OFFLINE 橫幅會蓋住地圖右上的
-   Save／日期等浮動控制項。離線時把整個地圖容器下移一個橫幅高度，控制項就全部讓開。 */
-body.pl-offline #pl-map-full { top: calc(env(safe-area-inset-top) + 28px); }
+/* V2.2.08：各分頁頂部固定（option B）。包住每頁標題列；負 margin 把背景拉到該頁外層 padding(10px 14px)
+   的邊緣，sticky 時整條背景滿版、不透出底下捲動的內容。各頁外層 padding 一致為 10px 14px。 */
+.pl-stickhead { position: sticky; top: 0; z-index: 40; background: var(--bg);
+                margin: -10px -14px 8px; padding: 10px 14px 8px; }
+/* 沉浸式地圖 #pl-map-full 是 inline style top:0（外部 CSS 蓋不過 inline）→ 離線時由 JS
+   _plApplyOfflineMapShift() 直接設 inline top，依實際 OFFLINE 橫幅高度把地圖+控制項一起下移讓開。 */
 </style>
 <script>
 /* 早期套用主題 + 字級，避免 FOUC（在 content render 前先讀 localStorage） */
@@ -343,10 +347,16 @@ if (document.readyState !== 'loading') pilotLogInit();
 // 規則同 CrewSync / Morning：每次推版必更新內容，舊版不刪。
 function _renderPilotLogChangelog(): string {
   return `
+    ${renderCommunityLink()}
     <div class="pl-cl-v">${PILOT_LOG_VERSION}</div>
     <div class="pl-cl-txt">
-      <b>🐛 修大 bug：記錄本現在會載入「全部」航班</b>（原本只載最近 200 筆，飛行多的人看不到舊航班；總時數一直是對的）。另外離線提示橫幅不再擋住地圖右上的按鈕。<br>
-      <b>🐛 Big fix: the logbook now loads ALL flights</b> (it used to load only the latest 200, hiding older flights for high-time pilots; total hours were always correct). Also, the offline banner no longer covers the map’s top-right buttons.
+      <b>🧭 記錄本更好用 ＋ 離線更穩。</b><b>(1)</b> 右側新增<b>年份索引</b>（可點、可滑，滑動時中央放大泡泡顯示年份），長記錄本一秒跳到任一年。<b>(2)</b> 各分頁<b>上方固定</b>、關掉<b>視窗回彈</b>。<b>(3)</b> 離線更穩：地圖<b>快取秒開</b>、橫幅<b>不再擋按鈕</b>、連回線<b>橫幅自動消失</b>。<b>(4)</b> 關於頁加<b>社群連結</b>。<br>
+      <b>🧭 Handier logbook + sturdier offline.</b> (1) New <b>year index</b> on the right (tap or slide, with a zoomed bubble) jumps to any year instantly. (2) Page tops now <b>stay fixed</b>; window <b>bounce removed</b>. (3) Offline: map <b>opens instantly from cache</b>, the banner <b>no longer covers buttons</b>, and it <b>clears itself</b> once you reconnect. (4) <b>Community link</b> added to About.
+    </div>
+    <div class="pl-cl-v old">V2.2.07</div>
+    <div class="pl-cl-txt">
+      <b>🐛 修大 bug：記錄本現在會載入「全部」航班</b>（原本只載最近 200 筆，飛行多的人看不到舊航班；總時數一直是對的）。<br>
+      <b>🐛 Big fix: the logbook now loads ALL flights</b> (it used to load only the latest 200, hiding older flights for high-time pilots; total hours were always correct).
     </div>
     <div class="pl-cl-v old">V2.2.06</div>
     <div class="pl-cl-txt">
