@@ -1505,7 +1505,7 @@ export function getSpaHtmlBody(): string {
       <button class="tab-util-btn tab-install-btn" id="tab-install-btn" onclick="showInstallGuide()" style="display:none">
         <span>📲</span>安裝
       </button>
-      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer;text-decoration:underline" onclick="showAbout()">V8.0.54</span>
+      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer;text-decoration:underline" onclick="showAbout()">V8.0.55</span>
     </div>
   </div>
 </div>
@@ -1539,7 +1539,12 @@ export function getSpaHtmlBody(): string {
     </div>
     <div style="max-height:50vh;overflow-y:auto;-webkit-overflow-scrolling:touch;margin-bottom:10px">
     ${renderCommunityLink()}
-    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V8.0.54</div>
+    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V8.0.55</div>
+    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
+      <div>🛰️ <b>衛星圖快取「這次真的」修好。</b>上一版把快取改成「只存成功回應」，但衛星圖磚是跨網域的不透明回應、判斷不出成功 → 反而每次打開機場都重新下載、先空白再載。這版改成跟 Pilot Log 一樣的寫法（不透明圖磚也存、命中就秒出），重複打開同一機場不再重抓。</div>
+      <div>🛰️ <b>Satellite-map cache actually fixed now.</b> The previous version cached only “successful” responses, but cross-origin map tiles are opaque and can’t be judged successful — so every airport reopen re-downloaded the map (blank, then reload). This matches Pilot Log’s caching (opaque tiles are cached too), so reopening the same airport is instant.</div>
+    </div>
+    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V8.0.54</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
       <div>📻 <b>ATIS 修復 ＋ 天氣載入加速 ＋ RCTP 衛星圖修。</b>ATIS 改成「你的瀏覽器經 allorigins 代理抓」（atis.guru 擋我們伺服器 IP，server 端抓不到）；天氣詳情改成 METAR/TAF/跑道圖先秒出、ATIS 背景補上，不再整頁卡等；修「衛星圖快取把失敗回應也存住」害 RCTP 圖出不來（改成只存成功的、壞的自動重抓）；Tools 入口文字改清楚（入口本身也能加到主畫面）。</div>
       <div>📻 <b>ATIS fixed + faster weather load + RCTP map fix.</b> ATIS is now fetched from your browser via the allorigins proxy (atis.guru blocks our server IP); weather details now show METAR/TAF/runway map instantly with ATIS loading in the background; fixed the satellite-map cache storing failed responses (which broke the RCTP map — now only successes are cached and bad ones re-fetched); clarified the Tools hub text.</div>

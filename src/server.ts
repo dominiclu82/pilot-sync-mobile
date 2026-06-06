@@ -675,10 +675,16 @@ self.addEventListener('fetch', e => {
   if (u.pathname.startsWith('/api/')) return;
   // ATIS 走瀏覽器端代理(allorigins)抓 atis.guru：時效性資料 + 跨域 GET，不可快取（否則 SW 會存成舊的、且 cache 一直長）→ 直接走網路。
   if (u.hostname === 'api.allorigins.win' || u.hostname === 'atis.guru') return;
-  // 衛星圖（Esri）→ 永久快取 plapt-maps（cache-first）：跟 Pilot Log 用同一個 cache + 同網址，
-  // 直接命中已預抓的 37 星宇機場底圖；CrewSync 看過的其他機場也順手存起來，下次/離線秒出。activate 不清這個 cache。
+  // 衛星圖（Esri）→ 永久快取 plapt-maps（stale-while-revalidate）：跟 Pilot Log 用同一個 cache + 同網址。
+  // 有快取「先秒出」（看不到空白、離線也行），同時背景重抓更新 → 萬一舊版存進壞圖磚（opaque 分不出好壞），
+  // 下次背景重抓會蓋掉自我痊癒（codex P1：activate 保留 plapt-maps，純 cache-first 會讓壞快取永遠卡住）。
+  // 圖磚有 HTTP 快取標頭，背景重抓多半走瀏覽器 HTTP 快取、不真的吃網路；離線時 fetch 失敗就退回 hit。
   if (u.hostname === 'server.arcgisonline.com') {
-    e.respondWith(caches.open('plapt-maps').then(c => c.match(e.request).then(hit => (hit && hit.ok) ? hit : fetch(e.request).then(r => { if (r.ok) c.put(e.request, r.clone()); return r; }).catch(() => hit || Response.error()))));
+    e.respondWith(caches.open('plapt-maps').then(c => c.match(e.request).then(hit => {
+      const net = fetch(e.request).then(r => { if (r && (r.ok || r.type === 'opaque')) c.put(e.request, r.clone()).catch(()=>{}); return r; }).catch(() => hit);
+      if (hit) e.waitUntil(net);  // 命中先回 hit，但用 waitUntil 撐住背景重抓+寫快取，否則 SW 可能被提前關掉、痊癒失效（codex P2）
+      return hit || net;
+    })));
     return;
   }
   e.respondWith(

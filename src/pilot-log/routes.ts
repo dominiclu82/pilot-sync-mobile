@@ -54,8 +54,8 @@ import { getAirportDbJs } from '../spa/js-airport-db.js';
 
 // ── 版本（比照 CrewSync / Morning：每次推版必更新；SW cache 名稱跟著走） ────
 // 本機 preview build 會暫時加 -tNN 後綴方便對版；推正式版前拿掉只留乾淨版號。
-export const PILOT_LOG_VERSION = 'V2.2.17';
-const PILOT_LOG_CACHE = 'pilotlog-v2-2-17';
+export const PILOT_LOG_VERSION = 'V2.2.18';
+const PILOT_LOG_CACHE = 'pilotlog-v2-2-18';
 
 export const pilotLogRouter = express.Router();
 
@@ -361,8 +361,13 @@ function _renderPilotLogChangelog(): string {
     ${renderCommunityLink()}
     <div class="pl-cl-v">${PILOT_LOG_VERSION}</div>
     <div class="pl-cl-txt">
-      <b>🩹 Analyze iPad 左右捲動修好（改照 Logbook）。</b>iPad 上 Analyze 改成跟 Logbook 一模一樣——只「右欄」做獨立捲動盒、左欄隨頁捲、群組標題在 iPad 不黏也不蓋住內容；手機維持原本整頁一起捲、完全不動。<br>
-      <b>🩹 Analyze scroll fixed on iPad (now matches Logbook).</b> On iPad, Analyze now works exactly like the Logbook detail — only the right column is an independent scroll box, the left scrolls with the page, and the group header no longer sticks or overlaps content; phone keeps its original single-page scroll, untouched.
+      <b>🩹 Analyze iPad 左右捲動「這次真的」修好。</b>上一版的修正改錯地方沒接上、群組標題（All Flight Time…）在 iPad 仍黏著蓋住內容；這版把標題接上正確樣式，iPad 才真的變成只「右欄」獨立捲動、標題不再蓋住；手機維持原樣不動。<br>
+      <b>🩹 Analyze iPad scroll actually fixed now.</b> The previous fix didn’t take effect — the group header still stuck and overlapped content on iPad. This version wires the header to the right style so iPad finally gets an independent right-column scroll with no overlap; phone untouched.
+    </div>
+    <div class="pl-cl-v old">V2.2.17</div>
+    <div class="pl-cl-txt">
+      <b>🩹 Analyze iPad 捲動修正（未生效，見 V2.2.18）＋ ATIS 改瀏覽器端抓。</b><br>
+      <b>🩹 Analyze iPad scroll fix (didn’t take effect, see V2.2.18) + ATIS moved to browser-side fetch.</b>
     </div>
     <div class="pl-cl-v old">V2.2.14</div>
     <div class="pl-cl-txt">

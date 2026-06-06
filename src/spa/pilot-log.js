@@ -5332,8 +5332,10 @@ function _plRenderAnalyzeContent() {
   var selSum = _plAnGroupSum(sel);
   var dim = (sel.section === 'type') ? 'company' : 'type';
   var rightHtml =
-    // #2-analyze：群組標題（All Flight Time 等）固定在頁面 sticky 標題下方，捲動明細時不被推走/蓋掉。
-    '<div style="position:sticky;top:calc(var(--pl-head-h, 0px));z-index:30;background:var(--bg);display:flex;justify-content:space-between;align-items:baseline;padding:4px 0 8px">' +
+    // #2-analyze：群組標題（All Flight Time 等）。手機(<768)靠 .pl-an-ghead 的 base sticky 固定；
+    //   iPad(≥768) 由 media query 改成 static（右欄自己是捲動盒，標題不再 sticky，否則行內 sticky 會蓋住內容）。
+    //   ⚠ 一定要用 class，不可寫行內 style position:sticky —— 行內優先權會壓過 media query 的 static 改寫（2026-06-06 踩過：iPad 標題一直蓋住內容修不好就是這個）。
+    '<div class="pl-an-ghead">' +
       '<div style="font-size:1.05em;font-weight:800">' + _plEsc(sel.label) + '</div>' +
       '<div style="font-size:.7em;color:var(--muted)">' + selSum.flights + ' flights</div>' +
     '</div>' +
