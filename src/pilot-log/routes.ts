@@ -54,8 +54,8 @@ import { getAirportDbJs } from '../spa/js-airport-db.js';
 
 // ── 版本（比照 CrewSync / Morning：每次推版必更新；SW cache 名稱跟著走） ────
 // 本機 preview build 會暫時加 -tNN 後綴方便對版；推正式版前拿掉只留乾淨版號。
-export const PILOT_LOG_VERSION = 'V2.2.08';
-const PILOT_LOG_CACHE = 'pilotlog-v2-2-08';
+export const PILOT_LOG_VERSION = 'V2.2.09';
+const PILOT_LOG_CACHE = 'pilotlog-v2-2-09';
 
 export const pilotLogRouter = express.Router();
 
@@ -178,8 +178,10 @@ body {
   .pl-list-pane { flex: 1 1 0; }
   .pl-detail-pane {
     flex: 1.25 1 0;
-    position: sticky; top: 8px;
-    max-height: calc(100dvh - 84px - env(safe-area-inset-bottom));
+    /* #7：列表頂部現在 sticky，編輯器要黏在「標題高度之下」才不會被蓋住、捲不到最上面 */
+    position: sticky; top: calc(var(--pl-head-h, 0px) + 8px);
+    /* 往下移了 --pl-head-h，max-height 也要扣掉同量，否則底部超出視窗被切掉（codex P2） */
+    max-height: calc(100dvh - 84px - var(--pl-head-h, 0px) - env(safe-area-inset-bottom));
     overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: none;
     background: var(--card); border-radius: 12px;
     border: 1px solid var(--border);
@@ -349,6 +351,11 @@ function _renderPilotLogChangelog(): string {
   return `
     ${renderCommunityLink()}
     <div class="pl-cl-v">${PILOT_LOG_VERSION}</div>
+    <div class="pl-cl-txt">
+      <b>🩹 修 V2.2.08 的版面回歸 ＋ 🗺️ 地圖標籤改用機場代碼。</b><b>(1)</b> 年份索引不再壓到航班、也不再漏到 Aircraft／Crew／Airports（只在記錄本航班列顯示）。<b>(2)</b> Crew 搜尋框、Airports 頂部也一起固定。<b>(3)</b> Analyze 群組標題捲動時保持可見。<b>(4)</b> iPad 編輯器可捲到最上面。<b>(5)</b> 地圖機場標籤改用<b>機場代碼</b>（RCTP／TPE，跟 IATA/ICAO 切換連動），不再用飛行員看不習慣的城市/區名。<br>
+      <b>🩹 Fixes for V2.2.08 layout regressions + 🗺️ airport-code map labels.</b> (1) The year index no longer overlaps flights or leaks onto Aircraft/Crew/Airports (logbook list only). (2) Crew search and the Airports top now stay fixed too. (3) The Analyze group title stays visible while scrolling. (4) The iPad editor can scroll to the very top again. (5) Map labels now show the <b>airport code</b> (RCTP/TPE, follows the IATA/ICAO toggle) instead of city/district names.
+    </div>
+    <div class="pl-cl-v old">V2.2.08</div>
     <div class="pl-cl-txt">
       <b>🧭 記錄本更好用 ＋ 離線更穩。</b><b>(1)</b> 右側新增<b>年份索引</b>（可點、可滑，滑動時中央放大泡泡顯示年份），長記錄本一秒跳到任一年。<b>(2)</b> 各分頁<b>上方固定</b>、關掉<b>視窗回彈</b>。<b>(3)</b> 離線更穩：地圖<b>快取秒開</b>、橫幅<b>不再擋按鈕</b>、連回線<b>橫幅自動消失</b>。<b>(4)</b> 關於頁加<b>社群連結</b>。<br>
       <b>🧭 Handier logbook + sturdier offline.</b> (1) New <b>year index</b> on the right (tap or slide, with a zoomed bubble) jumps to any year instantly. (2) Page tops now <b>stay fixed</b>; window <b>bounce removed</b>. (3) Offline: map <b>opens instantly from cache</b>, the banner <b>no longer covers buttons</b>, and it <b>clears itself</b> once you reconnect. (4) <b>Community link</b> added to About.

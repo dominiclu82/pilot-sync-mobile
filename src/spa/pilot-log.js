@@ -1033,25 +1033,43 @@ function _plYearIndexEl() {
   el.addEventListener('pointerup', end);
   el.addEventListener('pointercancel', end);
   document.body.appendChild(el);
-  // 視窗尺寸/轉向變化 → 重新定位（只在 logbook 時）
+  // 視窗尺寸/轉向變化 → 重新定位 + 量 sticky 標題高
   try {
-    window.addEventListener('resize', function () { if (_pl.tab === 'logbook') _plRenderYearIndex(); });
-    window.addEventListener('orientationchange', function () { setTimeout(function () { if (_pl.tab === 'logbook') _plRenderYearIndex(); }, 250); });
+    window.addEventListener('resize', function () { _plUpdateHeadHeight(); if (_pl.tab === 'logbook') _plRenderYearIndex(); });
+    window.addEventListener('orientationchange', function () { setTimeout(function () { _plUpdateHeadHeight(); if (_pl.tab === 'logbook') _plRenderYearIndex(); }, 250); });
+  } catch (_e) {}
+  // #2：盯著內容區 —— 任何頁面切換/子頁（Aircraft/Crew/Airports/編輯器…）替換 #pilotlog-content 內容時
+  // 都重判一次：①收起漏到別頁的年份索引 ②更新 sticky 標題高度 --pl-head-h（給編輯器下移/Analyze 標題固定用）。
+  try {
+    var content = document.getElementById('pilotlog-content');
+    if (content && window.MutationObserver) {
+      new MutationObserver(function () { _plRenderYearIndex(); _plUpdateHeadHeight(); }).observe(content, { childList: true });
+    }
   } catch (_e) {}
   return el;
 }
+// 量目前頁面 sticky 標題（.pl-topstack / .pl-stickhead）實際高度 → 寫進 --pl-head-h。
+// 給 #7（iPad 編輯器 detail-pane 黏貼位置往下移過標題）與 #2（Analyze 群組標題固定在標題下）共用。
+function _plUpdateHeadHeight() {
+  try {
+    var h = document.querySelector('#pilotlog-content .pl-topstack, #pilotlog-content .pl-stickhead');
+    var px = h ? Math.round(h.getBoundingClientRect().height) : 0;
+    document.documentElement.style.setProperty('--pl-head-h', px + 'px');
+  } catch (e) {}
+}
 function _plRenderYearIndex() {
+  _plUpdateHeadHeight();   // logbook 渲染時順手更新 --pl-head-h（給 iPad 編輯器下移用）
   var el = _plYearIndexEl();
   var list = document.getElementById('pl-list');
-  // 只在 logbook 列表畫面顯示（切到別頁 / 編輯中 / #pl-list 不在 → 收起來）。codex P2：含編輯器與其他分頁。
-  if (_pl.tab !== 'logbook' || !list || _pl.editing) { el.style.display = 'none'; _plYearBubble(null); return; }
+  // 只在 logbook 航班清單顯示（切到別頁 / 編輯中 / #pl-list 不在 → 收起來，並還原 list 右邊 gutter）。
+  if (_pl.tab !== 'logbook' || !list || _pl.editing) { el.style.display = 'none'; _plYearBubble(null); if (list) list.style.paddingRight = ''; return; }
   var rows = list.querySelectorAll('[data-yr]');
   var yrs = [], seen = {};
   for (var i = 0; i < rows.length; i++) {
     var y = rows[i].getAttribute('data-yr');
     if (y && !seen[y]) { seen[y] = 1; yrs.push(y); }
   }
-  if (yrs.length < 2) { el.style.display = 'none'; return; }   // 只有一年 → 沒必要
+  if (yrs.length < 2) { el.style.display = 'none'; list.style.paddingRight = ''; return; }   // 只有一年 → 沒必要
   el._yrs = yrs;
   el.innerHTML = yrs.map(function (y) {
     return '<span style="font-size:.6em;font-weight:700;color:var(--muted);line-height:1.05;padding:1px 0;pointer-events:none;font-variant-numeric:tabular-nums">’' + y.slice(2) + '</span>';
@@ -1063,6 +1081,8 @@ function _plRenderYearIndex() {
   el.style.right = rightInset + 'px';
   el.style.height = Math.max(120, Math.min(window.innerHeight - 200, yrs.length * 26)) + 'px';
   el.style.display = 'flex';
+  // #1：讓出右邊 gutter，索引不壓到班號/組員（量索引實際寬 + 緩衝）
+  list.style.paddingRight = (el.offsetWidth + 6) + 'px';
 }
 
 async function _plSetFilter(f) {
@@ -3689,8 +3709,10 @@ function _plRenderPlaces() {
     : '你飛過的機場，依航班數排序。點任一筆看進出航班。');
 
   if (!wide) {
-    c.innerHTML = '<div style="padding:10px 14px">' + header +
-      '<div style="font-size:.68em;color:var(--muted);margin-bottom:10px">' + hint + '</div>' +
+    c.innerHTML = '<div style="padding:10px 14px">' +
+      '<div class="pl-stickhead">' + header +   // #5：窄螢幕整頁捲 → 頂部（標題+篩選+說明）固定
+        '<div style="font-size:.68em;color:var(--muted)">' + hint + '</div>' +
+      '</div>' +
       _plAptListHtml(list, null) + '</div>';
     return;
   }
@@ -4407,11 +4429,11 @@ function _plRenderCrewList() {
         '<button onclick="_plExportCrewCsv()" style="background:transparent;color:var(--muted);border:1px solid var(--border,#334155);border-radius:6px;padding:5px 9px;font-size:.72em;cursor:pointer">⬇️ Export</button>' +
         '<div style="font-size:.7em;color:var(--muted)">共 ' + _pl.crew.length + ' 人</div>' +
       '</div>' +
-      '</div>' +
       _plCrewLabelsEditor() +
       '<input id="pl-crew-search" type="search" placeholder="搜尋名字 / ID..." value="' + _plEsc(term) + '" ' +
         'oninput="_plCrewSearchInput(this.value)" ' +
-        'style="width:100%;background:var(--bg,#0a0e1a);color:var(--text);border:1px solid var(--border,#334155);border-radius:6px;padding:8px 10px;font-size:.85em;margin-bottom:10px;box-sizing:border-box">' +
+        'style="width:100%;background:var(--bg,#0a0e1a);color:var(--text);border:1px solid var(--border,#334155);border-radius:6px;padding:8px 10px;font-size:.85em;margin-bottom:0;box-sizing:border-box">' +
+      '</div>' +   // #4：sticky 收尾移到搜尋框之後 → 標題+欄位名稱+搜尋一起固定
       ambNotice +
       '<div style="font-size:.65em;color:var(--muted);margin-bottom:8px">flight count 用完整資料計算（不受 Logbook 篩選影響）。點任一筆查看一起飛過的航班。<br>Flight counts use all data (ignores the Logbook filter). Tap anyone to see flights flown together.</div>' +
       '<div id="pl-crew-rows"></div>' +
@@ -5273,7 +5295,8 @@ function _plRenderAnalyzeContent() {
   var selSum = _plAnGroupSum(sel);
   var dim = (sel.section === 'type') ? 'company' : 'type';
   var rightHtml =
-    '<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:10px">' +
+    // #2-analyze：群組標題（All Flight Time 等）固定在頁面 sticky 標題下方，捲動明細時不被推走/蓋掉。
+    '<div style="position:sticky;top:calc(var(--pl-head-h, 0px));z-index:30;background:var(--bg);display:flex;justify-content:space-between;align-items:baseline;padding:4px 0 8px">' +
       '<div style="font-size:1.05em;font-weight:800">' + _plEsc(sel.label) + '</div>' +
       '<div style="font-size:.7em;color:var(--muted)">' + selSum.flights + ' flights</div>' +
     '</div>' +
@@ -5686,8 +5709,8 @@ function _plInitFlownMap(geo) {
         .addTo(map)
         .bindPopup('<b>' + _plEsc(a.iata || a.code) + '</b> <span style="opacity:.6">' + _plEsc(a.icao || '') + '</span><br>' +
           _plEsc(a.city || a.name || '') + '<br>' + a.visits + ' 次 · visits');
-      // 地名標籤：常駐 tooltip，但用 CSS 在 zoom 夠近才顯示（遠看不顯示，避免一堆文字漂浮）。
-      mk.bindTooltip(_plEsc(a.city || a.iata || a.code), { permanent: true, direction: 'right', offset: [5, 0], className: 'pl-maplbl' });
+      // 機場標籤：用機場代碼（跟 IATA/ICAO 切換連動），不用城市/區名（飛行員看不習慣）。常駐 tooltip、zoom 夠近才顯示。
+      mk.bindTooltip(_plEsc(_plAptFmt(a.code) || a.code || a.iata), { permanent: true, direction: 'right', offset: [5, 0], className: 'pl-maplbl' });
     });
     if (bounds.length) map.fitBounds(bounds, { padding: [28, 28], maxZoom: 6 });
     // 依 zoom 切換地名顯示：zoom 夠近(>=5)才把標籤顯示出來。
@@ -5833,7 +5856,7 @@ function _plInitGlobe(geo) {
           position: C.Cartesian3.fromDegrees(a.lon, a.lat),
           point: { pixelSize: px, color: C.Color.fromCssColorString('#f43f5e'), outlineColor: C.Color.WHITE, outlineWidth: 1.4 },
           label: {
-            text: a.city || a.iata || a.code,
+            text: _plAptFmt(a.code) || a.code || a.iata,   // 機場代碼（跟 IATA/ICAO 切換連動），不用城市/區名
             font: 'bold 13px -apple-system, "Segoe UI", sans-serif',
             fillColor: C.Color.WHITE, outlineColor: C.Color.BLACK, outlineWidth: 3,
             style: C.LabelStyle.FILL_AND_OUTLINE, pixelOffset: new C.Cartesian2(9, 0),
