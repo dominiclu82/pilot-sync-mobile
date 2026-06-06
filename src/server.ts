@@ -633,9 +633,14 @@ function _atisAllowed(level: 'owner' | 'founder'): boolean {
   const floor = level === 'owner' ? 0 : ATIS_OWNER_RESERVE;
   return _atisRate.remaining > floor;
 }
-// 給 Tower 後台讀「真實 airframes 用量」（直接來自 airframes，不是我們自己數的）
+// 給 Tower 後台讀「真實 airframes 用量」（總數直接來自 airframes 標頭）+「誰觸發的」清單（我們 server 記的）。
+// ⚠ 不主動打 airframes（會扣額度）→ 真實總數要等有人真的用過 ATIS 才有值（_atisRate==null 時 known:false）。
 export function getAtisUsage() {
-  if (!_atisRate) return { known: false, limit: 500, founderCap: 500 - ATIS_OWNER_RESERVE, cachedAirports: _atisCache.size };
+  const today = new Date().toISOString().slice(0, 10);
+  const who = (_atisWho.day === today)
+    ? Array.from(_atisWho.users.entries()).map(([id, v]) => ({ who: id, count: v.count, last: v.last })).sort((a, b) => b.count - a.count)
+    : [];
+  if (!_atisRate) return { known: false, limit: 500, founderCap: 500 - ATIS_OWNER_RESERVE, cachedAirports: _atisCache.size, who };
   return {
     known: true,
     limit: _atisRate.limit,
@@ -644,33 +649,47 @@ export function getAtisUsage() {
     founderCap: _atisRate.limit - ATIS_OWNER_RESERVE,
     resetAt: _atisRate.reset,
     cachedAirports: _atisCache.size,
+    who,
   };
 }
 
-// founder 判定（名單上的人才走 airframes）：驗 Pilot Log token → userId → 查名單。
-// 結果快取 10 分（per userId），避免每次抓 ATIS 都打 DB。
+// founder 判定（名單上的人才走 airframes）：驗 token → userId/email → 查名單，連 email(who) 一起回（記「誰扣額度」用）。
+// 結果快取 10 分，避免每次抓 ATIS 都打 DB。
 type AtisLevel = 'owner' | 'founder' | 'none';
-const _founderCache = new Map<string, { level: AtisLevel; time: number }>();
-async function _levelCached(key: string, compute: () => Promise<AtisLevel>): Promise<AtisLevel> {
+type AtisAuth = { level: AtisLevel; who: string };
+const _founderCache = new Map<string, { auth: AtisAuth; time: number }>();
+async function _authCached(key: string, compute: () => Promise<{ level: AtisLevel; email: string }>): Promise<AtisAuth> {
   const c = _founderCache.get(key);
-  if (c && Date.now() - c.time < 10 * 60 * 1000) return c.level;   // 結果快取 10 分，少打 DB
-  const level = await compute().catch(() => 'none' as const);
-  _founderCache.set(key, { level, time: Date.now() });
-  return level;
+  if (c && Date.now() - c.time < 10 * 60 * 1000) return c.auth;
+  const r = await compute().catch(() => ({ level: 'none' as AtisLevel, email: '' }));
+  const auth: AtisAuth = { level: r.level, who: r.email };
+  _founderCache.set(key, { auth, time: Date.now() });
+  return auth;
 }
-// 兩種登入都認：Pilot Log（pilotlog_at → userId）或 CrewSync 班表同步（email 身份證）。取較高等級。
-async function _atisAuthLevel(plToken: string, csIdt: string): Promise<AtisLevel> {
-  let lvl: AtisLevel = 'none';
+// 兩種登入都認：Pilot Log（pilotlog_at → userId）或 CrewSync 班表同步（email 身份證）。取較高等級、回 who。
+async function _atisAuthLevel(plToken: string, csIdt: string): Promise<AtisAuth> {
+  let res: AtisAuth = { level: 'none', who: '' };
   const payload = plToken ? verifyAccessToken(plToken) : null;
-  if (payload && payload.sub) lvl = await _levelCached('u:' + payload.sub, () => getFounderLevel(payload.sub));
-  if (lvl === 'owner') return 'owner';
+  if (payload && payload.sub) res = await _authCached('u:' + payload.sub, () => getFounderLevel(payload.sub));
+  if (res.level === 'owner') return res;
   const email = csIdt ? verifyEmailToken(csIdt) : null;
   if (email) {
-    const elvl = await _levelCached('e:' + email, () => getFounderLevelByEmail(email));
-    if (elvl === 'owner') return 'owner';
-    if (elvl === 'founder') lvl = 'founder';
+    const e = await _authCached('e:' + email, () => getFounderLevelByEmail(email));
+    if (e.level === 'owner') return e;
+    if (e.level === 'founder') res = e;   // 升級為 founder（連 who）
   }
-  return lvl;
+  return res;
+}
+
+// 「誰觸發了 airframes 呼叫」每日計數（owner 後台看誰在扣額度）。重啟歸零、只算實際打 airframes（快取命中不算）。
+const _atisWho = { day: '', users: new Map<string, { count: number; last: number }>() };
+function _atisRecordWho(who: string, level: AtisLevel) {
+  const d = new Date().toISOString().slice(0, 10);
+  if (_atisWho.day !== d) { _atisWho.day = d; _atisWho.users.clear(); }   // 跨日歸零
+  const id = who || (level === 'owner' ? '(owner)' : '(unknown)');
+  const e = _atisWho.users.get(id) || { count: 0, last: 0 };
+  e.count += 2; e.last = Date.now();      // 一次抓 ARR+DEP = 2 次額度
+  _atisWho.users.set(id, e);
 }
 
 // 查 airframes 某機場的 ARR / DEP D-ATIS（text 片語搜尋，去掉 ACARS 路由前綴）
@@ -719,10 +738,11 @@ app.get('/api/atis', async (req, res) => {
   }
   // 3. 亞洲/其他：穩定的 airframes「只給名單上的人」。owner→自己的 50 池、founder→共用 450 池、none→備案。
   //    註：快取命中已在最前面對所有人開放 → 非 founder 仍吃得到別人剛抓進 60 分快取的 airframes 資料。
-  const level = await _atisAuthLevel(String(req.headers['x-pl-at'] || ''), String(req.headers['x-cs-idt'] || ''));
-  if (level === 'none') return res.json({ fallback: true });
+  const auth = await _atisAuthLevel(String(req.headers['x-pl-at'] || ''), String(req.headers['x-cs-idt'] || ''));
+  if (auth.level === 'none') return res.json({ fallback: true });
   // 4. 依 airframes「真實剩餘額度」判斷（owner 用到剩 0、founder 用到剩 50 就停）；key 沒設或額度不足 → 備援。
-  if (!AIRFRAMES_KEY || !_atisAllowed(level)) return res.json({ fallback: true });
+  if (!AIRFRAMES_KEY || !_atisAllowed(auth.level)) return res.json({ fallback: true });
+  _atisRecordWho(auth.who, auth.level);   // 記「誰觸發了這次 airframes 呼叫（扣 2 次額度）」
   // 5. 抓 airframes ARR + DEP（過程用回應標頭更新真實額度，不自己數、不用退還）
   try {
     const [arr, dep] = await Promise.all([

@@ -66,39 +66,42 @@ export async function isLoginAllowed(email: string): Promise<boolean> {
 // ── Founder 等級判斷（CrewSync ATIS：分 owner / founder / none 三級，對應三個額度池）──
 // owner（站長）= 自己獨享 50 次池；founder（active 報名者）= 共用 450 次池；none = 走備案。
 // 輸入 userId（JWT sub）→ 查該用戶所有 email → 比對 owner / active 名單。不受登入 gate 開關影響。
-export async function getFounderLevel(userId: string): Promise<'owner' | 'founder' | 'none'> {
-  if (!userId) return 'none';
+export type FounderResult = { level: 'owner' | 'founder' | 'none'; email: string };
+export async function getFounderLevel(userId: string): Promise<FounderResult> {
+  if (!userId) return { level: 'none', email: '' };
   const pool = getPool();
-  if (!pool || !(await ensureTables())) return 'none';
+  if (!pool || !(await ensureTables())) return { level: 'none', email: '' };
   try {
     const u = await pool.query(`SELECT email FROM pilot_user_emails WHERE user_id = $1`, [userId]);
     const emails = u.rows.map((r: any) => normEmail(r.email)).filter(Boolean);
-    if (!emails.length) return 'none';
-    if (emails.some((e) => isOwnerEmail(e))) return 'owner';   // 站長 → 獨享池
+    if (!emails.length) return { level: 'none', email: '' };
+    const ownerE = emails.find((e) => isOwnerEmail(e));
+    if (ownerE) return { level: 'owner', email: ownerE };          // 站長
     const r = await pool.query(
-      `SELECT 1 FROM pilot_beta_applicants WHERE status = 'active' AND email = ANY($1::text[]) LIMIT 1`,
+      `SELECT email FROM pilot_beta_applicants WHERE status = 'active' AND email = ANY($1::text[]) LIMIT 1`,
       [emails]
     );
-    return r.rows.length > 0 ? 'founder' : 'none';
+    if (r.rows.length > 0) return { level: 'founder', email: normEmail(r.rows[0].email) };
+    return { level: 'none', email: emails[0] };
   } catch {
-    return 'none';
+    return { level: 'none', email: '' };
   }
 }
 
 // 同上，但直接用 email 判斷（CrewSync 班表同步登入：身份證裡就是 email，不必先查 userId）。
-export async function getFounderLevelByEmail(email: string): Promise<'owner' | 'founder' | 'none'> {
+export async function getFounderLevelByEmail(email: string): Promise<FounderResult> {
   const e = normEmail(email);
-  if (!e) return 'none';
-  if (isOwnerEmail(e)) return 'owner';
+  if (!e) return { level: 'none', email: '' };
+  if (isOwnerEmail(e)) return { level: 'owner', email: e };
   const pool = getPool();
-  if (!pool || !(await ensureTables())) return 'none';
+  if (!pool || !(await ensureTables())) return { level: 'none', email: e };
   try {
     const r = await pool.query(
       `SELECT 1 FROM pilot_beta_applicants WHERE status = 'active' AND email = $1 LIMIT 1`, [e]
     );
-    return r.rows.length > 0 ? 'founder' : 'none';
+    return { level: r.rows.length > 0 ? 'founder' : 'none', email: e };
   } catch {
-    return 'none';
+    return { level: 'none', email: e };
   }
 }
 
