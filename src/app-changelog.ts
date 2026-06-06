@@ -17,6 +17,9 @@ export function renderCommunityLink(): string {
 export interface ChangelogEntry { v: string; zh: string; en: string; }
 
 export const APP_CHANGELOG: ChangelogEntry[] = [
+  { v: 'V2.0.09',
+    zh: '[全域] 版號移到右下角設定區（今日／投資兩頁統一）；從 Tools 入口進來時右下多一顆「⊞ 回 Tools」鈕。',
+    en: '[Global] Version moved to the bottom-right settings area (unified across Today/Portfolio); a ⊞ Tools button appears bottom-right when launched from the Tools hub.' },
   { v: 'V2.0.08',
     zh: '[全域] 關於頁最上方加入社群連結（Money 回報區），點一下直接到 LINE。',
     en: '[Global] Added a community link at the top of About (Money 回報區) — tap to open LINE.' },

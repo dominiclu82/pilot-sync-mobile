@@ -35,7 +35,7 @@ body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSy
   cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:1px;padding:0;-webkit-appearance:none}
 .tab-util-btn span{font-size:1.3em;line-height:1}
 .font-size-wrap{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px}
-@media(min-width:500px){.font-size-wrap{flex-direction:row-reverse;gap:20px}}
+/* A+/A- 一律上下直排（三個 app 風格一致），不再因寬螢幕轉橫排 */
 .font-size-btn{font-weight:700;padding:2px 6px;border:1px solid var(--dim)!important;border-radius:4px}
 .font-size-btn-sm{font-size:.7em!important}
 .font-size-btn-lg{font-size:1em!important}

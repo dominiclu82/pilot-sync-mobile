@@ -16,7 +16,7 @@ import { renderAppChangelog } from './app-changelog.js';
 
 // V2.0.0: 統一版號 — 跟 Portfolio 共用 APP_VERSION。MORNING_VERSION alias 保留向後相容
 export const MORNING_VERSION = APP_VERSION;
-const MORNING_CACHE = 'morning-v1-3-13';
+const MORNING_CACHE = 'morning-v2-0-09';
 
 // ─── Postgres ────────────────────────────────────────────────────────
 let _pgPool: pg.Pool | null = null;
@@ -1984,20 +1984,24 @@ body { padding-bottom: calc(64px + env(safe-area-inset-bottom, 0px)); }
     <a href="/portfolio">📈 投資組合</a>
   </div>
   <div class="tab-controls">
+    <a href="/apps" id="cs-apps-home" aria-label="Tools" title="回 Tools" style="display:none;align-items:center;justify-content:center;font-size:1.3em;text-decoration:none;color:var(--muted);padding:0 4px">⊞</a>
     <button class="hdr-btn" id="btn-theme" title="日/夜">☀️</button>
     <div class="hdr-btn-font" title="字型大小">
       <button id="btn-font-up">A+</button>
       <button id="btn-font-dn">A−</button>
     </div>
+    <span onclick="showAbout()" style="cursor:pointer;font-size:.62em;color:var(--muted);text-decoration:underline;text-underline-offset:2px;white-space:nowrap">${MORNING_VERSION}</span>
   </div>
 </nav>
+<!-- ⊞ 回 Apps：只在「從 /apps 入口進來 + 裝成 PWA」時顯示 -->
+<script>(function(){try{var s=(window.matchMedia&&window.matchMedia('(display-mode: standalone)').matches)||window.navigator.standalone;if(s&&sessionStorage.getItem('cs_via_apps')==='1'){var b=document.getElementById('cs-apps-home');if(b)b.style.display='inline-flex';}}catch(e){}})();</script>
 
 <div class="top-stack">
   <div class="hdr">
     <div style="min-width:0;flex:1">
       <div class="hdr-title">
         <span class="emoji">📰</span><span id="hdr-user-title" onclick="changeUid()" style="cursor:pointer;text-decoration:underline dotted;text-underline-offset:3px">今日</span>
-        <span class="ver" onclick="showAbout()">${MORNING_VERSION}</span>
+        <!-- 版號已移到底部設定區（右下角，三個 app 一致） -->
       </div>
       <div class="hdr-date" id="hdr-date">—</div>
     </div>

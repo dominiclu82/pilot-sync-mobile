@@ -35,7 +35,7 @@ export function getPortfolioHtml(): string {
           <div style="min-width:0;flex:1">
             <div class="hdr-title">
               <span class="emoji">📈</span><span class="hdr-user" id="hdr-user" onclick="changeUid()">—</span>
-              <span class="ver" id="ver-tag" onclick="openAbout()">${APP_VERSION}</span>
+              <!-- 版號已移到底部設定區（右下角，三個 app 一致） -->
             </div>
             <div class="hdr-date" id="hdr-date">—</div>
           </div>
@@ -258,13 +258,17 @@ export function getPortfolioHtml(): string {
         <a href="/portfolio" class="active">📈 投資組合</a>
       </div>
       <div class="tab-controls">
+        <a href="/apps" id="cs-apps-home" aria-label="Tools" title="回 Tools" style="display:none;align-items:center;justify-content:center;font-size:1.3em;text-decoration:none;color:var(--muted);padding:0 4px">⊞</a>
         <button class="hdr-btn" id="btn-theme" onclick="toggleTheme()" title="日/夜">☀️</button>
         <div class="hdr-btn-font" title="字型大小">
           <button onclick="bumpFont(1)">A+</button>
           <button onclick="bumpFont(-1)">A−</button>
         </div>
+        <span onclick="openAbout()" style="cursor:pointer;font-size:.62em;color:var(--muted);text-decoration:underline;text-underline-offset:2px;white-space:nowrap">${APP_VERSION}</span>
       </div>
     </nav>
+    <!-- ⊞ 回 Tools：只在「從 /apps 入口進來 + 裝成 PWA」時顯示 -->
+    <script>(function(){try{var s=(window.matchMedia&&window.matchMedia('(display-mode: standalone)').matches)||window.navigator.standalone;if(s&&sessionStorage.getItem('cs_via_apps')==='1'){var b=document.getElementById('cs-apps-home');if(b)b.style.display='inline-flex';}}catch(e){}})();</script>
   </div>
 <script>${getClientJs()}</script>
 </body>

@@ -54,8 +54,8 @@ import { getAirportDbJs } from '../spa/js-airport-db.js';
 
 // ── 版本（比照 CrewSync / Morning：每次推版必更新；SW cache 名稱跟著走） ────
 // 本機 preview build 會暫時加 -tNN 後綴方便對版；推正式版前拿掉只留乾淨版號。
-export const PILOT_LOG_VERSION = 'V2.2.10';
-const PILOT_LOG_CACHE = 'pilotlog-v2-2-10';
+export const PILOT_LOG_VERSION = 'V2.2.11';
+const PILOT_LOG_CACHE = 'pilotlog-v2-2-11';
 
 export const pilotLogRouter = express.Router();
 
@@ -293,6 +293,7 @@ body.pl-offline .pl-topstack, body.pl-offline .pl-stickhead { top: calc(env(safe
   <button class="pl-tab-btn" id="plTabBtn-report" onclick="switchPlTab('report',this)">
     <span class="pl-tab-icon">📄</span>Report
   </button>
+  <a href="/apps" id="cs-apps-home" class="pl-util-btn" aria-label="Tools" title="回 Tools" style="display:none;flex:0 0 auto;align-self:center;font-size:1.3em;text-decoration:none;padding:0 8px">⊞</a>
   <div class="pl-tab-btn pl-tab-util">
     <button class="pl-util-btn" id="pl-theme-btn" onclick="_plToggleTheme()"><span id="pl-theme-icon">☀️</span></button>
     <div class="pl-font-wrap">
@@ -302,6 +303,8 @@ body.pl-offline .pl-topstack, body.pl-offline .pl-stickhead { top: calc(env(safe
     <span class="pl-ver-tag" onclick="plShowAbout()">${PILOT_LOG_VERSION}</span>
   </div>
 </div>
+<!-- ⊞ 回 Apps：只在「從 /apps 入口進來 + 裝成 PWA」時顯示 -->
+<script>(function(){try{var s=(window.matchMedia&&window.matchMedia('(display-mode: standalone)').matches)||window.navigator.standalone;if(s&&sessionStorage.getItem('cs_via_apps')==='1'){var b=document.getElementById('cs-apps-home');if(b)b.style.display='inline-flex';}}catch(e){}})();</script>
 
 <!-- About modal — 點底部版號開啟 -->
 <div class="pl-modal-wrap" id="pl-about-wrap" onclick="if(event.target===this)plHideAbout()">
@@ -355,6 +358,11 @@ function _renderPilotLogChangelog(): string {
   return `
     ${renderCommunityLink()}
     <div class="pl-cl-v">${PILOT_LOG_VERSION}</div>
+    <div class="pl-cl-txt">
+      <b>🩹 更新更即時，加「⊞ 回 Tools」鈕。</b>改網路優先，修「要滑掉兩次才看到新版」→ 上線時一次重開就更新（離線照常用快取）；從 Tools 入口進來時，右下角多一顆回 Tools 鈕。<br>
+      <b>🩹 Snappier updates + a Tools button.</b> App shell is now network-first — fixes “needs two reopens to update”, so it updates on the first reopen when online (offline still cached); added a ⊞ Tools launcher button in the bottom-right.
+    </div>
+    <div class="pl-cl-v old">V2.2.10</div>
     <div class="pl-cl-txt">
       <b>🩹 年份索引再修。</b><b>(1)</b> 索引<b>不再戳進搜尋框</b>（錨在工具列下方）。<b>(2)</b> 年份多也<b>不爆螢幕</b>——標籤自動<b>抽稀當刻度</b>，滑動仍能<b>精準跳到任一年</b>（泡泡顯示確切年）。<b>(3)</b> 離線時頂部工具列黏在<b>橫幅下方</b>，按鈕不再被橫幅蓋住。<br>
       <b>🩹 More year-index fixes.</b> (1) The index <b>no longer pokes into the search box</b> (anchored below the toolbar). (2) It <b>won’t overflow the screen</b> as years pile up — labels auto-thin into tick marks while sliding still jumps to <b>any exact year</b> (the bubble shows it). (3) Offline, the top toolbar sticks <b>below the banner</b> so its buttons aren’t covered.
@@ -900,6 +908,18 @@ self.addEventListener('fetch', e => {
   // API 走網路優先（auth + 動態資料絕不能從 cache 拿）
   if (u.pathname.startsWith('/api/pilot-log')) {
     e.respondWith(fetch(e.request));
+    return;
+  }
+  // HTML shell（navigation）network-first：上線時「一次」reopen 就拿到新版（pilot-log.js 內嵌在 shell 裡，
+  // 所以連程式都一起更新）；離線才退回快取。解決「要滑掉兩次才看到新版」。
+  if (e.request.mode === 'navigate') {
+    e.respondWith(
+      fetch(e.request).then(r => {
+        const cp = r.clone();
+        caches.open(CACHE).then(c => c.put(e.request, cp)).catch(()=>{});
+        return r;
+      }).catch(() => caches.match(e.request, { ignoreSearch: true }).then(c => c || caches.match('/pilot-log')))
+    );
     return;
   }
   // V2.0.01（codex P2）：機場庫 network-first —— 有網路一定拿最新（跑道/磁偏角/新增機場），

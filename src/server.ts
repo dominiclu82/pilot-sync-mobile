@@ -263,6 +263,16 @@ app.get('/apps', (_req, res) => {
   res.send(`<!DOCTYPE html><html lang="zh-Hant"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Apps</title>
+<link rel="manifest" href="/apps/manifest.json">
+<link rel="icon" href="/apps/icon.svg">
+<link rel="apple-touch-icon" href="/apps/icon.svg">
+<meta name="theme-color" content="#0B1428">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Tools">
+<meta name="mobile-web-app-capable" content="yes">
+<!-- 蓋「從 /apps 入口進來」的章：三個 app 靠這個 + standalone 判斷才顯示 ⊞ 回 Tools 鈕 -->
+<script>try{sessionStorage.setItem('cs_via_apps','1')}catch(e){}</script>
 <style>
   :root { color-scheme: dark; }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -302,6 +312,26 @@ app.get('/apps', (_req, res) => {
   </div>
   <div class="foot">oops.h-peak.com</div>
 </div></body></html>`);
+});
+
+// /apps PWA 圖示 + manifest —— 讓「加到主畫面」有專屬 App 啟動器圖示（2×2 彩色方塊）。
+const APPS_ICON_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><rect width="512" height="512" rx="112" fill="#0B1428"/><rect x="116" y="116" width="124" height="124" rx="30" fill="#3b82f6"/><rect x="272" y="116" width="124" height="124" rx="30" fill="#10b981"/><rect x="116" y="272" width="124" height="124" rx="30" fill="#f59e0b"/><rect x="272" y="272" width="124" height="124" rx="30" fill="#a855f7"/></svg>`;
+app.get('/apps/icon.svg', (_req, res) => {
+  res.setHeader('Content-Type', 'image/svg+xml');
+  res.setHeader('Cache-Control', 'public, max-age=86400');
+  res.send(APPS_ICON_SVG);
+});
+app.get('/apps/manifest.json', (_req, res) => {
+  res.setHeader('Content-Type', 'application/manifest+json');
+  res.json({
+    name: 'Tools', short_name: 'Tools',
+    description: 'CrewSync · Pilot Log · 今日 Today',
+    // scope 用 '/' 而非 '/apps'：讓這顆「入口 PWA」點進三個 app（/main、/pilot-log、/morning）時
+    // 仍留在 standalone 視窗內當啟動器（scope:'/apps' 會把 app 連結踢去瀏覽器，破壞「一次進三個 app」）。
+    start_url: '/apps', scope: '/', display: 'standalone',
+    background_color: '#0a0e1a', theme_color: '#0B1428',
+    icons: [{ src: '/apps/icon.svg', sizes: 'any', type: 'image/svg+xml', purpose: 'any maskable' }],
+  });
 });
 
 // ── Privacy Policy & Terms ───────────────────────────────────────────────────

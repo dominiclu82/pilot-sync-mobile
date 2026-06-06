@@ -361,7 +361,6 @@ export function getSpaHtmlBody(): string {
     <div class="subtab-slot"><button class="briefing-subtab" id="subtabBtn-pa" onclick="switchBriefingTab('pa',this)"><span class="drag-grip">≡</span>🎙️ PA</button></div>
     <div class="subtab-slot"><button class="briefing-subtab" id="subtabBtn-crewrest" onclick="switchBriefingTab('crewrest',this)"><span class="drag-grip">≡</span>⏳ Rest Calc</button></div>
     <div class="subtab-slot"><button class="briefing-subtab" id="subtabBtn-overtime" onclick="switchBriefingTab('overtime',this)"><span class="drag-grip">≡</span>💰 Overtime</button></div>
-    <div class="subtab-slot"><button class="briefing-subtab" id="subtabBtn-hf" onclick="switchBriefingTab('hf',this)"><span class="drag-grip">≡</span>📻 Pacific HF</button></div>
     <div class="subtab-wx-wrap">
       <button class="briefing-subtab active" id="subtabBtn-datis" onclick="switchBriefingTab('datis',this)"><span class="drag-grip">≡</span>⛅ WX <select class="wx-fleet-inline" id="wx-fleet-select"
         onclick="event.stopPropagation()"
@@ -542,17 +541,18 @@ export function getSpaHtmlBody(): string {
         <a class="tool-link-btn" href="https://app.cwa.gov.tw/web/obsmap/typhoon.html" target="_blank" onclick="return loadTool(event,this)">🌀 颱風路徑圖</a>
         <a class="tool-link-btn" href="https://gpsjam.org/" target="_blank" onclick="return loadTool(event,this)">🛰️ GPS干擾區域</a>
         <a class="tool-link-btn" href="https://turbli.com/" target="_blank">🌪️ Turbli 亂流預報</a>
+        <a class="tool-link-btn" href="https://radio.arinc.net/pacific/" target="_blank">📻 Pacific HF</a>
       </div>
-      <!-- 內嵌 iframe -->
-      <div id="tool-frame-wrap" style="display:none;margin-top:16px">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-          <span id="tool-frame-title" style="font-weight:700;font-size:.9em;color:var(--text)"></span>
-          <div style="display:flex;gap:10px;align-items:center">
+      <!-- 嵌入工具：全螢幕浮層（固定覆蓋，不再把分頁往上推/卡住捲不回；關閉鈕永遠在頂） -->
+      <div id="tool-frame-wrap" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;z-index:600;background:var(--bg);flex-direction:column;padding-top:env(safe-area-inset-top)">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 14px;border-bottom:1px solid var(--dim);flex-shrink:0">
+          <span id="tool-frame-title" style="font-weight:700;font-size:.9em;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></span>
+          <div style="display:flex;gap:12px;align-items:center;flex-shrink:0">
             <a id="tool-frame-external" href="#" target="_blank" style="font-size:.8em;color:var(--accent);text-decoration:none">↗ 新分頁</a>
-            <button onclick="closeTool()" style="background:none;border:none;color:var(--muted);font-size:1.1em;cursor:pointer;padding:0 4px">✕</button>
+            <button onclick="closeTool()" style="background:none;border:none;color:var(--text);font-size:1.3em;cursor:pointer;padding:0 4px">✕</button>
           </div>
         </div>
-        <iframe id="tool-frame" src="" style="width:100%;height:65vh;border:none;border-radius:12px;background:var(--surface)"></iframe>
+        <iframe id="tool-frame" src="" style="flex:1;width:100%;border:none;background:var(--surface)"></iframe>
       </div>
     </div>
   </div>
@@ -841,14 +841,7 @@ export function getSpaHtmlBody(): string {
     </div>
   </div>
 
-  <!-- ── 📻 Pacific HF panel ── -->
-  <div id="briefing-hf" class="briefing-panel">
-    <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 14px;border-bottom:1px solid var(--dim);flex-shrink:0">
-      <span style="font-size:.85em;font-weight:700;color:var(--text)">📻 Pacific HF 查詢</span>
-      <a href="https://radio.arinc.net/pacific/" target="_blank" style="font-size:.78em;color:var(--accent);text-decoration:none">↗ 新分頁</a>
-    </div>
-    <iframe id="hf-panel-iframe" src="" style="flex:1;border:none;width:100%;min-height:400px"></iframe>
-  </div>
+  <!-- 📻 Pacific HF 分頁已移除（ARINC 封鎖嵌入＋擋伺服器 IP，無法 app 內顯示）→ 改放 Tools 的「📻 Pacific HF」按鈕，在瀏覽器開。 -->
 
   <!-- ── ⏱️ Duty Time panel ── -->
   <div id="briefing-duty" class="briefing-panel" style="position:relative">
@@ -1497,6 +1490,7 @@ export function getSpaHtmlBody(): string {
   <button class="tab-btn" id="tabBtn-gate" onclick="switchTab('gate',this)">
     <span class="tab-btn-icon">🌏</span>Gate Info
   </button>
+  <a href="/apps" id="cs-apps-home" class="tab-util-btn" aria-label="Tools" title="回 Tools" style="display:none;flex:0 0 auto;align-self:center;font-size:1.3em;text-decoration:none;padding:0 8px">⊞</a>
   <div class="tab-btn tab-util" style="flex-direction:row;gap:0">
     <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center">
       <button class="tab-util-btn" onclick="toggleTheme()" id="tabBtn-theme">
@@ -1511,10 +1505,12 @@ export function getSpaHtmlBody(): string {
       <button class="tab-util-btn tab-install-btn" id="tab-install-btn" onclick="showInstallGuide()" style="display:none">
         <span>📲</span>安裝
       </button>
-      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer;text-decoration:underline" onclick="showAbout()">V8.0.48</span>
+      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer;text-decoration:underline" onclick="showAbout()">V8.0.49</span>
     </div>
   </div>
 </div>
+<!-- ⊞ 回 Apps：只在「從 /apps 入口進來(sessionStorage 章) + 裝成 PWA」時顯示 -->
+<script>(function(){try{var s=(window.matchMedia&&window.matchMedia('(display-mode: standalone)').matches)||window.navigator.standalone;if(s&&sessionStorage.getItem('cs_via_apps')==='1'){var b=document.getElementById('cs-apps-home');if(b)b.style.display='inline-flex';}}catch(e){}})();</script>
 
 <!-- iOS 安裝說明 -->
 <div id="install-overlay" class="install-overlay" style="display:none" onclick="if(event.target===this)closeInstallGuide()">
@@ -1543,7 +1539,12 @@ export function getSpaHtmlBody(): string {
     </div>
     <div style="max-height:50vh;overflow-y:auto;-webkit-overflow-scrolling:touch;margin-bottom:10px">
     ${renderCommunityLink()}
-    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V8.0.48</div>
+    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V8.0.49</div>
+    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
+      <div>📻 <b>Pacific HF 移到 Tools、嵌入工具改全螢幕浮層。</b>HF 分頁移除，改成 Tools 裡一顆按鈕直接開瀏覽器；Tools 嵌入工具（颱風/GPSjam）改全螢幕浮層，修掉把分頁推走、卡住的問題。A+/A- 改上下直排；從 Tools 入口進來時右下角多一顆「⊞ 回 Tools」鈕。</div>
+      <div>📻 <b>Pacific HF moved to Tools; embedded tools go full-screen.</b> The HF tab is gone — now a Tools button that opens in your browser; embedded tools (typhoon/GPS-jam) go full-screen, fixing the layout-push/stuck issue. A+/A- now stack vertically; a ⊞ Tools button appears bottom-right when launched from the Tools hub.</div>
+    </div>
+    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V8.0.48</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
       <div>💬 <b>加入社群連結。</b>關於頁最上方新增「加入社群 · Money 回報區」按鈕，點一下直接到 LINE 社群（所有軟體的回報都在這）。</div>
       <div>💬 <b>Community link added.</b> A "Join our community" button now sits at the top of the About page — tap to open the LINE group (feedback for all the apps).</div>

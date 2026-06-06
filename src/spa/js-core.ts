@@ -724,13 +724,12 @@ function switchCabinTab(panel, btn) {
 function switchBriefingTab(panel, btn) {
   document.querySelectorAll('.briefing-subtab').forEach(b => b.classList.remove('active'));
   document.querySelectorAll('.briefing-panel').forEach(p => p.classList.remove('active'));
-  btn.classList.add('active');
-  document.getElementById('briefing-' + panel).classList.add('active');
+  if (btn) btn.classList.add('active');
+  var pEl = document.getElementById('briefing-' + panel);
+  if (!pEl) return;   // 防呆：panel 不存在（如已移除的 'hf'）→ 不繼續，避免報錯
+  pEl.classList.add('active');
   if (panel === 'datis' && !wxLoaded) { wxLoaded = true; var fsel = document.getElementById('wx-fleet-select'); if (fsel) fsel.value = wxCurrentFleet; loadWxRegion(wxCurrentRegion); }
-  if (panel === 'hf') {
-    var ifr = document.getElementById('hf-panel-iframe');
-    if (ifr && !ifr.getAttribute('src')) ifr.src = '/api/pacific-hf';
-  }
+  // 📻 Pacific HF 分頁已移除（ARINC 封鎖嵌入）→ 改放 Tools 按鈕在瀏覽器開。
   if (panel === 'pa') {
     paStartTzTimer();
   }
@@ -760,8 +759,7 @@ function loadTool(e, anchor, mode) {
   document.getElementById('tool-frame').src = iframeUrl;
   document.getElementById('tool-frame-title').textContent = title;
   document.getElementById('tool-frame-external').href = externalUrl;
-  wrap.style.display = 'block';
-  wrap.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  wrap.style.display = 'flex';   // 全螢幕浮層（fixed），不再 scrollIntoView 推走分頁
   return false;
 }
 function closeTool() {
