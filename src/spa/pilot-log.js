@@ -5348,7 +5348,7 @@ function _plRenderAnalyzeContent() {
       '.pl-an-left{flex:0 0 268px}.pl-an-right{flex:1;min-width:0}' +
       '.pl-an-ghead{position:sticky;top:calc(var(--pl-head-h, 0px));z-index:30;background:var(--bg);display:flex;justify-content:space-between;align-items:baseline;padding:4px 0 8px}' +
       /* iPad/寬螢幕：照 Logbook detail 的做法，只把「右欄」變 sticky+overflow 的獨立捲動盒(左欄隨頁捲)；群組標題在盒內改 static 不再 sticky → 不會跟內容疊。align 只在這裡開，手機不受影響。 */
-      '@media(min-width:761px){.pl-an-wrap{align-items:flex-start}.pl-an-right{position:sticky;top:calc(var(--pl-head-h,0px) + 8px);max-height:calc(100dvh - 84px - var(--pl-head-h,0px) - env(safe-area-inset-bottom));overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:none}.pl-an-ghead{position:static}}' +
+      '@media(min-width:761px){.pl-an-wrap{align-items:flex-start}.pl-an-left,.pl-an-right{position:sticky;top:calc(var(--pl-head-h,0px) + 8px);max-height:calc(100dvh - 84px - var(--pl-head-h,0px) - env(safe-area-inset-bottom));overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:none}.pl-an-ghead{position:static}}' +
       '@media(max-width:760px){.pl-an-wrap{flex-direction:column}.pl-an-left{flex:none}}' +
     '</style>' +
     '<div style="padding:10px 14px">' +
@@ -5362,6 +5362,10 @@ function _plRenderAnalyzeContent() {
         '<div class="pl-an-right">' + rightHtml + '</div>' +
       '</div>' +
     '</div>';
+  // 量「📊 Analyze」標題實際高度寫進 --pl-head-h，左右捲動盒的 sticky top/max-height 才算得準（不然最上面會被切）。
+  // 立即量一次 + 下一幀再量一次（字體/版面 settle 後校正）。
+  _plUpdateHeadHeight();
+  requestAnimationFrame(function () { _plUpdateHeadHeight(); });
 }
 
 // === SECTION: Map tab — Flown Map(2D 衛星) / Earth(3D 地球)（V2.2.00）═════════

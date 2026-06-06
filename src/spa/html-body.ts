@@ -1505,7 +1505,7 @@ export function getSpaHtmlBody(): string {
       <button class="tab-util-btn tab-install-btn" id="tab-install-btn" onclick="showInstallGuide()" style="display:none">
         <span>📲</span>安裝
       </button>
-      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer;text-decoration:underline" onclick="showAbout()">V8.0.52</span>
+      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer;text-decoration:underline" onclick="showAbout()">V8.0.53</span>
     </div>
   </div>
 </div>
@@ -1539,10 +1539,15 @@ export function getSpaHtmlBody(): string {
     </div>
     <div style="max-height:50vh;overflow-y:auto;-webkit-overflow-scrolling:touch;margin-bottom:10px">
     ${renderCommunityLink()}
-    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V8.0.52</div>
+    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V8.0.53</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
-      <div>🌦️ <b>天氣 TAF/ATIS 修復 ＋ PA 時間欄位加大。</b>Airport WX 的 TAF/ATIS 之前繞的免費代理掛了、抓不到也很慢 → 改走自己 server 直連，恢復又快又穩；PA「下降」廣播的時間欄（HH:MM）放大好填。</div>
-      <div>🌦️ <b>TAF/ATIS fixed + bigger PA time fields.</b> Airport WX's TAF/ATIS no longer routes through a (now-broken) free proxy — fetched directly via our own server, fast and reliable again; the descent PA's HH:MM time fields are wider.</div>
+      <div>📻 <b>ATIS 真正修好 ＋ Tools 入口可加到主畫面。</b>上一版 ATIS 沒成（資料源 atis.guru 擋我們伺服器 IP）→ 改成「先直連、被擋就自動換可用的代理」，ATIS 回來了；Tools 入口頁文字也改清楚：入口本身也能「加到主畫面」當總啟動器。</div>
+      <div>📻 <b>ATIS actually fixed + the Tools hub is installable.</b> The previous ATIS fix didn't take (the source atis.guru blocks our server IP) — it now tries a direct fetch and auto-falls back to a working proxy; also clarified that the Tools hub itself can be added to the Home Screen as a launcher.</div>
+    </div>
+    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V8.0.52</div>
+    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
+      <div>🌦️ <b>天氣 TAF 修復 ＋ PA 時間欄位加大。</b>Airport WX 的 TAF 之前繞的免費代理掛了、抓不到也很慢 → 改走自己 server 直連，恢復又快又穩；PA「下降」廣播的時間欄（HH:MM）放大好填。</div>
+      <div>🌦️ <b>TAF fixed + bigger PA time fields.</b> Airport WX's TAF no longer routes through a (now-broken) free proxy — fetched directly via our own server, fast and reliable again; the descent PA's HH:MM time fields are wider.</div>
     </div>
     <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V8.0.51</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">

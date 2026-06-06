@@ -299,7 +299,7 @@ app.get('/apps', (_req, res) => {
   .tag { display:inline-block; background:#0a0e1a; border:1px solid #1f2a3d; border-radius:6px; padding:1px 7px; font-size:.92em; margin-right:4px; }
   .foot { text-align:center; color:#475569; font-size:.74em; margin-top:24px; }
 </style></head><body><div class="wrap">
-  <div class="sub" style="margin-top:6px">點開任一 App，再「加到主畫面」就能像獨立 App 一樣使用。<br><span style="color:#64748b">Tap an app, then add it to your Home Screen.</span></div>
+  <div class="sub" style="margin-top:6px">把這個 Tools 入口、或點進任一個 App，都能「加到主畫面」像獨立 App 一樣開。<br><span style="color:#64748b">Add this Tools hub — or any app inside — to your Home Screen and use it like a standalone app.</span></div>
   <div style="background:#2a1e08;border:1px solid #92590e;color:#fcd34d;border-radius:12px;padding:11px 14px;font-size:.8em;margin:0 0 18px;line-height:1.55">⚠️ 目前介面針對 <b>iPhone / iPad</b> 最佳化，<b>Android 裝置畫面可能會跑版</b>，建議用 iPhone / iPad 開啟。<br><span style="color:#a8a29e">Optimized for iPhone / iPad — layout may break on Android. Please use an iPhone / iPad.</span></div>
   ${cards}
   <a class="app" href="https://line.me/ti/g2/ArAw4k1D9vXEAMtBsButFLzSFjXzEvFXfKHQ2A?utm_source=invitation" target="_blank" rel="noopener" style="border-color:#16a34a66">
@@ -605,18 +605,41 @@ app.get('/api/taf', async (req, res) => {
   }
 });
 
-// ATIS：直連 atis.guru（server 對 server，無 CORS 限制）。原本 client 繞免費 proxy(codetabs)，
-// 那個 proxy 爛掉後 ATIS 就抓不到 → 改成自己 server proxy，跟 metar/taf 一致。
+// ATIS：來源 atis.guru。它沒 CORS（瀏覽器不能直連）、又擋 Render 機房 IP（server 直連回 502）。
+// 穩健版：① 先帶完整瀏覽器 headers 試直連 atis.guru（若只是 header 問題就成、且不靠外部 proxy）；
+// ② 直連失敗才退到 allorigins（它的 IP 抓得到 atis.guru、會幫加 CORS）。回傳含 <div class="atis"> 的 HTML 給前端解析。
 app.get('/api/atis', async (req, res) => {
+  const { icao } = req.query;
+  const target = `https://atis.guru/atis/${icao}`;
+  const headers = {
+    'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36',
+    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+    'Accept-Language': 'en-US,en;q=0.9',
+    'Referer': 'https://atis.guru/',
+  };
+  // ① 直連
   try {
-    const { icao } = req.query;
-    const url = `https://atis.guru/atis/${icao}`;
-    const r = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0' } });
-    const text = await r.text();
-    res.setHeader('Content-Type', 'text/html; charset=utf-8');
-    res.send(text);
+    const r = await fetch(target, { headers });
+    if (r.ok) {
+      const text = await r.text();
+      if (text && text.indexOf('class="atis"') >= 0) {
+        res.setHeader('Content-Type', 'text/html; charset=utf-8');
+        return res.send(text);
+      }
+    }
+  } catch (e: any) { /* 直連被擋 → 走 ② */ }
+  // ② 退到 allorigins。要驗 r2.ok + 內容真的含 ATIS，否則(429/500/空)回 502 讓前端走正常錯誤路徑，
+  //    不要把代理故障當成 200 空資料(codex P2)。
+  try {
+    const r2 = await fetch('https://api.allorigins.win/raw?url=' + encodeURIComponent(target), { headers });
+    const text2 = r2.ok ? await r2.text() : '';
+    if (text2 && text2.indexOf('class="atis"') >= 0) {
+      res.setHeader('Content-Type', 'text/html; charset=utf-8');
+      return res.send(text2);
+    }
+    return res.status(502).send('');
   } catch (e: any) {
-    res.status(502).send('');
+    return res.status(502).send('');
   }
 });
 
