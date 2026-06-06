@@ -276,8 +276,10 @@ app.get('/apps', (_req, res) => {
 <style>
   :root { color-scheme: dark; }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-  body { margin:0; background:#0a0e1a; color:#e2e8f0; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Noto Sans TC",sans-serif; line-height:1.5; }
-  .wrap { max-width:560px; margin:0 auto; padding:28px 18px 40px; }
+  /* 狀態列那塊鋪不透明底（同 CrewSync）：透明狀態列下捲動內容不透到狀態列區。 */
+  html::before { content:''; position:fixed; top:0; left:0; right:0; height:env(safe-area-inset-top,0px); background:#0a0e1a; z-index:9999; pointer-events:none; }
+  body { margin:0; background:#0a0e1a; color:#e2e8f0; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Noto Sans TC",sans-serif; line-height:1.5; padding-top:env(safe-area-inset-top); }
+  .wrap { max-width:560px; margin:0 auto; padding:28px 18px calc(40px + env(safe-area-inset-bottom)); }
   h1 { font-size:1.5em; margin:8px 0 2px; }
   .sub { color:#94a3b8; font-size:.86em; margin-bottom:22px; }
   .app { display:flex; align-items:center; gap:14px; background:#111827; border:1px solid #1f2a3d; border-radius:14px; padding:16px; margin-bottom:12px; text-decoration:none; color:inherit; transition:border-color .15s,transform .1s; }

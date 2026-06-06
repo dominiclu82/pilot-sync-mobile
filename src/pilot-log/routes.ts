@@ -54,8 +54,8 @@ import { getAirportDbJs } from '../spa/js-airport-db.js';
 
 // ── 版本（比照 CrewSync / Morning：每次推版必更新；SW cache 名稱跟著走） ────
 // 本機 preview build 會暫時加 -tNN 後綴方便對版；推正式版前拿掉只留乾淨版號。
-export const PILOT_LOG_VERSION = 'V2.2.13';
-const PILOT_LOG_CACHE = 'pilotlog-v2-2-13';
+export const PILOT_LOG_VERSION = 'V2.2.14';
+const PILOT_LOG_CACHE = 'pilotlog-v2-2-14';
 
 export const pilotLogRouter = express.Router();
 
@@ -105,6 +105,8 @@ export function _renderPilotLogHtml(): string {
 }
 * { box-sizing: border-box; }
 html { font-size: 15px; overscroll-behavior: none; }   /* V2.2.08：關掉視窗回彈（所有分頁）；body 也有，雙保險 */
+/* 狀態列那塊鋪不透明底（同 CrewSync）：透明狀態列(Tools 入口/PWA)下，捲動內容才不會透到狀態列區。 */
+html::before { content:''; position:fixed; top:0; left:0; right:0; height:env(safe-area-inset-top,0px); background:var(--bg); z-index:9999; pointer-events:none; }
 body {
   margin: 0; padding: 0;
   background: var(--bg); color: var(--text);
@@ -359,8 +361,8 @@ function _renderPilotLogChangelog(): string {
     ${renderCommunityLink()}
     <div class="pl-cl-v">${PILOT_LOG_VERSION}</div>
     <div class="pl-cl-txt">
-      <b>🩹 修年索引/標題在 Tools 入口下的位置 ＋ 更新更即時 ＋ 回 Tools 鈕。</b>從 Tools 入口進來（透明狀態列）時，年份索引會凸頂搜尋框、捲動時標題滑到狀態列底下 → 改成依「標題實際底緣」定位、固定標題吸頂補上狀態列安全區；app 改網路優先、一次重開就更新；從 Tools 入口進來右下角多一顆回 Tools 鈕（彩色四格）。<br>
-      <b>🩹 Fixes year-index/header position under the Tools hub + snappier updates + a Tools button.</b> Opening via the Tools hub (translucent status bar) pushed the year index into the search box and let the header slide under the status bar — now anchored to the header's real bottom and the sticky header respects the safe-area inset; the app is network-first so it updates on the first reopen; a Tools launcher button appears bottom-right.
+      <b>🩹 修 Tools 入口（透明狀態列）下的頂部顯示 ＋ 更新更即時 ＋ 回 Tools 鈕。</b>從 Tools 入口進來時，年份索引會凸頂搜尋框、捲動時標題/內容跑到狀態列那塊 → 改成依「標題實際底緣」定位、標題吸頂補安全區、狀態列那塊鋪不透明底。另外：Import 標題吸頂不被捲走、Analyze 左右各自獨立捲動（同 Logbook）；app 改網路優先、一次重開就更新；右下角多一顆回 Tools 鈕（彩色四格）。<br>
+      <b>🩹 Fixes top rendering under the Tools hub (translucent status bar) + snappier updates + a Tools button.</b> Entering via the Tools hub pushed the year index into the search box and let the header/content bleed into the status-bar area — now anchored to the header's real bottom, the sticky header respects the safe-area inset, and an opaque strip backs the status-bar area. Also: the Import header stays pinned, and Analyze scrolls its left/right columns independently (like Logbook); the app is network-first so it updates on the first reopen; a Tools launcher button appears bottom-right.
     </div>
     <div class="pl-cl-v old">V2.2.10</div>
     <div class="pl-cl-txt">

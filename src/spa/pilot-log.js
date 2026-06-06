@@ -2866,7 +2866,7 @@ function _plOpenImport() {
       '.pl-src-btn.active{background:#6366f1;color:#fff;border-color:#6366f1}' +
       '@media(max-width:640px){.pl-imp-wrap{flex-direction:column;padding:0 14px 18px;gap:10px}.pl-imp-nav{flex-direction:row;flex:none}.pl-imp-nav button{flex:1;text-align:center;padding:9px 4px;font-size:.72em}}' +
     '</style>' +
-    '<div style="display:flex;align-items:center;gap:10px;padding:16px 20px 14px;max-width:780px;margin:0 auto">' +
+    '<div style="position:sticky;top:env(safe-area-inset-top);z-index:40;background:var(--bg);display:flex;align-items:center;gap:10px;padding:16px 20px 14px;max-width:780px;margin:0 auto">' +
       '<button onclick="_plRenderMain()" style="background:transparent;border:0;color:var(--text);font-size:1.2em;cursor:pointer">←</button>' +
       '<div style="font-size:1em;font-weight:700">Import 匯入</div>' +
     '</div>' +
@@ -5289,7 +5289,15 @@ function _plAnBuildGroups(all) {
   tOrder.forEach(function(t) { add('ty:' + t, t, 'type', byT[t]); });
   return groups;
 }
-function _plAnSelect(id) { _pl.anGroup = id; _plRenderAnalyzeContent(); }
+function _plAnSelect(id) {
+  _pl.anGroup = id;
+  // iPad 左欄是獨立捲動盒：重建內容會讓它捲回頂 → 選下面的群組就跳掉。先存捲動位置、重建後復原。
+  var lp = document.querySelector('.pl-an-left');
+  var sc = lp ? lp.scrollTop : 0;
+  _plRenderAnalyzeContent();
+  var lp2 = document.querySelector('.pl-an-left');
+  if (lp2) lp2.scrollTop = sc;
+}
 
 function _plRenderAnalyzeContent() {
   var c = document.getElementById('pilotlog-content');
@@ -5332,8 +5340,8 @@ function _plRenderAnalyzeContent() {
   var selSum = _plAnGroupSum(sel);
   var dim = (sel.section === 'type') ? 'company' : 'type';
   var rightHtml =
-    // #2-analyze：群組標題（All Flight Time 等）固定在頁面 sticky 標題下方，捲動明細時不被推走/蓋掉。
-    '<div style="position:sticky;top:calc(var(--pl-head-h, 0px));z-index:30;background:var(--bg);display:flex;justify-content:space-between;align-items:baseline;padding:4px 0 8px">' +
+    // #2-analyze：群組標題（All Flight Time 等）固定。手機(整頁捲)黏在頁 sticky 標題下；iPad(右欄獨立捲動盒)黏在盒頂(top:0)。
+    '<div class="pl-an-ghead">' +
       '<div style="font-size:1.05em;font-weight:800">' + _plEsc(sel.label) + '</div>' +
       '<div style="font-size:.7em;color:var(--muted)">' + selSum.flights + ' flights</div>' +
     '</div>' +
@@ -5344,8 +5352,11 @@ function _plRenderAnalyzeContent() {
     (sel.id === 'all' ? _plRenderMonthlyChart(entries) + _plRenderOpeningSim() : '');
   c.innerHTML =
     '<style>' +
-      '.pl-an-wrap{display:flex;gap:14px;max-width:1100px;margin:0 auto}' +
+      '.pl-an-wrap{display:flex;gap:14px;max-width:1100px;margin:0 auto;align-items:flex-start}' +
       '.pl-an-left{flex:0 0 268px}.pl-an-right{flex:1;min-width:0}' +
+      /* iPad/寬螢幕：照搬 Logbook 的獨立捲動 — 左欄(群組)隨頁捲、右欄(明細)變 sticky+自己 overflow 的捲動盒 → 左右分開捲 */
+      '@media(min-width:761px){.pl-an-left{position:sticky;top:calc(var(--pl-head-h,0px) + 8px);max-height:calc(100dvh - 84px - var(--pl-head-h,0px) - env(safe-area-inset-bottom));overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:none}.pl-an-right{position:sticky;top:calc(var(--pl-head-h,0px) + 8px);max-height:calc(100dvh - 84px - var(--pl-head-h,0px) - env(safe-area-inset-bottom));overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:none}.pl-an-ghead{top:0}}' +
+      '.pl-an-ghead{position:sticky;top:var(--pl-head-h,0px);z-index:30;background:var(--bg);display:flex;justify-content:space-between;align-items:baseline;padding:4px 0 8px}' +
       '@media(max-width:760px){.pl-an-wrap{flex-direction:column}.pl-an-left{flex:none}}' +
     '</style>' +
     '<div style="padding:10px 14px">' +

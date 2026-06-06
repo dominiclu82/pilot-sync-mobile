@@ -339,6 +339,8 @@ function getStyles(): string {
 /* 禁 iOS 橡皮筋 overscroll (動態島 safe-area 由 top-stack 自己處理) */
 body { overscroll-behavior: none; }
 html { font-size: 15px; overscroll-behavior: none; }
+/* 狀態列那塊鋪不透明底（同 CrewSync）：透明狀態列下捲動內容不透到狀態列區。 */
+html::before { content:''; position:fixed; top:0; left:0; right:0; height:env(safe-area-inset-top,0px); background:var(--bg); z-index:9999; pointer-events:none; }
 /* V1.0.20: font-family + line-height 1:1 對齊晨報 — 兩邊中文字 fallback (Noto Sans TC vs
    Microsoft JhengHei) 跟 line-height (1.5 vs default 1.2) 差異累積成 baseline/間距感差 */
 html, body { margin: 0; background: var(--bg); color: var(--fg);

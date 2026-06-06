@@ -17,6 +17,9 @@ export function renderCommunityLink(): string {
 export interface ChangelogEntry { v: string; zh: string; en: string; }
 
 export const APP_CHANGELOG: ChangelogEntry[] = [
+  { v: 'V2.0.11',
+    zh: '[全域] 修頂部：狀態列那塊補不透明底，從 Tools 入口/PWA（透明狀態列）捲動時，內容不再透到狀態列區。',
+    en: '[Global] Top fix: an opaque strip now backs the status-bar area, so scrolling no longer bleeds content into it (Tools hub / translucent status bar).' },
   { v: 'V2.0.10',
     zh: '[全域] 版號移到右下角設定區（今日／投資兩頁統一）；從 Tools 入口進來時右下多一顆回 Tools 鈕（彩色四格）。',
     en: '[Global] Version moved to the bottom-right settings area (unified across Today/Portfolio); a Tools button appears bottom-right when launched from the Tools hub.' },
