@@ -258,7 +258,7 @@ export function getPortfolioHtml(): string {
         <a href="/portfolio" class="active">📈 投資組合</a>
       </div>
       <div class="tab-controls">
-        <a href="/apps" id="cs-apps-home" aria-label="Tools" title="回 Tools" style="display:none;align-items:center;justify-content:center;font-size:1.3em;text-decoration:none;color:var(--muted);padding:0 4px">⊞</a>
+        <a href="/apps" id="cs-apps-home" aria-label="Tools" title="回 Tools" style="display:none;align-items:center;justify-content:center;text-decoration:none;padding:0 4px"><svg width="20" height="20" viewBox="0 0 24 24"><rect x="2" y="2" width="9" height="9" rx="2.5" fill="#3b82f6"/><rect x="13" y="2" width="9" height="9" rx="2.5" fill="#10b981"/><rect x="2" y="13" width="9" height="9" rx="2.5" fill="#f59e0b"/><rect x="13" y="13" width="9" height="9" rx="2.5" fill="#a855f7"/></svg></a>
         <button class="hdr-btn" id="btn-theme" onclick="toggleTheme()" title="日/夜">☀️</button>
         <div class="hdr-btn-font" title="字型大小">
           <button onclick="bumpFont(1)">A+</button>

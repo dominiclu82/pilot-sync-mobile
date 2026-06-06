@@ -26,7 +26,8 @@ body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSy
 .tab-btn{flex:0 0 auto;min-width:70px;display:flex;flex-direction:column;align-items:center;justify-content:center;
   gap:2px;border:none;background:none;color:var(--muted);font-size:.7em;font-weight:600;
   cursor:pointer;transition:color .15s;-webkit-appearance:none;padding:0 8px;white-space:nowrap}
-@media(min-width:600px){.tab-bar{overflow-x:visible;display:grid;grid-template-columns:repeat(6,1fr)}.tab-btn{min-width:0;padding:0;width:100%}}
+/* iPad/寬螢幕：不撐滿、不寫死格數，按鈕自然寬度置中擠在一起（裝不下才捲動） */
+@media(min-width:600px){.tab-bar{justify-content:safe center;gap:6px}.tab-btn{padding:0 18px}}
 .tab-btn.tab-active{color:var(--accent)}
 .tab-btn-icon{font-size:1.5em;line-height:1}
 .tab-util{cursor:default;gap:1px}

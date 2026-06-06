@@ -16,7 +16,7 @@ import { renderAppChangelog } from './app-changelog.js';
 
 // V2.0.0: 統一版號 — 跟 Portfolio 共用 APP_VERSION。MORNING_VERSION alias 保留向後相容
 export const MORNING_VERSION = APP_VERSION;
-const MORNING_CACHE = 'morning-v2-0-09';
+const MORNING_CACHE = 'morning-v2-0-10';
 
 // ─── Postgres ────────────────────────────────────────────────────────
 let _pgPool: pg.Pool | null = null;
@@ -1984,7 +1984,7 @@ body { padding-bottom: calc(64px + env(safe-area-inset-bottom, 0px)); }
     <a href="/portfolio">📈 投資組合</a>
   </div>
   <div class="tab-controls">
-    <a href="/apps" id="cs-apps-home" aria-label="Tools" title="回 Tools" style="display:none;align-items:center;justify-content:center;font-size:1.3em;text-decoration:none;color:var(--muted);padding:0 4px">⊞</a>
+    <a href="/apps" id="cs-apps-home" aria-label="Tools" title="回 Tools" style="display:none;align-items:center;justify-content:center;text-decoration:none;padding:0 4px"><svg width="20" height="20" viewBox="0 0 24 24"><rect x="2" y="2" width="9" height="9" rx="2.5" fill="#3b82f6"/><rect x="13" y="2" width="9" height="9" rx="2.5" fill="#10b981"/><rect x="2" y="13" width="9" height="9" rx="2.5" fill="#f59e0b"/><rect x="13" y="13" width="9" height="9" rx="2.5" fill="#a855f7"/></svg></a>
     <button class="hdr-btn" id="btn-theme" title="日/夜">☀️</button>
     <div class="hdr-btn-font" title="字型大小">
       <button id="btn-font-up">A+</button>

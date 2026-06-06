@@ -54,8 +54,8 @@ import { getAirportDbJs } from '../spa/js-airport-db.js';
 
 // ── 版本（比照 CrewSync / Morning：每次推版必更新；SW cache 名稱跟著走） ────
 // 本機 preview build 會暫時加 -tNN 後綴方便對版；推正式版前拿掉只留乾淨版號。
-export const PILOT_LOG_VERSION = 'V2.2.11';
-const PILOT_LOG_CACHE = 'pilotlog-v2-2-11';
+export const PILOT_LOG_VERSION = 'V2.2.12';
+const PILOT_LOG_CACHE = 'pilotlog-v2-2-12';
 
 export const pilotLogRouter = express.Router();
 
@@ -293,7 +293,7 @@ body.pl-offline .pl-topstack, body.pl-offline .pl-stickhead { top: calc(env(safe
   <button class="pl-tab-btn" id="plTabBtn-report" onclick="switchPlTab('report',this)">
     <span class="pl-tab-icon">📄</span>Report
   </button>
-  <a href="/apps" id="cs-apps-home" class="pl-util-btn" aria-label="Tools" title="回 Tools" style="display:none;flex:0 0 auto;align-self:center;font-size:1.3em;text-decoration:none;padding:0 8px">⊞</a>
+  <a href="/apps" id="cs-apps-home" class="pl-util-btn" aria-label="Tools" title="回 Tools" style="display:none;flex:0 0 auto;align-self:center;text-decoration:none;padding:0 8px"><svg width="20" height="20" viewBox="0 0 24 24"><rect x="2" y="2" width="9" height="9" rx="2.5" fill="#3b82f6"/><rect x="13" y="2" width="9" height="9" rx="2.5" fill="#10b981"/><rect x="2" y="13" width="9" height="9" rx="2.5" fill="#f59e0b"/><rect x="13" y="13" width="9" height="9" rx="2.5" fill="#a855f7"/></svg></a>
   <div class="pl-tab-btn pl-tab-util">
     <button class="pl-util-btn" id="pl-theme-btn" onclick="_plToggleTheme()"><span id="pl-theme-icon">☀️</span></button>
     <div class="pl-font-wrap">
@@ -359,8 +359,8 @@ function _renderPilotLogChangelog(): string {
     ${renderCommunityLink()}
     <div class="pl-cl-v">${PILOT_LOG_VERSION}</div>
     <div class="pl-cl-txt">
-      <b>🩹 更新更即時，加「⊞ 回 Tools」鈕。</b>改網路優先，修「要滑掉兩次才看到新版」→ 上線時一次重開就更新（離線照常用快取）；從 Tools 入口進來時，右下角多一顆回 Tools 鈕。<br>
-      <b>🩹 Snappier updates + a Tools button.</b> App shell is now network-first — fixes “needs two reopens to update”, so it updates on the first reopen when online (offline still cached); added a ⊞ Tools launcher button in the bottom-right.
+      <b>🩹 修年索引顯示 ＋ 更新更即時 ＋ 回 Tools 鈕。</b>年份索引在直接開 PWA 時會位置跑掉或年份被砍（改成版面排好後再建一次）；app 改網路優先、一次重開就更新（修「要滑兩次」）；從 Tools 入口進來右下角多一顆回 Tools 鈕（彩色四格）。<br>
+      <b>🩹 Year-index fix + snappier updates + a Tools button.</b> The year index could be mispositioned or truncated when opening the PWA directly (now rebuilt after layout settles); the app is network-first so it updates on the first reopen; a Tools launcher button appears bottom-right when entered from the Tools hub.
     </div>
     <div class="pl-cl-v old">V2.2.10</div>
     <div class="pl-cl-txt">

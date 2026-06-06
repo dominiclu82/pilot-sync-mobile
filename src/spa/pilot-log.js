@@ -996,6 +996,7 @@ function _plRenderList() {
   }
   c.innerHTML = shown.map(_plRenderEntryRow).join('');
   _plRenderYearIndex();
+  _plDeferYearIndex();   // 直接開 PWA 載入太快時，index 會搶在版面/字體排好前就建 → 位移或年份截斷；排好後再校正一次
 }
 
 // V2.2.08：通訊錄式右側年份索引 —— 常駐、一眼看到整個職涯跨度、可點可滑（滑動時中央放大泡泡顯示年份）。
@@ -1110,6 +1111,14 @@ function _plRenderYearIndex() {
   el.style.display = 'flex';
   // #1：讓出右邊 gutter，索引不壓到班號/組員（量索引實際寬 + 緩衝）
   list.style.paddingRight = (el.offsetWidth + 6) + 'px';
+}
+// 直接開 PWA（吃快取）載入太快時，_plRenderYearIndex 會搶在「工具列高度量好、航班全排好、字體載入完」之前就建好，
+// 導致索引位移（頂到搜尋框）或年份被截斷（iPad 只到 2014）。這裡在版面 settle 後再重建一次校正 →
+// 不論快載/慢載、iPhone/iPad、入口進/直接開，最後都以排好後的正確狀態為準。
+function _plDeferYearIndex() {
+  var rerun = function () { if (_pl.tab === 'logbook' && !_pl.editing) _plRenderYearIndex(); };
+  requestAnimationFrame(function () { requestAnimationFrame(rerun); });
+  try { if (document.fonts && document.fonts.ready) document.fonts.ready.then(rerun); } catch (e) {}
 }
 
 async function _plSetFilter(f) {
