@@ -1505,7 +1505,7 @@ export function getSpaHtmlBody(): string {
       <button class="tab-util-btn tab-install-btn" id="tab-install-btn" onclick="showInstallGuide()" style="display:none">
         <span>📲</span>安裝
       </button>
-      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer;text-decoration:underline" onclick="showAbout()">V8.0.53</span>
+      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer;text-decoration:underline" onclick="showAbout()">V8.0.54</span>
     </div>
   </div>
 </div>
@@ -1539,10 +1539,10 @@ export function getSpaHtmlBody(): string {
     </div>
     <div style="max-height:50vh;overflow-y:auto;-webkit-overflow-scrolling:touch;margin-bottom:10px">
     ${renderCommunityLink()}
-    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V8.0.53</div>
+    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V8.0.54</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
-      <div>📻 <b>ATIS 真正修好 ＋ Tools 入口可加到主畫面。</b>上一版 ATIS 沒成（資料源 atis.guru 擋我們伺服器 IP）→ 改成「先直連、被擋就自動換可用的代理」，ATIS 回來了；Tools 入口頁文字也改清楚：入口本身也能「加到主畫面」當總啟動器。</div>
-      <div>📻 <b>ATIS actually fixed + the Tools hub is installable.</b> The previous ATIS fix didn't take (the source atis.guru blocks our server IP) — it now tries a direct fetch and auto-falls back to a working proxy; also clarified that the Tools hub itself can be added to the Home Screen as a launcher.</div>
+      <div>📻 <b>ATIS 修復 ＋ 天氣載入加速 ＋ RCTP 衛星圖修。</b>ATIS 改成「你的瀏覽器經 allorigins 代理抓」（atis.guru 擋我們伺服器 IP，server 端抓不到）；天氣詳情改成 METAR/TAF/跑道圖先秒出、ATIS 背景補上，不再整頁卡等；修「衛星圖快取把失敗回應也存住」害 RCTP 圖出不來（改成只存成功的、壞的自動重抓）；Tools 入口文字改清楚（入口本身也能加到主畫面）。</div>
+      <div>📻 <b>ATIS fixed + faster weather load + RCTP map fix.</b> ATIS is now fetched from your browser via the allorigins proxy (atis.guru blocks our server IP); weather details now show METAR/TAF/runway map instantly with ATIS loading in the background; fixed the satellite-map cache storing failed responses (which broke the RCTP map — now only successes are cached and bad ones re-fetched); clarified the Tools hub text.</div>
     </div>
     <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V8.0.52</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">

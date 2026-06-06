@@ -673,10 +673,12 @@ self.addEventListener('fetch', e => {
   if (e.request.method !== 'GET') return;
   const u = new URL(e.request.url);
   if (u.pathname.startsWith('/api/')) return;
+  // ATIS 走瀏覽器端代理(allorigins)抓 atis.guru：時效性資料 + 跨域 GET，不可快取（否則 SW 會存成舊的、且 cache 一直長）→ 直接走網路。
+  if (u.hostname === 'api.allorigins.win' || u.hostname === 'atis.guru') return;
   // 衛星圖（Esri）→ 永久快取 plapt-maps（cache-first）：跟 Pilot Log 用同一個 cache + 同網址，
   // 直接命中已預抓的 37 星宇機場底圖；CrewSync 看過的其他機場也順手存起來，下次/離線秒出。activate 不清這個 cache。
   if (u.hostname === 'server.arcgisonline.com') {
-    e.respondWith(caches.open('plapt-maps').then(c => c.match(e.request).then(hit => hit || fetch(e.request).then(r => { c.put(e.request, r.clone()); return r; }))));
+    e.respondWith(caches.open('plapt-maps').then(c => c.match(e.request).then(hit => (hit && hit.ok) ? hit : fetch(e.request).then(r => { if (r.ok) c.put(e.request, r.clone()); return r; }).catch(() => hit || Response.error()))));
     return;
   }
   e.respondWith(

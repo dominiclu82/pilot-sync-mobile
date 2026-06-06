@@ -296,20 +296,28 @@ function _wxBuildDetailHtml(icao, metarLines, tafText, atisSections) {
   }
   cards += buildMetarCard(icao);
   cards += '<div class="atis-card"><div class="atis-card-title">\\ud83d\\udcc5 TAF</div><pre>' + (tafText || noData) + '</pre></div>';
-  var atisOnly = atisSections.filter(function(s) {
-    var t = s.title.toLowerCase(); return !t.includes('metar') && !t.includes('taf');
-  });
-  if (atisOnly.length > 0) {
-    cards += atisOnly.map(function(s) {
-      return '<div class="atis-card"><div class="atis-card-title">' + s.title + '</div><pre>' + s.text + '</pre></div>';
-    }).join('');
+  // atisSections===null = 還在背景載(顯示「載入中」,不卡 METAR/TAF/跑道圖)；[] = 無資料；有 = 各 ATIS 卡。
+  if (atisSections === null) {
+    cards += '<div class="atis-card"><div class="atis-card-title">\\ud83d\\udcfb ATIS</div><pre><span style="color:var(--muted)">\\u8f09\\u5165\\u4e2d\\u2026 Loading\\u2026</span></pre></div>';
   } else {
-    cards += '<div class="atis-card"><div class="atis-card-title">\\ud83d\\udcfb ATIS</div><pre>' + noData + '</pre></div>';
+    var atisOnly = atisSections.filter(function(s) {
+      var t = s.title.toLowerCase(); return !t.includes('metar') && !t.includes('taf');
+    });
+    if (atisOnly.length > 0) {
+      cards += atisOnly.map(function(s) {
+        return '<div class="atis-card"><div class="atis-card-title">' + s.title + '</div><pre>' + s.text + '</pre></div>';
+      }).join('');
+    } else {
+      cards += '<div class="atis-card"><div class="atis-card-title">\\ud83d\\udcfb ATIS</div><pre>' + noData + '</pre></div>';
+    }
   }
   return cards;
 }
 
+var _wxDetailReqToken = 0;
 function fetchWxDetail(icao, name) {
+  /* 每次 fetch 給一個遞增 token,只讓「最新那次」的結果(含背景 ATIS)生效,避免慢 ATIS 覆蓋新資料 */
+  var _tok = ++_wxDetailReqToken;
   /* check 24hr cache first */
   var cached = wxDetailRawCache[icao];
   if (cached && (Date.now() - cached.time) < 86400000) {
@@ -327,19 +335,24 @@ function fetchWxDetail(icao, name) {
     }).catch(function() { return []; });
   var tafP = fetch('/api/taf?ids=' + icao)
     .then(function(r) { return r.ok ? r.text() : ''; }).then(function(t) { return t.trim(); }).catch(function() { return ''; });
-  var atisP = fetch('/api/atis?icao=' + icao)
+  var atisP = fetch('https://api.allorigins.win/raw?url=' + encodeURIComponent('https://atis.guru/atis/' + icao))
     .then(function(r) { return r.ok ? r.text() : ''; }).then(parseAtisHtml).catch(function() { return []; });
-  Promise.all([metarP, tafP, atisP]).then(function(res) {
-    var metarLines = res[0], tafText = res[1], atisSections = res[2];
-    /* save to 24hr cache */
-    wxDetailRawCache[icao] = { metar: metarLines, taf: tafText, atis: atisSections, time: Date.now() };
-    _wxSaveDetailCache();
+  /* 先等 METAR+TAF(快)就秒出(ATIS 標「載入中」、跑道圖照樣秒出);ATIS(allorigins,慢)背景補上 → 不卡載入。 */
+  Promise.all([metarP, tafP]).then(function(res) {
+    var metarLines = res[0], tafText = res[1];
     var content = document.getElementById('wx-detail-content');
-    if (!content || wxSelectedIcao !== icao) return;
-    var html = _wxBuildDetailHtml(icao, metarLines, tafText, atisSections);
-    wxDetailCache[icao] = html;
-    content.innerHTML = html;
+    if (!content || wxSelectedIcao !== icao || _tok !== _wxDetailReqToken) return;
+    content.innerHTML = _wxBuildDetailHtml(icao, metarLines, tafText, null);
     _wxDetailRefreshDone();
+    atisP.then(function(atisSections) {
+      wxDetailRawCache[icao] = { metar: metarLines, taf: tafText, atis: atisSections, time: Date.now() };
+      _wxSaveDetailCache();
+      if (wxSelectedIcao !== icao || _tok !== _wxDetailReqToken) return;
+      var html = _wxBuildDetailHtml(icao, metarLines, tafText, atisSections);
+      wxDetailCache[icao] = html;
+      var c2 = document.getElementById('wx-detail-content');
+      if (c2) c2.innerHTML = html;
+    });
   }).catch(function() { _wxDetailRefreshDone(); });
 }
 function _wxDetailRefreshDone() {
@@ -502,7 +515,7 @@ function _wxBatchRefresh(icaos, updateListRegion, btn, btnLabel) {
       var metarLines = metarAll[icao] || [];
       var tafText = tafAll[icao] || '';
 
-      fetch('/api/atis?icao=' + icao)
+      fetch('https://api.allorigins.win/raw?url=' + encodeURIComponent('https://atis.guru/atis/' + icao))
         .then(function(r) { return r.ok ? r.text() : ''; })
         .then(parseAtisHtml)
         .catch(function() { return []; })

@@ -485,7 +485,7 @@ function reloadCurrentAtis() {
 
 function fetchAtisData(url, icao, container) {
   // 全改走自己 server proxy（不再繞免費 codetabs，那個爛掉會讓 ATIS/TAF 抓不到）
-  const atisPromise = fetch('/api/atis?icao=' + icao)
+  const atisPromise = fetch('https://api.allorigins.win/raw?url=' + encodeURIComponent('https://atis.guru/atis/' + icao))
     .then(r => { if (!r.ok) throw new Error(); return r.text(); })
     .then(html => parseAtisHtml(html))
     .catch(() => []);

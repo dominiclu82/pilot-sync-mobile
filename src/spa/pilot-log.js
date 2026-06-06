@@ -5345,11 +5345,12 @@ function _plRenderAnalyzeContent() {
   c.innerHTML =
     '<style>' +
       '.pl-an-wrap{display:flex;gap:14px;max-width:1100px;margin:0 auto}' +
-      '.pl-an-left{flex:0 0 268px}.pl-an-right{flex:1;min-width:0}' +
-      '.pl-an-ghead{position:sticky;top:calc(var(--pl-head-h, 0px));z-index:30;background:var(--bg);display:flex;justify-content:space-between;align-items:baseline;padding:4px 0 8px}' +
-      /* iPad/寬螢幕：照 Logbook detail 的做法，只把「右欄」變 sticky+overflow 的獨立捲動盒(左欄隨頁捲)；群組標題在盒內改 static 不再 sticky → 不會跟內容疊。align 只在這裡開，手機不受影響。 */
-      '@media(min-width:761px){.pl-an-wrap{align-items:flex-start}.pl-an-left,.pl-an-right{position:sticky;top:calc(var(--pl-head-h,0px) + 8px);max-height:calc(100dvh - 84px - var(--pl-head-h,0px) - env(safe-area-inset-bottom));overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:none}.pl-an-ghead{position:static}}' +
-      '@media(max-width:760px){.pl-an-wrap{flex-direction:column}.pl-an-left{flex:none}}' +
+      '.pl-an-left{flex:0 0 268px;min-width:0}.pl-an-right{flex:1 1 0;min-width:0}' +
+      /* 群組標題 base 是 sticky —— 手機(整頁捲)就是靠這個固定群組標題，不能動。 */
+      '.pl-an-ghead{position:sticky;top:calc(var(--pl-head-h,0px));z-index:30;background:var(--bg);display:flex;justify-content:space-between;align-items:baseline;padding:4px 0 8px}' +
+      /* iPad/寬螢幕(≥768，對齊 Logbook 斷點)：完全照 Logbook detail —— 只「右欄」做 sticky+overflow 捲動盒，左欄隨頁捲；群組標題改 static(不黏、不蓋內容)。手機(<768 column)完全不動。 */
+      '@media(min-width:768px){.pl-an-wrap{align-items:flex-start}.pl-an-right{position:sticky;top:calc(var(--pl-head-h,0px) + 8px);max-height:calc(100dvh - 84px - var(--pl-head-h,0px) - env(safe-area-inset-bottom));overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain}.pl-an-ghead{position:static}}' +
+      '@media(max-width:767px){.pl-an-wrap{flex-direction:column}.pl-an-left{flex:none}}' +
     '</style>' +
     '<div style="padding:10px 14px">' +
       '<div class="pl-stickhead">' +

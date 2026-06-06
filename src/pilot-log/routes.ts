@@ -54,8 +54,8 @@ import { getAirportDbJs } from '../spa/js-airport-db.js';
 
 // ── 版本（比照 CrewSync / Morning：每次推版必更新；SW cache 名稱跟著走） ────
 // 本機 preview build 會暫時加 -tNN 後綴方便對版；推正式版前拿掉只留乾淨版號。
-export const PILOT_LOG_VERSION = 'V2.2.16';
-const PILOT_LOG_CACHE = 'pilotlog-v2-2-16';
+export const PILOT_LOG_VERSION = 'V2.2.17';
+const PILOT_LOG_CACHE = 'pilotlog-v2-2-17';
 
 export const pilotLogRouter = express.Router();
 
@@ -361,8 +361,8 @@ function _renderPilotLogChangelog(): string {
     ${renderCommunityLink()}
     <div class="pl-cl-v">${PILOT_LOG_VERSION}</div>
     <div class="pl-cl-txt">
-      <b>🩹 Analyze iPad 左右獨立捲動修好。</b>iPad 上 Analyze 改成左右兩欄各自獨立捲動盒（照 Logbook 的做法，sticky + 自己 overflow），群組標題不再疊到內容，渲染後重量標題高度避免最上面被切；手機維持原本整頁一起捲、完全不受影響。<br>
-      <b>🩹 Analyze independent scroll fixed on iPad.</b> On iPad both columns are now independent scroll boxes (like Logbook: sticky + their own overflow); the group header no longer overlaps the content, and the header height is re-measured after render so the top isn't clipped. Phone keeps its original single-page scroll, untouched.
+      <b>🩹 Analyze iPad 左右捲動修好（改照 Logbook）。</b>iPad 上 Analyze 改成跟 Logbook 一模一樣——只「右欄」做獨立捲動盒、左欄隨頁捲、群組標題在 iPad 不黏也不蓋住內容；手機維持原本整頁一起捲、完全不動。<br>
+      <b>🩹 Analyze scroll fixed on iPad (now matches Logbook).</b> On iPad, Analyze now works exactly like the Logbook detail — only the right column is an independent scroll box, the left scrolls with the page, and the group header no longer sticks or overlaps content; phone keeps its original single-page scroll, untouched.
     </div>
     <div class="pl-cl-v old">V2.2.14</div>
     <div class="pl-cl-txt">
