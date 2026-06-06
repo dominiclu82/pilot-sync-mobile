@@ -613,45 +613,36 @@ app.get('/api/taf', async (req, res) => {
 //   ⚠ 鐵律：ATIS 只在「點開單一機場」時抓，絕不放進一鍵更新（80 機場一次抓會瞬間爆 500/天）。
 const AIRFRAMES_KEY = process.env.AIRFRAMES_KEY || '';
 const ATIS_TTL = 60 * 60 * 1000;          // 快取 60 分（ATIS 大約一小時更新一次）
-// 兩個「完全獨立」的每日額度池（免費 500/天 = 50 + 450）：
-//   owner（站長）獨享 50 —— 只有你能動，其他人碰不到、保證你永遠有。
-//   founder（其他 active 報名者）共用 450 —— 吃不到 owner 的 50。
-const ATIS_OWNER_LIMIT = 50;
-const ATIS_FOUNDER_LIMIT = 450;
+// airframes 免費額度（單一池 500/天）。owner（站長）可用到剩 0；其他 founder 只能用到「剩 RESERVE」就停，
+// 把最後這些保留給 owner。真實用量「直接讀 airframes 回應的 x-ratelimit-* 標頭」最準 —— 重啟、外部用量都不會錯，不自己數。
+const ATIS_OWNER_RESERVE = 50;
 const _atisCache = new Map<string, { sections: { title: string; text: string }[]; time: number; source: string }>();
-const _atisBudget = { day: '', owner: 0, founder: 0 };   // 兩池各自計數（Tower 後台顯示用）
+let _atisRate: { limit: number; remaining: number; reset: number; updated: number } | null = null;
 
-function _atisToday(): string { return new Date().toISOString().slice(0, 10); }   // UTC 日界
-function _atisRollDay() {
-  const d = _atisToday();
-  if (_atisBudget.day !== d) { _atisBudget.day = d; _atisBudget.owner = 0; _atisBudget.founder = 0; }   // 跨日自動歸零
+// 從 airframes 回應標頭更新真實額度
+function _atisUpdateRate(r: any) {
+  const lim = parseInt(r.headers.get('x-ratelimit-limit') || '', 10);
+  const rem = parseInt(r.headers.get('x-ratelimit-remaining') || '', 10);
+  const rst = parseInt(r.headers.get('x-ratelimit-reset') || '', 10);
+  if (!isNaN(lim) && !isNaN(rem)) _atisRate = { limit: lim, remaining: rem, reset: isNaN(rst) ? 0 : rst, updated: Date.now() };
 }
-// 扣 n 次，回傳「扣的是哪個池」（扣不動回 null → 走備援）。
-//   owner：先扣自己的 50 專屬池；50 用完後若共用 450 池還有剩，繼續吃 450（保底 50 + 有剩再續用）。
-//   founder：只扣共用 450 池。
-//   ⚠ codex P1：扣完若 airframes 抓失敗/無資料，要用 _atisRefund 退還 → 不讓暫時性失敗把整池燒光。
-function _atisSpend(n: number, level: 'owner' | 'founder'): 'owner' | 'founder' | null {
-  _atisRollDay();
-  if (level === 'owner' && _atisBudget.owner + n <= ATIS_OWNER_LIMIT) {
-    _atisBudget.owner += n; return 'owner';                    // 先用 owner 專屬 50
-  }
-  if (_atisBudget.founder + n <= ATIS_FOUNDER_LIMIT) {
-    _atisBudget.founder += n; return 'founder';                // owner 50 用完後、或 founder → 共用 450
-  }
-  return null;
+// 依真實剩餘額度判斷某等級現在能不能再打 airframes。owner 用到剩 0、founder 用到剩 RESERVE 就停。
+// _atisRate 還不知道時（剛重啟、沒打過）→ 樂觀放行，第一次打就學到真實值。
+function _atisAllowed(level: 'owner' | 'founder'): boolean {
+  if (!_atisRate) return true;
+  const floor = level === 'owner' ? 0 : ATIS_OWNER_RESERVE;
+  return _atisRate.remaining > floor;
 }
-function _atisRefund(n: number, pool: 'owner' | 'founder') {
-  if (pool === 'owner') _atisBudget.owner = Math.max(0, _atisBudget.owner - n);
-  else _atisBudget.founder = Math.max(0, _atisBudget.founder - n);
-}
-// 給 Tower 後台讀「今日 airframes 用量」（owner 池 / founder 池分開顯示）
+// 給 Tower 後台讀「真實 airframes 用量」（直接來自 airframes，不是我們自己數的）
 export function getAtisUsage() {
-  const today = _atisToday();
-  const same = _atisBudget.day === today;
+  if (!_atisRate) return { known: false, limit: 500, founderCap: 500 - ATIS_OWNER_RESERVE, cachedAirports: _atisCache.size };
   return {
-    day: today,
-    owner: { used: same ? _atisBudget.owner : 0, limit: ATIS_OWNER_LIMIT },
-    founder: { used: same ? _atisBudget.founder : 0, limit: ATIS_FOUNDER_LIMIT },
+    known: true,
+    limit: _atisRate.limit,
+    remaining: _atisRate.remaining,
+    used: Math.max(0, _atisRate.limit - _atisRate.remaining),
+    founderCap: _atisRate.limit - ATIS_OWNER_RESERVE,
+    resetAt: _atisRate.reset,
     cachedAirports: _atisCache.size,
   };
 }
@@ -686,6 +677,7 @@ async function _atisAuthLevel(plToken: string, csIdt: string): Promise<AtisLevel
 async function _atisFetchAirframes(icao: string, kind: 'ARR' | 'DEP') {
   const url = 'https://api.airframes.io/messages?text=' + encodeURIComponent(icao + ' ' + kind + ' ATIS') + '&limit=1';
   const r = await fetch(url, { headers: { Authorization: 'Bearer ' + AIRFRAMES_KEY } });
+  _atisUpdateRate(r);                                     // 每次回應都帶 x-ratelimit-* → 更新真實額度
   if (!r.ok) throw new Error('airframes ' + r.status);   // 429/5xx → 讓上層走 fallback
   const a = await r.json() as any[];
   if (!Array.isArray(a) || !a.length) return null;
@@ -729,21 +721,19 @@ app.get('/api/atis', async (req, res) => {
   //    註：快取命中已在最前面對所有人開放 → 非 founder 仍吃得到別人剛抓進 60 分快取的 airframes 資料。
   const level = await _atisAuthLevel(String(req.headers['x-pl-at'] || ''), String(req.headers['x-cs-idt'] || ''));
   if (level === 'none') return res.json({ fallback: true });
-  // 4. 先佔額度（記住扣哪池）；池滿 or key 沒設 → 備援。抓失敗會在下面退還，不浪費額度（codex P1）。
-  const spent = AIRFRAMES_KEY ? _atisSpend(2, level) : null;
-  if (!spent) return res.json({ fallback: true });
-  // 5. 抓 airframes ARR + DEP
+  // 4. 依 airframes「真實剩餘額度」判斷（owner 用到剩 0、founder 用到剩 50 就停）；key 沒設或額度不足 → 備援。
+  if (!AIRFRAMES_KEY || !_atisAllowed(level)) return res.json({ fallback: true });
+  // 5. 抓 airframes ARR + DEP（過程用回應標頭更新真實額度，不自己數、不用退還）
   try {
     const [arr, dep] = await Promise.all([
       _atisFetchAirframes(icao, 'ARR').catch(() => null),
       _atisFetchAirframes(icao, 'DEP').catch(() => null),
     ]);
     const sections = [arr, dep].filter(Boolean) as { title: string; text: string }[];
-    if (!sections.length) { _atisRefund(2, spent); return res.json({ fallback: true }); }   // 沒資料 → 退額度
+    if (!sections.length) return res.json({ fallback: true });   // airframes 沒這機場 → 試 allorigins
     _atisCache.set(icao, { sections, time: Date.now(), source: 'airframes' });
     return res.json({ sections, source: 'airframes' });
   } catch (e: any) {
-    _atisRefund(2, spent);                                        // 抓失敗 → 退額度
     return res.json({ fallback: true });
   }
 });
