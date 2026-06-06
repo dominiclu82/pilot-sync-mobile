@@ -484,17 +484,15 @@ function reloadCurrentAtis() {
 }
 
 function fetchAtisData(url, icao, container) {
-  const corsProxy = 'https://api.codetabs.com/v1/proxy/?quest=';
-  const metarUrl = 'https://aviationweather.gov/api/data/metar?ids=' + icao + '&format=raw&hours=12';
-  const tafUrl = 'https://aviationweather.gov/api/data/taf?ids=' + icao + '&format=raw';
-  const atisPromise = fetch(corsProxy + encodeURIComponent(url))
+  // 全改走自己 server proxy（不再繞免費 codetabs，那個爛掉會讓 ATIS/TAF 抓不到）
+  const atisPromise = fetch('/api/atis?icao=' + icao)
     .then(r => { if (!r.ok) throw new Error(); return r.text(); })
     .then(html => parseAtisHtml(html))
     .catch(() => []);
-  const metarPromise = fetch(corsProxy + encodeURIComponent(metarUrl))
+  const metarPromise = fetch('/api/metar?ids=' + icao + '&hours=12')
     .then(r => { if (!r.ok) throw new Error(); return r.text(); })
     .then(t => t.trim()).catch(() => '');
-  const tafPromise = fetch(corsProxy + encodeURIComponent(tafUrl))
+  const tafPromise = fetch('/api/taf?ids=' + icao)
     .then(r => { if (!r.ok) throw new Error(); return r.text(); })
     .then(t => t.trim()).catch(() => '');
   Promise.all([atisPromise, metarPromise, tafPromise]).then(([atisSections, metarText, tafText]) => {

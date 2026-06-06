@@ -319,16 +319,15 @@ function fetchWxDetail(icao, name) {
     if (content && wxSelectedIcao === icao) content.innerHTML = html;
     return;
   }
-  var proxy = 'https://api.codetabs.com/v1/proxy/?quest=';
   var metarP = fetch('/api/metar?ids=' + icao + '&hours=6')
     .then(function(r) { return r.ok ? r.text() : ''; })
     .then(function(t) {
       var lines = t.trim().split('\\n').filter(function(l) { return l.trim(); });
       return lines.map(function(l) { return l.replace(/^(METAR|SPECI)\\s+/, '').trim(); }).filter(function(l) { return l.length > 0; });
     }).catch(function() { return []; });
-  var tafP = fetch(proxy + encodeURIComponent('https://aviationweather.gov/api/data/taf?ids=' + icao + '&format=raw'))
+  var tafP = fetch('/api/taf?ids=' + icao)
     .then(function(r) { return r.ok ? r.text() : ''; }).then(function(t) { return t.trim(); }).catch(function() { return ''; });
-  var atisP = fetch(proxy + encodeURIComponent('https://atis.guru/atis/' + icao))
+  var atisP = fetch('/api/atis?icao=' + icao)
     .then(function(r) { return r.ok ? r.text() : ''; }).then(parseAtisHtml).catch(function() { return []; });
   Promise.all([metarP, tafP, atisP]).then(function(res) {
     var metarLines = res[0], tafText = res[1], atisSections = res[2];
@@ -410,7 +409,6 @@ setTimeout(function() { try { _wxPrefetchAllMaps(); } catch (e) {} }, 4000);
 /* btn can be a DOM element or a string (element ID) — re-queried each time to survive re-renders */
 function _wxGetBtn(btn) { return typeof btn === 'string' ? document.getElementById(btn) : btn; }
 function _wxBatchRefresh(icaos, updateListRegion, btn, btnLabel) {
-  var proxy = 'https://api.codetabs.com/v1/proxy/?quest=';
   var doneCount = 0;
   var total = icaos.length;
 
@@ -431,7 +429,7 @@ function _wxBatchRefresh(icaos, updateListRegion, btn, btnLabel) {
     }).catch(function() { return {}; });
 
   /* batch TAF (all at once) */
-  var tafAllP = fetch(proxy + encodeURIComponent('https://aviationweather.gov/api/data/taf?ids=' + icaos.join(',') + '&format=raw'))
+  var tafAllP = fetch('/api/taf?ids=' + icaos.join(','))
     .then(function(r) { return r.ok ? r.text() : ''; })
     .then(function(text) {
       var result = {};
@@ -504,7 +502,7 @@ function _wxBatchRefresh(icaos, updateListRegion, btn, btnLabel) {
       var metarLines = metarAll[icao] || [];
       var tafText = tafAll[icao] || '';
 
-      fetch(proxy + encodeURIComponent('https://atis.guru/atis/' + icao))
+      fetch('/api/atis?icao=' + icao)
         .then(function(r) { return r.ok ? r.text() : ''; })
         .then(parseAtisHtml)
         .catch(function() { return []; })

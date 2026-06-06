@@ -54,8 +54,8 @@ import { getAirportDbJs } from '../spa/js-airport-db.js';
 
 // ── 版本（比照 CrewSync / Morning：每次推版必更新；SW cache 名稱跟著走） ────
 // 本機 preview build 會暫時加 -tNN 後綴方便對版；推正式版前拿掉只留乾淨版號。
-export const PILOT_LOG_VERSION = 'V2.2.14';
-const PILOT_LOG_CACHE = 'pilotlog-v2-2-14';
+export const PILOT_LOG_VERSION = 'V2.2.15';
+const PILOT_LOG_CACHE = 'pilotlog-v2-2-15';
 
 export const pilotLogRouter = express.Router();
 
@@ -361,8 +361,13 @@ function _renderPilotLogChangelog(): string {
     ${renderCommunityLink()}
     <div class="pl-cl-v">${PILOT_LOG_VERSION}</div>
     <div class="pl-cl-txt">
-      <b>🩹 修 Tools 入口（透明狀態列）下的頂部顯示 ＋ 更新更即時 ＋ 回 Tools 鈕。</b>從 Tools 入口進來時，年份索引會凸頂搜尋框、捲動時標題/內容跑到狀態列那塊 → 改成依「標題實際底緣」定位、標題吸頂補安全區、狀態列那塊鋪不透明底。另外：Import 標題吸頂不被捲走、Analyze 左右各自獨立捲動（同 Logbook）；app 改網路優先、一次重開就更新；右下角多一顆回 Tools 鈕（彩色四格）。<br>
-      <b>🩹 Fixes top rendering under the Tools hub (translucent status bar) + snappier updates + a Tools button.</b> Entering via the Tools hub pushed the year index into the search box and let the header/content bleed into the status-bar area — now anchored to the header's real bottom, the sticky header respects the safe-area inset, and an opaque strip backs the status-bar area. Also: the Import header stays pinned, and Analyze scrolls its left/right columns independently (like Logbook); the app is network-first so it updates on the first reopen; a Tools launcher button appears bottom-right.
+      <b>🩹 Analyze 左右獨立捲動修好。</b>上一版 Analyze 改獨立捲動時破版（手機欄位跑掉、iPad 群組標題與內容疊）→ 改成只把右欄做成獨立捲動盒（照 Logbook 的做法），手機維持原樣、iPad 左右分開捲。<br>
+      <b>🩹 Analyze independent scroll fixed.</b> The previous attempt broke the layout (mobile columns collapsed, the iPad group header overlapped the content) — now only the right column is an independent scroll box (like Logbook); mobile is unchanged and iPad scrolls its left/right columns separately.
+    </div>
+    <div class="pl-cl-v old">V2.2.14</div>
+    <div class="pl-cl-txt">
+      <b>🩹 修 Tools 入口（透明狀態列）下的頂部顯示 ＋ 更新更即時 ＋ 回 Tools 鈕。</b>從 Tools 入口進來時，年份索引會凸頂搜尋框、捲動時標題/內容跑到狀態列那塊 → 改成依「標題實際底緣」定位、標題吸頂補安全區、狀態列那塊鋪不透明底。另外：Import 標題吸頂不被捲走；app 改網路優先、一次重開就更新；右下角多一顆回 Tools 鈕（彩色四格）。<br>
+      <b>🩹 Fixes top rendering under the Tools hub (translucent status bar) + snappier updates + a Tools button.</b> Entering via the Tools hub pushed the year index into the search box and let the header/content bleed into the status-bar area — now anchored to the header's real bottom, the sticky header respects the safe-area inset, and an opaque strip backs the status-bar area. Also: the Import header stays pinned; the app is network-first so it updates on the first reopen; a Tools launcher button appears bottom-right.
     </div>
     <div class="pl-cl-v old">V2.2.10</div>
     <div class="pl-cl-txt">

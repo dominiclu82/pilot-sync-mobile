@@ -17,6 +17,9 @@ export function renderCommunityLink(): string {
 export interface ChangelogEntry { v: string; zh: string; en: string; }
 
 export const APP_CHANGELOG: ChangelogEntry[] = [
+  { v: 'V2.0.12',
+    zh: '[投資] 加交易可只填「股數/價格/總額」其中兩格，第三格自動算（總額=股數×價格，不含手續費）；交易紀錄的編輯✏️/刪除🗑改成有外框上色的鈕，一眼看出能點。',
+    en: '[Portfolio] Add-transaction lets you fill any two of shares / price / total and auto-computes the third (total = shares × price, excl. fee); the edit ✏️ / delete 🗑 buttons on transactions are now clearly tappable (outlined + colored).' },
   { v: 'V2.0.11',
     zh: '[全域] 修頂部：狀態列那塊補不透明底，從 Tools 入口/PWA（透明狀態列）捲動時，內容不再透到狀態列區。',
     en: '[Global] Top fix: an opaque strip now backs the status-bar area, so scrolling no longer bleeds content into it (Tools hub / translucent status bar).' },

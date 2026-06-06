@@ -5289,15 +5289,7 @@ function _plAnBuildGroups(all) {
   tOrder.forEach(function(t) { add('ty:' + t, t, 'type', byT[t]); });
   return groups;
 }
-function _plAnSelect(id) {
-  _pl.anGroup = id;
-  // iPad 左欄是獨立捲動盒：重建內容會讓它捲回頂 → 選下面的群組就跳掉。先存捲動位置、重建後復原。
-  var lp = document.querySelector('.pl-an-left');
-  var sc = lp ? lp.scrollTop : 0;
-  _plRenderAnalyzeContent();
-  var lp2 = document.querySelector('.pl-an-left');
-  if (lp2) lp2.scrollTop = sc;
-}
+function _plAnSelect(id) { _pl.anGroup = id; _plRenderAnalyzeContent(); }
 
 function _plRenderAnalyzeContent() {
   var c = document.getElementById('pilotlog-content');
@@ -5340,8 +5332,8 @@ function _plRenderAnalyzeContent() {
   var selSum = _plAnGroupSum(sel);
   var dim = (sel.section === 'type') ? 'company' : 'type';
   var rightHtml =
-    // #2-analyze：群組標題（All Flight Time 等）固定。手機(整頁捲)黏在頁 sticky 標題下；iPad(右欄獨立捲動盒)黏在盒頂(top:0)。
-    '<div class="pl-an-ghead">' +
+    // #2-analyze：群組標題（All Flight Time 等）固定在頁面 sticky 標題下方，捲動明細時不被推走/蓋掉。
+    '<div style="position:sticky;top:calc(var(--pl-head-h, 0px));z-index:30;background:var(--bg);display:flex;justify-content:space-between;align-items:baseline;padding:4px 0 8px">' +
       '<div style="font-size:1.05em;font-weight:800">' + _plEsc(sel.label) + '</div>' +
       '<div style="font-size:.7em;color:var(--muted)">' + selSum.flights + ' flights</div>' +
     '</div>' +
@@ -5352,11 +5344,11 @@ function _plRenderAnalyzeContent() {
     (sel.id === 'all' ? _plRenderMonthlyChart(entries) + _plRenderOpeningSim() : '');
   c.innerHTML =
     '<style>' +
-      '.pl-an-wrap{display:flex;gap:14px;max-width:1100px;margin:0 auto;align-items:flex-start}' +
+      '.pl-an-wrap{display:flex;gap:14px;max-width:1100px;margin:0 auto}' +
       '.pl-an-left{flex:0 0 268px}.pl-an-right{flex:1;min-width:0}' +
-      /* iPad/寬螢幕：照搬 Logbook 的獨立捲動 — 左欄(群組)隨頁捲、右欄(明細)變 sticky+自己 overflow 的捲動盒 → 左右分開捲 */
-      '@media(min-width:761px){.pl-an-left{position:sticky;top:calc(var(--pl-head-h,0px) + 8px);max-height:calc(100dvh - 84px - var(--pl-head-h,0px) - env(safe-area-inset-bottom));overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:none}.pl-an-right{position:sticky;top:calc(var(--pl-head-h,0px) + 8px);max-height:calc(100dvh - 84px - var(--pl-head-h,0px) - env(safe-area-inset-bottom));overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:none}.pl-an-ghead{top:0}}' +
-      '.pl-an-ghead{position:sticky;top:var(--pl-head-h,0px);z-index:30;background:var(--bg);display:flex;justify-content:space-between;align-items:baseline;padding:4px 0 8px}' +
+      '.pl-an-ghead{position:sticky;top:calc(var(--pl-head-h, 0px));z-index:30;background:var(--bg);display:flex;justify-content:space-between;align-items:baseline;padding:4px 0 8px}' +
+      /* iPad/寬螢幕：照 Logbook detail 的做法，只把「右欄」變 sticky+overflow 的獨立捲動盒(左欄隨頁捲)；群組標題在盒內改 static 不再 sticky → 不會跟內容疊。align 只在這裡開，手機不受影響。 */
+      '@media(min-width:761px){.pl-an-wrap{align-items:flex-start}.pl-an-right{position:sticky;top:calc(var(--pl-head-h,0px) + 8px);max-height:calc(100dvh - 84px - var(--pl-head-h,0px) - env(safe-area-inset-bottom));overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:none}.pl-an-ghead{position:static}}' +
       '@media(max-width:760px){.pl-an-wrap{flex-direction:column}.pl-an-left{flex:none}}' +
     '</style>' +
     '<div style="padding:10px 14px">' +

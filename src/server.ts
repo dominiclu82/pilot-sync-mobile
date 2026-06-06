@@ -605,6 +605,21 @@ app.get('/api/taf', async (req, res) => {
   }
 });
 
+// ATIS：直連 atis.guru（server 對 server，無 CORS 限制）。原本 client 繞免費 proxy(codetabs)，
+// 那個 proxy 爛掉後 ATIS 就抓不到 → 改成自己 server proxy，跟 metar/taf 一致。
+app.get('/api/atis', async (req, res) => {
+  try {
+    const { icao } = req.query;
+    const url = `https://atis.guru/atis/${icao}`;
+    const r = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0' } });
+    const text = await r.text();
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    res.send(text);
+  } catch (e: any) {
+    res.status(502).send('');
+  }
+});
+
 // ── Service Worker ────────────────────────────────────────────────────────────
 // V8.0.29 fix: cache name 從 html-body.js 動態抓當前 V8.0.X，每次推版自動 invalidate 舊 cache
 // 原本寫死 'crewsync-v8026' → 每次 deploy 同 cache name → SW activate handler

@@ -145,8 +145,9 @@ export function getPortfolioHtml(): string {
           </label>
           <label>代號 <input id="f-symbol" type="text" placeholder="2330 / AAPL" autocomplete="off"></label>
           <label>日期 <input id="f-date" type="date"></label>
-          <label>股數 <input id="f-qty" type="number" step="0.0001" min="0.0001" inputmode="decimal" oninput="updateFeePreview()"></label>
-          <label>價格 <input id="f-price" type="number" step="0.0001" min="0" inputmode="decimal" oninput="updateFeePreview()"></label>
+          <label>股數 <input id="f-qty" type="number" step="0.0001" min="0.0001" inputmode="decimal" oninput="_txInput('qty')"></label>
+          <label>價格 <input id="f-price" type="number" step="0.0001" min="0" inputmode="decimal" oninput="_txInput('price')"></label>
+          <label>總額（股數×價格，不含手續費；填任兩格自動算第三）<input id="f-total" type="number" step="0.0001" min="0" inputmode="decimal" oninput="_txInput('total')"></label>
           <label>手續費（空白 = 自動算 / 賣方含證交稅）<input id="f-fee" type="number" step="1" min="0" inputmode="decimal" placeholder="auto"></label>
           <label>備註（可選）<input id="f-note" type="text" maxlength="100"></label>
           <div id="fee-preview" class="muted muted-small" style="text-align:right;font-size:.82em" hidden></div>
@@ -532,10 +533,11 @@ a.h-symbol-link:hover, a.h-symbol-link:active { color: var(--accent); text-decor
 .txn-row .type.div { color: var(--accent); }
 .txn-row .detail { flex: 1; }
 .txn-row .timing { display: block; color: var(--muted); font-size: .82em; margin-top: 2px; }
-.txn-row .edit { cursor: pointer; color: var(--muted); padding: 0 6px; }
-.txn-row .edit:hover { color: var(--accent); }
-.txn-row .del { cursor: pointer; color: var(--muted); padding: 0 6px; }
-.txn-row .del:hover { color: var(--red); }
+.txn-row .edit, .txn-row .del { cursor: pointer; padding: 4px 9px; border-radius: 7px; border: 1px solid var(--border); font-size: 1.05em; line-height: 1; }
+.txn-row .edit { color: var(--accent); }
+.txn-row .del { color: var(--red); }
+.txn-row .edit:hover, .txn-row .edit:active { background: var(--accent); color: #fff; border-color: var(--accent); }
+.txn-row .del:hover, .txn-row .del:active { background: var(--red); color: #fff; border-color: var(--red); }
 .lot { padding: 8px 0; border-bottom: 1px solid var(--border); font-size: .9em; }
 .lot:last-child { border-bottom: none; }
 .lot .lot-hdr { font-weight: 600; }
@@ -1245,6 +1247,28 @@ function toggleLots() {
 
 // ── Add transaction modal ────────────────────────────────────────────────────
 
+// 加交易：股數 / 價格 / 總額 三格，填任兩格 → 自動算第三（總額 = 股數×價格，不含手續費）。
+// _txOrder：最近編輯的排後面；最久沒碰的(_txOrder[0]) = 被自動計算的那格。
+var _txOrder = ['total', 'qty', 'price'];
+function _txReset() { _txOrder = ['total', 'qty', 'price']; }
+function _txNum(n, d) { return (Math.round(n * Math.pow(10, d)) / Math.pow(10, d)).toString(); }
+function _txInput(f) {
+  var i = _txOrder.indexOf(f);
+  if (i >= 0) _txOrder.splice(i, 1);
+  _txOrder.push(f);
+  _txRecalc();
+  updateFeePreview();
+}
+function _txRecalc() {
+  var qEl = document.getElementById('f-qty'), pEl = document.getElementById('f-price'), tEl = document.getElementById('f-total');
+  if (!qEl || !pEl || !tEl) return;
+  var q = parseFloat(qEl.value), p = parseFloat(pEl.value), t = parseFloat(tEl.value);
+  var derived = _txOrder[0];
+  if (derived === 'total') { if (q > 0 && p > 0) tEl.value = _txNum(q * p, 2); }
+  else if (derived === 'price') { if (q > 0 && t > 0) pEl.value = _txNum(t / q, 4); }
+  else if (derived === 'qty') { if (p > 0 && t > 0) qEl.value = _txNum(t / p, 4); }
+}
+
 function openAddModal() {
   if (!getUid()) { changeUid(); return; }
   _state.editingTxnId = null;
@@ -1257,9 +1281,11 @@ function openAddModal() {
   document.getElementById('f-symbol').value = '';
   document.getElementById('f-qty').value = '';
   document.getElementById('f-price').value = '';
+  document.getElementById('f-total').value = '';
   document.getElementById('f-fee').value = '';
   document.getElementById('f-note').value = '';
   document.getElementById('modal-error').hidden = true;
+  _txReset();
   setSide('buy');
   updateFeePreview();
 }
@@ -1278,9 +1304,11 @@ function quickAddTxn(market, symbol) {
   document.getElementById('f-date').value = new Date().toISOString().slice(0, 10);
   document.getElementById('f-qty').value = '';
   document.getElementById('f-price').value = '';
+  document.getElementById('f-total').value = '';
   document.getElementById('f-fee').value = '';
   document.getElementById('f-note').value = '';
   document.getElementById('modal-error').hidden = true;
+  _txReset();
   setSide('buy');
   updateFeePreview();
   setTimeout(() => { const el = document.getElementById('f-qty'); if (el) el.focus(); }, 50);
@@ -1299,9 +1327,11 @@ function openEditModal(txn) {
   document.getElementById('f-date').value = txn.txn_date;
   document.getElementById('f-qty').value = txn.qty;
   document.getElementById('f-price').value = txn.price != null ? txn.price : '';
+  document.getElementById('f-total').value = (txn.qty > 0 && txn.price != null) ? _txNum(txn.qty * txn.price, 2) : '';
   document.getElementById('f-fee').value = txn.fee != null && txn.fee > 0 ? txn.fee : '';
   document.getElementById('f-note').value = txn.note || '';
   document.getElementById('modal-error').hidden = true;
+  _txReset();
   setSide(txn.txn_type);
   updateFeePreview();
 }
