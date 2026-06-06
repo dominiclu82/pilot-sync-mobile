@@ -75,6 +75,39 @@ export function verifyAccessToken(token: string): JwtPayload | null {
   }
 }
 
+// ── CrewSync 身份 token（給 ATIS founder 判斷用）─────────────────────────────────
+// 班表同步登入沒有 pilot_users / access JWT，只有 Google email。登入時用我們密鑰簽一張「email 身份證」
+// （別人偽造不了），存前端、抓 ATIS 時帶上 → server 驗章拿 email 比對名單。90 天有效（配合登入長效）。
+interface EmailTokenPayload { em: string; iat: number; exp: number; }
+export function signEmailToken(email: string): string {
+  const header = { alg: 'HS256', typ: 'JWT' };
+  const now = Math.floor(Date.now() / 1000);
+  const payload: EmailTokenPayload = {
+    em: String(email || '').trim().toLowerCase(), iat: now, exp: now + 90 * 24 * 60 * 60,
+  };
+  const headerB64 = b64url(JSON.stringify(header));
+  const payloadB64 = b64url(JSON.stringify(payload));
+  const signing = `${headerB64}.${payloadB64}`;
+  const sig = createHmac('sha256', _jwtSecret).update(signing).digest();
+  return `${signing}.${b64url(sig)}`;
+}
+export function verifyEmailToken(token: string): string | null {
+  const parts = token.split('.');
+  if (parts.length !== 3) return null;
+  const [h, p, s] = parts;
+  try {
+    const expected = createHmac('sha256', _jwtSecret).update(`${h}.${p}`).digest();
+    const got = b64urlDecode(s);
+    if (got.length !== expected.length || !timingSafeEqual(got, expected)) return null;
+    const payload = JSON.parse(b64urlDecode(p).toString('utf8')) as EmailTokenPayload;
+    if (typeof payload.exp !== 'number' || Math.floor(Date.now() / 1000) >= payload.exp) return null;
+    if (typeof payload.em !== 'string' || !payload.em) return null;
+    return payload.em;
+  } catch {
+    return null;
+  }
+}
+
 // ── Refresh token ────────────────────────────────────────────────────────────
 function newRefreshToken(): { raw: string; hash: string } {
   const raw = randomBytes(48).toString('base64url');

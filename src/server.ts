@@ -30,8 +30,8 @@ import { getSpaGroupsJs } from './spa/js-groups.js';
 import { morningRouter, startMorningCron } from './morning.js';
 import { pilotLogRouter, PILOT_LOG_VERSION } from './pilot-log/routes.js';
 import { APP_VERSION } from './version.js';
-import { requireAuth, AuthedRequest } from './pilot-log/auth.js';
-import { isOwnerUserId } from './pilot-log/beta.js';
+import { requireAuth, AuthedRequest, verifyAccessToken, signEmailToken, verifyEmailToken } from './pilot-log/auth.js';
+import { isOwnerUserId, getFounderLevel, getFounderLevelByEmail } from './pilot-log/beta.js';
 import { startPilotLogSnapshotCron } from './pilot-log/schema.js';
 import { portfolioRouter, startPortfolio } from './portfolio/routes.js';
 import FR24Pkg from 'flightradarapi';
@@ -605,42 +605,153 @@ app.get('/api/taf', async (req, res) => {
   }
 });
 
-// ATIS：來源 atis.guru。它沒 CORS（瀏覽器不能直連）、又擋 Render 機房 IP（server 直連回 502）。
-// 穩健版：① 先帶完整瀏覽器 headers 試直連 atis.guru（若只是 header 問題就成、且不靠外部 proxy）；
-// ② 直連失敗才退到 allorigins（它的 IP 抓得到 atis.guru、會幫加 CORS）。回傳含 <div class="atis"> 的 HTML 給前端解析。
-app.get('/api/atis', async (req, res) => {
-  const { icao } = req.query;
-  const target = `https://atis.guru/atis/${icao}`;
-  const headers = {
-    'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36',
-    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-    'Accept-Language': 'en-US,en;q=0.9',
-    'Referer': 'https://atis.guru/',
-  };
-  // ① 直連
-  try {
-    const r = await fetch(target, { headers });
-    if (r.ok) {
-      const text = await r.text();
-      if (text && text.indexOf('class="atis"') >= 0) {
-        res.setHeader('Content-Type', 'text/html; charset=utf-8');
-        return res.send(text);
-      }
-    }
-  } catch (e: any) { /* 直連被擋 → 走 ② */ }
-  // ② 退到 allorigins。要驗 r2.ok + 內容真的含 ATIS，否則(429/500/空)回 502 讓前端走正常錯誤路徑，
-  //    不要把代理故障當成 200 空資料(codex P2)。
-  try {
-    const r2 = await fetch('https://api.allorigins.win/raw?url=' + encodeURIComponent(target), { headers });
-    const text2 = r2.ok ? await r2.text() : '';
-    if (text2 && text2.indexOf('class="atis"') >= 0) {
-      res.setHeader('Content-Type', 'text/html; charset=utf-8');
-      return res.send(text2);
-    }
-    return res.status(502).send('');
-  } catch (e: any) {
-    return res.status(502).send('');
+// ── ATIS：airframes（ACARS 解碼社群網）為主源 + allorigins 自動備援 ───────────────
+// 為什麼：atis.guru 沒 CORS（瀏覽器不能直連）又擋 Render 機房 IP（server 直連 502）。
+//   airframes 有公開 API（免費 500/天）、server 抓得到、有完整台灣 D-ATIS（實測 RCTP/RCKH/RCSS 都新）。
+// 設計：on-demand 單機場查（ARR+DEP 各 1 次）→ 60min 記憶體快取 → 每日額度上限（留 margin）。
+//   爆額度 / key 未設 / airframes 查無 → 回 {fallback:true}，前端改走 allorigins（舊的、不穩、但無限）。
+//   ⚠ 鐵律：ATIS 只在「點開單一機場」時抓，絕不放進一鍵更新（80 機場一次抓會瞬間爆 500/天）。
+const AIRFRAMES_KEY = process.env.AIRFRAMES_KEY || '';
+const ATIS_TTL = 60 * 60 * 1000;          // 快取 60 分（ATIS 大約一小時更新一次）
+// 兩個「完全獨立」的每日額度池（免費 500/天 = 50 + 450）：
+//   owner（站長）獨享 50 —— 只有你能動，其他人碰不到、保證你永遠有。
+//   founder（其他 active 報名者）共用 450 —— 吃不到 owner 的 50。
+const ATIS_OWNER_LIMIT = 50;
+const ATIS_FOUNDER_LIMIT = 450;
+const _atisCache = new Map<string, { sections: { title: string; text: string }[]; time: number; source: string }>();
+const _atisBudget = { day: '', owner: 0, founder: 0 };   // 兩池各自計數（Tower 後台顯示用）
+
+function _atisToday(): string { return new Date().toISOString().slice(0, 10); }   // UTC 日界
+function _atisRollDay() {
+  const d = _atisToday();
+  if (_atisBudget.day !== d) { _atisBudget.day = d; _atisBudget.owner = 0; _atisBudget.founder = 0; }   // 跨日自動歸零
+}
+// 扣 n 次，回傳「扣的是哪個池」（扣不動回 null → 走備援）。
+//   owner：先扣自己的 50 專屬池；50 用完後若共用 450 池還有剩，繼續吃 450（保底 50 + 有剩再續用）。
+//   founder：只扣共用 450 池。
+//   ⚠ codex P1：扣完若 airframes 抓失敗/無資料，要用 _atisRefund 退還 → 不讓暫時性失敗把整池燒光。
+function _atisSpend(n: number, level: 'owner' | 'founder'): 'owner' | 'founder' | null {
+  _atisRollDay();
+  if (level === 'owner' && _atisBudget.owner + n <= ATIS_OWNER_LIMIT) {
+    _atisBudget.owner += n; return 'owner';                    // 先用 owner 專屬 50
   }
+  if (_atisBudget.founder + n <= ATIS_FOUNDER_LIMIT) {
+    _atisBudget.founder += n; return 'founder';                // owner 50 用完後、或 founder → 共用 450
+  }
+  return null;
+}
+function _atisRefund(n: number, pool: 'owner' | 'founder') {
+  if (pool === 'owner') _atisBudget.owner = Math.max(0, _atisBudget.owner - n);
+  else _atisBudget.founder = Math.max(0, _atisBudget.founder - n);
+}
+// 給 Tower 後台讀「今日 airframes 用量」（owner 池 / founder 池分開顯示）
+export function getAtisUsage() {
+  const today = _atisToday();
+  const same = _atisBudget.day === today;
+  return {
+    day: today,
+    owner: { used: same ? _atisBudget.owner : 0, limit: ATIS_OWNER_LIMIT },
+    founder: { used: same ? _atisBudget.founder : 0, limit: ATIS_FOUNDER_LIMIT },
+    cachedAirports: _atisCache.size,
+  };
+}
+
+// founder 判定（名單上的人才走 airframes）：驗 Pilot Log token → userId → 查名單。
+// 結果快取 10 分（per userId），避免每次抓 ATIS 都打 DB。
+type AtisLevel = 'owner' | 'founder' | 'none';
+const _founderCache = new Map<string, { level: AtisLevel; time: number }>();
+async function _levelCached(key: string, compute: () => Promise<AtisLevel>): Promise<AtisLevel> {
+  const c = _founderCache.get(key);
+  if (c && Date.now() - c.time < 10 * 60 * 1000) return c.level;   // 結果快取 10 分，少打 DB
+  const level = await compute().catch(() => 'none' as const);
+  _founderCache.set(key, { level, time: Date.now() });
+  return level;
+}
+// 兩種登入都認：Pilot Log（pilotlog_at → userId）或 CrewSync 班表同步（email 身份證）。取較高等級。
+async function _atisAuthLevel(plToken: string, csIdt: string): Promise<AtisLevel> {
+  let lvl: AtisLevel = 'none';
+  const payload = plToken ? verifyAccessToken(plToken) : null;
+  if (payload && payload.sub) lvl = await _levelCached('u:' + payload.sub, () => getFounderLevel(payload.sub));
+  if (lvl === 'owner') return 'owner';
+  const email = csIdt ? verifyEmailToken(csIdt) : null;
+  if (email) {
+    const elvl = await _levelCached('e:' + email, () => getFounderLevelByEmail(email));
+    if (elvl === 'owner') return 'owner';
+    if (elvl === 'founder') lvl = 'founder';
+  }
+  return lvl;
+}
+
+// 查 airframes 某機場的 ARR / DEP D-ATIS（text 片語搜尋，去掉 ACARS 路由前綴）
+async function _atisFetchAirframes(icao: string, kind: 'ARR' | 'DEP') {
+  const url = 'https://api.airframes.io/messages?text=' + encodeURIComponent(icao + ' ' + kind + ' ATIS') + '&limit=1';
+  const r = await fetch(url, { headers: { Authorization: 'Bearer ' + AIRFRAMES_KEY } });
+  if (!r.ok) throw new Error('airframes ' + r.status);   // 429/5xx → 讓上層走 fallback
+  const a = await r.json() as any[];
+  if (!Array.isArray(a) || !a.length) return null;
+  const text = String(a[0].text || '').replace(/^\/[^/]*\//, '').trim();   // 去 ACARS 路由前綴 /TPECAYA.TI2/
+  if (!text) return null;
+  return { title: kind + ' ATIS', text };
+}
+
+// 美國 D-ATIS：官方 FAA 源（經 atis.info，CORS*、免 key、免額度）。只有有 D-ATIS 的大場才有（關島等小場沒有 → 404）。
+async function _atisFetchUsFaa(icao: string) {
+  const r = await fetch('https://atis.info/api/' + icao);
+  if (!r.ok) return null;   // 404 = 該場沒 D-ATIS → 上層往下退 airframes/備案
+  const a = await r.json() as any[];
+  if (!Array.isArray(a) || !a.length) return null;
+  return a.map((o: any) => {
+    const t = String(o.type || '').toLowerCase();
+    const title = t === 'arr' ? 'ARR ATIS' : t === 'dep' ? 'DEP ATIS' : 'ATIS';
+    return { title, text: String(o.datis || '').trim() };
+  }).filter((s: any) => s.text);
+}
+
+app.get('/api/atis', async (req, res) => {
+  const icao = String(req.query.icao || '').toUpperCase();
+  if (!/^[A-Z]{4}$/.test(icao)) return res.status(400).json({ error: 'bad icao' });
+  // 1. 快取命中（60 分內）→ 直接回，不花額度
+  const c = _atisCache.get(icao);
+  if (c && Date.now() - c.time < ATIS_TTL) return res.json({ sections: c.sections, source: c.source, cached: true });
+  // 2. 美國機場（K/P 開頭）→ 官方 FAA 源 atis.info 為權威（免費、CORS*、不吃 airframes 額度）。
+  //    ⚠ 有就回；沒有(如關島 PGUM 沒 D-ATIS)或 atis.info 掛 → 直接走備案，「絕不」往下試 airframes
+  //    —— 美國沒 D-ATIS 的場 airframes 也不會有，去試純粹浪費額度；atis.guru 備案有美國、可能補到。
+  if (icao[0] === 'K' || icao[0] === 'P') {
+    let us: { title: string; text: string }[] | null = null;
+    try { us = await _atisFetchUsFaa(icao); } catch (e: any) { /* atis.info 掛 → 走備案 */ }
+    if (us && us.length) {
+      _atisCache.set(icao, { sections: us, time: Date.now(), source: 'faa' });
+      return res.json({ sections: us, source: 'faa' });
+    }
+    return res.json({ fallback: true });   // 美國機場一律不碰 airframes
+  }
+  // 3. 亞洲/其他：穩定的 airframes「只給名單上的人」。owner→自己的 50 池、founder→共用 450 池、none→備案。
+  //    註：快取命中已在最前面對所有人開放 → 非 founder 仍吃得到別人剛抓進 60 分快取的 airframes 資料。
+  const level = await _atisAuthLevel(String(req.headers['x-pl-at'] || ''), String(req.headers['x-cs-idt'] || ''));
+  if (level === 'none') return res.json({ fallback: true });
+  // 4. 先佔額度（記住扣哪池）；池滿 or key 沒設 → 備援。抓失敗會在下面退還，不浪費額度（codex P1）。
+  const spent = AIRFRAMES_KEY ? _atisSpend(2, level) : null;
+  if (!spent) return res.json({ fallback: true });
+  // 5. 抓 airframes ARR + DEP
+  try {
+    const [arr, dep] = await Promise.all([
+      _atisFetchAirframes(icao, 'ARR').catch(() => null),
+      _atisFetchAirframes(icao, 'DEP').catch(() => null),
+    ]);
+    const sections = [arr, dep].filter(Boolean) as { title: string; text: string }[];
+    if (!sections.length) { _atisRefund(2, spent); return res.json({ fallback: true }); }   // 沒資料 → 退額度
+    _atisCache.set(icao, { sections, time: Date.now(), source: 'airframes' });
+    return res.json({ sections, source: 'airframes' });
+  } catch (e: any) {
+    _atisRefund(2, spent);                                        // 抓失敗 → 退額度
+    return res.json({ fallback: true });
+  }
+});
+
+// Tower 後台讀「今日 airframes 用量」（owner 池 / founder 池）。只給 owner。
+app.get('/api/atis-usage', requireAuth, async (req: AuthedRequest, res) => {
+  if (!(await isOwnerUserId(req.pilotUserId || ''))) return res.status(403).json({ error: 'not_owner' });
+  res.json(getAtisUsage());
 });
 
 // ── Service Worker ────────────────────────────────────────────────────────────
@@ -1211,25 +1322,28 @@ async function oauthCallback(req: express.Request, res: express.Response) {
       pkceEntry ? { code: code as string, codeVerifier: pkceEntry.codeVerifier } as any : (code as string)
     );
     const rt = tokens.refresh_token ?? '';
-    // Save user email to database (decode id_token, no extra scope needed)
-    if (_pool && tokens.id_token) {
+    // 解出 email（存 DB + 簽一張 CrewSync ATIS 身份證）
+    let csEmail = '';
+    if (tokens.id_token) {
       try {
         const payload = JSON.parse(Buffer.from(tokens.id_token.split('.')[1], 'base64').toString());
-        const email = payload.email || '';
+        csEmail = payload.email || '';
         const name = payload.name || '';
         const picture = payload.picture || '';
-        if (email) {
+        if (_pool && csEmail) {
           await _pool.query(
             `INSERT INTO cs_users (email, name, picture) VALUES ($1, $2, $3)
              ON CONFLICT (email) DO UPDATE SET name = $2, picture = $3, updated_at = NOW()`,
-            [email, name, picture]
+            [csEmail, name, picture]
           );
-          console.log(`[DB] User saved: ${email}`);
+          console.log(`[DB] User saved: ${csEmail}`);
         }
       } catch (dbErr: any) {
         console.error('[DB] Save user error:', dbErr.message);
       }
     }
+    // CrewSync 班表同步登入沒有 pilot_users → 簽一張 email 身份證，前端存著、抓 ATIS 時帶上判斷 founder。
+    const csIdt = csEmail ? signEmailToken(csEmail) : '';
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
     res.send(`<!DOCTYPE html><html><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
@@ -1237,7 +1351,7 @@ async function oauthCallback(req: express.Request, res: express.Response) {
 </head><body>
 <div><p style="font-size:2.5em">✅</p><p>授權完成！<br>正在關閉視窗...</p></div>
 <script>
-  try { window.opener && window.opener.postMessage({ type:'oauth_done', refreshToken:${JSON.stringify(rt)} }, '*'); } catch(e){}
+  try { window.opener && window.opener.postMessage({ type:'oauth_done', refreshToken:${JSON.stringify(rt)}, idt:${JSON.stringify(csIdt)} }, '*'); } catch(e){}
   setTimeout(() => window.close(), 1000);
 </script></body></html>`);
   } catch (err: any) {

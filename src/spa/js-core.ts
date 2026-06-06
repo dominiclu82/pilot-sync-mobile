@@ -97,7 +97,7 @@ async function doGoogleAuth() {
         if (e.data && e.data.type === 'oauth_done') {
           clearTimeout(timer); window.removeEventListener('message', onMsg);
           if (!e.data.refreshToken) reject(new Error('未收到授權碼，請重試'));
-          else { refreshToken = e.data.refreshToken; localStorage.setItem('crewsync_rt', refreshToken); resolve(); }
+          else { refreshToken = e.data.refreshToken; localStorage.setItem('crewsync_rt', refreshToken); try { if (e.data.idt) localStorage.setItem('crewsync_idt', e.data.idt); } catch (x) {} resolve(); }
         }
       }
       window.addEventListener('message', onMsg);
@@ -136,7 +136,7 @@ async function doGoogleAuthFromSettings() {
         if (e.data && e.data.type === 'oauth_done') {
           clearTimeout(timer); window.removeEventListener('message', onMsg);
           if (!e.data.refreshToken) reject(new Error('未收到授權碼'));
-          else { refreshToken = e.data.refreshToken; localStorage.setItem('crewsync_rt', refreshToken); resolve(); }
+          else { refreshToken = e.data.refreshToken; localStorage.setItem('crewsync_rt', refreshToken); try { if (e.data.idt) localStorage.setItem('crewsync_idt', e.data.idt); } catch (x) {} resolve(); }
         }
       }
       window.addEventListener('message', onMsg);
@@ -158,6 +158,7 @@ function updateSettingsPage() {
 function clearSavedData() {
   if (!confirm('確定要清除所有儲存的資料嗎？')) return;
   localStorage.removeItem('crewsync_rt');
+  localStorage.removeItem('crewsync_idt');
   localStorage.removeItem('crewsync_user');
   refreshToken = '';
   const el = document.getElementById('settings-msg');
@@ -483,12 +484,24 @@ function reloadCurrentAtis() {
   }
 }
 
+// CrewSync 與 Pilot Log 同網域 → 讀得到 Pilot Log 登入 token，帶給 /api/atis，讓 server 判斷是不是名單上的 founder
+// （founder 走穩定的 airframes，非 founder 走備案）。沒登入就不帶，server 當非 founder 處理。
+function _plAtHeaders() {
+  var h = {};
+  try { var t = localStorage.getItem('pilotlog_at'); if (t) h['X-PL-AT'] = t; } catch (e) {}        // Pilot Log 登入
+  try { var c = localStorage.getItem('crewsync_idt'); if (c) h['X-CS-IDT'] = c; } catch (e) {}       // 班表同步登入身份證
+  return h;
+}
+
 function fetchAtisData(url, icao, container) {
-  // 全改走自己 server proxy（不再繞免費 codetabs，那個爛掉會讓 ATIS/TAF 抓不到）
-  const atisPromise = fetch('https://api.allorigins.win/raw?url=' + encodeURIComponent('https://atis.guru/atis/' + icao))
+  // ATIS：先打我們 server(airframes,穩、有台灣);回 {fallback:true}(爆額度/無資料/非founder)、或 server 出錯/網路掛 → 都退回舊的 allorigins→atis.guru。
+  const _atisFb = () => fetch('https://api.allorigins.win/raw?url=' + encodeURIComponent('https://atis.guru/atis/' + icao))
     .then(r => { if (!r.ok) throw new Error(); return r.text(); })
-    .then(html => parseAtisHtml(html))
-    .catch(() => []);
+    .then(html => parseAtisHtml(html)).catch(() => []);
+  const atisPromise = fetch('/api/atis?icao=' + icao, { headers: _plAtHeaders() })
+    .then(r => r.ok ? r.json() : null)
+    .then(d => (d && d.sections) ? d.sections : _atisFb())   // 無 sections(fallback/null)→ 備案
+    .catch(() => _atisFb());                                  // server 非 JSON / 網路錯 → 也走備案(codex P1)
   const metarPromise = fetch('/api/metar?ids=' + icao + '&hours=12')
     .then(r => { if (!r.ok) throw new Error(); return r.text(); })
     .then(t => t.trim()).catch(() => '');

@@ -335,9 +335,16 @@ function fetchWxDetail(icao, name) {
     }).catch(function() { return []; });
   var tafP = fetch('/api/taf?ids=' + icao)
     .then(function(r) { return r.ok ? r.text() : ''; }).then(function(t) { return t.trim(); }).catch(function() { return ''; });
-  var atisP = fetch('https://api.allorigins.win/raw?url=' + encodeURIComponent('https://atis.guru/atis/' + icao))
-    .then(function(r) { return r.ok ? r.text() : ''; }).then(parseAtisHtml).catch(function() { return []; });
-  /* 先等 METAR+TAF(快)就秒出(ATIS 標「載入中」、跑道圖照樣秒出);ATIS(allorigins,慢)背景補上 → 不卡載入。 */
+  /* ATIS：先打我們 server(airframes,穩、有台灣)；回 {fallback:true}(爆額度/無資料)才退回舊的 allorigins→atis.guru。 */
+  var _atisFb = function() {
+    return fetch('https://api.allorigins.win/raw?url=' + encodeURIComponent('https://atis.guru/atis/' + icao))
+      .then(function(r) { return r.ok ? r.text() : ''; }).then(parseAtisHtml).catch(function() { return []; });
+  };
+  var atisP = fetch('/api/atis?icao=' + icao, { headers: (typeof _plAtHeaders === 'function' ? _plAtHeaders() : {}) })
+    .then(function(r) { return r.ok ? r.json() : null; })
+    .then(function(d) { return (d && d.sections) ? d.sections : _atisFb(); })   // 無 sections → 備案
+    .catch(function() { return _atisFb(); });                                   // server 非 JSON / 網路錯 → 也走備案(codex P1)
+  /* 先等 METAR+TAF(快)就秒出(ATIS 標「載入中」、跑道圖照樣秒出);ATIS 背景補上 → 不卡載入。 */
   Promise.all([metarP, tafP]).then(function(res) {
     var metarLines = res[0], tafText = res[1];
     var content = document.getElementById('wx-detail-content');
@@ -495,41 +502,30 @@ function _wxBatchRefresh(icaos, updateListRegion, btn, btnLabel) {
       renderWxList(curAirports, wxCurrentRegion);
     }
 
-    /* staggered ATIS fetch (300ms interval) */
-    var idx = 0;
-    function fetchNextAtis() {
-      if (idx >= icaos.length) {
-        _wxSaveDetailCache();
-        _wxRefreshDone(btn, total, btnLabel);
-        /* re-render selected airport detail if applicable */
-        if (wxSelectedIcao && wxDetailRawCache[wxSelectedIcao]) {
-          var c = wxDetailRawCache[wxSelectedIcao];
-          var html = _wxBuildDetailHtml(wxSelectedIcao, c.metar, c.taf, c.atis);
-          wxDetailCache[wxSelectedIcao] = html;
-          var el = document.getElementById('wx-detail-content');
-          if (el) el.innerHTML = html;
-        }
-        return;
-      }
-      var icao = icaos[idx];
-      var metarLines = metarAll[icao] || [];
-      var tafText = tafAll[icao] || '';
-
-      fetch('https://api.allorigins.win/raw?url=' + encodeURIComponent('https://atis.guru/atis/' + icao))
-        .then(function(r) { return r.ok ? r.text() : ''; })
-        .then(parseAtisHtml)
-        .catch(function() { return []; })
-        .then(function(atisSections) {
-          wxDetailRawCache[icao] = { metar: metarLines, taf: tafText, atis: atisSections, time: Date.now() };
-          wxMetarRawMap[icao] = metarLines;
-          delete wxDetailCache[icao];
-          doneCount++;
-          var _b = _wxGetBtn(btn); if (_b) _b.textContent = '\\u21ba ' + doneCount + '/' + total;
-          idx++;
-          setTimeout(fetchNextAtis, 300);
-        });
+    /* 一鍵更新只做 METAR/TAF（上面 batch 已抓好 + 已更新左側列表）。
+       ⚠ ATIS 改成「點開單一機場時才向 server(airframes) 抓」，絕不在這裡一次抓 80 個機場
+       （一次幾百個請求會瞬間爆 airframes 免費 500/天額度）。 */
+    _wxRefreshDone(btn, total, btnLabel);
+    /* 更新「所有已開過(有 detail 快取)機場」的 METAR/TAF，保留各自 ATIS、不重抓 ATIS → 之後點開不會看到舊天氣。
+       沒開過的不建快取(維持點開才抓)。codex P2:原本只更新選中那個 → 其他開過的機場會殘留 24h 舊資料。 */
+    icaos.forEach(function(ic) {
+      var sc = wxDetailRawCache[ic];
+      if (!sc) return;
+      if (metarAll[ic]) sc.metar = metarAll[ic];
+      if (tafAll[ic] != null) sc.taf = tafAll[ic];
+      sc.time = Date.now();
+      wxMetarRawMap[ic] = sc.metar;
+      delete wxDetailCache[ic];                    // 清渲染快取,下次重建
+    });
+    _wxSaveDetailCache();
+    /* 重 render 當前開著的那個 */
+    if (wxSelectedIcao && wxDetailRawCache[wxSelectedIcao]) {
+      var c = wxDetailRawCache[wxSelectedIcao];
+      var html = _wxBuildDetailHtml(wxSelectedIcao, c.metar, c.taf, c.atis);
+      wxDetailCache[wxSelectedIcao] = html;
+      var el = document.getElementById('wx-detail-content');
+      if (el) el.innerHTML = html;
     }
-    fetchNextAtis();
   }).catch(function() {
     _wxRefreshDone(btn, 0, btnLabel);
   });

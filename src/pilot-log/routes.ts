@@ -2920,6 +2920,7 @@ async function load(){
     T.data=await r.json();
     try{var rs=await api('/api/pilot-log/oops/stats?limit=30');if(rs.ok)T.db=await rs.json();}catch(e){}
     try{var ru=await api('/api/pilot-log/oops/users');if(ru.ok){var ju=await ru.json();T.dbusers=ju.users||[];}}catch(e){}
+    try{var ra=await api('/api/atis-usage');if(ra.ok)T.atis=await ra.json();}catch(e){}
     el('me').textContent='owner';el('reBtn').style.display='';el('outBtn').style.display='';el('foot').style.display='';el('msg').textContent='';
     render();
   }catch(e){}
@@ -2947,6 +2948,7 @@ function dash(){
     '<div class=card><div class=lbl>今日新增</div><div class="big blue">+'+newToday+'</div></div>'+
     '<div class=card><div class=lbl>跨 App 重疊</div><div class=big>'+overlap+'</div><div class=sub>CrewSync + Pilot Log</div></div>'+
     (diskBytes!=null?'<div class=card><div class=lbl>資料庫</div><div class=big>'+mb(diskBytes)+'<span style="font-size:.5em;color:#64748b"> / 1 GB</span></div><div class=bar><i style="width:'+pct+'%"></i></div><div class=sub>'+pct+'% · Pilot Log '+mb(plBytes)+'</div></div>':'')+
+    (T.atis?'<div class=card><div class=lbl>ATIS 額度 · airframes</div><div class=big>'+((T.atis.owner.used||0)+(T.atis.founder.used||0))+'<span style="font-size:.5em;color:#64748b"> / 500</span></div><div class=seg><span class=blue>你 <b>'+T.atis.owner.used+'/'+T.atis.owner.limit+'</b></span><span class=gray>founder <b>'+T.atis.founder.used+'/'+T.atis.founder.limit+'</b></span></div><div class=sub>今日(UTC) · 快取機場 '+(T.atis.cachedAirports||0)+'</div></div>':'')+
   '</div>';
 }
 function filt(arr,keys){var q=T.q.toLowerCase();if(!q)return arr;return arr.filter(function(u){return keys.some(function(k){var v=u[k];if(Array.isArray(v))v=v.join(' ');return String(v||'').toLowerCase().indexOf(q)>=0;});});}

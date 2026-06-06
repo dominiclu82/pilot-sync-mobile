@@ -1505,7 +1505,7 @@ export function getSpaHtmlBody(): string {
       <button class="tab-util-btn tab-install-btn" id="tab-install-btn" onclick="showInstallGuide()" style="display:none">
         <span>📲</span>安裝
       </button>
-      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer;text-decoration:underline" onclick="showAbout()">V8.0.55</span>
+      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer;text-decoration:underline" onclick="showAbout()">V8.0.56</span>
     </div>
   </div>
 </div>
@@ -1539,7 +1539,12 @@ export function getSpaHtmlBody(): string {
     </div>
     <div style="max-height:50vh;overflow-y:auto;-webkit-overflow-scrolling:touch;margin-bottom:10px">
     ${renderCommunityLink()}
-    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V8.0.55</div>
+    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V8.0.56</div>
+    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
+      <div>📻 <b>ATIS 來源升級,更穩。</b>美國機場改走官方 FAA 源;其他機場改走更可靠的資料源;一鍵更新改成只刷天氣(ATIS 改成「點開機場才抓」,省資源)。</div>
+      <div>📻 <b>ATIS sources upgraded for reliability.</b> US airports now use the official FAA feed; other airports use a more reliable source; Refresh All updates weather only (ATIS loads when you open an airport).</div>
+    </div>
+    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V8.0.55</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
       <div>🛰️ <b>衛星圖快取「這次真的」修好。</b>上一版把快取改成「只存成功回應」，但衛星圖磚是跨網域的不透明回應、判斷不出成功 → 反而每次打開機場都重新下載、先空白再載。這版改成跟 Pilot Log 一樣的寫法（不透明圖磚也存、命中就秒出），重複打開同一機場不再重抓。</div>
       <div>🛰️ <b>Satellite-map cache actually fixed now.</b> The previous version cached only “successful” responses, but cross-origin map tiles are opaque and can’t be judged successful — so every airport reopen re-downloaded the map (blank, then reload). This matches Pilot Log’s caching (opaque tiles are cached too), so reopening the same airport is instant.</div>

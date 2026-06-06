@@ -63,6 +63,45 @@ export async function isLoginAllowed(email: string): Promise<boolean> {
   }
 }
 
+// ── Founder 等級判斷（CrewSync ATIS：分 owner / founder / none 三級，對應三個額度池）──
+// owner（站長）= 自己獨享 50 次池；founder（active 報名者）= 共用 450 次池；none = 走備案。
+// 輸入 userId（JWT sub）→ 查該用戶所有 email → 比對 owner / active 名單。不受登入 gate 開關影響。
+export async function getFounderLevel(userId: string): Promise<'owner' | 'founder' | 'none'> {
+  if (!userId) return 'none';
+  const pool = getPool();
+  if (!pool || !(await ensureTables())) return 'none';
+  try {
+    const u = await pool.query(`SELECT email FROM pilot_user_emails WHERE user_id = $1`, [userId]);
+    const emails = u.rows.map((r: any) => normEmail(r.email)).filter(Boolean);
+    if (!emails.length) return 'none';
+    if (emails.some((e) => isOwnerEmail(e))) return 'owner';   // 站長 → 獨享池
+    const r = await pool.query(
+      `SELECT 1 FROM pilot_beta_applicants WHERE status = 'active' AND email = ANY($1::text[]) LIMIT 1`,
+      [emails]
+    );
+    return r.rows.length > 0 ? 'founder' : 'none';
+  } catch {
+    return 'none';
+  }
+}
+
+// 同上，但直接用 email 判斷（CrewSync 班表同步登入：身份證裡就是 email，不必先查 userId）。
+export async function getFounderLevelByEmail(email: string): Promise<'owner' | 'founder' | 'none'> {
+  const e = normEmail(email);
+  if (!e) return 'none';
+  if (isOwnerEmail(e)) return 'owner';
+  const pool = getPool();
+  if (!pool || !(await ensureTables())) return 'none';
+  try {
+    const r = await pool.query(
+      `SELECT 1 FROM pilot_beta_applicants WHERE status = 'active' AND email = $1 LIMIT 1`, [e]
+    );
+    return r.rows.length > 0 ? 'founder' : 'none';
+  } catch {
+    return 'none';
+  }
+}
+
 // ── 名額計數（招募頁計數器用）────────────────────────────────────────────────
 export interface SlotInfo {
   total: number;        // 對外顯示總席次（10）
