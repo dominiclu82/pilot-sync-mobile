@@ -26,8 +26,8 @@ body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSy
 .tab-btn{flex:0 0 auto;min-width:70px;display:flex;flex-direction:column;align-items:center;justify-content:center;
   gap:2px;border:none;background:none;color:var(--muted);font-size:.7em;font-weight:600;
   cursor:pointer;transition:color .15s;-webkit-appearance:none;padding:0 8px;white-space:nowrap}
-/* iPad/寬螢幕：不撐滿、不寫死格數，按鈕自然寬度置中擠在一起（裝不下才捲動） */
-@media(min-width:600px){.tab-bar{justify-content:safe center;gap:6px}.tab-btn{padding:0 18px}}
+/* iPad/寬螢幕：自動幾欄就幾欄、每欄等寬鋪滿（平均分散）。不寫死 6 格，所以多一顆鈕也不會掉第二行 */
+@media(min-width:600px){.tab-bar{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(0,1fr)}.tab-btn{min-width:0;padding:0;width:100%}}
 .tab-btn.tab-active{color:var(--accent)}
 .tab-btn-icon{font-size:1.5em;line-height:1}
 .tab-util{cursor:default;gap:1px}

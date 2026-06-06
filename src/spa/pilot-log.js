@@ -1087,11 +1087,12 @@ function _plRenderYearIndex() {
   var rightInset = 3;
   if (pane) { var pr = pane.getBoundingClientRect(); rightInset = Math.max(3, window.innerWidth - pr.right + 3); }
   el.style.right = rightInset + 'px';
-  // #2：錨定在固定工具列「下方」（不置中、不戳進上方按鈕區）。離線時工具列被橫幅往下推 → 再加橫幅底位移。
+  // #2：錨定在固定工具列「下方」。用標題「實際底緣」(getBoundingClientRect) 定位 → 自動含狀態列安全區
+  // （Tools 入口 PWA 是透明狀態列，內容鑽到瀏海下；用 headH+14 會少算 safe-area → 索引凸頂搜尋框）與離線橫幅，
+  // 不用各自加總。headH 只當抓不到標題時的退路。
+  var headEl = document.querySelector('#pilotlog-content .pl-topstack, #pilotlog-content .pl-stickhead');
   var headH = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--pl-head-h'), 10) || 0;
-  var offBar = document.getElementById('pl-offline-bar');
-  var bannerBottom = (offBar && document.body.classList.contains('pl-offline')) ? Math.max(0, offBar.getBoundingClientRect().bottom) : 0;
-  var topPx = bannerBottom + headH + 14;
+  var topPx = headEl ? (Math.max(0, Math.round(headEl.getBoundingClientRect().bottom)) + 14) : (headH + 14);
   el.style.top = topPx + 'px';
   el.style.transform = 'none';
   var avail = Math.max(120, window.innerHeight - topPx - 74);   // 預留底部 tab bar 空間
@@ -1171,7 +1172,7 @@ function _plRenderMain() {
   c.innerHTML =
     '<div>' +
       // V2.2.08：整個頂部（標題 email + 工具列）固定 —— 長列表滑到哪都能搜尋/篩選/+New（option B）。
-      '<div class="pl-topstack" style="position:sticky;top:0;z-index:40;background:var(--bg,#0a0e1a);padding:10px 14px 8px;will-change:transform;-webkit-backface-visibility:hidden">' +
+      '<div class="pl-topstack" style="position:sticky;top:env(safe-area-inset-top);z-index:40;background:var(--bg,#0a0e1a);padding:10px 14px 8px;will-change:transform;-webkit-backface-visibility:hidden">' +
       '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;gap:8px">' +
         '<div style="font-size:1em;font-weight:700;white-space:nowrap">📒 Logbook</div>' +
         '<div id="pl-sync-status" style="font-size:.65em;flex:1;text-align:center"></div>' +

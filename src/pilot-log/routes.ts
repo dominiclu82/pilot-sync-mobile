@@ -54,8 +54,8 @@ import { getAirportDbJs } from '../spa/js-airport-db.js';
 
 // ── 版本（比照 CrewSync / Morning：每次推版必更新；SW cache 名稱跟著走） ────
 // 本機 preview build 會暫時加 -tNN 後綴方便對版；推正式版前拿掉只留乾淨版號。
-export const PILOT_LOG_VERSION = 'V2.2.12';
-const PILOT_LOG_CACHE = 'pilotlog-v2-2-12';
+export const PILOT_LOG_VERSION = 'V2.2.13';
+const PILOT_LOG_CACHE = 'pilotlog-v2-2-13';
 
 export const pilotLogRouter = express.Router();
 
@@ -249,7 +249,7 @@ body {
 body.pl-offline { padding-top: calc(env(safe-area-inset-top) + var(--pl-banner-h, 28px)); }
 /* V2.2.08：各分頁頂部固定（option B）。包住每頁標題列；負 margin 把背景拉到該頁外層 padding(10px 14px)
    的邊緣，sticky 時整條背景滿版、不透出底下捲動的內容。各頁外層 padding 一致為 10px 14px。 */
-.pl-stickhead { position: sticky; top: 0; z-index: 40; background: var(--bg);
+.pl-stickhead { position: sticky; top: env(safe-area-inset-top); z-index: 40; background: var(--bg);
                 margin: -10px -14px 8px; padding: 10px 14px 8px;
                 will-change: transform; -webkit-backface-visibility: hidden; }   /* iOS：放獨立合成層，捲動時 sticky 不消失/被內容蓋住 */
 /* 離線時頂部固定工具列要黏在 OFFLINE 橫幅「下方」，否則橫幅(z-250)會蓋住按鈕。
@@ -359,8 +359,8 @@ function _renderPilotLogChangelog(): string {
     ${renderCommunityLink()}
     <div class="pl-cl-v">${PILOT_LOG_VERSION}</div>
     <div class="pl-cl-txt">
-      <b>🩹 修年索引顯示 ＋ 更新更即時 ＋ 回 Tools 鈕。</b>年份索引在直接開 PWA 時會位置跑掉或年份被砍（改成版面排好後再建一次）；app 改網路優先、一次重開就更新（修「要滑兩次」）；從 Tools 入口進來右下角多一顆回 Tools 鈕（彩色四格）。<br>
-      <b>🩹 Year-index fix + snappier updates + a Tools button.</b> The year index could be mispositioned or truncated when opening the PWA directly (now rebuilt after layout settles); the app is network-first so it updates on the first reopen; a Tools launcher button appears bottom-right when entered from the Tools hub.
+      <b>🩹 修年索引/標題在 Tools 入口下的位置 ＋ 更新更即時 ＋ 回 Tools 鈕。</b>從 Tools 入口進來（透明狀態列）時，年份索引會凸頂搜尋框、捲動時標題滑到狀態列底下 → 改成依「標題實際底緣」定位、固定標題吸頂補上狀態列安全區；app 改網路優先、一次重開就更新；從 Tools 入口進來右下角多一顆回 Tools 鈕（彩色四格）。<br>
+      <b>🩹 Fixes year-index/header position under the Tools hub + snappier updates + a Tools button.</b> Opening via the Tools hub (translucent status bar) pushed the year index into the search box and let the header slide under the status bar — now anchored to the header's real bottom and the sticky header respects the safe-area inset; the app is network-first so it updates on the first reopen; a Tools launcher button appears bottom-right.
     </div>
     <div class="pl-cl-v old">V2.2.10</div>
     <div class="pl-cl-txt">

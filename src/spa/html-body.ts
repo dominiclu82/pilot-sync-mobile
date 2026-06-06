@@ -1505,7 +1505,7 @@ export function getSpaHtmlBody(): string {
       <button class="tab-util-btn tab-install-btn" id="tab-install-btn" onclick="showInstallGuide()" style="display:none">
         <span>📲</span>安裝
       </button>
-      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer;text-decoration:underline" onclick="showAbout()">V8.0.50</span>
+      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer;text-decoration:underline" onclick="showAbout()">V8.0.51</span>
     </div>
   </div>
 </div>
@@ -1539,10 +1539,10 @@ export function getSpaHtmlBody(): string {
     </div>
     <div style="max-height:50vh;overflow-y:auto;-webkit-overflow-scrolling:touch;margin-bottom:10px">
     ${renderCommunityLink()}
-    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V8.0.50</div>
+    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V8.0.51</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
-      <div>📻 <b>Pacific HF 移到 Tools、嵌入工具改全螢幕浮層。</b>HF 分頁移除，改成 Tools 裡一顆按鈕直接開瀏覽器；Tools 嵌入工具（颱風/GPSjam）改全螢幕浮層，修掉把分頁推走、卡住的問題。A+/A- 改上下直排、iPad 底部分頁列改置中不撐開；從 Tools 入口進來時右下角多一顆回 Tools 鈕（彩色四格）。</div>
-      <div>📻 <b>Pacific HF moved to Tools; embedded tools go full-screen.</b> The HF tab is gone — now a Tools button that opens in your browser; embedded tools (typhoon/GPS-jam) go full-screen, fixing the layout-push/stuck issue. A+/A- now stack vertically and the iPad bottom tab bar is centered (no longer stretched); a Tools button appears bottom-right when launched from the Tools hub.</div>
+      <div>📻 <b>Pacific HF 移到 Tools、嵌入工具改全螢幕浮層。</b>HF 分頁移除，改成 Tools 裡一顆按鈕直接開瀏覽器；Tools 嵌入工具（颱風/GPSjam）改全螢幕浮層，修掉把分頁推走、卡住的問題。A+/A- 改上下直排、iPad 底部分頁列改等寬鋪滿（平均分散，多一顆鈕也不換行）；從 Tools 入口進來時右下角多一顆回 Tools 鈕（彩色四格）。</div>
+      <div>📻 <b>Pacific HF moved to Tools; embedded tools go full-screen.</b> The HF tab is gone — now a Tools button that opens in your browser; embedded tools (typhoon/GPS-jam) go full-screen, fixing the layout-push/stuck issue. A+/A- now stack vertically and the iPad bottom tab bar evenly fills the width; a Tools button appears bottom-right when launched from the Tools hub.</div>
     </div>
     <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V8.0.48</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
