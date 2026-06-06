@@ -54,8 +54,8 @@ import { getAirportDbJs } from '../spa/js-airport-db.js';
 
 // ── 版本（比照 CrewSync / Morning：每次推版必更新；SW cache 名稱跟著走） ────
 // 本機 preview build 會暫時加 -tNN 後綴方便對版；推正式版前拿掉只留乾淨版號。
-export const PILOT_LOG_VERSION = 'V2.2.09';
-const PILOT_LOG_CACHE = 'pilotlog-v2-2-09';
+export const PILOT_LOG_VERSION = 'V2.2.10';
+const PILOT_LOG_CACHE = 'pilotlog-v2-2-10';
 
 export const pilotLogRouter = express.Router();
 
@@ -246,11 +246,15 @@ body {
   letter-spacing: .2px;
 }
 .pl-offline-bar.show { display: block; }
-body.pl-offline { padding-top: calc(env(safe-area-inset-top) + 28px); }
+body.pl-offline { padding-top: calc(env(safe-area-inset-top) + var(--pl-banner-h, 28px)); }
 /* V2.2.08：各分頁頂部固定（option B）。包住每頁標題列；負 margin 把背景拉到該頁外層 padding(10px 14px)
    的邊緣，sticky 時整條背景滿版、不透出底下捲動的內容。各頁外層 padding 一致為 10px 14px。 */
 .pl-stickhead { position: sticky; top: 0; z-index: 40; background: var(--bg);
-                margin: -10px -14px 8px; padding: 10px 14px 8px; }
+                margin: -10px -14px 8px; padding: 10px 14px 8px;
+                will-change: transform; -webkit-backface-visibility: hidden; }   /* iOS：放獨立合成層，捲動時 sticky 不消失/被內容蓋住 */
+/* 離線時頂部固定工具列要黏在 OFFLINE 橫幅「下方」，否則橫幅(z-250)會蓋住按鈕。
+   --pl-banner-h 由 JS 量實際橫幅高度（窄螢幕/大字會換行變更高，不能寫死 28px）。!important 蓋過 inline/class top:0。 */
+body.pl-offline .pl-topstack, body.pl-offline .pl-stickhead { top: calc(env(safe-area-inset-top) + var(--pl-banner-h, 28px)) !important; }
 /* 沉浸式地圖 #pl-map-full 是 inline style top:0（外部 CSS 蓋不過 inline）→ 離線時由 JS
    _plApplyOfflineMapShift() 直接設 inline top，依實際 OFFLINE 橫幅高度把地圖+控制項一起下移讓開。 */
 </style>
@@ -351,6 +355,11 @@ function _renderPilotLogChangelog(): string {
   return `
     ${renderCommunityLink()}
     <div class="pl-cl-v">${PILOT_LOG_VERSION}</div>
+    <div class="pl-cl-txt">
+      <b>🩹 年份索引再修。</b><b>(1)</b> 索引<b>不再戳進搜尋框</b>（錨在工具列下方）。<b>(2)</b> 年份多也<b>不爆螢幕</b>——標籤自動<b>抽稀當刻度</b>，滑動仍能<b>精準跳到任一年</b>（泡泡顯示確切年）。<b>(3)</b> 離線時頂部工具列黏在<b>橫幅下方</b>，按鈕不再被橫幅蓋住。<br>
+      <b>🩹 More year-index fixes.</b> (1) The index <b>no longer pokes into the search box</b> (anchored below the toolbar). (2) It <b>won’t overflow the screen</b> as years pile up — labels auto-thin into tick marks while sliding still jumps to <b>any exact year</b> (the bubble shows it). (3) Offline, the top toolbar sticks <b>below the banner</b> so its buttons aren’t covered.
+    </div>
+    <div class="pl-cl-v old">V2.2.09</div>
     <div class="pl-cl-txt">
       <b>🩹 修 V2.2.08 的版面回歸 ＋ 🗺️ 地圖標籤改用機場代碼。</b><b>(1)</b> 年份索引不再壓到航班、也不再漏到 Aircraft／Crew／Airports（只在記錄本航班列顯示）。<b>(2)</b> Crew 搜尋框、Airports 頂部也一起固定。<b>(3)</b> Analyze 群組標題捲動時保持可見。<b>(4)</b> iPad 編輯器可捲到最上面。<b>(5)</b> 地圖機場標籤改用<b>機場代碼</b>（RCTP／TPE，跟 IATA/ICAO 切換連動），不再用飛行員看不習慣的城市/區名。<br>
       <b>🩹 Fixes for V2.2.08 layout regressions + 🗺️ airport-code map labels.</b> (1) The year index no longer overlaps flights or leaks onto Aircraft/Crew/Airports (logbook list only). (2) Crew search and the Airports top now stay fixed too. (3) The Analyze group title stays visible while scrolling. (4) The iPad editor can scroll to the very top again. (5) Map labels now show the <b>airport code</b> (RCTP/TPE, follows the IATA/ICAO toggle) instead of city/district names.

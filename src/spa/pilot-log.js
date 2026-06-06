@@ -418,8 +418,18 @@ function _plSetOffline(off) {
   var bar = document.getElementById('pl-offline-bar');
   if (bar) bar.classList.toggle('show', !!off);
   document.body.classList.toggle('pl-offline', !!off);
+  _plUpdateBannerHeight();     // 量實際橫幅高度（換行會變高）→ 給 sticky 工具列偏移用（codex P2）
   _plApplyOfflineMapShift();   // V2.2.08：離線時把沉浸式地圖下移，避免 OFFLINE 橫幅擋住浮動控制項
   _plManageReconnectProbe(!!off);   // V2.2.08：離線時開始主動探線（iOS 的 online 事件常不觸發 → 橫幅卡住）
+}
+// 量 OFFLINE 橫幅實際高度 → 寫進 --pl-banner-h（離線時 sticky 工具列要黏在橫幅下方，橫幅換行會變更高，不能寫死）。
+function _plUpdateBannerHeight() {
+  try {
+    var bar = document.getElementById('pl-offline-bar');
+    var off = document.body.classList.contains('pl-offline');
+    var h = (off && bar && bar.offsetHeight) ? bar.offsetHeight : 0;
+    document.documentElement.style.setProperty('--pl-banner-h', h + 'px');
+  } catch (e) {}
 }
 // V2.2.08：離線時每 15 秒主動探一次線（打 /me 帶 timeout）。一旦成功就當作連回線 → 清橫幅 + 重抓當前頁。
 // 不靠 window 'online' 事件（iOS PWA 上常不觸發，導致連回線了橫幅還在、要重開 App）。
@@ -1035,8 +1045,8 @@ function _plYearIndexEl() {
   document.body.appendChild(el);
   // 視窗尺寸/轉向變化 → 重新定位 + 量 sticky 標題高
   try {
-    window.addEventListener('resize', function () { _plUpdateHeadHeight(); if (_pl.tab === 'logbook') _plRenderYearIndex(); });
-    window.addEventListener('orientationchange', function () { setTimeout(function () { _plUpdateHeadHeight(); if (_pl.tab === 'logbook') _plRenderYearIndex(); }, 250); });
+    window.addEventListener('resize', function () { _plUpdateBannerHeight(); _plUpdateHeadHeight(); if (_pl.tab === 'logbook') _plRenderYearIndex(); });
+    window.addEventListener('orientationchange', function () { setTimeout(function () { _plUpdateBannerHeight(); _plUpdateHeadHeight(); if (_pl.tab === 'logbook') _plRenderYearIndex(); }, 250); });
   } catch (_e) {}
   // #2：盯著內容區 —— 任何頁面切換/子頁（Aircraft/Crew/Airports/編輯器…）替換 #pilotlog-content 內容時
   // 都重判一次：①收起漏到別頁的年份索引 ②更新 sticky 標題高度 --pl-head-h（給編輯器下移/Analyze 標題固定用）。
@@ -1070,16 +1080,33 @@ function _plRenderYearIndex() {
     if (y && !seen[y]) { seen[y] = 1; yrs.push(y); }
   }
   if (yrs.length < 2) { el.style.display = 'none'; list.style.paddingRight = ''; return; }   // 只有一年 → 沒必要
-  el._yrs = yrs;
-  el.innerHTML = yrs.map(function (y) {
-    return '<span style="font-size:.6em;font-weight:700;color:var(--muted);line-height:1.05;padding:1px 0;pointer-events:none;font-variant-numeric:tabular-nums">’' + y.slice(2) + '</span>';
-  }).join('');
+  el._yrs = yrs;   // 滑動一律對應「完整年份清單」，泡泡顯示確切年（標籤可抽稀，不影響精準度）
   // 貼齊 list pane 右緣（iPhone 滿版 → 視窗右緣；iPad split → 左側列表的右緣）
   var pane = document.querySelector('.pl-list-pane');
   var rightInset = 3;
   if (pane) { var pr = pane.getBoundingClientRect(); rightInset = Math.max(3, window.innerWidth - pr.right + 3); }
   el.style.right = rightInset + 'px';
-  el.style.height = Math.max(120, Math.min(window.innerHeight - 200, yrs.length * 26)) + 'px';
+  // #2：錨定在固定工具列「下方」（不置中、不戳進上方按鈕區）。離線時工具列被橫幅往下推 → 再加橫幅底位移。
+  var headH = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--pl-head-h'), 10) || 0;
+  var offBar = document.getElementById('pl-offline-bar');
+  var bannerBottom = (offBar && document.body.classList.contains('pl-offline')) ? Math.max(0, offBar.getBoundingClientRect().bottom) : 0;
+  var topPx = bannerBottom + headH + 14;
+  el.style.top = topPx + 'px';
+  el.style.transform = 'none';
+  var avail = Math.max(120, window.innerHeight - topPx - 74);   // 預留底部 tab bar 空間
+  var hPx = Math.min(avail, Math.max(8, yrs.length) * 26);
+  el.style.height = hPx + 'px';
+  // #3：標籤「抽稀」—— 螢幕裝得下幾個就顯示幾個（年份多就均勻跳著當刻度），避免愈來愈長爆出螢幕。
+  var maxLabels = Math.max(4, Math.floor(hPx / 24));
+  var labels = yrs;
+  if (yrs.length > maxLabels) {
+    labels = [];
+    for (var k = 0; k < maxLabels; k++) labels.push(yrs[Math.round(k * (yrs.length - 1) / (maxLabels - 1))]);
+    var sn = {}; labels = labels.filter(function (v) { if (sn[v]) return false; sn[v] = 1; return true; });
+  }
+  el.innerHTML = labels.map(function (y) {
+    return '<span style="font-size:.6em;font-weight:700;color:var(--muted);line-height:1.05;padding:1px 0;pointer-events:none;font-variant-numeric:tabular-nums">’' + y.slice(2) + '</span>';
+  }).join('');
   el.style.display = 'flex';
   // #1：讓出右邊 gutter，索引不壓到班號/組員（量索引實際寬 + 緩衝）
   list.style.paddingRight = (el.offsetWidth + 6) + 'px';
@@ -1135,7 +1162,7 @@ function _plRenderMain() {
   c.innerHTML =
     '<div>' +
       // V2.2.08：整個頂部（標題 email + 工具列）固定 —— 長列表滑到哪都能搜尋/篩選/+New（option B）。
-      '<div class="pl-topstack" style="position:sticky;top:0;z-index:40;background:var(--bg,#0a0e1a);padding:10px 14px 8px">' +
+      '<div class="pl-topstack" style="position:sticky;top:0;z-index:40;background:var(--bg,#0a0e1a);padding:10px 14px 8px;will-change:transform;-webkit-backface-visibility:hidden">' +
       '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;gap:8px">' +
         '<div style="font-size:1em;font-weight:700;white-space:nowrap">📒 Logbook</div>' +
         '<div id="pl-sync-status" style="font-size:.65em;flex:1;text-align:center"></div>' +

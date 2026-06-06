@@ -28,7 +28,8 @@ import { getSpaRunwayMapJs } from './spa/js-runway-map.js';
 import { getSpaFriendsJs } from './spa/js-friends.js';
 import { getSpaGroupsJs } from './spa/js-groups.js';
 import { morningRouter, startMorningCron } from './morning.js';
-import { pilotLogRouter } from './pilot-log/routes.js';
+import { pilotLogRouter, PILOT_LOG_VERSION } from './pilot-log/routes.js';
+import { APP_VERSION } from './version.js';
 import { requireAuth, AuthedRequest } from './pilot-log/auth.js';
 import { isOwnerUserId } from './pilot-log/beta.js';
 import { startPilotLogSnapshotCron } from './pilot-log/schema.js';
@@ -246,15 +247,17 @@ app.get('/share', (_req, res) => {
 app.get('/apps', (_req, res) => {
   res.setHeader('Content-Type', 'text/html; charset=utf-8');
   res.setHeader('Cache-Control', 'no-store');
+  // 版號自動抓（改版自動跟著變，不用手動更新這頁）：CrewSync 從 html-body 抓首個 V8.0.x；其餘用常數。
+  const csVer = (getSpaHtmlBody().match(/V\d+\.\d+\.\d+/) || [''])[0];
   const apps = [
-    { icon: '🛬', name: 'CrewSync', href: '/main', cn: '班表同步 · 機場天氣 · 跑道圖 · 即時雷達', en: 'Roster · Weather · Runway maps · Live radar' },
-    { icon: '📒', name: 'Pilot Log', href: '/pilot-log', cn: '電子飛行紀錄 · 班表匯入 · 統計分析', en: 'Electronic logbook · roster import · analytics' },
-    { icon: '📰', name: '今日 Today', href: '/morning', cn: '新聞 · 天氣 · 投資速覽', en: 'News · Weather · Portfolio' },
+    { icon: '🛬', name: 'CrewSync', ver: csVer, href: '/main', cn: '班表同步 · 機場天氣 · 跑道圖 · 即時雷達', en: 'Roster · Weather · Runway maps · Live radar' },
+    { icon: '📒', name: 'Pilot Log', ver: PILOT_LOG_VERSION, href: '/pilot-log', cn: '電子飛行紀錄 · 班表匯入 · 統計分析', en: 'Electronic logbook · roster import · analytics' },
+    { icon: '📰', name: '今日 Today', ver: APP_VERSION, href: '/morning', cn: '新聞 · 天氣 · 投資速覽', en: 'News · Weather · Portfolio' },
   ];
   const cards = apps.map(a =>
     `<a class="app" href="${a.href}">
        <div class="ico">${a.icon}</div>
-       <div class="meta"><div class="nm">${a.name}</div><div class="dz">${a.cn}</div><div class="dz en">${a.en}</div></div>
+       <div class="meta"><div class="nm">${a.name}${a.ver ? ` <span class="ver">${a.ver}</span>` : ''}</div><div class="dz">${a.cn}</div><div class="dz en">${a.en}</div></div>
        <div class="go">開啟 ›</div>
      </a>`).join('');
   res.send(`<!DOCTYPE html><html lang="zh-Hant"><head>
@@ -273,6 +276,7 @@ app.get('/apps', (_req, res) => {
   .ico { font-size:2.1em; width:52px; height:52px; display:flex; align-items:center; justify-content:center; background:#0a0e1a; border-radius:12px; flex-shrink:0; }
   .meta { flex:1; min-width:0; }
   .nm { font-weight:800; font-size:1.08em; }
+  .ver { font-size:.6em; font-weight:600; color:#64748b; vertical-align:middle; margin-left:5px; letter-spacing:.3px; }
   .dz { color:#94a3b8; font-size:.78em; }
   .dz.en { color:#64748b; font-size:.72em; }
   .go { color:#3b82f6; font-weight:700; font-size:.85em; flex-shrink:0; }
