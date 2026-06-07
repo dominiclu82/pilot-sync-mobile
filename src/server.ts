@@ -1051,9 +1051,13 @@ function _atfmStrip(s: any): string {
     .replace(/(\s*\/\s*){2,}/g, ' / ').replace(/\s+/g, ' ').trim();
 }
 async function _atfmJson(url: string, opts?: any): Promise<any> {
-  const r = await fetch(url, { headers: { 'User-Agent': _FIDS_UA, 'Accept': 'application/json,*/*' }, ...(opts || {}) });
-  if (!r.ok) throw new Error('HTTP ' + r.status);
-  return r.json();
+  const ac = new AbortController();
+  const t = setTimeout(() => ac.abort(), 6000);  // 任一上游卡住最多 6 秒就放掉，不拖垮整頁
+  try {
+    const r = await fetch(url, { headers: { 'User-Agent': _FIDS_UA, 'Accept': 'application/json,*/*' }, ...(opts || {}), signal: ac.signal });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    return await r.json();
+  } finally { clearTimeout(t); }
 }
 const _atfmHkT = (s: any): string => { const x = String(s || ''); return x.length >= 12 ? x.slice(6, 8) + '/' + x.slice(8, 12) : x; };
 const _atfmIsoT = (s: any): string => { const m = String(s || '').match(/\d{4}-(\d{2})-(\d{2})T(\d{2}):(\d{2})/); return m ? m[2] + '/' + m[3] + m[4] : ''; };
@@ -1096,12 +1100,15 @@ async function _atfmMap(): Promise<any[]> {
   const st = await _atfmMapStatus();
   return Object.keys(st).filter(ic => st[ic].color !== 'green').map(ic => ({ airport: ic, text: st[ic].text, type: st[ic].type }));
 }
+// 未來潛在北美航點(長榮/華航現飛、我們尚未列入 Ops Spec)：JFK 紐約/IAH 休士頓/DFW 達拉斯/ORD 芝加哥/IAD 華府杜勒斯/YYZ 多倫多
+// 美國的吃 FAA 即時狀態,加拿大 YYZ 無 ATFM 源→灰點(no data)
+const _atfmExtraIcaos = ['KJFK', 'KIAH', 'KDFW', 'KORD', 'KIAD', 'CYYZ'];
 // Ops Spec 機場 + 座標(airport-data.js 的 ICAO ∩ airport-db.js 座標)，啟動算一次快取
 let _atfmOpsCache: any[] | null = null;
 function _atfmOps(): any[] {
   if (_atfmOpsCache) return _atfmOpsCache;
   try {
-    const icaos = [...new Set([...getSpaAirportDataJs().matchAll(/icao:'([A-Z]{4})'/g)].map(m => m[1]))];
+    const icaos = [...new Set([...[...getSpaAirportDataJs().matchAll(/icao:'([A-Z]{4})'/g)].map(m => m[1]), ..._atfmExtraIcaos])];
     const db = getAirportDbJs();
     const out: any[] = [];
     for (const ic of icaos) {
@@ -1176,8 +1183,12 @@ app.get('/api/atfm', async (req, res) => {
   if (cached && Date.now() - cached.ts < _ATFM_TTL) { res.json(cached.data); return; }
   try {
     let data: any;
-    if (region === 'apac') {
-      const [st, faa] = await Promise.all([_atfmMapStatus(), _atfmFaa()]);
+    if (region === 'all' || region === 'apac') {
+      const [st, faa, twD, hkD, moD, thD] = await Promise.all([
+        _atfmMapStatus(), _atfmFaa(),
+        _atfmTw().catch(() => ({ ctot: [] })), _atfmHk('vhhh', 'hk').catch(() => ({ ctot: [] })),
+        _atfmHk('vmmc', 'mo').catch(() => ({ ctot: [] })), _atfmTh().catch(() => ({ ctot: [] }))
+      ]);
       const airports = _atfmOps().map((a: any) => {
         const s = st[a.icao] || (a.iata && faa.status[a.iata]);
         let color = 'grey', text = '', type = '';
@@ -1185,7 +1196,17 @@ app.get('/api/atfm', async (req, res) => {
         else if (/^K/.test(a.icao)) { color = 'green'; }  // FAA 監控的美國本土機場,無事件=正常
         return { icao: a.icao, lat: a.lat, lon: a.lon, color, text, type };
       });
-      data = { region: 'apac', airports, hasCtot: false };
+      // 台/港/澳/泰逐班 CTOT 一次合併,前端點機場時依 adep/ades 過濾
+      // 跨境航班(如台灣→香港)兩邊源都會列出 → 去重
+      const _seen = new Set<string>();
+      const ctot = ([] as any[]).concat(
+        (twD as any).ctot || [], (hkD as any).ctot || [], (moD as any).ctot || [], (thD as any).ctot || []
+      ).filter((c: any) => {
+        // 鍵含 CTOT 時間(取數字):只有班號+航線+時間全同才併(跨源同一班);同航線不同班次時間不同→保留,不誤藏
+        const k = (c.acid || '') + '|' + (c.adep || '') + '|' + (c.ades || '') + '|' + String(c.ctot || '').replace(/\D/g, '');
+        if (_seen.has(k)) return false; _seen.add(k); return true;
+      });
+      data = { region: 'all', airports, ctot, hasCtot: false };
     }
     else if (region === 'tw') data = await _atfmTw();
     else if (region === 'hk') data = await _atfmHk('vhhh', 'hk');
