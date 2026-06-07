@@ -79,6 +79,16 @@ async function _dbInit() {
         updated_at TIMESTAMPTZ DEFAULT NOW(),
         UNIQUE(employee_id, month)
       );
+      -- ATIS airframes 用量持久化（重啟不歸零）：rate 快照(單列) + 每日誰用
+      CREATE TABLE IF NOT EXISTS cs_atis_rate (
+        id INTEGER PRIMARY KEY,
+        lim INTEGER, remaining INTEGER, reset_at BIGINT, updated_at TIMESTAMPTZ DEFAULT NOW()
+      );
+      CREATE TABLE IF NOT EXISTS cs_atis_who (
+        day TEXT NOT NULL, who TEXT NOT NULL,
+        cnt INTEGER NOT NULL DEFAULT 0, last_at TIMESTAMPTZ,
+        PRIMARY KEY (day, who)
+      );
     `);
     // Add columns if not exist (for existing tables)
     await _pool.query(`ALTER TABLE cs_users ADD COLUMN IF NOT EXISTS employee_id TEXT`).catch(() => {});
@@ -165,7 +175,7 @@ async function _dbInit() {
     console.error('❌ Database init error:', e.message);
   }
 }
-_dbInit();
+_dbInit().then(() => _atisLoadState());   // 建表後從 DB 載回 ATIS 用量（重啟不歸零）
 
 // Determine redirect URI: env var > BASE_URL-derived > credentials.json
 const _creds = loadCredentials();
@@ -619,37 +629,45 @@ const ATIS_OWNER_RESERVE = 50;
 const _atisCache = new Map<string, { sections: { title: string; text: string }[]; time: number; source: string }>();
 let _atisRate: { limit: number; remaining: number; reset: number; updated: number } | null = null;
 
-// 從 airframes 回應標頭更新真實額度
+// 從 airframes 回應標頭更新真實額度（+ 持久化到 DB，重啟不歸零）
 function _atisUpdateRate(r: any) {
   const lim = parseInt(r.headers.get('x-ratelimit-limit') || '', 10);
   const rem = parseInt(r.headers.get('x-ratelimit-remaining') || '', 10);
   const rst = parseInt(r.headers.get('x-ratelimit-reset') || '', 10);
-  if (!isNaN(lim) && !isNaN(rem)) _atisRate = { limit: lim, remaining: rem, reset: isNaN(rst) ? 0 : rst, updated: Date.now() };
+  if (isNaN(lim) || isNaN(rem)) return;
+  _atisRate = { limit: lim, remaining: rem, reset: isNaN(rst) ? 0 : rst, updated: Date.now() };
+  if (_pool) _pool.query(
+    `INSERT INTO cs_atis_rate (id,lim,remaining,reset_at,updated_at) VALUES (1,$1,$2,$3,NOW())
+     ON CONFLICT (id) DO UPDATE SET lim=$1,remaining=$2,reset_at=$3,updated_at=NOW()`,
+    [lim, rem, _atisRate.reset]
+  ).catch(() => {});
 }
-// 依真實剩餘額度判斷某等級現在能不能再打 airframes。owner 用到剩 0、founder 用到剩 RESERVE 就停。
-// _atisRate 還不知道時（剛重啟、沒打過）→ 樂觀放行，第一次打就學到真實值。
+// 有效剩餘額度：過了 UTC 重置就當滿額（顯示 getAtisUsage 與判斷 _atisAllowed 用同一套，避免不一致 codex P2）。
+function _atisRemainingNow(): number | null {
+  if (!_atisRate) return null;
+  if (_atisRate.reset > 0 && _atisRate.reset * 1000 < Date.now()) return _atisRate.limit;   // 過了重置 → 滿額
+  return _atisRate.remaining;
+}
+// owner 用到剩 0、founder 用到剩 RESERVE 就停。_atisRate 還不知道（剛重啟、沒打過）→ 樂觀放行。
 function _atisAllowed(level: 'owner' | 'founder'): boolean {
-  if (!_atisRate) return true;
+  const rem = _atisRemainingNow();
+  if (rem == null) return true;
   const floor = level === 'owner' ? 0 : ATIS_OWNER_RESERVE;
-  return _atisRate.remaining > floor;
+  return rem > floor;
 }
-// 給 Tower 後台讀「真實 airframes 用量」（總數直接來自 airframes 標頭）+「誰觸發的」清單（我們 server 記的）。
+// 給 Tower 後台讀「真實 airframes 額度」（總數來自 airframes 標頭）。誰用的清單改由 /api/atis-usage 從 DB 撈（一致、原子）。
 // ⚠ 不主動打 airframes（會扣額度）→ 真實總數要等有人真的用過 ATIS 才有值（_atisRate==null 時 known:false）。
 export function getAtisUsage() {
-  const today = new Date().toISOString().slice(0, 10);
-  const who = (_atisWho.day === today)
-    ? Array.from(_atisWho.users.entries()).map(([id, v]) => ({ who: id, count: v.count, last: v.last })).sort((a, b) => b.count - a.count)
-    : [];
-  if (!_atisRate) return { known: false, limit: 500, founderCap: 500 - ATIS_OWNER_RESERVE, cachedAirports: _atisCache.size, who };
+  const rem = _atisRemainingNow();
+  if (rem == null) return { known: false, limit: 500, founderCap: 500 - ATIS_OWNER_RESERVE, cachedAirports: _atisCache.size };
   return {
     known: true,
-    limit: _atisRate.limit,
-    remaining: _atisRate.remaining,
-    used: Math.max(0, _atisRate.limit - _atisRate.remaining),
-    founderCap: _atisRate.limit - ATIS_OWNER_RESERVE,
-    resetAt: _atisRate.reset,
+    limit: _atisRate!.limit,
+    remaining: rem,
+    used: Math.max(0, _atisRate!.limit - rem),
+    founderCap: _atisRate!.limit - ATIS_OWNER_RESERVE,
+    resetAt: _atisRate!.reset,
     cachedAirports: _atisCache.size,
-    who,
   };
 }
 
@@ -681,15 +699,31 @@ async function _atisAuthLevel(plToken: string, csIdt: string): Promise<AtisAuth>
   return res;
 }
 
-// 「誰觸發了 airframes 呼叫」每日計數（owner 後台看誰在扣額度）。重啟歸零、只算實際打 airframes（快取命中不算）。
-const _atisWho = { day: '', users: new Map<string, { count: number; last: number }>() };
+// 「誰觸發了 airframes 呼叫」計數 → 原子寫進 DB（cnt = cnt + 2），重啟不歸零、不會競態覆蓋（codex P2）。
+// 不存記憶體；顯示一律即時從 DB 撈（/api/atis-usage），避免記憶體/DB 不一致。只算實際打 airframes（快取命中不算）。
 function _atisRecordWho(who: string, level: AtisLevel) {
+  if (!_pool) return;
   const d = new Date().toISOString().slice(0, 10);
-  if (_atisWho.day !== d) { _atisWho.day = d; _atisWho.users.clear(); }   // 跨日歸零
   const id = who || (level === 'owner' ? '(owner)' : '(unknown)');
-  const e = _atisWho.users.get(id) || { count: 0, last: 0 };
-  e.count += 2; e.last = Date.now();      // 一次抓 ARR+DEP = 2 次額度
-  _atisWho.users.set(id, e);
+  _pool.query(
+    `INSERT INTO cs_atis_who (day,who,cnt,last_at) VALUES ($1,$2,2,NOW())
+     ON CONFLICT (day,who) DO UPDATE SET cnt = cs_atis_who.cnt + 2, last_at = NOW()`,
+    [d, id]
+  ).catch(() => {});   // 一次抓 ARR+DEP = +2；原子遞增
+}
+
+// 啟動時從 DB 載回 rate 快照（過了重置時間就當滿額）。誰用的不載記憶體（一律即時從 DB 撈）。
+async function _atisLoadState() {
+  if (!_pool) return;
+  try {
+    const rr = await _pool.query(`SELECT lim,remaining,reset_at FROM cs_atis_rate WHERE id=1`);
+    if (rr.rows.length) {
+      const row = rr.rows[0];
+      const reset = Number(row.reset_at) || 0;
+      const remaining = (reset && reset * 1000 < Date.now()) ? row.lim : row.remaining;   // 過了重置→已歸零→當滿額
+      _atisRate = { limit: row.lim, remaining, reset, updated: Date.now() };
+    }
+  } catch { /* 載入失敗就用空的，不擋啟動 */ }
 }
 
 // 查 airframes 某機場的 ARR / DEP D-ATIS（text 片語搜尋，去掉 ACARS 路由前綴）
@@ -761,7 +795,23 @@ app.get('/api/atis', async (req, res) => {
 // Tower 後台讀「今日 airframes 用量」（owner 池 / founder 池）。只給 owner。
 app.get('/api/atis-usage', requireAuth, async (req: AuthedRequest, res) => {
   if (!(await isOwnerUserId(req.pilotUserId || ''))) return res.status(403).json({ error: 'not_owner' });
-  res.json(getAtisUsage());
+  const usage: any = getAtisUsage();
+  usage.who = [];
+  // 今日誰用 + 歷史（保留全部、給 ATIS 分頁看）：一律從 DB 撈，跟計數一致（codex P2）。
+  if (_pool) {
+    try {
+      const day = new Date().toISOString().slice(0, 10);
+      const today = await _pool.query(
+        `SELECT who, cnt AS count, last_at AS last FROM cs_atis_who WHERE day=$1 ORDER BY cnt DESC`, [day]);
+      usage.who = today.rows;
+      const byUser = await _pool.query(
+        `SELECT who, SUM(cnt)::int AS total, MAX(last_at) AS last FROM cs_atis_who GROUP BY who ORDER BY total DESC LIMIT 100`);
+      const byDay = await _pool.query(
+        `SELECT day, SUM(cnt)::int AS total, COUNT(*)::int AS users FROM cs_atis_who GROUP BY day ORDER BY day DESC LIMIT 60`);
+      usage.history = { byUser: byUser.rows, byDay: byDay.rows };
+    } catch { usage.history = { byUser: [], byDay: [] }; }
+  }
+  res.json(usage);
 });
 
 // ── Service Worker ────────────────────────────────────────────────────────────
