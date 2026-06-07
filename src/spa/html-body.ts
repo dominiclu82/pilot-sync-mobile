@@ -1531,7 +1531,7 @@ export function getSpaHtmlBody(): string {
       <button class="tab-util-btn tab-install-btn" id="tab-install-btn" onclick="showInstallGuide()" style="display:none">
         <span>📲</span>安裝
       </button>
-      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer;text-decoration:underline" onclick="showAbout()">V9.4.01</span>
+      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer;text-decoration:underline" onclick="showAbout()">V9.4.02</span>
     </div>
   </div>
 </div>
@@ -1565,7 +1565,12 @@ export function getSpaHtmlBody(): string {
     </div>
     <div style="max-height:50vh;overflow-y:auto;-webkit-overflow-scrolling:touch;margin-bottom:10px">
     ${renderCommunityLink()}
-    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V9.4.01</div>
+    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V9.4.02</div>
+    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
+      <div>🚦 <b>ATFM 歐洲修正——機場事件不再重複（紅點卻顯示 No data），並加強保鮮讓歐洲不會熄燈。</b></div>
+      <div>🚦 <b>ATFM Europe fixes — no more duplicate airport entries (red dot showing "No data"); keep-alive so Europe data stays lit.</b></div>
+    </div>
+    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V9.4.01</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
       <div>🚦 <b>ATFM 新增歐洲——EUROCONTROL 網路事件（機場關閉／罷工／維修／天氣／軍事區），有事件的機場上色＋列出原因。</b></div>
       <div>🚦 <b>ATFM adds Europe — EUROCONTROL network events (closures, strikes, works, weather, military zones); affected airports flagged with the reason.</b></div>

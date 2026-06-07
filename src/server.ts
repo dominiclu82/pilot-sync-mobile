@@ -1194,8 +1194,8 @@ function _atfmEuClassify(text: string): { color: string; type: string } {
   if (/WEATHER|FOG|SNOW|STORM|WIND|THUNDER/.test(u)) return { color: 'amber', type: 'WEATHER' };
   return { color: 'amber', type: 'EVENT' };
 }
-async function _atfmEu(): Promise<any> {
-  if (_atfmEuCache && Date.now() - _atfmEuCache.ts < 600000) return _atfmEuCache.data;  // 10 分快取
+async function _atfmEu(force = false): Promise<any> {
+  if (!force && _atfmEuCache && Date.now() - _atfmEuCache.ts < 600000) return _atfmEuCache.data;  // 10 分快取(保活 force 跳過讀取但不清舊)
   let events: { icaos: string[]; texts: string[] }[] = [];
   let ok = false;
   try { events = await fetchNopNetworkEvents(_nopRecipe); ok = !!_nopRecipe.cookie; } catch { }   // 沒 cookie(冷啟動)別當成功快取空的;等 cookie 到再抓
@@ -1217,6 +1217,9 @@ async function _atfmEu(): Promise<any> {
   if (ok) _atfmEuCache = { ts: Date.now(), data };   // 成功就快取(含「目前無事件」的空結果);只有抓取/解碼失敗才不快取、下次重試
   return data;
 }
+// NOP session 約 30 分閒置就過期。每 12 分用現有 cookie 主動打一次 NOP 保活(沒人看 ATFM 時也維持 + 順便刷新),
+// 不必等 GitHub Action(排程會延遲)。Action 負責定期換「新 cookie」(處理 session 絕對上限),保活處理「閒置過期」。
+setInterval(() => { if (_nopRecipe.cookie) _atfmEu(true).catch(() => { }); }, 12 * 60 * 1000);   // force=強制抓(製造活動),失敗保留舊快取不清
 // 美國 FAA NAS Status(公開JSON):每機場 groundStop/groundDelay/airportClosure。回 {status:{IATA:{color,text,type}}, measures}
 let _atfmFaaCache: { ts: number; data: any } | null = null;
 async function _atfmFaa(): Promise<any> {
@@ -1267,7 +1270,12 @@ app.get('/api/atfm', async (req, res) => {
         else if (/^K/.test(a.icao)) { color = 'green'; }  // FAA 監控的美國本土機場,無事件=正常
         return { icao: a.icao, lat: a.lat, lon: a.lon, color, text, type };
       });
-      airports.push(...((euD as any).airports || []));   // 歐洲:只有「有事件」的機場進來(NOP 網路事件)
+      // 歐洲(NOP 網路事件)併進來:有些歐洲機場(LKPR/EDDM/EDDB/EPWA/LOWL/LOWW)也在 Ops Spec → 去重覆蓋,別產生「紅點但點了 No data」的重複
+      for (const ea of ((euD as any).airports || [])) {
+        const ex = airports.find((a: any) => a.icao === ea.icao);
+        if (ex) { ex.color = ea.color; ex.text = ea.text; ex.type = ea.type; }
+        else airports.push(ea);
+      }
       // 台/港/澳/泰/越逐班 CTOT 一次合併,前端點機場時依 adep/ades 過濾
       // 跨境航班(如台灣→香港)兩邊源都會列出 → 去重
       const _seen = new Set<string>();
