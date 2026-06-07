@@ -1105,8 +1105,8 @@ function _atfmOps(): any[] {
     const db = getAirportDbJs();
     const out: any[] = [];
     for (const ic of icaos) {
-      const m = db.match(new RegExp('"' + ic + '","[^"]*","[^"]*","[^"]*","[^"]*",(-?[\\d.]+),(-?[\\d.]+)'));
-      if (m) out.push({ icao: ic, lat: parseFloat(m[1]), lon: parseFloat(m[2]) });
+      const m = db.match(new RegExp('"' + ic + '","([^"]*)","[^"]*","[^"]*","[^"]*",(-?[\\d.]+),(-?[\\d.]+)'));
+      if (m) out.push({ icao: ic, iata: m[1], lat: parseFloat(m[2]), lon: parseFloat(m[3]) });
     }
     _atfmOpsCache = out;
   } catch { _atfmOpsCache = []; }
@@ -1118,13 +1118,16 @@ async function _atfmTw(): Promise<any> {
     _atfmJson('https://atfm.anws.gov.tw/upload_file/atfm_ALL.json?' + Date.now())
   ]);
   const measures = (info.status === 'fulfilled' ? (info.value.data || []) : []).map((r: any) => ({ type: _atfmStrip(r[2]) || 'NOTICE', text: _atfmStrip(r[3]), airport: '', time: _atfmStrip(r[1]) }));
-  const ctot = (ct.status === 'fulfilled' ? (ct.value.data || []) : []).map((r: any) => ({ acid: _atfmStrip(r[1]), adep: _atfmStrip(r[7]), ades: _atfmStrip(r[8]), cobt: _atfmStrip(r[2]), ctot: _atfmStrip(r[3]), ctotNew: _atfmStrip(r[5] || r[4] || ''), win: _atfmStrip(r[6]), status: _atfmStrip(r[9]) }));
+  const ctot = (ct.status === 'fulfilled' ? (ct.value.data || []) : []).map((r: any) => {
+    const adep = _atfmStrip(r[7]), ades = _atfmStrip(r[8]);
+    return { acid: _atfmStrip(r[1]), adep, ades, cobt: _atfmStrip(r[2]), ctot: _atfmStrip(r[3]), ctotNew: _atfmStrip(r[5] || r[4] || ''), win: _atfmStrip(r[6]), status: _atfmStrip(r[9]), dir: /^RC/.test(adep) ? 'DEP' : (/^RC/.test(ades) ? 'ARR' : '') };
+  });
   return { region: 'tw', measures, ctot, hasCtot: true };
 }
 async function _atfmHk(port: string, region: string): Promise<any> {
   const base = 'https://www.atfmc.gov.hk/schedule';
   const [o, i] = await Promise.allSettled([_atfmJson(`${base}/outbound/port/${port}`), _atfmJson(`${base}/inbound/port/${port}`)]);
-  const mk = (j: any, dir: string) => (j && j.data ? j.data : []).filter((r: any) => r.expired !== 'Y').map((r: any) => ({ acid: _atfmStrip(r.acid), optr: _atfmStrip(r.optr), adep: _atfmStrip(r.adep), ades: _atfmStrip(r.ades), cobt: _atfmHkT(r.eobt), ctot: _atfmHkT(r.ctot), ctotNew: '', win: '', status: dir }));
+  const mk = (j: any, dir: string) => (j && j.data ? j.data : []).filter((r: any) => r.expired !== 'Y').map((r: any) => ({ acid: _atfmStrip(r.acid), optr: _atfmStrip(r.optr), adep: _atfmStrip(r.adep), ades: _atfmStrip(r.ades), cobt: _atfmHkT(r.eobt), ctot: _atfmHkT(r.ctot), ctotNew: '', win: '', status: '', dir }));
   const ctot = [...mk(o.status === 'fulfilled' ? o.value : null, 'DEP'), ...mk(i.status === 'fulfilled' ? i.value : null, 'ARR')];
   let measures: any[] = []; try { measures = (await _atfmMap()).filter(m => m.airport === port.toUpperCase()); } catch { }
   return { region, measures, ctot, hasCtot: true };
@@ -1133,10 +1136,39 @@ async function _atfmTh(): Promise<any> {
   let ctot: any[] = [];
   try {
     const j = await _atfmJson('https://atfm.aerothai.aero/CTOTDistributor/QueryCtotflights', { method: 'POST', headers: { 'User-Agent': _FIDS_UA, 'Content-Type': 'application/json', 'Accept': 'application/json' }, body: '{}' });
-    ctot = (j.ctotFlights || []).map((f: any) => { const fl = f.flight || {}; return { acid: _atfmStrip(fl.callsign), adep: _atfmStrip(fl.airportDeparture), ades: _atfmStrip(fl.airportArrival), cobt: _atfmIsoT(fl.cobt || fl.eobt), ctot: _atfmIsoT(fl.ctot || fl.etot), ctotNew: '', win: '', status: _atfmStrip(f.measureString) }; });
+    ctot = (j.ctotFlights || []).map((f: any) => { const fl = f.flight || {}; const adep = _atfmStrip(fl.airportDeparture), ades = _atfmStrip(fl.airportArrival); return { acid: _atfmStrip(fl.callsign), adep, ades, cobt: _atfmIsoT(fl.cobt || fl.eobt), ctot: _atfmIsoT(fl.ctot || fl.etot), ctotNew: '', win: '', status: _atfmStrip(f.measureString), dir: /^VT/.test(adep) ? 'DEP' : (/^VT/.test(ades) ? 'ARR' : '') }; });
   } catch { }
   let measures: any[] = []; try { measures = (await _atfmMap()).filter(m => /^VT/.test(m.airport)); } catch { }
   return { region: 'th', measures, ctot, hasCtot: true };
+}
+// 美國 FAA NAS Status(公開JSON):每機場 groundStop/groundDelay/airportClosure。回 {status:{IATA:{color,text,type}}, measures}
+let _atfmFaaCache: { ts: number; data: any } | null = null;
+async function _atfmFaa(): Promise<any> {
+  if (_atfmFaaCache && Date.now() - _atfmFaaCache.ts < _ATFM_TTL) return _atfmFaaCache.data;
+  const status: Record<string, any> = {}; const measures: any[] = [];
+  try {
+    const arr = await _atfmJson('https://nasstatus.faa.gov/api/airport-events');
+    (Array.isArray(arr) ? arr : []).forEach((a: any) => {
+      const id = a.airportId; if (!id) return;
+      let color = '', type = '', ev: any = null;
+      if (a.airportClosure) { color = 'red'; type = 'CLOSURE'; ev = a.airportClosure; }
+      else if (a.groundStop) { color = 'red'; type = 'GROUND STOP'; ev = a.groundStop; }
+      else if (a.groundDelay) { color = 'amber'; type = 'GDP'; ev = a.groundDelay; }
+      else if (a.freeForm) { color = 'amber'; type = 'ATFM MEASURE'; ev = a.freeForm; }
+      if (!ev) return;
+      const text = _atfmStrip(ev.simpleText || ev.text || '');
+      status[id] = { color, text, type };
+      measures.push({ airport: id, text, type });
+    });
+  } catch { }
+  _atfmFaaCache = { ts: Date.now(), data: { status, measures } };
+  return _atfmFaaCache.data;
+}
+// 從香港 cross-border 圖取某地區機場的「狀態」(無逐班CTOT)：日韓等自己不發CTOT的用這個
+async function _atfmMapRegion(region: string, re: RegExp): Promise<any> {
+  const st = await _atfmMapStatus();
+  const measures = Object.keys(st).filter(ic => re.test(ic) && st[ic].color !== 'green').map(ic => ({ airport: ic, text: st[ic].text, type: st[ic].type }));
+  return { region, measures, ctot: [], hasCtot: false };
 }
 app.get('/api/atfm', async (req, res) => {
   const region = String(req.query.region || 'tw').toLowerCase();
@@ -1145,14 +1177,23 @@ app.get('/api/atfm', async (req, res) => {
   try {
     let data: any;
     if (region === 'apac') {
-      const st = await _atfmMapStatus();
-      const airports = _atfmOps().map((a: any) => { const s = st[a.icao]; return { icao: a.icao, lat: a.lat, lon: a.lon, color: s ? s.color : 'grey', text: s ? s.text : '', type: s ? s.type : '' }; });
+      const [st, faa] = await Promise.all([_atfmMapStatus(), _atfmFaa()]);
+      const airports = _atfmOps().map((a: any) => {
+        const s = st[a.icao] || (a.iata && faa.status[a.iata]);
+        let color = 'grey', text = '', type = '';
+        if (s) { color = s.color; text = s.text; type = s.type; }
+        else if (/^K/.test(a.icao)) { color = 'green'; }  // FAA 監控的美國本土機場,無事件=正常
+        return { icao: a.icao, lat: a.lat, lon: a.lon, color, text, type };
+      });
       data = { region: 'apac', airports, hasCtot: false };
     }
     else if (region === 'tw') data = await _atfmTw();
     else if (region === 'hk') data = await _atfmHk('vhhh', 'hk');
     else if (region === 'mo') data = await _atfmHk('vmmc', 'mo');
     else if (region === 'th') data = await _atfmTh();
+    else if (region === 'us') { const faa = await _atfmFaa(); data = { region: 'us', measures: faa.measures, ctot: [], hasCtot: false }; }
+    else if (region === 'jp') data = await _atfmMapRegion('jp', /^RJ|^RO/);
+    else if (region === 'kr') data = await _atfmMapRegion('kr', /^RK/);
     else { res.status(400).json({ error: 'unknown region' }); return; }
     const tw = new Date(Date.now() + 8 * 3600 * 1000);
     data.updated = String(tw.getUTCHours()).padStart(2, '0') + ':' + String(tw.getUTCMinutes()).padStart(2, '0');

@@ -2,9 +2,12 @@
 var _atfmRegions = [
   { code: 'apac', name: 'APAC', center: [20, 116], zoom: 4 },
   { code: 'tw', name: 'Taiwan', center: [24.2, 121], zoom: 7 },
+  { code: 'jp', name: 'Japan', center: [37, 138], zoom: 5 },
+  { code: 'kr', name: 'Korea', center: [36.5, 127.8], zoom: 7 },
   { code: 'hk', name: 'Hong Kong', center: [22.31, 113.92], zoom: 9 },
   { code: 'mo', name: 'Macau', center: [22.15, 113.57], zoom: 11 },
-  { code: 'th', name: 'Thailand', center: [13.9, 100.7], zoom: 6 }
+  { code: 'th', name: 'Thailand', center: [13.9, 100.7], zoom: 6 },
+  { code: 'us', name: 'US', center: [39, -98], zoom: 4 }
 ];
 var _atfmRegion = 'apac';
 var _atfmMapObj = null;
@@ -101,7 +104,8 @@ function _atfmShowRestrictions() {
 var _atfmMBadge = {
   'FLOW CONTROL': ['#fff3cd', '#7d4e00'], 'ATFM MEASURE': ['#fde8e8', '#b91c1c'], 'GDP': ['#ffedd5', '#9a3412'],
   'GROUND STOP': ['#fee2e2', '#991b1b'], 'LVL RESTRICTION': ['#e0f2fe', '#0369a1'], 'MDI': ['#ede9fe', '#6d28d9'],
-  'CTOT TRIAL': ['#f3f4f6', '#374151'], 'NOTICE': ['#f3f4f6', '#374151']
+  'CTOT TRIAL': ['#f3f4f6', '#374151'], 'NOTICE': ['#f3f4f6', '#374151'],
+  'CLOSURE': ['#fee2e2', '#991b1b'], 'GROUND STOP': ['#fee2e2', '#991b1b']
 };
 function _atfmLoadRegion(code, quiet) {
   var bar = document.getElementById('atfm-bar');
@@ -116,13 +120,27 @@ function _atfmLoadRegion(code, quiet) {
         return '<div class="atfm-m-row"><span class="atfm-badge" style="background:' + b[0] + ';color:' + b[1] + '">' + _atfmEsc(m.type) + '</span><span class="atfm-m-txt">' + (m.airport ? '<b>' + _atfmEsc(m.airport) + '</b> ' : '') + _atfmEsc(m.text) + (m.time ? ' <span class="atfm-m-t">' + _atfmEsc(m.time) + '</span>' : '') + '</span></div>';
       }).join('');
     }
-    h += '<div class="atfm-bar-h">CTOT (' + ctot.length + ')' + (d.updated ? ' · ' + _atfmEsc(d.updated) : '') + '</div>';
-    if (ctot.length) {
-      h += '<div class="atfm-tw"><table class="atfm-table"><thead><tr><th>Flight</th><th>Route</th><th>CTOT</th><th>Note</th></tr></thead><tbody>' +
-        ctot.map(function (c) {
-          return '<tr><td class="atfm-acid">' + _atfmEsc(c.acid || '—') + '</td><td>' + _atfmEsc(c.adep || '—') + '→' + _atfmEsc(c.ades || '—') + '</td><td class="atfm-ctotv">' + _atfmEsc(c.ctot || '—') + (c.ctotNew ? ' <span class="atfm-new">' + _atfmEsc(c.ctotNew) + '</span>' : '') + '</td><td class="atfm-note">' + _atfmEsc(c.status || c.win || '') + '</td></tr>';
-        }).join('') + '</tbody></table></div>';
-    } else { h += '<div class="atfm-empty">No active CTOT</div>'; }
+    if (d.hasCtot === false) {
+      // 純機場狀態(US FAA):只列 measures,無逐班 CTOT
+      if (!meas.length) h += '<div class="atfm-bar-h">' + (d.updated ? 'Updated ' + _atfmEsc(d.updated) : 'Status') + '</div><div class="atfm-empty">No active restrictions ✅</div>';
+    } else {
+      var _atfmTbl = function (rows) {
+        return '<div class="atfm-tw"><table class="atfm-table"><thead><tr><th>Flight</th><th>Route</th><th>CTOT</th><th>Note</th></tr></thead><tbody>' +
+          rows.map(function (c) {
+            return '<tr><td class="atfm-acid">' + _atfmEsc(c.acid || '—') + '</td><td>' + _atfmEsc(c.adep || '—') + '→' + _atfmEsc(c.ades || '—') + '</td><td class="atfm-ctotv">' + _atfmEsc(c.ctot || '—') + (c.ctotNew ? ' <span class="atfm-new">' + _atfmEsc(c.ctotNew) + '</span>' : '') + '</td><td class="atfm-note">' + _atfmEsc(c.status || c.win || '') + '</td></tr>';
+          }).join('') + '</tbody></table></div>';
+      };
+      if (!ctot.length) {
+        h += '<div class="atfm-bar-h">CTOT (0)' + (d.updated ? ' · ' + _atfmEsc(d.updated) : '') + '</div><div class="atfm-empty">No active CTOT</div>';
+      } else {
+        var deps = ctot.filter(function (c) { return c.dir === 'DEP'; });
+        var arrs = ctot.filter(function (c) { return c.dir === 'ARR'; });
+        var others = ctot.filter(function (c) { return c.dir !== 'DEP' && c.dir !== 'ARR'; });
+        h += '<div class="atfm-bar-h">🛫 Departures (' + deps.length + ')' + (d.updated ? ' · ' + _atfmEsc(d.updated) : '') + '</div>' + (deps.length ? _atfmTbl(deps) : '<div class="atfm-empty">—</div>');
+        h += '<div class="atfm-bar-h">🛬 Arrivals (' + arrs.length + ')</div>' + (arrs.length ? _atfmTbl(arrs) : '<div class="atfm-empty">—</div>');
+        if (others.length) h += '<div class="atfm-bar-h">Other (' + others.length + ')</div>' + _atfmTbl(others);
+      }
+    }
     bar.innerHTML = h;
   }).catch(function () { if (_atfmRegion === code && !quiet) bar.innerHTML = '<div class="atfm-empty">載入失敗 Load failed</div>'; });
 }

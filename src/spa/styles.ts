@@ -27,7 +27,7 @@ body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSy
   gap:2px;border:none;background:none;color:var(--muted);font-size:.7em;font-weight:600;
   cursor:pointer;transition:color .15s;-webkit-appearance:none;padding:0 8px;white-space:nowrap}
 /* iPad/寬螢幕：自動幾欄就幾欄、每欄等寬鋪滿（平均分散）。不寫死 6 格，所以多一顆鈕也不會掉第二行 */
-@media(min-width:600px){.tab-bar{display:flex}.tab-btn{flex:1 1 0;min-width:0;padding:0;width:auto}.tab-bar .tab-util,.tab-bar #cs-apps-home{flex:0 0 auto;width:auto}}
+@media(min-width:600px){.tab-bar{display:flex}.tab-btn{flex:1 1 0;min-width:0;padding:0;width:auto}.tab-bar .tab-util,.tab-bar #cs-apps-home{flex:0 0 auto;width:auto}.tab-bar .tab-util{padding-right:16px}}
 .tab-btn.tab-active{color:var(--accent)}
 .tab-btn-icon{font-size:1.5em;line-height:1}
 .tab-util{cursor:default;gap:1px}
