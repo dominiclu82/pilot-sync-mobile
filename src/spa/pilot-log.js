@@ -4300,10 +4300,10 @@ function _plOpenFleetPicker() {
   });
   c.innerHTML =
     '<div style="padding:10px 14px">' +
-      '<div style="display:flex;align-items:center;gap:10px;margin-bottom:6px">' +
+      '<div class="pl-stickhead"><div style="display:flex;align-items:center;gap:10px">' +
         '<button onclick="_plOpenAircraft()" style="background:transparent;border:0;color:var(--text);font-size:1.2em;cursor:pointer">←</button>' +
         '<div style="font-size:1em;font-weight:700">🇹🇼 從機隊挑機 · Pick from fleet</div>' +
-      '</div>' +
+      '</div></div>' +
       '<div style="font-size:.7em;color:var(--muted);margin-bottom:6px">台灣 6 家機隊。點一架加進你的機尾庫（綠色 ✓ = 已在庫；<b>加錯再點 ✓ 可取消</b>，前提是還沒有航班）。<b>虛線 = 尚未交機的預留機號</b>（清單含未來機，仍可先選入）。退役機不在此清單，可用 + Add Aircraft 手動加。<br>Tap to add; ✓ to remove (no-flights only); dashed = reserved tail not yet delivered.</div>' +
       body +
     '</div>';

@@ -9,7 +9,8 @@ var _atfmRegions = [
   { code: 'mo', name: 'Macau', center: [22.15, 113.57], zoom: 11 },
   { code: 'th', name: 'Thailand', center: [13.9, 100.7], zoom: 6 },
   { code: 'vn', name: 'Vietnam', center: [16.5, 107], zoom: 6 },
-  { code: 'us', name: 'US', center: [39, 245], zoom: 4 }
+  { code: 'us', name: 'US', center: [39, 245], zoom: 4 },
+  { code: 'eu', name: 'Europe', center: [50, 10], zoom: 4 }
 ];
 function _atfmLon(lon) { return lon < -30 ? lon + 360 : lon; }  // 美洲移到右側
 var _atfmRegion = 'all';

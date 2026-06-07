@@ -4,6 +4,7 @@ import fs from 'fs';
 import path from 'path';
 import { randomUUID, randomBytes, createHash } from 'crypto';
 import { Agent as UndiciAgent } from 'undici';
+import { fetchNopNetworkEvents } from './atfm-nop.js';
 import { config } from 'dotenv';
 import { OUTPUT_DIR, ROOT, loadCredentials } from './config.js';
 import { generateICSHeadless } from './generate-ics-headless.js';
@@ -1181,6 +1182,41 @@ async function _atfmVn(): Promise<any> {
   _atfmVnCache = { ts: Date.now(), data };
   return data;
 }
+// 歐洲 EUROCONTROL NOP 網路事件(機場關閉/罷工/維修/軍事/天氣/容量)。cookie 由 GitHub Action 鑄好 POST 進來。
+// 不是逐班 CTOT(歐洲不公開),是「為什麼受影響」的事件原因 → 有事件的機場上色 + 列清單。
+let _nopRecipe: { cookie: string; url?: string; body?: string; permutation?: string } = { cookie: '' };
+let _atfmEuCache: { ts: number; data: any } | null = null;
+function _atfmEuClassify(text: string): { color: string; type: string } {
+  const u = (text || '').toUpperCase();
+  if (/CLOSED|CLOSURE/.test(u)) return { color: 'red', type: 'CLOSURE' };
+  if (/STRIKE/.test(u)) return { color: 'amber', type: 'STRIKE' };
+  if (/FIRING|MILITARY|DANGER|MISSILE|EXERCISE/.test(u)) return { color: 'amber', type: 'MILITARY' };
+  if (/WEATHER|FOG|SNOW|STORM|WIND|THUNDER/.test(u)) return { color: 'amber', type: 'WEATHER' };
+  return { color: 'amber', type: 'EVENT' };
+}
+async function _atfmEu(): Promise<any> {
+  if (_atfmEuCache && Date.now() - _atfmEuCache.ts < 600000) return _atfmEuCache.data;  // 10 分快取
+  let events: { icaos: string[]; texts: string[] }[] = [];
+  let ok = false;
+  try { events = await fetchNopNetworkEvents(_nopRecipe); ok = !!_nopRecipe.cookie; } catch { }   // 沒 cookie(冷啟動)別當成功快取空的;等 cookie 到再抓
+  const db = getAirportDbJs();
+  const status: Record<string, any> = {}; const airports: any[] = []; const measures: any[] = [];
+  for (const ev of events) {
+    const text = ev.texts.filter(t => t.length > 4).sort((a, b) => b.length - a.length)[0] || ev.texts[0] || 'Network event';
+    const { color, type } = _atfmEuClassify(text);
+    for (const ic of ev.icaos) {                                       // 一事件可能影響多機場 → 全展開
+      if (status[ic] || db.indexOf('"' + ic + '","') < 0) continue;    // 已收 / 不在機場庫(濾假碼 IRAQ/NICE)
+      const m = db.match(new RegExp('"' + ic + '","([^"]*)","[^"]*","[^"]*","[^"]*",(-?[\\d.]+),(-?[\\d.]+)'));
+      if (!m) continue;
+      status[ic] = { color, text, type };
+      airports.push({ icao: ic, lat: parseFloat(m[2]), lon: parseFloat(m[3]), color, text, type });
+      measures.push({ airport: ic, text, type, time: '' });
+    }
+  }
+  const data = { region: 'eu', status, airports, measures, ctot: [], hasCtot: false };
+  if (ok) _atfmEuCache = { ts: Date.now(), data };   // 成功就快取(含「目前無事件」的空結果);只有抓取/解碼失敗才不快取、下次重試
+  return data;
+}
 // 美國 FAA NAS Status(公開JSON):每機場 groundStop/groundDelay/airportClosure。回 {status:{IATA:{color,text,type}}, measures}
 let _atfmFaaCache: { ts: number; data: any } | null = null;
 async function _atfmFaa(): Promise<any> {
@@ -1217,11 +1253,11 @@ app.get('/api/atfm', async (req, res) => {
   try {
     let data: any;
     if (region === 'all' || region === 'apac') {
-      const [st, faa, twD, hkD, moD, thD, vnD] = await Promise.all([
+      const [st, faa, twD, hkD, moD, thD, vnD, euD] = await Promise.all([
         _atfmMapStatus(), _atfmFaa(),
         _atfmTw().catch(() => ({ ctot: [] })), _atfmHk('vhhh', 'hk').catch(() => ({ ctot: [] })),
         _atfmHk('vmmc', 'mo').catch(() => ({ ctot: [] })), _atfmTh().catch(() => ({ ctot: [] })),
-        _atfmVn().catch(() => ({ ctot: [], status: {} }))
+        _atfmVn().catch(() => ({ ctot: [], status: {} })), _atfmEu().catch(() => ({ airports: [] }))
       ]);
       const vnSt = (vnD as any).status || {};
       const airports = _atfmOps().map((a: any) => {
@@ -1231,6 +1267,7 @@ app.get('/api/atfm', async (req, res) => {
         else if (/^K/.test(a.icao)) { color = 'green'; }  // FAA 監控的美國本土機場,無事件=正常
         return { icao: a.icao, lat: a.lat, lon: a.lon, color, text, type };
       });
+      airports.push(...((euD as any).airports || []));   // 歐洲:只有「有事件」的機場進來(NOP 網路事件)
       // 台/港/澳/泰/越逐班 CTOT 一次合併,前端點機場時依 adep/ades 過濾
       // 跨境航班(如台灣→香港)兩邊源都會列出 → 去重
       const _seen = new Set<string>();
@@ -1248,6 +1285,7 @@ app.get('/api/atfm', async (req, res) => {
     else if (region === 'mo') data = await _atfmHk('vmmc', 'mo');
     else if (region === 'th') data = await _atfmTh();
     else if (region === 'vn') data = await _atfmVn();
+    else if (region === 'eu') data = await _atfmEu();
     else if (region === 'us') { const faa = await _atfmFaa(); data = { region: 'us', measures: faa.measures, ctot: [], hasCtot: false }; }
     else if (region === 'jp') data = await _atfmMapRegion('jp', /^RJ|^RO/);
     else if (region === 'kr') data = await _atfmMapRegion('kr', /^RK/);
@@ -1261,6 +1299,21 @@ app.get('/api/atfm', async (req, res) => {
     if (cached) { res.json(cached.data); return; }  // 上游暫時失敗 → 退回上次成功的(雖過期)，不讓畫面空白
     res.status(502).json({ error: e.message });
   }
+});
+
+// NOP cookie 投遞口:GitHub Action 鑄好瀏覽器 cookie 後 POST 進來(token 防護)。存記憶體,重啟後等下次鑄。
+app.post('/api/nop-refresh', (req, res) => {
+  const secret = process.env.NOP_REFRESH_SECRET;
+  if (!secret || req.query.token !== secret) { res.status(403).json({ error: 'forbidden' }); return; }
+  const b = req.body || {};
+  const cookie = String(b.cookie || '').trim();
+  if (!cookie) { res.status(400).json({ error: 'no cookie' }); return; }
+  // 自癒配方:鑄造端從 live portal 抓的當下 url/body/permutation 一起存(歐洲改版自動跟上);沒給就用寫死 fallback
+  _nopRecipe = { cookie, url: b.url ? String(b.url) : undefined, body: b.body ? String(b.body) : undefined, permutation: b.permutation ? String(b.permutation) : undefined };
+  _atfmEuCache = null;   // 換新配方 → 下次強制重抓
+  delete _atfmCache['eu']; delete _atfmCache['all']; delete _atfmCache['apac'];   // 清外層快取,立即生效不卡 30 秒
+  console.log('[NOP] recipe refreshed, cookie', cookie.length, 'url', b.url ? 'live' : 'fallback');
+  res.json({ ok: true });
 });
 
 // ── OpenSky Network proxy (OAuth2) ────────────────────────────────────────────

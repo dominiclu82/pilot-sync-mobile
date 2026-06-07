@@ -54,8 +54,8 @@ import { getAirportDbJs } from '../spa/js-airport-db.js';
 
 // ── 版本（比照 CrewSync / Morning：每次推版必更新；SW cache 名稱跟著走） ────
 // 本機 preview build 會暫時加 -tNN 後綴方便對版；推正式版前拿掉只留乾淨版號。
-export const PILOT_LOG_VERSION = 'V2.2.20';
-const PILOT_LOG_CACHE = 'pilotlog-v2-2-20';
+export const PILOT_LOG_VERSION = 'V2.2.21';
+const PILOT_LOG_CACHE = 'pilotlog-v2-2-21';
 
 export const pilotLogRouter = express.Router();
 
@@ -362,6 +362,11 @@ function _renderPilotLogChangelog(): string {
   return `
     ${renderCommunityLink()}
     <div class="pl-cl-v">${PILOT_LOG_VERSION}</div>
+    <div class="pl-cl-txt">
+      <b>🗺️ 「Pick from fleet」從機隊挑機頁的頂部標題列釘住，捲動機隊時不再被推走。</b><br>
+      <b>🗺️ Pick-from-fleet: the header now stays pinned while you scroll the fleet list.</b>
+    </div>
+    <div class="pl-cl-v old">V2.2.20</div>
     <div class="pl-cl-txt">
       <b>🗺️ Airports 右欄 All / Dep / Arr 篩選列釘在欄頂，捲動航班時不再被推走。</b><br>
       <b>🗺️ Airports: the All / Dep / Arr filter bar now stays pinned while you scroll the flight list.</b>

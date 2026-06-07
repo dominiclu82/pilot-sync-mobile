@@ -1,0 +1,24 @@
+name: NOP cookie refresh
+# 每 30 分鐘鑄一次 EUROCONTROL NOP cookie 投遞給 Render server(歐洲 ATFM 用)。
+# 需要 repo secret: NOP_REFRESH_SECRET(跟 Render 同一把)。public repo 跑 Actions 免費。
+on:
+  schedule:
+    - cron: '*/30 * * * *'
+  workflow_dispatch: {}
+concurrency:
+  group: nop-cookies
+  cancel-in-progress: true
+jobs:
+  mint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - run: npm i -D playwright@1.49.1 && npx playwright install --with-deps chromium
+      - run: node scripts/nop-mint.mjs
+        env:
+          NOP_REFRESH_SECRET: ${{ secrets.NOP_REFRESH_SECRET }}
+          NOP_SERVER: https://crew-sync.onrender.com
