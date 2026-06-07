@@ -1186,6 +1186,7 @@ async function _atfmVn(): Promise<any> {
 // 不是逐班 CTOT(歐洲不公開),是「為什麼受影響」的事件原因 → 有事件的機場上色 + 列清單。
 let _nopRecipe: { cookie: string; url?: string; body?: string; permutation?: string } = { cookie: '' };
 let _atfmEuCache: { ts: number; data: any } | null = null;
+let _atfmEuLast: { ts: number; data: any } | null = null;   // 最後一次「成功抓到」的歐洲快照,抓不到時續用(stale 安全網,1 小時內)
 function _atfmEuClassify(text: string): { color: string; type: string } {
   const u = (text || '').toUpperCase();
   if (/CLOSED|CLOSURE/.test(u)) return { color: 'red', type: 'CLOSURE' };
@@ -1199,6 +1200,8 @@ async function _atfmEu(force = false): Promise<any> {
   let events: { icaos: string[]; texts: string[] }[] = [];
   let ok = false;
   try { events = await fetchNopNetworkEvents(_nopRecipe); ok = !!_nopRecipe.cookie; } catch { }   // 沒 cookie(冷啟動)別當成功快取空的;等 cookie 到再抓
+  // 即時優先:抓不到(cookie 過期/沒 cookie)時,續用 1 小時內上次成功的資料,不熄燈(歐洲事件慢變,稍舊仍有效)
+  if (!ok && _atfmEuLast && Date.now() - _atfmEuLast.ts < 3600000) return _atfmEuLast.data;
   const db = getAirportDbJs();
   const status: Record<string, any> = {}; const airports: any[] = []; const measures: any[] = [];
   for (const ev of events) {
@@ -1213,13 +1216,14 @@ async function _atfmEu(force = false): Promise<any> {
       measures.push({ airport: ic, text, type, time: '' });
     }
   }
-  const data = { region: 'eu', status, airports, measures, ctot: [], hasCtot: false };
-  if (ok) _atfmEuCache = { ts: Date.now(), data };   // 成功就快取(含「目前無事件」的空結果);只有抓取/解碼失敗才不快取、下次重試
+  const _tw = new Date(Date.now() + 8 * 3600 * 1000);
+  const data: any = { region: 'eu', status, airports, measures, ctot: [], hasCtot: false, updated: String(_tw.getUTCHours()).padStart(2, '0') + ':' + String(_tw.getUTCMinutes()).padStart(2, '0') };
+  if (ok) { _atfmEuCache = { ts: Date.now(), data }; _atfmEuLast = { ts: Date.now(), data }; }   // 成功:更新快取 + 留作 stale 安全網(updated=抓取當下,stale 時顯示真實舊時間不誤導)
   return data;
 }
-// NOP session 約 30 分閒置就過期。每 12 分用現有 cookie 主動打一次 NOP 保活(沒人看 ATFM 時也維持 + 順便刷新),
-// 不必等 GitHub Action(排程會延遲)。Action 負責定期換「新 cookie」(處理 session 絕對上限),保活處理「閒置過期」。
-setInterval(() => { if (_nopRecipe.cookie) _atfmEu(true).catch(() => { }); }, 12 * 60 * 1000);   // force=強制抓(製造活動),失敗保留舊快取不清
+// NOP session 是「閒置型」、timeout 約 10-12 分(2026-06-07 受控實驗:3分ping撐過18分、12分ping約15分死)。
+// → 每 4 分用現有 cookie 主動打一次 NOP 保活(壓在 timeout 之下),session 就永遠維持、永遠即時,不必等不可靠的 GitHub 排程。
+setInterval(() => { if (_nopRecipe.cookie) _atfmEu(true).catch(() => { }); }, 4 * 60 * 1000);   // force=強制抓(製造活動),失敗保留舊快取不清
 // 美國 FAA NAS Status(公開JSON):每機場 groundStop/groundDelay/airportClosure。回 {status:{IATA:{color,text,type}}, measures}
 let _atfmFaaCache: { ts: number; data: any } | null = null;
 async function _atfmFaa(): Promise<any> {
@@ -1299,7 +1303,7 @@ app.get('/api/atfm', async (req, res) => {
     else if (region === 'kr') data = await _atfmMapRegion('kr', /^RK/);
     else { res.status(400).json({ error: 'unknown region' }); return; }
     const tw = new Date(Date.now() + 8 * 3600 * 1000);
-    data.updated = String(tw.getUTCHours()).padStart(2, '0') + ':' + String(tw.getUTCMinutes()).padStart(2, '0');
+    if (!data.updated) data.updated = String(tw.getUTCHours()).padStart(2, '0') + ':' + String(tw.getUTCMinutes()).padStart(2, '0');   // 歐洲 stale 續用時自帶抓取時間,別覆蓋成現在(避免舊資料假裝剛更新)
     _atfmCache[region] = { ts: Date.now(), data };
     res.json(data);
   } catch (e: any) {
