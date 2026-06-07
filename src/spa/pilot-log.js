@@ -3850,7 +3850,8 @@ function _plAptFlightsHtml(key) {
     var on = (filt === f);
     return '<button onclick="_plSetPlaceFilter(\'' + f + '\',\'' + _plJs(key) + '\')" style="flex:1;background:' + (on ? '#3b82f6' : 'transparent') + ';color:' + (on ? '#fff' : 'var(--muted)') + ';border:1px solid ' + (on ? '#3b82f6' : 'var(--border,#334155)') + ';border-radius:6px;padding:7px 4px;font-size:.74em;font-weight:600;cursor:pointer">' + lbl + ' <b>' + n + '</b></button>';
   }
-  var tabs = '<div style="display:flex;gap:6px;margin-bottom:10px">' +
+  // 釘在欄頂:列表捲動時 All/Dep/Arr 不被推走(底色蓋住底下捲動的航班)
+  var tabs = '<div style="display:flex;gap:6px;position:sticky;top:0;z-index:3;background:var(--bg,#0a0e1a);padding-bottom:8px;margin-bottom:2px">' +
     ftab('all', 'All', all.length) + ftab('dep', '🛫 Dep', depF.length) + ftab('arr', '🛬 Arr', arrF.length) + '</div>';
   var rows = flights.length === 0
     ? '<div style="text-align:center;color:var(--muted);padding:24px;font-size:.85em">沒有航班。 · No flights.</div>'

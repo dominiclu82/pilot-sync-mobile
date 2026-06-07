@@ -771,6 +771,11 @@ html:has(#tab-atfm.tab-active) body{overflow:hidden;height:100dvh}
 #atfm-map{flex:1;width:100%;min-height:200px;z-index:1;background:#0a0e1a;overscroll-behavior:none;touch-action:none}
 .atfm-lbl{background:transparent;border:none;box-shadow:none;color:#fbbf24;font-weight:700;font-size:11px;text-shadow:0 0 3px #000}
 .atfm-pp b{font-size:1.05em}.atfm-pp-ty{display:inline-block;background:#ffedd5;color:#9a3412;border-radius:4px;padding:1px 6px;font-size:.78em;font-weight:700;margin-top:3px}
+.atfm-bar-toggle{flex-shrink:0;width:100%;display:flex;flex-direction:column;align-items:center;gap:1px;background:var(--card);border:none;border-top:1px solid var(--dim);color:var(--muted);padding:3px 0 1px;cursor:pointer;line-height:1;-webkit-appearance:none}
+.atfm-bar-grip{width:34px;height:4px;border-radius:3px;background:var(--dim)}
+#atfm-bar-chev{font-size:.9em;display:inline-block;transition:transform .2s}
+#tab-atfm.atfm-bar-hidden #atfm-bar{display:none}
+#tab-atfm.atfm-bar-hidden #atfm-bar-chev{transform:rotate(180deg)}
 .atfm-bar{padding:8px 12px;background:var(--card);border-top:1px solid var(--dim);font-size:.78em;max-height:34vh;overflow:auto;overscroll-behavior:none;-webkit-overflow-scrolling:touch;flex-shrink:0}
 .atfm-bar-h{font-weight:700;margin:6px 0 4px;color:var(--text)}
 .atfm-tap-h{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:4px 0 6px}

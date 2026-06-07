@@ -43,7 +43,7 @@ function atfmInit() {
       if (b !== _atfmLastBase) _atfmPlotMarkers();
     });
   }
-  if (!_atfmUiReady) { _atfmRenderRegions(); _atfmUiReady = true; }
+  if (!_atfmUiReady) { _atfmRenderRegions(); _atfmApplyBarState(); _atfmUiReady = true; }
   setTimeout(function () { if (_atfmMapObj) _atfmMapObj.invalidateSize(); }, 120);
   _atfmLoadAll();
   if (_atfmRegion !== 'all') _atfmLoadRegion(_atfmRegion);
@@ -58,6 +58,20 @@ function _atfmStartAuto() {
   }, 45000);
 }
 function _atfmStopAuto() { if (_atfmTimer) { clearInterval(_atfmTimer); _atfmTimer = null; } }
+
+// 收合底部資訊面板:地圖變大。狀態存 localStorage,切回來記得
+function atfmToggleBar() {
+  var t = document.getElementById('tab-atfm'); if (!t) return;
+  var hidden = t.classList.toggle('atfm-bar-hidden');
+  try { localStorage.setItem('crewsync_atfm_bar', hidden ? '0' : '1'); } catch (e) { }
+  setTimeout(function () { if (_atfmMapObj) _atfmMapObj.invalidateSize(); }, 220);  // 面板收合後地圖重算尺寸
+}
+function _atfmApplyBarState() {
+  try {
+    var t = document.getElementById('tab-atfm');
+    if (t && localStorage.getItem('crewsync_atfm_bar') === '0') t.classList.add('atfm-bar-hidden');
+  } catch (e) { }
+}
 
 function _atfmRenderRegions() {
   var el = document.getElementById('atfm-regions');

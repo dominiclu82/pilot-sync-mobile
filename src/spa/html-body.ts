@@ -1321,6 +1321,7 @@ export function getSpaHtmlBody(): string {
     <span class="atfm-legend-hint">Tap airport for details</span>
   </div>
   <div id="atfm-map"></div>
+  <button class="atfm-bar-toggle" onclick="atfmToggleBar()" aria-label="收合/展開資訊面板"><span class="atfm-bar-grip"></span><span id="atfm-bar-chev">⌄</span></button>
   <div class="atfm-bar" id="atfm-bar"></div>
 </div><!-- end tab-atfm -->
 
@@ -1530,7 +1531,7 @@ export function getSpaHtmlBody(): string {
       <button class="tab-util-btn tab-install-btn" id="tab-install-btn" onclick="showInstallGuide()" style="display:none">
         <span>📲</span>安裝
       </button>
-      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer;text-decoration:underline" onclick="showAbout()">V9.3.01</span>
+      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer;text-decoration:underline" onclick="showAbout()">V9.3.02</span>
     </div>
   </div>
 </div>
@@ -1564,7 +1565,12 @@ export function getSpaHtmlBody(): string {
     </div>
     <div style="max-height:50vh;overflow-y:auto;-webkit-overflow-scrolling:touch;margin-bottom:10px">
     ${renderCommunityLink()}
-    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V9.3.01</div>
+    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V9.3.02</div>
+    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
+      <div>🚦 <b>ATFM 底部資訊面板可收合——點面板上方把手收起、騰出地圖空間，狀態會記住。</b></div>
+      <div>🚦 <b>ATFM bottom panel is now collapsible — tap the handle to free up the map; remembers your choice.</b></div>
+    </div>
+    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V9.3.01</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
       <div>🚦 <b>ATFM 新增越南（河內）流量管制；修正點機場面板頂走頁首與地圖回彈；📡 FR24 飛行軌跡修復。</b></div>
       <div>🚦 <b>ATFM adds Vietnam (Hanoi) flow control; fixed airport-tap panel pushing the header &amp; map bounce; 📡 FR24 flight trail restored.</b></div>
