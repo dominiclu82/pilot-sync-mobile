@@ -1313,6 +1313,10 @@ export function getSpaHtmlBody(): string {
     <div class="gi-header">
       <div class="gi-header-left">
         <span class="gi-notice-inline" style="color:#eab308">⚠ Non-operational Reference only</span>
+        <div class="gi-station-bar">
+          <select id="gi-region" class="gi-station-sel" onchange="giSetRegion(this.value)"></select>
+          <select id="gi-station" class="gi-station-sel" onchange="giSetStation(this.value)"></select>
+        </div>
         <div class="gi-date-nav">
           <button class="gi-nav-btn" id="gi-prev-day" onclick="giPrevDay()">◀</button>
           <span class="gi-date" id="gate-date"></span>
@@ -1505,7 +1509,7 @@ export function getSpaHtmlBody(): string {
       <button class="tab-util-btn tab-install-btn" id="tab-install-btn" onclick="showInstallGuide()" style="display:none">
         <span>📲</span>安裝
       </button>
-      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer;text-decoration:underline" onclick="showAbout()">V8.0.59</span>
+      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer;text-decoration:underline" onclick="showAbout()">V8.1.01</span>
     </div>
   </div>
 </div>
@@ -1539,7 +1543,12 @@ export function getSpaHtmlBody(): string {
     </div>
     <div style="max-height:50vh;overflow-y:auto;-webkit-overflow-scrolling:touch;margin-bottom:10px">
     ${renderCommunityLink()}
-    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V8.0.59</div>
+    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V8.1.01</div>
+    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
+      <div>🛫 <b>Gate Info 新增機場切換，加入日本新千歲、函館（含 gate），ALL 改為顯示全部航空；後台優化。</b></div>
+      <div>🛫 <b>Gate Info adds airport switching with New Chitose &amp; Hakodate, Japan (incl. gate); ALL now shows all airlines; backend improvements.</b></div>
+    </div>
+    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V8.0.59</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
       <div>🔧 <b>後台優化與穩定度調整。</b></div>
       <div>🔧 <b>Backend improvements and stability tweaks.</b></div>

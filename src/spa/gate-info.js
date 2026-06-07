@@ -10,6 +10,22 @@ var _giRawArr = [];
 var _giAirline = (function(){ try { return localStorage.getItem('crewsync_gi_airline') || 'JX'; } catch(e){ return 'JX'; } })();
 var _giTimeSlot = '±2hr';
 
+// ── 場站切換（地區 → 場站）。桃園走原邏輯；外站走 /api/fids?airport= 正規化來源 ──
+var _giRegions = {
+  TW: { name: '台灣', stations: [ { code: 'TPE', name: '桃園', src: 'tpe' } ] },
+  JP: { name: '日本', stations: [ { code: 'CTS', name: '新千歲', src: 'cts' }, { code: 'HKD', name: '函館', src: 'hkd' } ] }
+};
+var _giRegion = 'TW';
+var _giAirport = 'TPE';      // 目前場站 code
+var _giStationRows = null;   // 外站抓回的正規化 rows（含全航空，前端再篩）
+var _giStationCache = {};    // key: src|date
+
+function _giCurrentStation() {
+  var r = _giRegions[_giRegion];
+  if (r) { for (var i = 0; i < r.stations.length; i++) { if (r.stations[i].code === _giAirport) return r.stations[i]; } }
+  return { code: 'TPE', name: '桃園', src: 'tpe' };
+}
+
 function giFmtTime(t) {
   if (!t) return '';
   return t.replace(/:\d{2}$/, '');
@@ -250,9 +266,9 @@ function renderGateFlights() {
     sorted.forEach(function(f) {
       var matched = false;
       if (isNumeric) {
-        // Flight number search
-        var num = f.fno.replace(/^(JX|BR|CI)/, '');
-        matched = (num === searchTerm || num.indexOf(searchTerm) === 0);
+        // Flight number search（IATA 與 ICAO 兩種航班號都比對）
+        var nums = [f.fno, f.altFno || ''].map(function(x) { var m = x.toUpperCase().match(/(\d+[A-Z]?)$/); return (m ? m[1] : '').replace(/^0+/, ''); });
+        matched = nums.some(function(n) { return n && (n === searchTerm || n.indexOf(searchTerm) === 0); });
       } else {
         // Station search: IATA code, ICAO (via mapping), or city name
         var oCode = (f.originCode || '').toUpperCase();
@@ -260,8 +276,10 @@ function renderGateFlights() {
         var oName = f.originName || '';
         var dName = f.destName || '';
         var fno = f.fno.toUpperCase();
+        var altFno = (f.altFno || '').toUpperCase();
 
         matched = fno.indexOf(termUpper) >= 0
+          || (altFno && altFno.indexOf(termUpper) >= 0)
           || oCode.indexOf(termUpper) >= 0
           || dCode.indexOf(termUpper) >= 0
           || oName.indexOf(searchTerm) >= 0
@@ -482,17 +500,69 @@ function loadGateFlights() {
   gateFlightsList = [];
 
   var dateStr = _giSelectedDate || _paDateOffset(0);
-  var tpePromise = _fidsFetchByDate(dateStr);
+  var st = _giCurrentStation();
 
-  tpePromise.then(function(data) {
+  if (st.code === 'TPE') {
+    // 桃園：原邏輯完全不動
+    _fidsFetchByDate(dateStr).then(function(data) {
+      dateEl.textContent = data.date || '';
+      _giRawDep = data.dep || [];
+      _giRawArr = data.arr || [];
+      _giProcessFlights();
+    }).catch(function(e) {
+      statusEl.textContent = '載入失敗：' + e.message;
+      statusEl.style.display = 'block';
+    });
+    return;
+  }
+
+  // 外站：抓正規化 rows，前端再依航空快篩
+  _giStationRows = null;
+  _giRawDep = []; _giRawArr = [];
+  _giFetchStation(st.src, dateStr).then(function(data) {
     dateEl.textContent = data.date || '';
-    _giRawDep = data.dep || [];
-    _giRawArr = data.arr || [];
-    _giProcessFlights();
+    _giStationRows = data.rows || [];
+    _giProcessStationRows();
   }).catch(function(e) {
     statusEl.textContent = '載入失敗：' + e.message;
     statusEl.style.display = 'block';
   });
+}
+
+function _giFetchStation(src, dateStr) {
+  var key = src + '|' + dateStr;
+  var c = _giStationCache[key];
+  if (c) {
+    var expired = navigator.onLine && (Date.now() - c.ts > 120000);
+    if (!expired) return Promise.resolve(c.data);
+  }
+  if (!navigator.onLine) return Promise.reject(new Error('offline'));
+  return fetch('/api/fids?airport=' + encodeURIComponent(src) + '&date=' + encodeURIComponent(dateStr))
+    .then(function(r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+    .then(function(data) { _giStationCache[key] = { data: data, ts: Date.now() }; return data; });
+}
+
+function _giProcessStationRows() {
+  var statusEl = document.getElementById('gate-status');
+  var wrapEl = document.getElementById('gate-table-wrap');
+  var airline = _giAirline;
+  var isAll = (airline === 'ALL');
+  var rows = (_giStationRows || []).filter(function(f) {
+    if (isAll) return true;
+    return (f.fno || '').toUpperCase().indexOf(airline) === 0;
+  });
+  if (rows.length === 0) {
+    statusEl.textContent = '今日無 ' + (isAll ? 'ALL' : airline) + ' 航班資料';
+    statusEl.style.display = 'block';
+    wrapEl.style.display = 'none';
+    gateFlightsList = [];
+    return;
+  }
+  gateFlightsList = rows;
+  statusEl.style.display = 'none';
+  wrapEl.style.display = '';
+  renderGateFlights();
+  gateFlightsLoaded = true;
 }
 
 function _giProcessFlights() {
@@ -504,11 +574,11 @@ function _giProcessFlights() {
 
   // Filter TPE FIDS by airline
   var dep = _giRawDep.filter(function(f) {
-    if (isAll) return f.ACode && /^(JX|BR|CI)$/.test(f.ACode.trim());
+    if (isAll) return !!(f.ACode && f.ACode.trim());
     return f.ACode && f.ACode.trim() === airline;
   });
   var arr = _giRawArr.filter(function(f) {
-    if (isAll) return f.ACode && /^(JX|BR|CI)$/.test(f.ACode.trim());
+    if (isAll) return !!(f.ACode && f.ACode.trim());
     return f.ACode && f.ACode.trim() === airline;
   });
 
@@ -650,8 +720,10 @@ function _giUpdateDateNav() {
   var todayBtn = document.getElementById('gi-today-btn');
   var tomorrow = _giShiftDate(today, 1);
   var yesterday = _giShiftDate(today, -1);
+  // 桃園可看到次日；外站(北海道)只有 today/yesterday，次日上限設今天
+  var maxNext = (_giCurrentStation().code === 'TPE') ? tomorrow : today;
   if (prevBtn) prevBtn.disabled = (current <= yesterday);
-  if (nextBtn) nextBtn.disabled = (current >= tomorrow);
+  if (nextBtn) nextBtn.disabled = (current >= maxNext);
   if (todayBtn) todayBtn.style.display = (current === today) ? 'none' : '';
 }
 
@@ -687,13 +759,64 @@ function giToday() {
 
 function giSetAirline(al) {
   _giAirline = al;
-  try { localStorage.setItem('crewsync_gi_airline', al); } catch(e){}
+  // 只在桃園記住偏好；外站(預設 ALL)的手動點選不污染桃園存檔
+  if (_giCurrentStation().code === 'TPE') { try { localStorage.setItem('crewsync_gi_airline', al); } catch(e){} }
   _giUpdateAirlineBtns();
   var titleEl = document.querySelector('.gi-title');
   if (titleEl) titleEl.textContent = (al === 'ALL' ? 'ALL' : al) + ' Flight Info';
-  if (_giRawDep.length > 0 || _giRawArr.length > 0) {
-    _giProcessFlights();
+  if (_giCurrentStation().code === 'TPE') {
+    if (_giRawDep.length > 0 || _giRawArr.length > 0) _giProcessFlights();
+  } else {
+    if (_giStationRows) _giProcessStationRows(); else loadGateFlights();
   }
+}
+
+// ── 場站切換 ──────────────────────────────────────────────────────────────────
+function _giRenderRegionOptions() {
+  var sel = document.getElementById('gi-region');
+  if (!sel) return;
+  sel.innerHTML = '';
+  Object.keys(_giRegions).forEach(function(rk) {
+    var o = document.createElement('option');
+    o.value = rk; o.textContent = _giRegions[rk].name;
+    sel.appendChild(o);
+  });
+  sel.value = _giRegion;
+}
+function _giRenderStationOptions() {
+  var sel = document.getElementById('gi-station');
+  if (!sel) return;
+  sel.innerHTML = '';
+  ((_giRegions[_giRegion] || {}).stations || []).forEach(function(s) {
+    var o = document.createElement('option');
+    o.value = s.code; o.textContent = s.name + ' ' + s.code;
+    sel.appendChild(o);
+  });
+  sel.value = _giAirport;
+}
+function giSetRegion(region) {
+  if (!_giRegions[region]) return;
+  _giRegion = region;
+  _giRenderStationOptions();
+  giSetStation(_giRegions[region].stations[0].code);
+}
+function giSetStation(code) {
+  _giAirport = code;
+  var sel = document.getElementById('gi-station');
+  if (sel) sel.value = code;
+  // 桃園用儲存偏好(預設 JX)；外站預設 ALL(整個機場全板，不然套 JX 多半空)
+  if (code === 'TPE') {
+    try { _giAirline = localStorage.getItem('crewsync_gi_airline') || 'JX'; } catch (e) { _giAirline = 'JX'; }
+  } else {
+    _giAirline = 'ALL';
+  }
+  _giUpdateAirlineBtns();
+  var titleEl = document.querySelector('.gi-title');
+  if (titleEl) titleEl.textContent = (_giAirline === 'ALL' ? 'ALL' : _giAirline) + ' Flight Info';
+  _giStationRows = null;
+  _giSelectedDate = null;     // 切場站回今天，避免帶著別站的日期造成空白
+  _giUpdateDateNav();
+  loadGateFlights();
 }
 
 function giSetTimeSlot(slot) {
@@ -772,6 +895,8 @@ function _giHighlightCurrentSlot() {
   _giUpdateAirlineBtns();
   _giUpdateTimeBtns();
   _giHighlightCurrentSlot();
+  _giRenderRegionOptions();
+  _giRenderStationOptions();
   var titleEl = document.querySelector('.gi-title');
   if (titleEl && _giAirline !== 'JX') {
     titleEl.textContent = (_giAirline === 'ALL' ? 'ALL' : _giAirline) + ' Flight Info';

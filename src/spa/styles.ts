@@ -752,6 +752,10 @@ input[type=radio]{width:15px;height:15px;aspect-ratio:1;accent-color:var(--accen
 .gi-header-left{display:flex;flex-direction:column;gap:2px}
 .gi-title{font-weight:700;font-size:.95em;color:var(--text)}
 .gi-date{font-size:.72em;color:var(--muted)}
+.gi-station-bar{display:flex;align-items:center;gap:6px;margin:2px 0}
+.gi-station-sel{background:var(--bg);border:1px solid var(--dim);color:var(--text);border-radius:6px;
+  padding:3px 8px;font-size:.75em;cursor:pointer;-webkit-appearance:menulist;line-height:1.4;max-width:46vw}
+.gi-station-sel:active{opacity:.7}
 .gi-date-nav{display:flex;align-items:center;gap:6px}
 .gi-nav-btn{background:none;border:1px solid var(--dim);color:var(--muted);border-radius:6px;
   padding:2px 8px;font-size:.72em;cursor:pointer;-webkit-appearance:none;line-height:1.4}

@@ -2948,7 +2948,7 @@ function dash(){
     '<div class=card><div class=lbl>今日新增</div><div class="big blue">+'+newToday+'</div></div>'+
     '<div class=card><div class=lbl>跨 App 重疊</div><div class=big>'+overlap+'</div><div class=sub>CrewSync + Pilot Log</div></div>'+
     (diskBytes!=null?'<div class=card><div class=lbl>資料庫</div><div class=big>'+mb(diskBytes)+'<span style="font-size:.5em;color:#64748b"> / 1 GB</span></div><div class=bar><i style="width:'+pct+'%"></i></div><div class=sub>'+pct+'% · Pilot Log '+mb(plBytes)+'</div></div>':'')+
-    (T.atis?'<div class=card><div class=lbl>ATIS 額度 · airframes</div>'+(T.atis.known?'<div class=big>'+T.atis.used+'<span style="font-size:.5em;color:#64748b"> / '+T.atis.limit+'</span></div><div class=seg><span class=gray>剩 <b>'+T.atis.remaining+'</b></span><span class=blue>founder 上限 <b>'+T.atis.founderCap+'</b></span></div>':'<div class=big>—</div><div class=sub>等有人用過才顯示(不主動抓、省額度)</div>')+'<div class=sub style="margin-top:5px">今日 <b style="color:#e2e8f0">'+((T.atis.who&&T.atis.who.length)||0)+'</b> 人用 · 詳見 📻 ATIS 分頁</div></div>':'')+
+    (T.atis?'<div class=card><div class=lbl>ATIS 額度 · airframes</div>'+(T.atis.known?'<div class=big>'+T.atis.used+'<span style="font-size:.5em;color:#64748b"> / '+T.atis.limit+'</span></div><div class=seg><span class=gray>剩 <b>'+T.atis.remaining+'</b></span><span class=blue>founder 上限 <b>'+T.atis.founderCap+'</b></span></div>':'<div class=big>—</div><div class=sub>等有人用過才顯示(不主動抓、省額度)</div>')+'<div class=sub style="margin-top:5px">今日 <b style="color:#e2e8f0">'+(T.atis.todayUsers||0)+'</b> 人用 · 詳見 📻 ATIS 分頁</div></div>':'')+
   '</div>';
 }
 function filt(arr,keys){var q=T.q.toLowerCase();if(!q)return arr;return arr.filter(function(u){return keys.some(function(k){var v=u[k];if(Array.isArray(v))v=v.join(' ');return String(v||'').toLowerCase().indexOf(q)>=0;});});}
@@ -2975,18 +2975,25 @@ function secAtis(){
   h+='<div class=row><div class=stats>';
   if(a.known){h+='<span>今日已用 <b>'+a.used+'</b> / '+a.limit+'</span><span>剩 <b>'+a.remaining+'</b></span><span>founder 上限 <b>'+a.founderCap+'</b></span><span>你 owner 可用滿 <b>'+a.limit+'</b></span>';}
   else{h+='<span>今日已用 <b>—</b>（不主動抓、省額度 → 等有人真的用過 ATIS 才顯示）</span>';}
-  h+='</div><div class=t>快取機場 '+(a.cachedAirports||0)+' · 數字直接來自 airframes，重啟也不歸零</div></div>';
-  h+='<div class=sechdr><h2 style="font-size:.95em">今日誰用（觸發 airframes 呼叫）</h2><span class=cnt>'+((a.who&&a.who.length)||0)+' 人</span></div>';
-  if(a.who&&a.who.length){
-    a.who.forEach(function(w){
-      h+='<div class=row><div class=r1><span class=id>'+esc(w.who)+'</span><span class=badge style="background:#0a0e1a;color:#93c5fd;border:1px solid #1e3a5f">'+w.count+' 次</span></div>'+(w.last?'<div class=t>最後 '+fmtDt(new Date(w.last).toISOString())+'</div>':'')+'</div>';
-    });
-  }else{h+='<div class=row>今日尚無人觸發 airframes（大家走快取或備案）</div>';}
-  var hist=a.history||{byUser:[],byDay:[]};
-  h+='<div class=sechdr style="margin-top:14px"><h2 style="font-size:.95em">累計用量（誰用最多 · 全部歷史）</h2><span class=cnt>'+hist.byUser.length+' 人</span></div>';
-  if(hist.byUser.length){hist.byUser.forEach(function(w){h+='<div class=row><div class=r1><span class=id>'+esc(w.who)+'</span><span class=badge style="background:#0a0e1a;color:#fcd34d;border:1px solid #92590e">'+w.total+' 次</span></div>'+(w.last?'<div class=t>最後 '+fmtDt(w.last)+'</div>':'')+'</div>';});}else{h+='<div class=row>尚無紀錄</div>';}
+  h+='</div><div class=t>快取機場 '+(a.cachedAirports||0)+' · 數字來自 airframes，重啟不歸零</div></div>';
+  // helper：把 [{who,icao,n}] 依 who 分組;把機場清單轉字串
+  function grp(rows,k){var m={};(rows||[]).forEach(function(r){(m[r.who]=m[r.who]||[]).push({icao:r.icao,n:r[k]});});return m;}
+  function aptStr(list){return (list||[]).map(function(x){return '<span><b>'+esc(x.icao||'?')+'</b> '+x.n+'</span>';}).join('');}
+  var hist=a.history||{};
+  // 今日誰用(誰查了哪些機場)
+  var todayG=grp(a.who,'count'),todayKeys=Object.keys(todayG);
+  h+='<div class=sechdr style="margin-top:14px"><h2 style="font-size:.95em">今日誰用 · 查了哪些機場</h2><span class=cnt>'+(a.todayUsers||0)+' 人</span></div>';
+  if(todayKeys.length){todayKeys.forEach(function(who){var s=todayG[who].reduce(function(t,x){return t+x.n;},0);h+='<div class=row><div class=r1><span class=id>'+esc(who)+'</span><span class=badge style="background:#0a0e1a;color:#fcd34d;border:1px solid #92590e">共 '+s+'</span></div><div class=src style="flex-wrap:wrap">'+aptStr(todayG[who])+'</div></div>';});}else{h+='<div class=row>今日尚無人觸發 airframes</div>';}
+  // 累計誰用最多(+各自查的機場)
+  var uaG=grp(hist.byUserAirport,'total');
+  h+='<div class=sechdr style="margin-top:14px"><h2 style="font-size:.95em">累計 · 誰用最多（全部歷史）</h2><span class=cnt>'+((hist.byUser&&hist.byUser.length)||0)+' 人</span></div>';
+  if(hist.byUser&&hist.byUser.length){hist.byUser.forEach(function(w){h+='<div class=row><div class=r1><span class=id>'+esc(w.who)+'</span><span class=badge style="background:#0a0e1a;color:#fcd34d;border:1px solid #92590e">'+w.total+' 次</span></div><div class=src style="flex-wrap:wrap">'+aptStr(uaG[w.who])+'</div>'+(w.last?'<div class=t>最後 '+fmtDt(w.last)+'</div>':'')+'</div>';});}else{h+='<div class=row>尚無紀錄</div>';}
+  // 各機場被查熱度
+  h+='<div class=sechdr style="margin-top:14px"><h2 style="font-size:.95em">各機場被查次數（全部歷史）</h2></div>';
+  if(hist.byAirport&&hist.byAirport.length){h+='<div class=row><div class=src style="flex-wrap:wrap">'+hist.byAirport.map(function(x){return '<span><b>'+esc(x.icao||'?')+'</b> '+x.total+'</span>';}).join('')+'</div></div>';}else{h+='<div class=row>尚無紀錄</div>';}
+  // 每日用量
   h+='<div class=sechdr style="margin-top:14px"><h2 style="font-size:.95em">每日用量</h2></div>';
-  if(hist.byDay.length){hist.byDay.forEach(function(dd){h+='<div class=row><div class=r1><span class=id>'+esc(dd.day)+'</span><span class=badge style="background:#0a0e1a;color:#93c5fd;border:1px solid #1e3a5f">'+dd.total+' 次</span><span class=name>'+dd.users+' 人</span></div></div>';});}else{h+='<div class=row>尚無紀錄</div>';}
+  if(hist.byDay&&hist.byDay.length){hist.byDay.forEach(function(dd){h+='<div class=row><div class=r1><span class=id>'+esc(dd.day)+'</span><span class=badge style="background:#0a0e1a;color:#93c5fd;border:1px solid #1e3a5f">'+dd.total+' 次</span><span class=name>'+dd.users+' 人</span></div></div>';});}else{h+='<div class=row>尚無紀錄</div>';}
   return h+'</div>';
 }
 function secCrew(c){

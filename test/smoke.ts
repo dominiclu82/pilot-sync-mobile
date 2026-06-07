@@ -14,9 +14,13 @@ let server: ChildProcess | null = null;
 
 async function startServer(): Promise<void> {
   return new Promise((resolve, reject) => {
+    // ⚠ 安全鎖：smoke test 絕不可碰正式 DB。把 DATABASE_URL 設成空字串，
+    // server.ts 的 _pool 就會是 null（無 DB 模式）→ 不連庫、不跑 migration。
+    // dotenv 沒開 override，空字串「已存在」→ .env 不會蓋回真實連線字串。
     server = spawn('npx', ['tsx', 'src/server.ts'], {
       stdio: ['ignore', 'pipe', 'pipe'],
       shell: true,
+      env: { ...process.env, DATABASE_URL: '' },
     });
     const timeout = setTimeout(() => reject(new Error('Server 啟動超時')), 30000);
     server.stdout?.on('data', (data: Buffer) => {

@@ -85,11 +85,16 @@ async function _dbInit() {
         lim INTEGER, remaining INTEGER, reset_at BIGINT, updated_at TIMESTAMPTZ DEFAULT NOW()
       );
       CREATE TABLE IF NOT EXISTS cs_atis_who (
-        day TEXT NOT NULL, who TEXT NOT NULL,
+        day TEXT NOT NULL, who TEXT NOT NULL, icao TEXT NOT NULL DEFAULT '',
         cnt INTEGER NOT NULL DEFAULT 0, last_at TIMESTAMPTZ,
-        PRIMARY KEY (day, who)
+        PRIMARY KEY (day, who, icao)
       );
     `);
+    // V8.0.60：cs_atis_who 加 icao（記「誰查了哪個機場」）。舊表(PK day,who)要遷移：加欄、改主鍵。
+    // ⚠ 不可刪舊列！舊聚合列 icao='' 保留(顯示時當「未分機場」)，避免清掉歷史用量。
+    await _pool.query(`ALTER TABLE cs_atis_who ADD COLUMN IF NOT EXISTS icao TEXT NOT NULL DEFAULT ''`).catch(() => {});
+    await _pool.query(`ALTER TABLE cs_atis_who DROP CONSTRAINT IF EXISTS cs_atis_who_pkey`).catch(() => {});
+    await _pool.query(`ALTER TABLE cs_atis_who ADD PRIMARY KEY (day, who, icao)`).catch(() => {});
     // Add columns if not exist (for existing tables)
     await _pool.query(`ALTER TABLE cs_users ADD COLUMN IF NOT EXISTS employee_id TEXT`).catch(() => {});
     await _pool.query(`ALTER TABLE cs_users ADD COLUMN IF NOT EXISTS picture TEXT`).catch(() => {});
@@ -701,15 +706,15 @@ async function _atisAuthLevel(plToken: string, csIdt: string): Promise<AtisAuth>
 
 // 「誰觸發了 airframes 呼叫」計數 → 原子寫進 DB（cnt = cnt + 2），重啟不歸零、不會競態覆蓋（codex P2）。
 // 不存記憶體；顯示一律即時從 DB 撈（/api/atis-usage），避免記憶體/DB 不一致。只算實際打 airframes（快取命中不算）。
-function _atisRecordWho(who: string, level: AtisLevel) {
+function _atisRecordWho(who: string, level: AtisLevel, icao: string) {
   if (!_pool) return;
   const d = new Date().toISOString().slice(0, 10);
   const id = who || (level === 'owner' ? '(owner)' : '(unknown)');
   _pool.query(
-    `INSERT INTO cs_atis_who (day,who,cnt,last_at) VALUES ($1,$2,2,NOW())
-     ON CONFLICT (day,who) DO UPDATE SET cnt = cs_atis_who.cnt + 2, last_at = NOW()`,
-    [d, id]
-  ).catch(() => {});   // 一次抓 ARR+DEP = +2；原子遞增
+    `INSERT INTO cs_atis_who (day,who,icao,cnt,last_at) VALUES ($1,$2,$3,2,NOW())
+     ON CONFLICT (day,who,icao) DO UPDATE SET cnt = cs_atis_who.cnt + 2, last_at = NOW()`,
+    [d, id, icao]
+  ).catch(() => {});   // 一次抓 ARR+DEP = +2；原子遞增。記「誰查了哪個機場」
 }
 
 // 啟動時從 DB 載回 rate 快照（過了重置時間就當滿額）。誰用的不載記憶體（一律即時從 DB 撈）。
@@ -776,7 +781,7 @@ app.get('/api/atis', async (req, res) => {
   if (auth.level === 'none') return res.json({ fallback: true });
   // 4. 依 airframes「真實剩餘額度」判斷（owner 用到剩 0、founder 用到剩 50 就停）；key 沒設或額度不足 → 備援。
   if (!AIRFRAMES_KEY || !_atisAllowed(auth.level)) return res.json({ fallback: true });
-  _atisRecordWho(auth.who, auth.level);   // 記「誰觸發了這次 airframes 呼叫（扣 2 次額度）」
+  _atisRecordWho(auth.who, auth.level, icao);   // 記「誰、查了哪個機場、扣 2 次額度」
   // 5. 抓 airframes ARR + DEP（過程用回應標頭更新真實額度，不自己數、不用退還）
   try {
     const [arr, dep] = await Promise.all([
@@ -801,14 +806,21 @@ app.get('/api/atis-usage', requireAuth, async (req: AuthedRequest, res) => {
   if (_pool) {
     try {
       const day = new Date().toISOString().slice(0, 10);
+      // 今日：誰、查了哪個機場、幾次（前端依 who 分組顯示）
       const today = await _pool.query(
-        `SELECT who, cnt AS count, last_at AS last FROM cs_atis_who WHERE day=$1 ORDER BY cnt DESC`, [day]);
+        `SELECT who, icao, cnt AS count, last_at AS last FROM cs_atis_who WHERE day=$1 ORDER BY who, cnt DESC`, [day]);
       usage.who = today.rows;
+      usage.todayUsers = new Set(today.rows.map((r: any) => r.who)).size;   // 今日不重複人數(卡片用)
+      // 歷史：每人累計、每人每機場累計、每日總量、各機場熱度
       const byUser = await _pool.query(
         `SELECT who, SUM(cnt)::int AS total, MAX(last_at) AS last FROM cs_atis_who GROUP BY who ORDER BY total DESC LIMIT 100`);
+      const byUserAirport = await _pool.query(
+        `SELECT who, icao, SUM(cnt)::int AS total FROM cs_atis_who WHERE icao <> '' GROUP BY who, icao ORDER BY who, total DESC`);
       const byDay = await _pool.query(
-        `SELECT day, SUM(cnt)::int AS total, COUNT(*)::int AS users FROM cs_atis_who GROUP BY day ORDER BY day DESC LIMIT 60`);
-      usage.history = { byUser: byUser.rows, byDay: byDay.rows };
+        `SELECT day, SUM(cnt)::int AS total, COUNT(DISTINCT who)::int AS users FROM cs_atis_who GROUP BY day ORDER BY day DESC LIMIT 60`);
+      const byAirport = await _pool.query(
+        `SELECT icao, SUM(cnt)::int AS total FROM cs_atis_who WHERE icao <> '' GROUP BY icao ORDER BY total DESC LIMIT 100`);
+      usage.history = { byUser: byUser.rows, byUserAirport: byUserAirport.rows, byDay: byDay.rows, byAirport: byAirport.rows };
     } catch { usage.history = { byUser: [], byDay: [] }; }
   }
   res.json(usage);
@@ -885,7 +897,102 @@ app.get('/api/pacific-hf', async (_req, res) => {
 });
 
 // ── FIDS proxy ──────────────────────────────────────────────────────────────
+// 外站(非桃園)資料來源 → 正規化成「前端最終 row 格式」，桌子(表格)不變、只換資料。
+const _FIDS_UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36';
+// 北海道機場公司統一 API：免 key 靜態 JSON、含 GateNo。slug=API 代號、code/name=顯示。
+const _FIDS_PORTS: Record<string, { slug: string; code: string; name: string; tz: number }> = {
+  cts: { slug: 'new-chitose', code: 'CTS', name: '新千歲', tz: 9 },  // 北海道 UTC+9
+  hkd: { slug: 'hakodate', code: 'HKD', name: '函館', tz: 9 }
+};
+// 任意時區的「當地日期」字串（offsetHours=該地 UTC 偏移；dayShift 天位移）
+function _localDateStr(offsetHours: number, dayShift = 0): string {
+  const d = new Date(Date.now() + offsetHours * 3600 * 1000 + dayShift * 86400 * 1000);
+  return d.getUTCFullYear() + '/' + String(d.getUTCMonth() + 1).padStart(2, '0') + '/' + String(d.getUTCDate()).padStart(2, '0');
+}
+// 部分場站航班號用 ICAO 三字碼(TTW/JAL)，統一轉成 IATA 兩字碼(IT/JL)，比照桃園
+const _ICAO2IATA: Record<string, string> = {
+  TTW: 'IT', EVA: 'BR', CAL: 'CI', SJX: 'JX', UIA: 'B7', MDA: 'AE', CPA: 'CX', CRK: 'HX',
+  JAL: 'JL', ANA: 'NH', ADO: 'HD', JJP: 'GK', APJ: 'MM', SKY: 'BC', SNJ: '6J', FDA: 'JH',
+  AAR: 'OZ', JJA: '7C', JNA: 'LJ', ESR: 'ZE', ABL: 'BX', KAL: 'KE', CES: 'MU', CSN: 'CZ',
+  CQH: '9C', DKH: 'HO', CHH: 'HU', CSZ: 'ZH'
+};
+function _hkdFno(flight: any): string {
+  const f = String(flight || '').replace(/\s/g, '');
+  const m = f.match(/^([A-Za-z]{2,3})(\d.*)$/);
+  if (!m) return f;
+  const pre = m[1].toUpperCase();
+  return (pre.length === 3 && _ICAO2IATA[pre]) ? _ICAO2IATA[pre] + m[2] : f;
+}
+function _twDateStr(offsetDays = 0): string { return _localDateStr(8, offsetDays); }
+// 一筆北海道航班 → 桃園同款 row（沒有的欄位留空字串，前端顯示「—」）
+function _hkdRow(f: any, port: { code: string; name: string }): any | null {
+  const airs: any[] = Array.isArray(f.Airline) ? f.Airline : [];
+  const op = airs.find(a => a && a.SharingfltDiv === 0) || airs[0];
+  if (!op) return null;
+  const rawFno = String(op.Flight || '').replace(/\s/g, '').toUpperCase();
+  const fno = _hkdFno(op.Flight);
+  if (!fno) return null;
+  const altFno = (rawFno && rawFno !== fno.toUpperCase()) ? rawFno : '';
+  const otherCode = op.AreaCode || '';
+  const otherName = op.AreaName || op.AreaTranName || otherCode || '';
+  const gate = (f.GateNo == null ? '' : String(f.GateNo)).trim();
+  const st = (f.ST == null ? '' : String(f.ST)).trim();
+  const et = (f.ET_AT == null ? '' : String(f.ET_AT)).trim();
+  const base = { fno, altFno, checkin: '', depTerminal: '', arrTerminal: '', carousel: '' };
+  if (f.DA === 'D') {
+    // 出發：本站 → 對方站；gate/std/atd 有值
+    return { ...base, origin: port.code, originCode: port.code, originName: port.name,
+      dest: otherCode, destCode: otherCode, destName: otherName,
+      gate, std: st, atd: et, sta: '', ata: '', parking: '' };
+  }
+  // 到達：對方站 → 本站；比照桃園，到達 gate 放 parking 欄；sta/ata 有值
+  return { ...base, origin: otherCode, originCode: otherCode, originName: otherName,
+    dest: port.code, destCode: port.code, destName: port.name,
+    gate: '', std: '', atd: '', sta: st, ata: et, parking: gate };
+}
+async function _fidsOutstation(port: { slug: string; code: string; name: string; tz: number }, reqDate: string, res: any) {
+  try {
+    // 北海道只有 today / yesterday 兩檔。用「機場當地時區」(port.tz, 北海道 UTC+9)判日期，
+    // 避免台北(UTC+8) 23:00-24:00 那一小時機場已跨日卻還給到前一天的板。
+    const apToday = _localDateStr(port.tz, 0), apYest = _localDateStr(port.tz, -1);
+    const twToday = _twDateStr(0), twYest = _twDateStr(-1);
+    let when = '';
+    // 「今天」視角(前端送台北今天 / 機場今天 / 空) → 一律給機場當前的 today.json
+    if (!reqDate || reqDate === twToday || reqDate === apToday) when = 'today';
+    else if (reqDate === twYest || reqDate === apYest) when = 'yesterday';
+    if (!when) { res.json({ rows: [], date: reqDate || apToday, airport: port.code }); return; }
+    // 回傳「機場當地日期」當 label：服務的是 today.json/yesterday.json，標籤要跟著機場的日子走
+    const respDate = (when === 'today') ? apToday : apYest;
+    const base = `https://www.hokkaido-airports.com/api/v1/${port.slug}/static/fis`;
+    const getJ = async (u: string) => { const r = await fetch(u, { headers: { 'User-Agent': _FIDS_UA } }); if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); };
+    const [intlR, domR] = await Promise.allSettled([
+      getJ(`${base}/international/${when}.json`),
+      getJ(`${base}/domestic/${when}.json`)
+    ]);
+    // 兩支 feed 都掛才當上游故障(比照桃園 dep/arr 都失敗才 502)；一支活就給資料
+    if (intlR.status === 'rejected' && domR.status === 'rejected') {
+      console.error('FIDS outstation upstream error:', port.code, (intlR.reason || {}).message, (domR.reason || {}).message);
+      res.status(502).json({ error: 'upstream unavailable' });
+      return;
+    }
+    const _items = (d: any): any[] => Array.isArray(d) ? d : (d && Array.isArray(d.items) ? d.items : []);
+    const intl = intlR.status === 'fulfilled' ? intlR.value : [];
+    const dom = domR.status === 'fulfilled' ? domR.value : [];
+    const flat = [..._items(intl), ..._items(dom)];
+    const rows = flat.map(f => _hkdRow(f, port)).filter(Boolean);
+    res.json({ rows, date: respDate, airport: port.code });
+  } catch (e: any) {
+    console.error('FIDS outstation error:', e.message);
+    res.status(502).json({ error: e.message });
+  }
+}
 app.get('/api/fids', async (req, res) => {
+  // 外站分流：?airport=cts|hkd → 北海道正規化來源；無/tpe → 維持桃園原邏輯
+  const apParam = String(req.query.airport || '').toLowerCase();
+  if (apParam && apParam !== 'tpe' && _FIDS_PORTS[apParam]) {
+    await _fidsOutstation(_FIDS_PORTS[apParam], String(req.query.date || ''), res);
+    return;
+  }
   try {
     let odate = req.query.date as string || '';
     if (!odate || !/^\d{4}\/\d{2}\/\d{2}$/.test(odate)) {
