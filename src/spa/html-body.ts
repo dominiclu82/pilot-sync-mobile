@@ -1530,7 +1530,7 @@ export function getSpaHtmlBody(): string {
       <button class="tab-util-btn tab-install-btn" id="tab-install-btn" onclick="showInstallGuide()" style="display:none">
         <span>📲</span>安裝
       </button>
-      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer;text-decoration:underline" onclick="showAbout()">V9.1.01</span>
+      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer;text-decoration:underline" onclick="showAbout()">V9.1.02</span>
     </div>
   </div>
 </div>
@@ -1564,7 +1564,12 @@ export function getSpaHtmlBody(): string {
     </div>
     <div style="max-height:50vh;overflow-y:auto;-webkit-overflow-scrolling:touch;margin-bottom:10px">
     ${renderCommunityLink()}
-    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V9.1.01</div>
+    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V9.1.02</div>
+    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
+      <div>🚦 <b>ATFM 的 CTOT 表改用「出發 / 到達」切換（看到達不用再滑出發），並加航班／機場搜尋。</b></div>
+      <div>🚦 <b>ATFM CTOT now toggles Departures / Arrivals (no scrolling) + flight/airport search.</b></div>
+    </div>
+    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V9.1.01</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
       <div>🚦 <b>ATFM 擴充——CTOT 分出發/到達、新增美國（FAA）與日本/韓國機場狀態、iPad 版號邊距修正。</b></div>
       <div>🚦 <b>ATFM update — CTOT split by departure/arrival; added US (FAA) + Japan/Korea airport status; iPad label fix.</b></div>

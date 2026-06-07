@@ -770,6 +770,12 @@ input[type=radio]{width:15px;height:15px;aspect-ratio:1;accent-color:var(--accen
 .atfm-pp b{font-size:1.05em}.atfm-pp-ty{display:inline-block;background:#ffedd5;color:#9a3412;border-radius:4px;padding:1px 6px;font-size:.78em;font-weight:700;margin-top:3px}
 .atfm-bar{padding:8px 12px;background:var(--card);border-top:1px solid var(--dim);font-size:.78em;max-height:34vh;overflow:auto;flex-shrink:0}
 .atfm-bar-h{font-weight:700;margin:6px 0 4px;color:var(--text)}
+.atfm-da{display:flex;gap:6px;align-items:center;margin:4px 0 6px;flex-wrap:wrap}
+.atfm-da-btn{background:var(--bg);border:1px solid var(--dim);color:var(--muted);border-radius:14px;padding:4px 12px;font-size:.95em;cursor:pointer;white-space:nowrap;-webkit-appearance:none}
+.atfm-da-on{background:var(--accent);color:#fff;border-color:var(--accent)}
+.atfm-da2{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+.atfm-search{flex:1;min-width:0;background:var(--bg);border:1px solid var(--dim);color:var(--text);border-radius:8px;padding:5px 10px;font-size:.95em;-webkit-appearance:none}
+.atfm-upd{color:var(--muted);font-size:.85em;white-space:nowrap}
 .atfm-m-row{display:flex;gap:8px;align-items:flex-start;padding:5px 0;border-bottom:1px solid var(--dim)}
 .atfm-badge{font-size:.72em;font-weight:700;border-radius:4px;padding:1px 6px;white-space:nowrap}
 .atfm-m-txt{flex:1;line-height:1.35;color:var(--text)}.atfm-m-t{color:var(--muted);font-size:.85em}
