@@ -1530,7 +1530,7 @@ export function getSpaHtmlBody(): string {
       <button class="tab-util-btn tab-install-btn" id="tab-install-btn" onclick="showInstallGuide()" style="display:none">
         <span>📲</span>安裝
       </button>
-      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer;text-decoration:underline" onclick="showAbout()">V9.2.01</span>
+      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer;text-decoration:underline" onclick="showAbout()">V9.3.01</span>
     </div>
   </div>
 </div>
@@ -1564,7 +1564,12 @@ export function getSpaHtmlBody(): string {
     </div>
     <div style="max-height:50vh;overflow-y:auto;-webkit-overflow-scrolling:touch;margin-bottom:10px">
     ${renderCommunityLink()}
-    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V9.2.01</div>
+    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V9.3.01</div>
+    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
+      <div>🚦 <b>ATFM 新增越南（河內）流量管制；修正點機場面板頂走頁首與地圖回彈；📡 FR24 飛行軌跡修復。</b></div>
+      <div>🚦 <b>ATFM adds Vietnam (Hanoi) flow control; fixed airport-tap panel pushing the header &amp; map bounce; 📡 FR24 flight trail restored.</b></div>
+    </div>
+    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V9.2.01</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
       <div>🚦 <b>ATFM 改為全球地圖：可無限左右拖動，直接點機場看該場 CTOT（出發／到達），並加入長榮、華航北美航點作為未來潛在點。</b></div>
       <div>🚦 <b>ATFM is now a global map — pan freely and tap any airport for its CTOT (departures/arrivals); added EVA Air &amp; China Airlines North America stations as future points.</b></div>

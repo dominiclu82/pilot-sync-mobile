@@ -54,8 +54,8 @@ import { getAirportDbJs } from '../spa/js-airport-db.js';
 
 // ── 版本（比照 CrewSync / Morning：每次推版必更新；SW cache 名稱跟著走） ────
 // 本機 preview build 會暫時加 -tNN 後綴方便對版；推正式版前拿掉只留乾淨版號。
-export const PILOT_LOG_VERSION = 'V2.2.18';
-const PILOT_LOG_CACHE = 'pilotlog-v2-2-18';
+export const PILOT_LOG_VERSION = 'V2.2.19';
+const PILOT_LOG_CACHE = 'pilotlog-v2-2-19';
 
 export const pilotLogRouter = express.Router();
 
@@ -254,6 +254,8 @@ body.pl-offline { padding-top: calc(env(safe-area-inset-top) + var(--pl-banner-h
 .pl-stickhead { position: sticky; top: env(safe-area-inset-top); z-index: 40; background: var(--bg);
                 margin: -10px -14px 8px; padding: 10px 14px 8px;
                 will-change: transform; -webkit-backface-visibility: hidden; }   /* iOS：放獨立合成層，捲動時 sticky 不消失/被內容蓋住 */
+/* 寬版 Airports 三欄：鎖 body 不捲(只在這頁,靠 #pl-apt-listcol 存在判斷),避免右欄空白拖動外溢把頁首頂上去；三欄各自內捲 */
+body:has(#pl-apt-listcol) { overflow: hidden; height: 100dvh; }
 /* 離線時頂部固定工具列要黏在 OFFLINE 橫幅「下方」，否則橫幅(z-250)會蓋住按鈕。
    --pl-banner-h 由 JS 量實際橫幅高度（窄螢幕/大字會換行變更高，不能寫死 28px）。!important 蓋過 inline/class top:0。 */
 body.pl-offline .pl-topstack, body.pl-offline .pl-stickhead { top: calc(env(safe-area-inset-top) + var(--pl-banner-h, 28px)) !important; }
@@ -360,6 +362,11 @@ function _renderPilotLogChangelog(): string {
   return `
     ${renderCommunityLink()}
     <div class="pl-cl-v">${PILOT_LOG_VERSION}</div>
+    <div class="pl-cl-txt">
+      <b>🗺️ Airports：捲動航班不再把頁首頂走、點機場保留列表捲動位置；補回金邊舊機場 VDPP（Pochentong，給歷史航班）。</b><br>
+      <b>🗺️ Airports: scrolling flights no longer pushes the header; the airport list keeps its scroll position when you tap an airport; restored old Phnom Penh (VDPP, Pochentong) for historical flights.</b>
+    </div>
+    <div class="pl-cl-v old">V2.2.18</div>
     <div class="pl-cl-txt">
       <b>🩹 Analyze iPad 左右捲動「這次真的」修好。</b>上一版的修正改錯地方沒接上、群組標題（All Flight Time…）在 iPad 仍黏著蓋住內容；這版把標題接上正確樣式，iPad 才真的變成只「右欄」獨立捲動、標題不再蓋住；手機維持原樣不動。<br>
       <b>🩹 Analyze iPad scroll actually fixed now.</b> The previous fix didn’t take effect — the group header still stuck and overlapped content on iPad. This version wires the header to the right style so iPad finally gets an independent right-column scroll with no overlap; phone untouched.

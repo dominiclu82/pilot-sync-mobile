@@ -3722,6 +3722,10 @@ function _plAptIsWide() { return (typeof window !== 'undefined' && window.innerW
 function _plRenderPlaces() {
   var c = document.getElementById('pilotlog-content');
   if (!c) return;
+  // 保留左欄機場列表的捲動位置:點機場會整頁重畫,不要跳回頂端(要重滑找回剛剛的機場)
+  var _prevAptScroll = 0;
+  var _leOld = document.getElementById('pl-apt-listcol');
+  if (_leOld) _prevAptScroll = _leOld.scrollTop;
   var mode = _pl.aptMode || 'flown';
   var list = _plAirportAgg(mode);
   var wide = _plAptIsWide();
@@ -3756,13 +3760,16 @@ function _plRenderPlaces() {
   // 寬螢幕三欄：外框固定高度，三欄各自獨立捲動（不整頁一起捲）
   c.innerHTML = '<div style="padding:10px 14px">' + header +
     '<div style="display:flex;gap:14px;align-items:stretch;height:calc(100vh - 138px)">' +
-      '<div style="flex:0 0 280px;overflow-y:auto;padding-right:2px">' + _plAptListHtml(list, sel) + '</div>' +
+      '<div id="pl-apt-listcol" style="flex:0 0 280px;overflow-y:auto;overscroll-behavior:contain;padding-right:2px">' + _plAptListHtml(list, sel) + '</div>' +
       (sel
-        ? '<div style="flex:0 0 400px;overflow-y:auto;padding-right:2px">' + _plAptInfoHtml(sel) + '</div>' +
-          '<div style="flex:1 1 auto;min-width:0;max-width:660px;overflow-y:auto">' + _plAptFlightsHtml(sel) + '</div>'
+        ? '<div style="flex:0 0 400px;overflow-y:auto;overscroll-behavior:contain;padding-right:2px">' + _plAptInfoHtml(sel) + '</div>' +
+          '<div style="flex:1 1 auto;min-width:0;max-width:660px;overflow-y:auto;overscroll-behavior:contain">' + _plAptFlightsHtml(sel) + '</div>'
         : '<div style="flex:1;color:var(--muted);padding:30px;font-size:.85em">左邊選一個機場 · pick an airport</div>') +
     '</div>' +
   '</div>';
+  // 點機場重畫後把左欄捲回剛剛位置(不用重滑找機場)
+  var _leNew = document.getElementById('pl-apt-listcol');
+  if (_leNew) _leNew.scrollTop = _prevAptScroll;
 }
 // 點機場：寬螢幕更新三欄中右；窄螢幕進詳情頁
 function _plSelectAirport(key) {

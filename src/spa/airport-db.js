@@ -3340,6 +3340,7 @@ var _PL_AIRPORTS=[
 ["VDSA","SAI","Siem Reap-Angkor International Airport","Siem Reap","KH",13.37,104.224,"",191,"KH-17",[["05","23",null,null,null,null,11827,197]],-0.8],
 ["VDSV","KOS","Sihanouk International Airport","Preah Sihanouk","KH",10.571,103.632,"Asia/Phnom_Penh",33,"KH-18",[["03","21",10.574,103.634,10.5844,103.64,8202,112]],-0.5],
 ["VDTI","KTI","Techo International Airport","Phnom Penh (Boeng Khyang)","KH",11.36,104.921,"",20,"KH-8",[],-0.6],
+["VDPP","PNH","Phnom Penh International Airport (Pochentong)","Phnom Penh","KH",11.5466,104.8442,"Asia/Phnom_Penh",40,"KH-12",[],-0.6],
 ["VEAB","IXD","Prayagraj Airport","Allahabad","IN",25.44,81.734,"",322,"IN-UP",[],0.4],
 ["VEAP","AHA","Maa Mahamaya Airport","Ambikapur","IN",22.988,83.196,"",1930,"IN-CT",[],0],
 ["VEAT","IXA","Agartala - Maharaja Bir Bikram Airport","Agartala","IN",23.887,91.24,"Asia/Calcutta",46,"IN-TR",[["18","36",23.8973,91.2413,23.8767,91.2396,7500,148]],-0.4],

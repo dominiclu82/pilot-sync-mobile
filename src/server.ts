@@ -3,6 +3,7 @@ import { google } from 'googleapis';
 import fs from 'fs';
 import path from 'path';
 import { randomUUID, randomBytes, createHash } from 'crypto';
+import { Agent as UndiciAgent } from 'undici';
 import { config } from 'dotenv';
 import { OUTPUT_DIR, ROOT, loadCredentials } from './config.js';
 import { generateICSHeadless } from './generate-ics-headless.js';
@@ -1148,6 +1149,38 @@ async function _atfmTh(): Promise<any> {
   let measures: any[] = []; try { measures = (await _atfmMap()).filter(m => /^VT/.test(m.airport)); } catch { }
   return { region: 'th', measures, ctot, hasCtot: true };
 }
+// 越南 Hanoi ATFMU(自己的源)：憑證壞→跳驗證。getTop=機場流量限制 / dayFlights=當日逐班(取有CTOT且越南起飛)
+const _atfmVnAgent = new UndiciAgent({ connect: { rejectUnauthorized: false } });
+let _atfmVnCache: { ts: number; data: any } | null = null;
+async function _atfmVn(): Promise<any> {
+  if (_atfmVnCache && Date.now() - _atfmVnCache.ts < _ATFM_TTL) return _atfmVnCache.data;
+  const opt: any = { dispatcher: _atfmVnAgent, headers: { 'User-Agent': _FIDS_UA, 'Accept': 'application/json' } };
+  const [topR, dfR] = await Promise.allSettled([
+    fetch('https://atfm.vn/ctotGenerator/rest/getTop/', opt).then(r => r.json()),
+    fetch('https://atfm.vn/ctotGenerator/rest/dayFlights/', opt).then(r => r.json())
+  ]);
+  const top = topR.status === 'fulfilled' && Array.isArray(topR.value) ? topR.value : [];
+  const df = dfR.status === 'fulfilled' && Array.isArray(dfR.value) ? dfR.value : [];
+  const now = Date.now();
+  const status: Record<string, any> = {}; const measures: any[] = [];
+  const hm = (ms: number) => { const d = new Date(ms); return String(d.getUTCHours()).padStart(2, '0') + ':' + String(d.getUTCMinutes()).padStart(2, '0'); };
+  for (const t of top) {
+    const ic = _atfmStrip(t.airport); if (!ic) continue;
+    const end = t.endRecovery || t.endRestriction || 0;
+    if (end && end < now) continue;  // 已恢復的不顯示
+    const txt = 'Flow ' + t.normalFlow + '→' + t.restrictionFlow + '/h' + (t.beginRestriction ? ' ' + hm(t.beginRestriction) + '-' + hm(end) + 'Z' : '');
+    status[ic] = { color: 'amber', text: txt, type: 'GDP' };
+    measures.push({ airport: ic, text: txt, type: 'GDP', time: '' });
+  }
+  const fmt = (s: any) => { const x = String(s == null ? '' : s).trim(); return /^\d{4}$/.test(x) ? x.slice(0, 2) + ':' + x.slice(2) : x; };
+  const ctot = df.filter((f: any) => f.ctot && /^VV/.test(String(f.fromAirp || ''))).map((f: any) => ({
+    acid: _atfmStrip(f.flightnbr), adep: _atfmStrip(f.fromAirp), ades: _atfmStrip(f.toAirp),
+    cobt: fmt(f.eobt), ctot: fmt(f.ctot), ctotNew: '', win: '', status: '', dir: 'DEP'
+  }));
+  const data = { region: 'vn', status, measures, ctot, hasCtot: true };
+  _atfmVnCache = { ts: Date.now(), data };
+  return data;
+}
 // 美國 FAA NAS Status(公開JSON):每機場 groundStop/groundDelay/airportClosure。回 {status:{IATA:{color,text,type}}, measures}
 let _atfmFaaCache: { ts: number; data: any } | null = null;
 async function _atfmFaa(): Promise<any> {
@@ -1184,23 +1217,25 @@ app.get('/api/atfm', async (req, res) => {
   try {
     let data: any;
     if (region === 'all' || region === 'apac') {
-      const [st, faa, twD, hkD, moD, thD] = await Promise.all([
+      const [st, faa, twD, hkD, moD, thD, vnD] = await Promise.all([
         _atfmMapStatus(), _atfmFaa(),
         _atfmTw().catch(() => ({ ctot: [] })), _atfmHk('vhhh', 'hk').catch(() => ({ ctot: [] })),
-        _atfmHk('vmmc', 'mo').catch(() => ({ ctot: [] })), _atfmTh().catch(() => ({ ctot: [] }))
+        _atfmHk('vmmc', 'mo').catch(() => ({ ctot: [] })), _atfmTh().catch(() => ({ ctot: [] })),
+        _atfmVn().catch(() => ({ ctot: [], status: {} }))
       ]);
+      const vnSt = (vnD as any).status || {};
       const airports = _atfmOps().map((a: any) => {
-        const s = st[a.icao] || (a.iata && faa.status[a.iata]);
+        const s = st[a.icao] || vnSt[a.icao] || (a.iata && faa.status[a.iata]);
         let color = 'grey', text = '', type = '';
         if (s) { color = s.color; text = s.text; type = s.type; }
         else if (/^K/.test(a.icao)) { color = 'green'; }  // FAA 監控的美國本土機場,無事件=正常
         return { icao: a.icao, lat: a.lat, lon: a.lon, color, text, type };
       });
-      // 台/港/澳/泰逐班 CTOT 一次合併,前端點機場時依 adep/ades 過濾
+      // 台/港/澳/泰/越逐班 CTOT 一次合併,前端點機場時依 adep/ades 過濾
       // 跨境航班(如台灣→香港)兩邊源都會列出 → 去重
       const _seen = new Set<string>();
       const ctot = ([] as any[]).concat(
-        (twD as any).ctot || [], (hkD as any).ctot || [], (moD as any).ctot || [], (thD as any).ctot || []
+        (twD as any).ctot || [], (hkD as any).ctot || [], (moD as any).ctot || [], (thD as any).ctot || [], (vnD as any).ctot || []
       ).filter((c: any) => {
         // 鍵含 CTOT 時間(取數字):只有班號+航線+時間全同才併(跨源同一班);同航線不同班次時間不同→保留,不誤藏
         const k = (c.acid || '') + '|' + (c.adep || '') + '|' + (c.ades || '') + '|' + String(c.ctot || '').replace(/\D/g, '');
@@ -1212,6 +1247,7 @@ app.get('/api/atfm', async (req, res) => {
     else if (region === 'hk') data = await _atfmHk('vhhh', 'hk');
     else if (region === 'mo') data = await _atfmHk('vmmc', 'mo');
     else if (region === 'th') data = await _atfmTh();
+    else if (region === 'vn') data = await _atfmVn();
     else if (region === 'us') { const faa = await _atfmFaa(); data = { region: 'us', measures: faa.measures, ctot: [], hasCtot: false }; }
     else if (region === 'jp') data = await _atfmMapRegion('jp', /^RJ|^RO/);
     else if (region === 'kr') data = await _atfmMapRegion('kr', /^RK/);
@@ -1336,11 +1372,32 @@ app.get('/api/fr24', async (req, res) => {
   }
 });
 
+// FR24 clickhandler 直抓(flightradarapi 1.4 送的 header 被 FR24 403;帶瀏覽器 header + version 就通)
+// 含航跡 trail[]、起訖機場、時刻。30s 快取 + 失敗退舊 + 自動清理避免記憶體膨脹(trail 每筆~200KB)
+const _FR24_CH_UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
+const _fr24ChCache: Record<string, { ts: number; data: any }> = {};
+async function _fr24Clickhandler(id: string): Promise<any> {
+  const c = _fr24ChCache[id];
+  if (c && Date.now() - c.ts < 30000) return c.data;
+  try {
+    const r = await fetch('https://data-live.flightradar24.com/clickhandler/?flight=' + encodeURIComponent(id) + '&version=1.5',
+      { headers: { 'User-Agent': _FR24_CH_UA, 'Accept': 'application/json', 'Referer': 'https://www.flightradar24.com/' } });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const data = await r.json();
+    _fr24ChCache[id] = { ts: Date.now(), data };
+    const now = Date.now();
+    if (Object.keys(_fr24ChCache).length > 60) for (const k in _fr24ChCache) if (now - _fr24ChCache[k].ts > 60000) delete _fr24ChCache[k];
+    return data;
+  } catch (e) {
+    if (c) return c.data;  // 上游失敗退回上次成功的
+    throw e;
+  }
+}
 app.get('/api/fr24/detail', async (req, res) => {
   try {
     const flightId = req.query.id as string;
     if (!flightId) { res.status(400).json({ error: 'missing id' }); return; }
-    const details = await _fr24Api.getFlightDetails({ id: flightId } as any);
+    const details = await _fr24Clickhandler(flightId);
     res.json(details || {});
   } catch (e: any) {
     console.error('FR24 detail error:', e.message);
@@ -1385,7 +1442,7 @@ async function _fr24RefreshDetails(): Promise<void> {
     const newFlights: Record<string, any> = {};
     for (const t of targets) {
       try {
-        const detail = await _fr24Api.getFlightDetails({ id: t.id } as any);
+        const detail = await _fr24Clickhandler(t.id);
         if (!detail) continue;
         const airport = (detail as any).airport || {};
         const orig = airport.origin || {};

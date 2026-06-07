@@ -753,7 +753,10 @@ input[type=radio]{width:15px;height:15px;aspect-ratio:1;accent-color:var(--accen
 .gi-title{font-weight:700;font-size:.95em;color:var(--text)}
 .gi-date{font-size:.72em;color:var(--muted)}
 /* ── ATFM 流量管制（地圖版）── */
-#tab-atfm{flex-direction:column;position:relative;padding:0;overflow:hidden;min-height:calc(100dvh - 56px)}
+/* ATFM active 時鎖 body 捲動(全尺寸):底部面板長高不會把頂部 CrewSync 標題頂出去,改由地圖 flex 吸收 */
+html:has(#tab-atfm.tab-active){overflow:hidden;height:100dvh}
+html:has(#tab-atfm.tab-active) body{overflow:hidden;height:100dvh}
+#tab-atfm{flex-direction:column;position:relative;padding:0;overflow:hidden;overscroll-behavior:none;height:calc(100dvh - 56px - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px) - 30px)}
 #tab-atfm.tab-active{display:flex}
 .atfm-head{display:flex;align-items:center;justify-content:space-between;padding:9px 14px;background:var(--bg);border-bottom:1px solid var(--dim);flex-shrink:0}
 .atfm-title{font-weight:700;font-size:.92em;color:var(--text)}
@@ -765,10 +768,10 @@ input[type=radio]{width:15px;height:15px;aspect-ratio:1;accent-color:var(--accen
 .atfm-legend{display:flex;gap:12px;padding:5px 14px;font-size:.68em;color:var(--muted);background:var(--bg);flex-shrink:0;align-items:center;flex-wrap:wrap;border-bottom:1px solid var(--dim)}
 .atfm-dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:3px;vertical-align:middle;border:1px solid #0a0e1a}
 .atfm-legend-hint{margin-left:auto;color:#6b7280}
-#atfm-map{flex:1;width:100%;min-height:200px;z-index:1;background:#0a0e1a}
+#atfm-map{flex:1;width:100%;min-height:200px;z-index:1;background:#0a0e1a;overscroll-behavior:none;touch-action:none}
 .atfm-lbl{background:transparent;border:none;box-shadow:none;color:#fbbf24;font-weight:700;font-size:11px;text-shadow:0 0 3px #000}
 .atfm-pp b{font-size:1.05em}.atfm-pp-ty{display:inline-block;background:#ffedd5;color:#9a3412;border-radius:4px;padding:1px 6px;font-size:.78em;font-weight:700;margin-top:3px}
-.atfm-bar{padding:8px 12px;background:var(--card);border-top:1px solid var(--dim);font-size:.78em;max-height:34vh;overflow:auto;flex-shrink:0}
+.atfm-bar{padding:8px 12px;background:var(--card);border-top:1px solid var(--dim);font-size:.78em;max-height:34vh;overflow:auto;overscroll-behavior:none;-webkit-overflow-scrolling:touch;flex-shrink:0}
 .atfm-bar-h{font-weight:700;margin:6px 0 4px;color:var(--text)}
 .atfm-tap-h{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:4px 0 6px}
 .atfm-tap-h b{font-size:1.05em;color:var(--text)}
