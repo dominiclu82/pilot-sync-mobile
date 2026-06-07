@@ -419,7 +419,7 @@ setTimeout(function() {
 
 // ── Tab switching ─────────────────────────────────────────────────────────────
 function switchTab(tab, btn) {
-  ['tab-sync','tab-briefing','tab-cabin','tab-fr24','tab-gate'].forEach(function(id) {
+  ['tab-sync','tab-briefing','tab-cabin','tab-fr24','tab-atfm','tab-gate'].forEach(function(id) {
     var el = document.getElementById(id);
     if (el) { el.classList.remove('tab-active'); el.style.display = 'none'; }
   });
@@ -438,6 +438,11 @@ function switchTab(tab, btn) {
   } else {
     if (typeof _fr24UnlockOrientation === 'function') _fr24UnlockOrientation();
     if (typeof fr24StopAll === 'function') fr24StopAll();
+  }
+  if (tab === 'atfm') {
+    if (typeof atfmInit === 'function') atfmInit();
+  } else {
+    if (typeof _atfmStopAuto === 'function') _atfmStopAuto();
   }
   if (typeof _liveUnlockOrientation === 'function') _liveUnlockOrientation();
   if (typeof liveStopAll === 'function') liveStopAll();

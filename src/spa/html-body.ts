@@ -1306,6 +1306,24 @@ export function getSpaHtmlBody(): string {
   </div>
 </div><!-- end tab-cabin -->
 
+<!-- ══ Tab: ATFM 流量管制 ═══════════════════════════════════════════════ -->
+<div id="tab-atfm" style="display:none">
+  <div class="atfm-head">
+    <span class="atfm-title">🚦 Air Traffic Flow Management</span>
+    <span class="atfm-notice">⚠ Non-operational Reference only</span>
+  </div>
+  <div id="atfm-regions" class="atfm-regions"></div>
+  <div class="atfm-legend">
+    <span><span class="atfm-dot" style="background:#6b7280"></span>No data</span>
+    <span><span class="atfm-dot" style="background:#22c55e"></span>Normal</span>
+    <span><span class="atfm-dot" style="background:#f59e0b"></span>GDP</span>
+    <span><span class="atfm-dot" style="background:#ef4444"></span>Ground Stop</span>
+    <span class="atfm-legend-hint">Tap airport for details</span>
+  </div>
+  <div id="atfm-map"></div>
+  <div class="atfm-bar" id="atfm-bar"></div>
+</div><!-- end tab-atfm -->
+
 <!-- ══ Tab: Gate Info ═══════════════════════════════════════════════ -->
 <div id="tab-gate" style="display:none">
 
@@ -1491,6 +1509,9 @@ export function getSpaHtmlBody(): string {
   <button class="tab-btn" id="tabBtn-fr24" onclick="switchTab('fr24',this)">
     <span class="tab-btn-icon">📡</span>FR24
   </button>
+  <button class="tab-btn" id="tabBtn-atfm" onclick="switchTab('atfm',this)">
+    <span class="tab-btn-icon">🚦</span>ATFM
+  </button>
   <button class="tab-btn" id="tabBtn-gate" onclick="switchTab('gate',this)">
     <span class="tab-btn-icon">🌏</span>Gate Info
   </button>
@@ -1509,7 +1530,7 @@ export function getSpaHtmlBody(): string {
       <button class="tab-util-btn tab-install-btn" id="tab-install-btn" onclick="showInstallGuide()" style="display:none">
         <span>📲</span>安裝
       </button>
-      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer;text-decoration:underline" onclick="showAbout()">V8.1.01</span>
+      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer;text-decoration:underline" onclick="showAbout()">V9.0.01</span>
     </div>
   </div>
 </div>
@@ -1543,7 +1564,12 @@ export function getSpaHtmlBody(): string {
     </div>
     <div style="max-height:50vh;overflow-y:auto;-webkit-overflow-scrolling:touch;margin-bottom:10px">
     ${renderCommunityLink()}
-    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V8.1.01</div>
+    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V9.0.01</div>
+    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
+      <div>🚦 <b>新增 ATFM 流量管制——地圖顯示亞太機場即時管制狀態（GDP / Ground Stop），點地區看 CTOT；Gate Info 小修與 iPad 排版優化。</b></div>
+      <div>🚦 <b>New ATFM flow control — live map of Asia-Pacific airport restrictions (GDP / Ground Stop), tap a region for CTOT; Gate Info fixes &amp; iPad layout tweaks.</b></div>
+    </div>
+    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V8.1.01</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
       <div>🛫 <b>Gate Info 新增機場切換，加入日本新千歲、函館（含 gate），ALL 改為顯示全部航空；後台優化。</b></div>
       <div>🛫 <b>Gate Info adds airport switching with New Chitose &amp; Hakodate, Japan (incl. gate); ALL now shows all airlines; backend improvements.</b></div>

@@ -12,8 +12,8 @@ var _giTimeSlot = '±2hr';
 
 // ── 場站切換（地區 → 場站）。桃園走原邏輯；外站走 /api/fids?airport= 正規化來源 ──
 var _giRegions = {
-  TW: { name: '台灣', stations: [ { code: 'TPE', name: '桃園', src: 'tpe' } ] },
-  JP: { name: '日本', stations: [ { code: 'CTS', name: '新千歲', src: 'cts' }, { code: 'HKD', name: '函館', src: 'hkd' } ] }
+  TW: { name: 'TW', stations: [ { code: 'TPE', name: '桃園', src: 'tpe' } ] },
+  JP: { name: 'JP', stations: [ { code: 'CTS', name: '新千歲', src: 'cts' }, { code: 'HKD', name: '函館', src: 'hkd' } ] }
 };
 var _giRegion = 'TW';
 var _giAirport = 'TPE';      // 目前場站 code
@@ -539,7 +539,8 @@ function _giFetchStation(src, dateStr) {
   if (!navigator.onLine) return Promise.reject(new Error('offline'));
   return fetch('/api/fids?airport=' + encodeURIComponent(src) + '&date=' + encodeURIComponent(dateStr))
     .then(function(r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
-    .then(function(data) { _giStationCache[key] = { data: data, ts: Date.now() }; return data; });
+    .then(function(data) { _giStationCache[key] = { data: data, ts: Date.now() }; return data; })
+    .catch(function(e) { if (c) return c.data; throw e; });  // 抓失敗時退回上次成功的舊資料(機場wifi不穩)
 }
 
 function _giProcessStationRows() {

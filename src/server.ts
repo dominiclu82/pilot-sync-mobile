@@ -13,6 +13,7 @@ import { getSpaCoreJs } from './spa/js-core.js';
 import { getSpaWeatherJs } from './spa/js-weather.js';
 import { getSpaDutyTimeJs } from './spa/js-duty-time.js';
 import { getSpaGateInfoJs } from './spa/js-gate-info.js';
+import { getSpaAtfmJs } from './spa/js-atfm.js';
 import { getSpaPaJs } from './spa/js-pa.js';
 import { getSpaAirportDataJs } from './spa/js-airport-data.js';
 import { getSpaCalendarJs } from './spa/js-calendar-wrap.js';
@@ -1033,6 +1034,133 @@ app.get('/api/fids', async (req, res) => {
     res.json({ dep, arr, date: odate });
   } catch (e: any) {
     console.error('FIDS proxy error:', e.message);
+    res.status(502).json({ error: e.message });
+  }
+});
+
+// ── ATFM (流量管制) 多地區可插拔 ─────────────────────────────────────────────
+// 各官方源正規化成共同 shape {measures[], ctot[]}。命名中性藏來源。公開源:
+//   tw=台灣ANWS / hk,mo=香港atfmc / th=泰國aerothai / apac=香港cross-border地圖(全亞洲管制概況)
+const _atfmCache: Record<string, { ts: number; data: any }> = {};
+let _atfmMapCache: { ts: number; data: any } | null = null;
+const _ATFM_TTL = 30000;
+function _atfmStrip(s: any): string {
+  return String(s == null ? '' : s)
+    .replace(/<br\s*\/?>/gi, ' / ').replace(/<[^>]*>/g, '')
+    .replace(/&#39;/g, "'").replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&nbsp;/g, ' ')
+    .replace(/(\s*\/\s*){2,}/g, ' / ').replace(/\s+/g, ' ').trim();
+}
+async function _atfmJson(url: string, opts?: any): Promise<any> {
+  const r = await fetch(url, { headers: { 'User-Agent': _FIDS_UA, 'Accept': 'application/json,*/*' }, ...(opts || {}) });
+  if (!r.ok) throw new Error('HTTP ' + r.status);
+  return r.json();
+}
+const _atfmHkT = (s: any): string => { const x = String(s || ''); return x.length >= 12 ? x.slice(6, 8) + '/' + x.slice(8, 12) : x; };
+const _atfmIsoT = (s: any): string => { const m = String(s || '').match(/\d{4}-(\d{2})-(\d{2})T(\d{2}):(\d{2})/); return m ? m[2] + '/' + m[3] + m[4] : ''; };
+function _atfmType(s: string): string {
+  const u = s.toUpperCase();
+  if (/GROUND STOP/.test(u)) return 'GROUND STOP';
+  if (/GDP|GROUND DELAY/.test(u)) return 'GDP';
+  if (/LVL|LEVEL|FL\d/.test(u)) return 'LVL RESTRICTION';
+  if (/MDI|MINIMUM DEP/.test(u)) return 'MDI';
+  if (/FLOW/.test(u)) return 'FLOW CONTROL';
+  if (/MEASURE/.test(u)) return 'ATFM MEASURE';
+  return 'NOTICE';
+}
+// 香港 cross-border 地圖(全亞洲) → 每機場狀態 {ICAO:{color,text,type}}。color: green/amber/red(灰由前端判=不在圖內)
+async function _atfmMapStatus(): Promise<Record<string, any>> {
+  if (_atfmMapCache && Date.now() - _atfmMapCache.ts < _ATFM_TTL) return _atfmMapCache.data;
+  const r = await fetch('https://www.atfmc.gov.hk/public/map?refresh=1', { headers: { 'User-Agent': _FIDS_UA } });
+  if (!r.ok) throw new Error('HTTP ' + r.status);
+  const html = await r.text();
+  const st: Record<string, any> = {};
+  const rank: Record<string, number> = { green: 0, amber: 1, red: 2 };
+  for (const m of html.matchAll(/title=(["'])([\s\S]{6,400}?)\1/gi)) {
+    const clean = _atfmStrip(m[2]);
+    const mm = clean.match(/^([A-Z]{4})\s*[:：]\s*(.+)$/);
+    if (!mm) continue;
+    const ic = mm[1], text = mm[2].trim(), u = text.toUpperCase();
+    let color: string;
+    if (/NO ATFM MEASURE|NO MEASURE|NO RESTRICTION|NO ACTIVE/.test(u)) color = 'green';
+    else if (/NOT AVAILABLE|NO DATA|UNAVAILABLE/.test(u)) continue;  // 拿不到資料 → 不收(前端顯示灰)
+    else if (/GROUND STOP/.test(u)) color = 'red';
+    else if (/GDP|GROUND DELAY|ATFM MEASURE|FLOW|MDI|RESTRICT|CLOSURE|DELAY/.test(u)) color = 'amber';
+    else color = 'green';
+    if (!st[ic] || rank[color] > rank[st[ic].color]) st[ic] = { color, text, type: _atfmType(clean) };
+  }
+  _atfmMapCache = { ts: Date.now(), data: st };
+  return st;
+}
+// 措施清單(只 amber/red) → 各區公告用
+async function _atfmMap(): Promise<any[]> {
+  const st = await _atfmMapStatus();
+  return Object.keys(st).filter(ic => st[ic].color !== 'green').map(ic => ({ airport: ic, text: st[ic].text, type: st[ic].type }));
+}
+// Ops Spec 機場 + 座標(airport-data.js 的 ICAO ∩ airport-db.js 座標)，啟動算一次快取
+let _atfmOpsCache: any[] | null = null;
+function _atfmOps(): any[] {
+  if (_atfmOpsCache) return _atfmOpsCache;
+  try {
+    const icaos = [...new Set([...getSpaAirportDataJs().matchAll(/icao:'([A-Z]{4})'/g)].map(m => m[1]))];
+    const db = getAirportDbJs();
+    const out: any[] = [];
+    for (const ic of icaos) {
+      const m = db.match(new RegExp('"' + ic + '","[^"]*","[^"]*","[^"]*","[^"]*",(-?[\\d.]+),(-?[\\d.]+)'));
+      if (m) out.push({ icao: ic, lat: parseFloat(m[1]), lon: parseFloat(m[2]) });
+    }
+    _atfmOpsCache = out;
+  } catch { _atfmOpsCache = []; }
+  return _atfmOpsCache;
+}
+async function _atfmTw(): Promise<any> {
+  const [info, ct] = await Promise.allSettled([
+    _atfmJson('https://atfm.anws.gov.tw/upload_file/dy_info.json?' + Date.now()),
+    _atfmJson('https://atfm.anws.gov.tw/upload_file/atfm_ALL.json?' + Date.now())
+  ]);
+  const measures = (info.status === 'fulfilled' ? (info.value.data || []) : []).map((r: any) => ({ type: _atfmStrip(r[2]) || 'NOTICE', text: _atfmStrip(r[3]), airport: '', time: _atfmStrip(r[1]) }));
+  const ctot = (ct.status === 'fulfilled' ? (ct.value.data || []) : []).map((r: any) => ({ acid: _atfmStrip(r[1]), adep: _atfmStrip(r[7]), ades: _atfmStrip(r[8]), cobt: _atfmStrip(r[2]), ctot: _atfmStrip(r[3]), ctotNew: _atfmStrip(r[5] || r[4] || ''), win: _atfmStrip(r[6]), status: _atfmStrip(r[9]) }));
+  return { region: 'tw', measures, ctot, hasCtot: true };
+}
+async function _atfmHk(port: string, region: string): Promise<any> {
+  const base = 'https://www.atfmc.gov.hk/schedule';
+  const [o, i] = await Promise.allSettled([_atfmJson(`${base}/outbound/port/${port}`), _atfmJson(`${base}/inbound/port/${port}`)]);
+  const mk = (j: any, dir: string) => (j && j.data ? j.data : []).filter((r: any) => r.expired !== 'Y').map((r: any) => ({ acid: _atfmStrip(r.acid), optr: _atfmStrip(r.optr), adep: _atfmStrip(r.adep), ades: _atfmStrip(r.ades), cobt: _atfmHkT(r.eobt), ctot: _atfmHkT(r.ctot), ctotNew: '', win: '', status: dir }));
+  const ctot = [...mk(o.status === 'fulfilled' ? o.value : null, 'DEP'), ...mk(i.status === 'fulfilled' ? i.value : null, 'ARR')];
+  let measures: any[] = []; try { measures = (await _atfmMap()).filter(m => m.airport === port.toUpperCase()); } catch { }
+  return { region, measures, ctot, hasCtot: true };
+}
+async function _atfmTh(): Promise<any> {
+  let ctot: any[] = [];
+  try {
+    const j = await _atfmJson('https://atfm.aerothai.aero/CTOTDistributor/QueryCtotflights', { method: 'POST', headers: { 'User-Agent': _FIDS_UA, 'Content-Type': 'application/json', 'Accept': 'application/json' }, body: '{}' });
+    ctot = (j.ctotFlights || []).map((f: any) => { const fl = f.flight || {}; return { acid: _atfmStrip(fl.callsign), adep: _atfmStrip(fl.airportDeparture), ades: _atfmStrip(fl.airportArrival), cobt: _atfmIsoT(fl.cobt || fl.eobt), ctot: _atfmIsoT(fl.ctot || fl.etot), ctotNew: '', win: '', status: _atfmStrip(f.measureString) }; });
+  } catch { }
+  let measures: any[] = []; try { measures = (await _atfmMap()).filter(m => /^VT/.test(m.airport)); } catch { }
+  return { region: 'th', measures, ctot, hasCtot: true };
+}
+app.get('/api/atfm', async (req, res) => {
+  const region = String(req.query.region || 'tw').toLowerCase();
+  const cached = _atfmCache[region];
+  if (cached && Date.now() - cached.ts < _ATFM_TTL) { res.json(cached.data); return; }
+  try {
+    let data: any;
+    if (region === 'apac') {
+      const st = await _atfmMapStatus();
+      const airports = _atfmOps().map((a: any) => { const s = st[a.icao]; return { icao: a.icao, lat: a.lat, lon: a.lon, color: s ? s.color : 'grey', text: s ? s.text : '', type: s ? s.type : '' }; });
+      data = { region: 'apac', airports, hasCtot: false };
+    }
+    else if (region === 'tw') data = await _atfmTw();
+    else if (region === 'hk') data = await _atfmHk('vhhh', 'hk');
+    else if (region === 'mo') data = await _atfmHk('vmmc', 'mo');
+    else if (region === 'th') data = await _atfmTh();
+    else { res.status(400).json({ error: 'unknown region' }); return; }
+    const tw = new Date(Date.now() + 8 * 3600 * 1000);
+    data.updated = String(tw.getUTCHours()).padStart(2, '0') + ':' + String(tw.getUTCMinutes()).padStart(2, '0');
+    _atfmCache[region] = { ts: Date.now(), data };
+    res.json(data);
+  } catch (e: any) {
+    console.error('ATFM error:', region, e.message);
+    if (cached) { res.json(cached.data); return; }  // 上游暫時失敗 → 退回上次成功的(雖過期)，不讓畫面空白
     res.status(502).json({ error: e.message });
   }
 });
@@ -2325,6 +2453,7 @@ ${getSpaAirportDataJs()}
 ${getSpaWeatherJs()}
 ${getSpaDutyTimeJs()}
 ${getSpaGateInfoJs()}
+${getSpaAtfmJs()}
 ${getSpaPaJs()}
 ${getSpaCalendarJs()}
 ${getSpaLiveRadarJs()}

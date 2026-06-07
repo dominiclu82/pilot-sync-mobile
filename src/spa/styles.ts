@@ -27,7 +27,7 @@ body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSy
   gap:2px;border:none;background:none;color:var(--muted);font-size:.7em;font-weight:600;
   cursor:pointer;transition:color .15s;-webkit-appearance:none;padding:0 8px;white-space:nowrap}
 /* iPad/寬螢幕：自動幾欄就幾欄、每欄等寬鋪滿（平均分散）。不寫死 6 格，所以多一顆鈕也不會掉第二行 */
-@media(min-width:600px){.tab-bar{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(0,1fr)}.tab-btn{min-width:0;padding:0;width:100%}}
+@media(min-width:600px){.tab-bar{display:flex}.tab-btn{flex:1 1 0;min-width:0;padding:0;width:auto}.tab-bar .tab-util,.tab-bar #cs-apps-home{flex:0 0 auto;width:auto}}
 .tab-btn.tab-active{color:var(--accent)}
 .tab-btn-icon{font-size:1.5em;line-height:1}
 .tab-util{cursor:default;gap:1px}
@@ -752,10 +752,39 @@ input[type=radio]{width:15px;height:15px;aspect-ratio:1;accent-color:var(--accen
 .gi-header-left{display:flex;flex-direction:column;gap:2px}
 .gi-title{font-weight:700;font-size:.95em;color:var(--text)}
 .gi-date{font-size:.72em;color:var(--muted)}
-.gi-station-bar{display:flex;align-items:center;gap:6px;margin:2px 0}
+/* ── ATFM 流量管制（地圖版）── */
+#tab-atfm{flex-direction:column;position:relative;padding:0;overflow:hidden;min-height:calc(100dvh - 56px)}
+#tab-atfm.tab-active{display:flex}
+.atfm-head{display:flex;align-items:center;justify-content:space-between;padding:9px 14px;background:var(--bg);border-bottom:1px solid var(--dim);flex-shrink:0}
+.atfm-title{font-weight:700;font-size:.92em;color:var(--text)}
+.atfm-notice{font-size:.6em;color:#eab308}
+.atfm-regions{display:flex;gap:6px;padding:7px 12px;background:var(--bg);border-bottom:1px solid var(--dim);overflow-x:auto;flex-shrink:0}
+.atfm-regions::-webkit-scrollbar{display:none}
+.atfm-rgn{background:var(--card);border:1px solid var(--dim);color:var(--muted);border-radius:14px;padding:5px 14px;font-size:.8em;white-space:nowrap;cursor:pointer;-webkit-appearance:none}
+.atfm-rgn-on{background:var(--accent);color:#fff;border-color:var(--accent)}
+.atfm-legend{display:flex;gap:12px;padding:5px 14px;font-size:.68em;color:var(--muted);background:var(--bg);flex-shrink:0;align-items:center;flex-wrap:wrap;border-bottom:1px solid var(--dim)}
+.atfm-dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:3px;vertical-align:middle;border:1px solid #0a0e1a}
+.atfm-legend-hint{margin-left:auto;color:#6b7280}
+#atfm-map{flex:1;width:100%;min-height:200px;z-index:1;background:#0a0e1a}
+.atfm-lbl{background:transparent;border:none;box-shadow:none;color:#fbbf24;font-weight:700;font-size:11px;text-shadow:0 0 3px #000}
+.atfm-pp b{font-size:1.05em}.atfm-pp-ty{display:inline-block;background:#ffedd5;color:#9a3412;border-radius:4px;padding:1px 6px;font-size:.78em;font-weight:700;margin-top:3px}
+.atfm-bar{padding:8px 12px;background:var(--card);border-top:1px solid var(--dim);font-size:.78em;max-height:34vh;overflow:auto;flex-shrink:0}
+.atfm-bar-h{font-weight:700;margin:6px 0 4px;color:var(--text)}
+.atfm-m-row{display:flex;gap:8px;align-items:flex-start;padding:5px 0;border-bottom:1px solid var(--dim)}
+.atfm-badge{font-size:.72em;font-weight:700;border-radius:4px;padding:1px 6px;white-space:nowrap}
+.atfm-m-txt{flex:1;line-height:1.35;color:var(--text)}.atfm-m-t{color:var(--muted);font-size:.85em}
+.atfm-empty{padding:10px 2px;color:#6b7280}
+.atfm-tw{overflow-x:auto}
+.atfm-table{width:100%;border-collapse:collapse;font-size:.92em}
+.atfm-table th{text-align:left;color:var(--muted);font-weight:600;padding:4px 8px;border-bottom:1px solid var(--dim);white-space:nowrap}
+.atfm-table td{padding:4px 8px;border-bottom:1px solid var(--dim);white-space:nowrap}
+.atfm-acid{font-weight:700;color:var(--text)}.atfm-ctotv{font-weight:700;color:#fbbf24}.atfm-new{color:#22c55e}.atfm-note{color:var(--muted);font-size:.9em}
+.gi-station-bar{display:flex;align-items:center;gap:6px;margin:2px 0;flex-wrap:wrap}
 .gi-station-sel{background:var(--bg);border:1px solid var(--dim);color:var(--text);border-radius:6px;
-  padding:3px 8px;font-size:.75em;cursor:pointer;-webkit-appearance:menulist;line-height:1.4;max-width:46vw}
+  padding:3px 8px;font-size:.75em;cursor:pointer;-webkit-appearance:menulist;line-height:1.4}
 .gi-station-sel:active{opacity:.7}
+#gi-region{flex:0 0 auto;max-width:6em}
+#gi-station{flex:0 1 auto;min-width:0;max-width:60vw}
 .gi-date-nav{display:flex;align-items:center;gap:6px}
 .gi-nav-btn{background:none;border:1px solid var(--dim);color:var(--muted);border-radius:6px;
   padding:2px 8px;font-size:.72em;cursor:pointer;-webkit-appearance:none;line-height:1.4}
