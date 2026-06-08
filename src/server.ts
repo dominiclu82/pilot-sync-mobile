@@ -315,6 +315,16 @@ app.get('/apps', (_req, res) => {
 <script>(function(){
   if(!('caches' in window)) return;
   var M = ${JSON.stringify(_offMap)};
+  // ⚠ 不再只靠各 app 的 SW install 去存：iPad/iPhone 上從一頁同時註冊多個 SW 常常不裝、快取進不去 → 指示器永遠卡「準備離線中」。
+  //   改成「本頁自己」把每個 app 的啟動頁直接抓下來存進它的快取 —— 本頁「寫」的就是下面「讀」的同一個快取，最可靠。各 app 的 SW 仍照常服務離線/補抓子資源。
+  M.forEach(function(a){
+    caches.open(a.cache).then(function(c){
+      return c.match(a.url).then(function(hit){
+        if (hit) return;   // 已存在就別重抓
+        return fetch(a.url, {cache:'no-store'}).then(function(r){ if (r && r.ok && !r.redirected) return c.put(a.url, r); });
+      });
+    }).catch(function(){});
+  });
   function tick(){
     var left = 0;
     M.forEach(function(a){

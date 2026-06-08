@@ -1538,7 +1538,7 @@ export function getSpaHtmlBody(): string {
       <button class="tab-util-btn tab-install-btn" id="tab-install-btn" onclick="showInstallGuide()" style="display:none">
         <span>📲</span>安裝
       </button>
-      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer;text-decoration:underline" onclick="showAbout()">V9.4.11</span>
+      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer;text-decoration:underline" onclick="showAbout()">V9.4.12</span>
     </div>
   </div>
 </div>
@@ -1572,10 +1572,15 @@ export function getSpaHtmlBody(): string {
     </div>
     <div style="max-height:50vh;overflow-y:auto;-webkit-overflow-scrolling:touch;margin-bottom:10px">
     ${renderCommunityLink()}
-    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V9.4.11</div>
+    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V9.4.12</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
-      <div>🔧 <b>修好入口頁「準備離線中」一直卡住(離線快取被一個轉址檔拖垮整批);CrewSync 說明改 ATFM。</b></div>
-      <div>🔧 <b>Fixed the hub stuck on "preparing offline" (one redirecting file broke the whole cache); CrewSync tagline now shows ATFM.</b></div>
+      <div>🔧 <b>入口頁「準備離線中」真的修好——改由入口頁自己預存,不再靠 iPad/iPhone 上常常不裝的多重 SW。</b></div>
+      <div>🔧 <b>Hub "preparing offline" really fixed — the hub now precaches itself instead of relying on multiple service workers that often fail to install on iPad/iPhone.</b></div>
+    </div>
+    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V9.4.11</div>
+    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
+      <div>🔧 <b>修好入口頁離線快取被一個轉址檔拖垮整批;CrewSync 說明改 ATFM。</b></div>
+      <div>🔧 <b>Fixed offline cache broken by one redirecting file; CrewSync tagline now shows ATFM.</b></div>
     </div>
     <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V9.4.10</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
