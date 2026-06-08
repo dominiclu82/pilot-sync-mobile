@@ -1215,6 +1215,9 @@ async function _atfmEu(force = false): Promise<any> {
   const db = getAirportDbJs();
   const status: Record<string, any> = {}; const airports: any[] = []; const measures: any[] = [];
   const _euRank: Record<string, number> = { info: 0, amber: 1, red: 2 };
+  // 綠燈底圖清單:歐洲主要樞紐 + JX 確定/候選航點。⭐LKPR 布拉格=確定;LEBL/LSZH/EFHK=候選;其餘為亞洲航司常用大樞紐。
+  // base=true 代表「在我們清單內」→ 前端 Key 模式只顯示這些;清單外的事件機場 base=false,只在 Events 模式顯示。
+  const EU_BASE = ['LKPR', 'LEBL', 'LSZH', 'EFHK', 'EGLL', 'EGKK', 'LFPG', 'EDDF', 'EDDM', 'EHAM', 'LOWW', 'LIMC', 'LIRF', 'LEMD', 'LTFM', 'EBBR', 'EKCH', 'ESSA', 'ENGM', 'EIDW', 'LPPT'];
   for (const ev of events) {
     const text = ev.texts.filter(t => t.length > 4).sort((a, b) => b.length - a.length)[0] || ev.texts[0] || 'Network event';
     const { color, type } = _atfmEuClassify(text);
@@ -1227,24 +1230,22 @@ async function _atfmEu(force = false): Promise<any> {
       status[ic] = { color, text, type };
       const ai = airports.find(a => a.icao === ic);
       if (ai) { ai.color = color; ai.text = text; ai.type = type; }    // 升級覆蓋已畫的點
-      else airports.push({ icao: ic, lat: parseFloat(m[2]), lon: parseFloat(m[3]), color, text, type });
+      else airports.push({ icao: ic, lat: parseFloat(m[2]), lon: parseFloat(m[3]), color, text, type, base: EU_BASE.indexOf(ic) >= 0 });
     }
   }
   // 措施清單只列真影響流量的(紅/黃);info 資訊告示只在地圖可點選、不進清單,避免洗版
   for (const ic in status) {
     if (status[ic].color !== 'info') measures.push({ airport: ic, text: status[ic].text, type: status[ic].type, time: '' });
   }
-  // 綠燈底圖:歐洲主要樞紐 + JX 確定/候選航點。抓取成功時,沒事件的塗綠(代表「確實查過 NOP、此刻無管制」);
-  // 有事件的上面已收(黃/紅),這裡 status[ic] 已存在會跳過 → 事件蓋過綠。讓歐洲看起來像正常狀態圖(一片綠、出事才跳黃紅)。
-  // ⭐LKPR 布拉格=JX 確定航點;LEBL/LSZH/EFHK=候選;其餘為亞洲航司常用大樞紐。未來開新歐洲航點加一行即可。
-  const EU_BASE = ['LKPR', 'LEBL', 'LSZH', 'EFHK', 'EGLL', 'EGKK', 'LFPG', 'EDDF', 'EDDM', 'EHAM', 'LOWW', 'LIMC', 'LIRF', 'LEMD', 'LTFM', 'EBBR', 'EKCH', 'ESSA', 'ENGM', 'EIDW', 'LPPT'];
+  // 綠燈底圖:抓取成功時,清單內沒事件的機場塗綠(代表「確實查過 NOP、此刻無管制」);有事件的上面已收(黃/紅/info),
+  // status[ic] 已存在會跳過 → 事件蓋過綠。讓歐洲看起來像正常狀態圖(一片綠、出事才跳黃紅)。base:true=固定底圖、Key 模式也顯示。
   if (ok) {
     for (const ic of EU_BASE) {
       if (status[ic] || db.indexOf('"' + ic + '","') < 0) continue;   // 已有事件(蓋過) / 不在機場庫
       const m = db.match(new RegExp('"' + ic + '","([^"]*)","[^"]*","[^"]*","[^"]*",(-?[\\d.]+),(-?[\\d.]+)'));
       if (!m) continue;
       status[ic] = { color: 'green', text: 'No active ATFM event', type: '' };
-      airports.push({ icao: ic, lat: parseFloat(m[2]), lon: parseFloat(m[3]), color: 'green', text: 'No active ATFM event', type: '' });
+      airports.push({ icao: ic, lat: parseFloat(m[2]), lon: parseFloat(m[3]), color: 'green', text: 'No active ATFM event', type: '', base: true });
     }
   }
   const _tw = new Date(Date.now() + 8 * 3600 * 1000);
@@ -1298,18 +1299,34 @@ app.get('/api/atfm', async (req, res) => {
         _atfmVn().catch(() => ({ ctot: [], status: {} })), _atfmEu().catch(() => ({ airports: [] }))
       ]);
       const vnSt = (vnD as any).status || {};
+      const db = getAirportDbJs();
+      // base:true=在我們清單(各區 Ops Spec)→ 前端 Key 模式固定顯示。清單外的事件機場 base:false,只在 Events 模式顯示。
       const airports = _atfmOps().map((a: any) => {
         const s = st[a.icao] || vnSt[a.icao] || (a.iata && faa.status[a.iata]);
         let color = 'grey', text = '', type = '';
         if (s) { color = s.color; text = s.text; type = s.type; }
         else if (/^K/.test(a.icao)) { color = 'green'; }  // FAA 監控的美國本土機場,無事件=正常
-        return { icao: a.icao, lat: a.lat, lon: a.lon, color, text, type };
+        return { icao: a.icao, lat: a.lat, lon: a.lon, color, text, type, base: true };
       });
       // 歐洲(NOP 網路事件)併進來:有些歐洲機場(LKPR/EDDM/EDDB/EPWA/LOWL/LOWW)也在 Ops Spec → 去重覆蓋,別產生「紅點但點了 No data」的重複
+      // 覆蓋時不動 base(Ops Spec 維持 base:true);清單外的歐洲事件機場帶 base:false(來自 _atfmEu)
       for (const ea of ((euD as any).airports || [])) {
         const ex = airports.find((a: any) => a.icao === ea.icao);
         if (ex) { ex.color = ea.color; ex.text = ea.text; ex.type = ea.type; }
         else airports.push(ea);
+      }
+      // 美國:清單外、FAA 正在管制的機場(KATL/KORD…)補進來當 base:false → Events 模式才顯示。
+      // FAA status 以 IATA 為鍵。用 IATA 反查 db(第二欄就是 IATA)拿到 ICAO + 座標 → 涵蓋阿拉斯加 PANC/夏威夷 PHNL 等非 K 開頭場(不寫死 K+IATA)。
+      const opsIata = new Set(_atfmOps().map((a: any) => a.iata).filter(Boolean));
+      for (const iata in faa.status) {
+        if (opsIata.has(iata)) continue;                                 // 已在清單(上面已上色)
+        if (!/^[A-Z0-9]{3}$/.test(iata)) continue;                       // 防 regex 注入 / 非標準碼
+        const m = db.match(new RegExp('"([A-Z]{4})","' + iata + '","[^"]*","[^"]*","[^"]*",(-?[\\d.]+),(-?[\\d.]+)'));
+        if (!m) continue;                                                // db 查無此 IATA 座標 → 略過
+        const icao = m[1];
+        if (airports.find((a: any) => a.icao === icao)) continue;
+        const s = faa.status[iata];
+        airports.push({ icao, lat: parseFloat(m[2]), lon: parseFloat(m[3]), color: s.color, text: s.text, type: s.type, base: false });
       }
       // 台/港/澳/泰/越逐班 CTOT 一次合併,前端點機場時依 adep/ades 過濾
       // 跨境航班(如台灣→香港)兩邊源都會列出 → 去重

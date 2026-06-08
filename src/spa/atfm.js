@@ -13,7 +13,7 @@ var _atfmRegions = [
   { code: 'eu', name: 'Europe', center: [50, 10], zoom: 4 }
 ];
 function _atfmLon(lon) { return lon < -30 ? lon + 360 : lon; }  // 美洲移到右側
-var _atfmRegion = 'all';
+var _atfmRegion = 'tw';   // 預設載入定位 Taiwan(JX 主場);可隨時切 ALL/其他區
 var _atfmMapObj = null;
 var _atfmMarkerLayer = null;
 var _atfmAirports = null;   // 全機場狀態快取（含座標/色）
@@ -27,6 +27,7 @@ var _atfmDepArrAuto = true;   // true=自動挑有資料的(預設DEP);使用者
 var _atfmSearch = '';
 var _atfmRegionData = null;   // 目前地區的資料(切 DEP/ARR 不重抓)
 var _atfmLastBase = null;     // 目前拖到第幾「圈」世界(經度 base)，換圈才重畫點
+var _atfmShowAll = false;     // 顯示範圍:false=Key(只顯示清單內 base 機場)/true=Events(含所有事件機場)
 var _atfmCLR = { grey: '#6b7280', green: '#22c55e', amber: '#f59e0b', red: '#ef4444', info: '#38bdf8' };  // info=淡藍:資訊告示(不影響流量)
 
 function _atfmEsc(s) { var d = document.createElement('div'); d.textContent = (s == null ? '' : s); return d.innerHTML; }
@@ -44,7 +45,7 @@ function atfmInit() {
       if (b !== _atfmLastBase) _atfmPlotMarkers();
     });
   }
-  if (!_atfmUiReady) { _atfmRenderRegions(); _atfmApplyBarState(); _atfmApplyLegendState(); _atfmUiReady = true; }
+  if (!_atfmUiReady) { _atfmRenderRegions(); _atfmApplyBarState(); _atfmApplyLegendState(); _atfmApplyScopeState(); _atfmUiReady = true; }
   setTimeout(function () { if (_atfmMapObj) _atfmMapObj.invalidateSize(); }, 120);
   _atfmLoadAll();
   if (_atfmRegion !== 'all') _atfmLoadRegion(_atfmRegion);
@@ -85,6 +86,31 @@ function _atfmApplyLegendState() {
     if (el && localStorage.getItem('crewsync_atfm_legend') === '1') el.classList.add('open');
   } catch (e) { }
 }
+// 顯示範圍切換:⭐ Key(只顯示清單內機場)⇄ 🌐 Events(含所有當下有事件的機場)。狀態存 localStorage
+function atfmToggleScope() {
+  _atfmShowAll = !_atfmShowAll;
+  try { localStorage.setItem('crewsync_atfm_scope', _atfmShowAll ? '1' : '0'); } catch (e) { }
+  // 切回 Key 後,若目前點選的是清單外機場(已從地圖濾掉)→ 取消點選,免得下方面板卡在地圖上不存在的機場
+  if (_atfmTapped && !_atfmShowAll) {
+    var sel = (_atfmAirports || []).filter(function (x) { return x.icao === _atfmTapped; })[0];
+    if (sel && sel.base === false) _atfmTapped = null;
+  }
+  _atfmRenderScope();
+  _atfmPlotMarkers();
+  _atfmRenderBar();   // 一律重繪:清掉點選→總覽;仍有效→該機場
+}
+function _atfmApplyScopeState() {
+  try { if (localStorage.getItem('crewsync_atfm_scope') === '1') _atfmShowAll = true; } catch (e) { }
+  _atfmRenderScope();
+}
+function _atfmRenderScope() {
+  var b = document.getElementById('atfm-scope');
+  if (b) b.innerHTML = _atfmShowAll ? '🌐 Events' : '⭐ Key';
+}
+// 依顯示範圍過濾:Key 模式只留清單內機場(base!==false);Events 全留(清單外事件機場 base===false)
+function _atfmScopeFilter(list) {
+  return _atfmShowAll ? (list || []) : (list || []).filter(function (a) { return a.base !== false; });
+}
 
 function _atfmRenderRegions() {
   var el = document.getElementById('atfm-regions');
@@ -120,7 +146,7 @@ function _atfmPlotMarkers() {
   var base = Math.round((_atfmMapObj.getCenter().lng - 180) / 360) * 360;  // 目前這圈
   _atfmLastBase = base;
   var copies = [base - 360, base, base + 360];  // 當前圈 + 左右各一圈，拖動時點不消失
-  (_atfmAirports || []).forEach(function (a) {
+  _atfmScopeFilter(_atfmAirports).forEach(function (a) {
     var ctrl = (a.color === 'amber' || a.color === 'red');
     var canon = _atfmLon(a.lon);
     copies.forEach(function (off) {
@@ -144,7 +170,7 @@ function _atfmRenderBar() {
 function _atfmShowRestrictions() {
   var bar = document.getElementById('atfm-bar');
   if (!bar) return;
-  var active = (_atfmAirports || []).filter(function (a) { return a.color === 'amber' || a.color === 'red'; });
+  var active = _atfmScopeFilter(_atfmAirports).filter(function (a) { return a.color === 'amber' || a.color === 'red'; });
   var h = '<div class="atfm-bar-h">Active restrictions (' + active.length + ')' + (_atfmUpdated ? ' · ' + _atfmEsc(_atfmUpdated) : '') + '</div>';
   if (active.length) {
     h += active.map(function (a) {
@@ -161,7 +187,17 @@ function _atfmShowRestrictions() {
 function atfmTapAirport(icao) {
   _atfmTapped = icao;
   _atfmDepArr = 'dep'; _atfmDepArrAuto = true; _atfmSearch = '';
+  _atfmExpandBar();          // 點機場自動展開下方面板(收合著也彈開,直接看到詳情)
   _atfmRenderTapped();
+}
+// 展開下方資訊面板(若被收合)。點機場時叫用,免得收合後點機場看不到內容
+function _atfmExpandBar() {
+  var t = document.getElementById('tab-atfm');
+  if (t && t.classList.contains('atfm-bar-hidden')) {
+    t.classList.remove('atfm-bar-hidden');
+    try { localStorage.setItem('crewsync_atfm_bar', '1'); } catch (e) { }
+    setTimeout(function () { if (_atfmMapObj) _atfmMapObj.invalidateSize(); }, 220);
+  }
 }
 function atfmClearTap() { _atfmTapped = null; _atfmSearch = ''; _atfmRenderBar(); }
 function _atfmTapDep() { var ic = _atfmTapped; return (_atfmAllCtot || []).filter(function (c) { return c.adep === ic; }); }

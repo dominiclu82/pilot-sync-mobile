@@ -1314,7 +1314,10 @@ export function getSpaHtmlBody(): string {
   </div>
   <div id="atfm-regions" class="atfm-regions"></div>
   <div class="atfm-legend" id="atfm-legend">
-    <button class="atfm-legend-tog" onclick="atfmToggleLegend()"><span class="atfm-legend-chev" id="atfm-legend-chev">▸</span>🚦 Legend 燈號說明</button>
+    <div class="atfm-legend-head">
+      <button class="atfm-legend-tog" onclick="atfmToggleLegend()"><span class="atfm-legend-chev" id="atfm-legend-chev">▸</span>🚦 Legend 燈號說明</button>
+      <button class="atfm-scope" id="atfm-scope" onclick="atfmToggleScope()" title="⭐ Key 只看清單機場 / 🌐 Events 看全部事件機場">⭐ Key</button>
+    </div>
     <div class="atfm-legend-body">
       <span><span class="atfm-dot" style="background:#ef4444"></span>Closed 關場·地停</span>
       <span><span class="atfm-dot" style="background:#f59e0b"></span>Restriction 管制·天氣·罷工·跑道關</span>
@@ -1535,7 +1538,7 @@ export function getSpaHtmlBody(): string {
       <button class="tab-util-btn tab-install-btn" id="tab-install-btn" onclick="showInstallGuide()" style="display:none">
         <span>📲</span>安裝
       </button>
-      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer;text-decoration:underline" onclick="showAbout()">V9.4.04</span>
+      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer;text-decoration:underline" onclick="showAbout()">V9.4.05</span>
     </div>
   </div>
 </div>
@@ -1569,7 +1572,12 @@ export function getSpaHtmlBody(): string {
     </div>
     <div style="max-height:50vh;overflow-y:auto;-webkit-overflow-scrolling:touch;margin-bottom:10px">
     ${renderCommunityLink()}
-    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V9.4.04</div>
+    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V9.4.05</div>
+    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
+      <div>🌐 <b>ATFM 新增 Key/Events 切換——預設只看重點清單機場，一鍵切換看全部正在管制的機場（美國也補上 FAA 即時管制場）；點機場自動展開資訊面板；預設載入定位台灣。</b></div>
+      <div>🌐 <b>ATFM adds Key/Events toggle — curated list by default, switch to all airports under active restriction (incl. US FAA); tap auto-opens the info panel; opens at Taiwan.</b></div>
+    </div>
+    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V9.4.04</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
       <div>🟢🔵 <b>ATFM 歐洲大升級——加綠燈底圖（主要樞紐＋布拉格等航點平常顯綠）；事件分三級：紅＝關場、黃＝真管制（天氣／罷工／跑道關）、藍＝資訊告示（施工／設施，不影響流量），不再一片黃。燈號說明改可收合。</b></div>
       <div>🟢🔵 <b>ATFM Europe overhaul — green baseline for major hubs &amp; destinations; events tiered red/amber/blue (closure / real restriction / info-only), no more all-amber. Collapsible legend.</b></div>

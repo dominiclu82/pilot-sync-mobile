@@ -766,7 +766,10 @@ html:has(#tab-atfm.tab-active) body{overflow:hidden;height:100dvh}
 .atfm-rgn{background:var(--card);border:1px solid var(--dim);color:var(--muted);border-radius:14px;padding:5px 14px;font-size:.8em;white-space:nowrap;cursor:pointer;-webkit-appearance:none}
 .atfm-rgn-on{background:var(--accent);color:#fff;border-color:var(--accent)}
 .atfm-legend{display:block;padding:0;font-size:.68em;color:var(--muted);background:var(--bg);flex-shrink:0;border-bottom:1px solid var(--dim)}
-.atfm-legend-tog{display:flex;align-items:center;gap:5px;width:100%;padding:5px 14px;background:none;border:none;color:var(--muted);font-size:1em;font-family:inherit;cursor:pointer;text-align:left}
+.atfm-legend-head{display:flex;align-items:center}
+.atfm-legend-tog{display:flex;align-items:center;gap:5px;flex:1;padding:5px 14px;background:none;border:none;color:var(--muted);font-size:1em;font-family:inherit;cursor:pointer;text-align:left}
+.atfm-scope{flex-shrink:0;margin-right:10px;padding:3px 11px;background:var(--card);border:1px solid var(--dim);border-radius:13px;color:var(--text);font-size:1em;font-family:inherit;cursor:pointer;white-space:nowrap}
+.atfm-scope:active{background:var(--accent);color:#fff}
 .atfm-legend-chev{display:inline-block;transition:transform .15s;font-size:.9em}
 .atfm-legend.open .atfm-legend-chev{transform:rotate(90deg)}
 .atfm-legend-body{display:none;gap:6px 14px;padding:0 14px 7px;flex-wrap:wrap}
