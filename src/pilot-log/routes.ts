@@ -54,8 +54,8 @@ import { getAirportDbJs } from '../spa/js-airport-db.js';
 
 // ── 版本（比照 CrewSync / Morning：每次推版必更新；SW cache 名稱跟著走） ────
 // 本機 preview build 會暫時加 -tNN 後綴方便對版；推正式版前拿掉只留乾淨版號。
-export const PILOT_LOG_VERSION = 'V2.2.24';
-const PILOT_LOG_CACHE = 'pilotlog-v2-2-24';
+export const PILOT_LOG_VERSION = 'V2.2.25';
+const PILOT_LOG_CACHE = 'pilotlog-v2-2-25';
 
 export const pilotLogRouter = express.Router();
 
@@ -362,6 +362,11 @@ function _renderPilotLogChangelog(): string {
   return `
     ${renderCommunityLink()}
     <div class="pl-cl-v">${PILOT_LOG_VERSION}</div>
+    <div class="pl-cl-txt">
+      <b>🔧 修正 iOS 離線：/pilot-log 啟動頁改用可離線快取的標頭（原本 no-store 被 iPhone/iPad 拒存，導致飛航模式打不開）。</b><br>
+      <b>🔧 iOS offline fix: the /pilot-log launch page now uses an offline-cacheable header (the old no-store was refused by iPhone/iPad, breaking airplane-mode launch).</b>
+    </div>
+    <div class="pl-cl-v old">V2.2.24</div>
     <div class="pl-cl-txt">
       <b>📄 Log ATP 2 匯入支援 Realm system data 原始格式（自動辨識，可加組員檔把 ID 對回姓名）；跨 UTC 午夜時間正確。</b><br>
       <b>📄 Log ATP 2 import now supports raw Realm system-data export (auto-detected; optional crew file maps IDs to names); times correct across UTC midnight.</b>
@@ -840,7 +845,8 @@ function _renderPilotLogChangelog(): string {
 
 pilotLogRouter.get('/pilot-log', (_req, res) => {
   res.setHeader('Content-Type', 'text/html; charset=utf-8');
-  res.setHeader('Cache-Control', 'no-store');
+  // no-store 在 iOS WebKit 會擋 CacheStorage（離線殼存不進去）→ 改 no-cache：仍 revalidate 拿最新版、但可存離線副本（codex 診斷）。
+  res.setHeader('Cache-Control', 'private, no-cache, max-age=0, must-revalidate');
   res.send(_renderPilotLogHtml());
 });
 

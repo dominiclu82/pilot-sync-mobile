@@ -256,20 +256,22 @@ app.get('/', (_req, res) => { res.redirect('/main'); });
 
 app.get('/main', (_req, res) => {
   res.setHeader('Content-Type', 'text/html; charset=utf-8');
-  res.setHeader('Cache-Control', 'no-store');
+  // ⚠ 不可用 no-store：iOS WebKit 會連 CacheStorage 也拒存 → PWA 離線殼永遠存不進去、指示器卡「準備離線中」、飛航模式打不開（codex 診斷）。
+  //   no-cache 仍每次跟 server revalidate（線上一定拿最新版、不卡舊版），但允許存離線副本。
+  res.setHeader('Cache-Control', 'private, no-cache, max-age=0, must-revalidate');
   res.send(getSPAHtml());
 });
 
 app.get('/share', (_req, res) => {
   res.setHeader('Content-Type', 'text/html; charset=utf-8');
-  res.setHeader('Cache-Control', 'no-store');
+  res.setHeader('Cache-Control', 'private, no-cache, max-age=0, must-revalidate');  // 同 /main：no-store 在 iOS 會擋 CacheStorage
   res.send(getSPAHtml(undefined, ['sync']));
 });
 
 // ── App 入口頁（給 LINE 社群置頂用：一頁拿到三個 App + 加到主畫面教學）────────────────
 app.get('/apps', (_req, res) => {
   res.setHeader('Content-Type', 'text/html; charset=utf-8');
-  res.setHeader('Cache-Control', 'no-store');
+  res.setHeader('Cache-Control', 'private, no-cache, max-age=0, must-revalidate');  // 同 /main：no-store 在 iOS 會擋 CacheStorage（這頁要能離線precache 自己）
   // 版號自動抓（改版自動跟著變，不用手動更新這頁）：CrewSync 從 html-body 抓首個 V8.0.x；其餘用常數。
   const csVer = (getSpaHtmlBody().match(/V\d+\.\d+\.\d+/) || [''])[0];
   const apps = [
@@ -313,31 +315,39 @@ app.get('/apps', (_req, res) => {
 }</script>
 <!-- 離線就緒指示:每秒查「該 app 新版快取」裡有沒有它的啟動頁,有就 ✅(代表新版存好、可離線)。每張卡各自顯示。 -->
 <script>(function(){
-  if(!('caches' in window)) return;
   var M = ${JSON.stringify(_offMap)};
-  // ⚠ 不再只靠各 app 的 SW install 去存：iPad/iPhone 上從一頁同時註冊多個 SW 常常不裝、快取進不去 → 指示器永遠卡「準備離線中」。
-  //   改成「本頁自己」把每個 app 的啟動頁直接抓下來存進它的快取 —— 本頁「寫」的就是下面「讀」的同一個快取，最可靠。各 app 的 SW 仍照常服務離線/補抓子資源。
-  M.forEach(function(a){
-    caches.open(a.cache).then(function(c){
-      return c.match(a.url).then(function(hit){
-        if (hit) return;   // 已存在就別重抓
-        return fetch(a.url, {cache:'no-store'}).then(function(r){ if (r && r.ok && !r.redirected) return c.put(a.url, r); });
+  // 本頁自己把每個 app 的啟動頁抓下來存進它的快取（本頁「寫」就是「讀」的同一個快取，最可靠）。各 app SW 仍照常服務離線。
+  // ⚠ 關鍵：啟動頁 HTML 不可再用 no-store（iOS WebKit 會連 CacheStorage 也拒存）→ 已改 no-cache。這裡「存完立刻 match 驗證」，存不進就明白標失敗、不再假裝「準備中」卡死（codex 診斷）。
+  function el(s){ return document.getElementById('off-' + s); }
+  function setOk(e){ e.setAttribute('data-st','ok'); e.textContent='\\u2705 \\u96e2\\u7dda\\u5c31\\u7dd2'; e.className='off ok'; }
+  function setErr(e){ e.setAttribute('data-st','err'); e.textContent='\\u26a0\\ufe0f \\u96e2\\u7dda\\u5feb\\u53d6\\u672a\\u6210'; e.className='off err'; }
+  if(!('caches' in window)){ M.forEach(function(a){ var e=el(a.slug); if(e) setErr(e); }); return; }
+  function warm(a){
+    var e = el(a.slug); if(!e || e.getAttribute('data-st')==='ok') return Promise.resolve();
+    var req = new Request(a.url);
+    return caches.open(a.cache).then(function(c){
+      return c.match(req).then(function(hit){
+        if (hit) { setOk(e); return; }
+        return fetch(req, {cache:'no-store'}).then(function(r){
+          if (!(r && r.ok && !r.redirected)) return;
+          return c.put(req, r).then(function(){ return c.match(req); }).then(function(h2){ if (h2) setOk(e); });   // 存完立刻驗證
+        });
       });
-    }).catch(function(){});
-  });
-  function tick(){
-    var left = 0;
-    M.forEach(function(a){
-      var el = document.getElementById('off-' + a.slug);
-      if (!el || el.getAttribute('data-ok')) return;
-      left++;
-      caches.open(a.cache).then(function(c){ return c.match(a.url); }).then(function(hit){
-        if (hit && el) { el.setAttribute('data-ok','1'); el.textContent='\\u2705 \\u96e2\\u7dda\\u5c31\\u7dd2'; el.className='off ok'; }
-      }).catch(function(){});
-    });
-    if (left === 0) clearInterval(T);
+    }).catch(function(err){ if(window.console) console.error('offline precache failed', a.slug, err); });
   }
-  var T = setInterval(tick, 1000); tick();
+  var tries = 0;
+  function round(){
+    tries++;
+    Promise.all(M.map(warm)).then(function(){
+      var allOk = M.every(function(a){ var e=el(a.slug); return e && e.getAttribute('data-st')==='ok'; });
+      if (allOk) { clearInterval(T); return; }
+      if (tries >= 6) {   // ~12s 還沒成 → 把還沒成的明白標「未成」，不要永遠假裝準備中
+        clearInterval(T);
+        M.forEach(function(a){ var e=el(a.slug); if(e && e.getAttribute('data-st')!=='ok') setErr(e); });
+      }
+    });
+  }
+  var T = setInterval(round, 2000); round();
 })();</script>
 <style>
   :root { color-scheme: dark; }
@@ -359,6 +369,7 @@ app.get('/apps', (_req, res) => {
   .dz.en { color:#64748b; font-size:.72em; }
   .off { font-size:.72em; margin-top:4px; color:#64748b; display:flex; align-items:center; gap:4px; }
   .off.ok { color:#22c55e; }
+  .off.err { color:#f59e0b; }
   .go { color:#3b82f6; font-weight:700; font-size:.85em; flex-shrink:0; }
   .install { margin-top:26px; background:#111827; border:1px solid #1f2a3d; border-radius:14px; padding:16px 18px; }
   .install h2 { font-size:.95em; margin:0 0 10px; color:#e2e8f0; }

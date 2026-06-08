@@ -1538,7 +1538,7 @@ export function getSpaHtmlBody(): string {
       <button class="tab-util-btn tab-install-btn" id="tab-install-btn" onclick="showInstallGuide()" style="display:none">
         <span>📲</span>安裝
       </button>
-      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer;text-decoration:underline" onclick="showAbout()">V9.4.12</span>
+      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer;text-decoration:underline" onclick="showAbout()">V9.4.13</span>
     </div>
   </div>
 </div>
@@ -1572,10 +1572,15 @@ export function getSpaHtmlBody(): string {
     </div>
     <div style="max-height:50vh;overflow-y:auto;-webkit-overflow-scrolling:touch;margin-bottom:10px">
     ${renderCommunityLink()}
-    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V9.4.12</div>
+    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V9.4.13</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
-      <div>🔧 <b>入口頁「準備離線中」真的修好——改由入口頁自己預存,不再靠 iPad/iPhone 上常常不裝的多重 SW。</b></div>
-      <div>🔧 <b>Hub "preparing offline" really fixed — the hub now precaches itself instead of relying on multiple service workers that often fail to install on iPad/iPhone.</b></div>
+      <div>🔧 <b>離線真的修好——啟動頁不再用 iOS 會拒存的 no-store 標頭;入口頁存完即驗證、存不進會明白標示。</b></div>
+      <div>🔧 <b>Offline really fixed — launch pages no longer use the no-store header that iOS refuses to cache; the hub now verifies the cache and shows a clear status.</b></div>
+    </div>
+    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V9.4.12</div>
+    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
+      <div>🔧 <b>入口頁改由自己預存(不靠多重 SW);(此版 iOS 仍卡,V9.4.13 才真正解掉)。</b></div>
+      <div>🔧 <b>Hub precaches itself instead of relying on multiple SWs (iOS still stuck here; fully fixed in V9.4.13).</b></div>
     </div>
     <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V9.4.11</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">

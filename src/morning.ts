@@ -16,7 +16,7 @@ import { renderAppChangelog } from './app-changelog.js';
 
 // V2.0.0: 統一版號 — 跟 Portfolio 共用 APP_VERSION。MORNING_VERSION alias 保留向後相容
 export const MORNING_VERSION = APP_VERSION;
-const MORNING_CACHE = 'morning-v2-0-12';
+const MORNING_CACHE = 'morning-v2-0-13';
 
 // ─── Postgres ────────────────────────────────────────────────────────
 let _pgPool: pg.Pool | null = null;
@@ -491,7 +491,8 @@ export const morningRouter = express.Router();
 // ─── /morning — SPA 主頁 ──────────────────────────────────────────────
 morningRouter.get('/morning', (_req, res) => {
   res.setHeader('Content-Type', 'text/html; charset=utf-8');
-  res.setHeader('Cache-Control', 'no-store');
+  // no-store 在 iOS WebKit 會擋 CacheStorage（離線殼存不進去）→ 改 no-cache：仍每次 revalidate 拿最新版，但可存離線副本（codex 診斷）。
+  res.setHeader('Cache-Control', 'private, no-cache, max-age=0, must-revalidate');
   res.send(getMorningHtml());
 });
 
