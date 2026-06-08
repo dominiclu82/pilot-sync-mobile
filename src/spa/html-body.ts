@@ -1538,7 +1538,7 @@ export function getSpaHtmlBody(): string {
       <button class="tab-util-btn tab-install-btn" id="tab-install-btn" onclick="showInstallGuide()" style="display:none">
         <span>📲</span>安裝
       </button>
-      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer;text-decoration:underline" onclick="showAbout()">V9.4.07</span>
+      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer;text-decoration:underline" onclick="showAbout()">V9.4.08</span>
     </div>
   </div>
 </div>
@@ -1572,7 +1572,12 @@ export function getSpaHtmlBody(): string {
     </div>
     <div style="max-height:50vh;overflow-y:auto;-webkit-overflow-scrolling:touch;margin-bottom:10px">
     ${renderCommunityLink()}
-    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V9.4.07</div>
+    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V9.4.08</div>
+    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
+      <div>🔧 <b>修 ATIS 換到沒資料的來源時切換鈕消失、切不回來;歐洲 cookie 存資料庫,部署重啟自動復原不熄燈。</b></div>
+      <div>🔧 <b>Fix ATIS switch button vanishing on an empty source; persist Europe cookie so it survives restarts.</b></div>
+    </div>
+    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V9.4.07</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
       <div>🔀 <b>切換鈕改顯示「按了會變成什麼」（ATIS 換來源、ATFM Key/Events）。</b></div>
       <div>🔀 <b>Toggle buttons now show what tapping switches to.</b></div>

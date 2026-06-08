@@ -92,6 +92,11 @@ async function _dbInit() {
         cnt INTEGER NOT NULL DEFAULT 0, last_at TIMESTAMPTZ,
         PRIMARY KEY (day, who, icao)
       );
+      -- 歐洲 NOP 配方(cookie + url/body/permutation)持久化:Render 重啟自動載回 → 不用人工重新點火,歐洲不因部署熄燈
+      CREATE TABLE IF NOT EXISTS cs_nop_recipe (
+        id INTEGER PRIMARY KEY,
+        recipe JSONB NOT NULL, updated_at TIMESTAMPTZ DEFAULT NOW()
+      );
     `);
     // V8.0.60：cs_atis_who 加 icao（記「誰查了哪個機場」）。舊表(PK day,who)要遷移：加欄、改主鍵。
     // ⚠ 不可刪舊列！舊聚合列 icao='' 保留(顯示時當「未分機場」)，避免清掉歷史用量。
@@ -183,7 +188,7 @@ async function _dbInit() {
     console.error('❌ Database init error:', e.message);
   }
 }
-_dbInit().then(() => _atisLoadState());   // 建表後從 DB 載回 ATIS 用量（重啟不歸零）
+_dbInit().then(() => { _atisLoadState(); _nopLoadState(); });   // 建表後從 DB 載回 ATIS 用量 + 歐洲 NOP cookie（重啟不歸零、不熄燈）
 
 // Determine redirect URI: env var > BASE_URL-derived > credentials.json
 const _creds = loadCredentials();
@@ -732,6 +737,20 @@ async function _atisLoadState() {
       _atisRate = { limit: row.lim, remaining, reset, updated: Date.now() };
     }
   } catch { /* 載入失敗就用空的，不擋啟動 */ }
+}
+
+// 啟動時從 DB 載回歐洲 NOP 配方(cookie)。Render 重啟只要 1-2 分鐘、cookie session 閒置 timeout ~10-12 分 → 載回通常還活著,保活直接續命,歐洲不熄燈、不用人工點火。
+async function _nopLoadState() {
+  if (!_pool) return;
+  try {
+    const rr = await _pool.query(`SELECT recipe FROM cs_nop_recipe WHERE id=1`);
+    const rec = rr.rows[0] && rr.rows[0].recipe;
+    if (rec && rec.cookie) {
+      _nopRecipe = rec;
+      console.log('[NOP] recipe loaded from DB, cookie', String(rec.cookie).length);
+      _atfmEu(true).catch(() => { });   // 啟動就用載回的 cookie 抓一次 → 歐洲立刻亮,不等下一輪保活
+    }
+  } catch { /* 載入失敗不擋啟動 */ }
 }
 
 // 查 airframes 某機場的 ARR / DEP D-ATIS（text 片語搜尋，去掉 ACARS 路由前綴）
@@ -1384,6 +1403,11 @@ app.post('/api/nop-refresh', (req, res) => {
   _nopRecipe = { cookie, url: b.url ? String(b.url) : undefined, body: b.body ? String(b.body) : undefined, permutation: b.permutation ? String(b.permutation) : undefined };
   _atfmEuCache = null;   // 換新配方 → 下次強制重抓
   delete _atfmCache['eu']; delete _atfmCache['all']; delete _atfmCache['apac'];   // 清外層快取,立即生效不卡 30 秒
+  if (_pool) _pool.query(                                                          // 存進 DB → Render 重啟自動載回,不用人工重新點火
+    `INSERT INTO cs_nop_recipe (id,recipe,updated_at) VALUES (1,$1,NOW())
+     ON CONFLICT (id) DO UPDATE SET recipe=$1, updated_at=NOW()`,
+    [JSON.stringify(_nopRecipe)]
+  ).catch(() => {});
   console.log('[NOP] recipe refreshed, cookie', cookie.length, 'url', b.url ? 'live' : 'fallback');
   res.json({ ok: true });
 });
