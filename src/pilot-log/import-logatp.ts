@@ -80,6 +80,101 @@ function resolveFlightNo(raw: string, tail: string): string {
   return code ? code + fn : fn;              // 查不到 → 留原樣（代碼空白）
 }
 
+// ── Log ATP 2「system data」(Realm 資料庫原始匯出)支援 ──────────────────────
+//   欄名是 camelCase(flightDate/departure…)、OOOI 是 Unix epoch 秒、Block/Flight/Night 是分鐘、
+//   crew1~4 是 Realm objectId(要配 crew 檔對成名字)。做法:把每列「正規化」成可讀格式的 row,
+//   後面整套處理(防重/insert)沿用不改。偵測:headers 有 flightDate 但沒有 'Flight Date'。
+function isSystemDataHeaders(headers: string[]): boolean {
+  return headers.includes('flightDate') && headers.includes('departure') && !headers.includes('Flight Date');
+}
+// Unix epoch 秒(float)→ UTC 'HH:MM';0 / 0.0 / 空 = 缺(回空字串,讓上層當沒填)
+function epochToHHMM(v: string): string {
+  const n = parseFloat(String(v == null ? '' : v).trim());
+  if (!isFinite(n) || n <= 0) return '';
+  const d = new Date(n * 1000);
+  if (isNaN(d.getTime())) return '';
+  return String(d.getUTCHours()).padStart(2, '0') + ':' + String(d.getUTCMinutes()).padStart(2, '0');
+}
+// Unix epoch 秒 → UTC 'YYYY-MM-DD'(那刻的真實 UTC 日期)。日期錨在 out 這刻 → 不管幾點起飛、跨不跨 UTC 午夜都對。
+function epochToUTCDate(v: string): string {
+  const n = parseFloat(String(v == null ? '' : v).trim());
+  if (!isFinite(n) || n <= 0) return '';
+  const d = new Date(n * 1000);
+  if (isNaN(d.getTime())) return '';
+  return d.toISOString().slice(0, 10);
+}
+// 分鐘整數 → 'HH:MM'(blockTime=192 → '03:12');空/負 = 缺
+function minToHHMM(v: string): string {
+  const n = parseInt(String(v == null ? '' : v).trim(), 10);
+  if (!isFinite(n) || n < 0) return '';
+  return Math.floor(n / 60) + ':' + String(n % 60).padStart(2, '0');
+}
+// 'true'/'false' → 'TRUE'/'FALSE'(isTrue 認 'TRUE')。picTime 也走這支:實際資料一律 boolean('false'),
+// 不揣測「分鐘數>0 當 PIC」——否則萬一是分鐘數會把整段 block 灌成 PIC、誇大 pic_minutes(codex P1)。boolean 才安全。
+function boolToTrue(v: string): string { return String(v == null ? '' : v).trim().toLowerCase() === 'true' ? 'TRUE' : 'FALSE'; }
+// crew 檔(objectId,firstName,lastName,…,isSelf)→ map: objectId → {name, isSelf}
+function buildCrewMap(crewText?: string): Record<string, { name: string; isSelf: boolean }> {
+  const map: Record<string, { name: string; isSelf: boolean }> = {};
+  if (!crewText) return map;
+  const { rows } = parseCsv(crewText);
+  for (const r of rows) {
+    const id = (r['objectId'] || '').trim();
+    if (!id) continue;
+    const name = cleanName((r['firstName'] || '') + ' ' + (r['lastName'] || ''));   // 中文「瑞棋 陳」/西文全名;空格收斂
+    map[id] = { name, isSelf: String(r['isSelf'] || '').trim().toLowerCase() === 'true' };
+  }
+  return map;
+}
+const SYSDATA_HEADERS = ['Object ID', 'Flight Date', 'Departure', 'Destination', 'Aircraft Registration', 'Flight Number', 'Aircraft Type', 'Out time', 'Off time', 'On time', 'In time', 'Total Block Time', 'Total Flight Time', 'Night Time', 'PF Takeoff', 'PF Landing', 'PIC', 'Autoland', 'Diverted', 'Go around', 'Crew 1', 'Crew 2', 'Crew 3', 'Crew 4'];
+// 把 system-data 列正規化成可讀格式的 row(crew1~4 用 crewMap 對名字、排除本人 isSelf)
+function normalizeSystemData(rows: Record<string, string>[], crewText?: string): { headers: string[]; rows: Record<string, string>[] } {
+  const crewMap = buildCrewMap(crewText);
+  const out = rows.map((sr) => {
+    const r: Record<string, string> = {};
+    // 防重 source_ref 用:objectId 優先;空的(此格式常見)退用 realmID(每列都有、Realm 主鍵、穩定唯一)
+    //   → 重匯 idempotent,不會因列序變動而重複(codex P1)。兩者都空才落到下游含列序的 fallback。
+    r['Object ID'] = (sr['objectId'] || '').trim() || (sr['realmID'] || '').trim();
+    // 日期錨在 out 這刻的真實 UTC 日期 → 不管幾點起飛、跨不跨 UTC 午夜,
+    //   後面 parseHmAtDate(date, HH:MM) 配 epoch 還原的時刻一定落在對的那天(off/on/in 跨午夜由 +1day 邏輯接)。
+    //   退路:沒 outTime 才用 flightDate 欄。
+    r['Flight Date'] = epochToUTCDate(sr['outTime']) || (sr['flightDate'] || '').trim();
+    r['Departure'] = sr['departure'] || '';
+    r['Destination'] = sr['destination'] || '';
+    r['Aircraft Registration'] = sr['aircraftRegistration'] || '';
+    r['Flight Number'] = sr['flightNumber'] || '';
+    r['Aircraft Type'] = sr['aircraftType'] || '';
+    r['Out time'] = epochToHHMM(sr['outTime']);
+    r['Off time'] = epochToHHMM(sr['offTime']);
+    r['On time'] = epochToHHMM(sr['onTime']);
+    r['In time'] = epochToHHMM(sr['inTime']);
+    r['Total Block Time'] = minToHHMM(sr['blockTime']);
+    r['Total Flight Time'] = minToHHMM(sr['flightTime']);
+    r['Night Time'] = minToHHMM(sr['nightTime']);
+    r['PF Takeoff'] = boolToTrue(sr['pfTakeoff']);
+    r['PF Landing'] = boolToTrue(sr['pfLanding']);
+    r['PIC'] = boolToTrue(sr['picTime']);
+    r['Autoland'] = boolToTrue(sr['autoland']);
+    r['Diverted'] = boolToTrue(sr['diverted']);
+    r['Go around'] = boolToTrue(sr['goAround']);
+    // crew1 = PIC slot:下游把 Crew 1 當機長(pic),所以「固定」放 crew1(本人即 PIC 時留空,不把自己列成機長)。
+    //   ⚠ 不可把其餘 crew compact 進 Crew 1 → 否則本人是 PIC 那趟,副駕會被誤標機長(codex P2)。
+    const c1 = crewMap[String(sr['crew1'] == null ? '' : sr['crew1']).trim()];
+    r['Crew 1'] = (c1 && !c1.isSelf && c1.name) ? c1.name : '';
+    // crew2~4:排除本人後 compact 進 Crew 2~4(這幾格無 PIC 語意,壓掉空格較乾淨)
+    const rest: string[] = [];
+    for (const id of [sr['crew2'], sr['crew3'], sr['crew4']]) {
+      const c = crewMap[String(id == null ? '' : id).trim()];
+      if (c && !c.isSelf && c.name) rest.push(c.name);
+    }
+    for (let i = 0; i < 3; i++) r['Crew ' + (i + 2)] = rest[i] || '';
+    return r;
+  });
+  return { headers: SYSDATA_HEADERS, rows: out };
+}
+
+// 給單元測試用(不影響正式流程)
+export const _logatpTestHooks = { parseCsv, isSystemDataHeaders, normalizeSystemData, epochToHHMM, epochToUTCDate, minToHHMM, buildCrewMap, parseHmAtDate };
+
 const INSERT_COLS = [
   'id', 'user_id', 'source', 'source_ref', 'status',
   'flight_date', 'flight_no', 'origin', 'dest',
@@ -130,7 +225,8 @@ const REQUIRED = ['Flight Date', 'Departure', 'Destination'];
 export async function importLogatp(
   userId: string,
   text: string,
-  opts: { dryRun?: boolean } = {}
+  opts: { dryRun?: boolean } = {},
+  crewText?: string   // Log ATP 2 system data 用:crew 檔(把 crew1~4 的 Realm ID 對成名字)
 ): Promise<ImportLogatpResult> {
   const empty: ImportLogatpResult = {
     inserted: 0, updated: 0, duplicate_skipped: 0, cross_source_skipped: 0,
@@ -139,7 +235,16 @@ export async function importLogatp(
   const pool = getPool();
   if (!pool || !(await ensureTables())) return { ...empty, error: 'database_unavailable' };
 
-  const { headers, rows } = parseCsv(text);
+  let { headers, rows } = parseCsv(text);
+  if (isSystemDataHeaders(headers)) {   // Log ATP 2 system data(Realm 原始匯出,camelCase)→ 正規化成可讀格式,後面流程不變
+    // 防靜默資料流失:航班列帶了組員 ID、卻沒附組員檔 → 名字對不回來會被清空還報成功。直接擋下提示補檔(codex P2)。
+    //   (純無組員的 system data 不受影響:本來就沒 ID,允許只匯航班。)
+    const hasCrewIds = rows.some((r) => (r['crew1'] || r['crew2'] || r['crew3'] || r['crew4'] || '').trim());
+    const hasCrewFile = !!(crewText && crewText.trim());
+    if (hasCrewIds && !hasCrewFile) return { ...empty, error: 'system_data_needs_crew_file' };
+    const norm = normalizeSystemData(rows, crewText);
+    headers = norm.headers; rows = norm.rows;
+  }
   if (!headers.length) return { ...empty, error: 'empty_or_invalid_file' };
   const missing = REQUIRED.filter((r) => !headers.includes(r));
   if (missing.length) return { ...empty, error: `missing_required_columns:${missing.join(',')}` };

@@ -3000,16 +3000,19 @@ function _plImportCardLogatp() {
   return '<div class="pl-imp-card">' +
       '<div style="font-size:.85em;font-weight:700;margin-bottom:6px">📄 Log ATP 2 · CSV 匯出 / export</div>' +
       '<div style="font-size:.7em;color:var(--muted);margin-bottom:8px;line-height:1.5">' +
-        'Log ATP 2 匯出 CSV（取 Sheet 1）。航班、OOOI、夜航、PIC/SIC、組員都會帶進來。<br>' +
+        'Log ATP 2 匯出 CSV。航班、OOOI、夜航、PIC/SIC、組員都會帶進來。可讀格式或 system data（Realm 原始匯出）都吃。<br>' +
         '時間視為 <b>UTC</b>；班號保留航空代碼（沒代碼會用機尾反查補上）；機尾統一加破折號；重複航班自動略過。<br>' +
-        'Imports Log ATP 2 CSV — flights, OOOI (UTC), night, PIC/SIC, crew; dedupes against existing logbooks.' +
+        'Imports Log ATP 2 CSV (readable or raw system-data export) — flights, OOOI (UTC), night, PIC/SIC, crew; dedupes against existing logbooks.' +
       '</div>' +
+      '<div style="font-size:.7em;font-weight:600;margin-bottom:3px">航班檔 Flight CSV</div>' +
       '<input type="file" id="pl-logatp-file" accept=".csv,text/csv,text/plain" style="font-size:.78em">' +
+      '<div style="font-size:.7em;font-weight:600;margin:8px 0 3px">組員檔 Crew CSV <span style="color:var(--muted);font-weight:400">（選填，system data 要組員名字才需要）</span></div>' +
+      '<input type="file" id="pl-logatp-crew-file" accept=".csv,text/csv,text/plain" style="font-size:.78em">' +
       '<div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap">' +
         '<button onclick="_plUploadLogatp(true)" style="background:#475569;color:#fff;border:0;border-radius:6px;padding:6px 12px;font-size:.78em;font-weight:700;cursor:pointer">🔍 Preview (dry-run)</button>' +
         '<button onclick="_plUploadLogatp(false)" style="background:#10b981;color:#fff;border:0;border-radius:6px;padding:6px 12px;font-size:.78em;font-weight:700;cursor:pointer">Import</button>' +
       '</div>' +
-      '<div style="font-size:.65em;color:var(--muted);margin-top:6px">建議先 Preview 確認解析正常再 Import。</div>' +
+      '<div style="font-size:.65em;color:var(--muted);margin-top:6px">建議先 Preview 確認解析正常再 Import。system data 格式請一併選組員檔，才帶得到組員名字。</div>' +
     '</div>';
 }
 
@@ -3321,11 +3324,27 @@ async function _plUploadWader(dryRun) {
 
 async function _plUploadLogatp(dryRun) {
   var endpoint = '/api/pilot-log/import/logatp' + (dryRun ? '?dryRun=1' : '');
-  var j = await _plUploadFile('pl-logatp-file', endpoint);
+  // 讀航班檔(必填)+ 組員檔(選填,system data 要組員名字才需要)→ 合併送(用標記切),server 端對照 crew1~4 的 ID → 名字。
+  var fin = document.getElementById('pl-logatp-file');
+  if (!fin || !fin.files || !fin.files[0]) { _plToast('請先選航班檔', 'warn'); return; }
+  var cin = document.getElementById('pl-logatp-crew-file');
+  var hasCrew = !!(cin && cin.files && cin.files[0]);
+  // ⚠ 兩檔合併送 → 合計要 < server body limit(5MB),否則 413(codex P2)。航班+組員合計檢查(+標記約 30 bytes)。
+  var combinedBytes = fin.files[0].size + (hasCrew ? cin.files[0].size + 30 : 0);
+  if (combinedBytes > 5 * 1024 * 1024) { _plToast('檔案太大：航班+組員合計需 <5MB', 'error'); return; }
+  var text = await fin.files[0].text();
+  if (hasCrew) text = text + '\n__LOGATP_CREW_FILE__\n' + (await cin.files[0].text());
+  var rr = await _plApi(endpoint, { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: text });
+  if (!rr.ok && rr.status !== 400) { _plToast('上傳失敗 ' + rr.status, 'error'); return; }
+  var j = await rr.json().catch(function() { return null; });
   if (!j) return;
   var resBox = document.getElementById('pl-import-result');
   if (j.error) {
-    resBox.innerHTML = '<div style="background:#7f1d1d;color:#fff;padding:10px;border-radius:8px;font-size:.78em">❌ ' + _plEsc(j.error) + '</div>';
+    // system data 帶了組員 ID 卻沒附組員檔 → 翻成白話,叫 user 補上組員檔(否則組員會被清空)。
+    var emsg = (j.error === 'system_data_needs_crew_file')
+      ? '這是 System Data 格式、航班裡有組員代碼，請一併在「組員檔 Crew CSV」放上組員 CSV，才對得到名字。<br>This is a System Data export with crew codes — please also attach the Crew CSV so names can be matched.'
+      : _plEsc(j.error);
+    resBox.innerHTML = '<div style="background:#7f1d1d;color:#fff;padding:10px;border-radius:8px;font-size:.78em">❌ ' + emsg + '</div>';
     return;
   }
   var nNew = (j.preview || []).filter(function(p) { return p.action === 'insert'; }).length;

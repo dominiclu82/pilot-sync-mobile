@@ -54,8 +54,8 @@ import { getAirportDbJs } from '../spa/js-airport-db.js';
 
 // ── 版本（比照 CrewSync / Morning：每次推版必更新；SW cache 名稱跟著走） ────
 // 本機 preview build 會暫時加 -tNN 後綴方便對版；推正式版前拿掉只留乾淨版號。
-export const PILOT_LOG_VERSION = 'V2.2.23';
-const PILOT_LOG_CACHE = 'pilotlog-v2-2-23';
+export const PILOT_LOG_VERSION = 'V2.2.24';
+const PILOT_LOG_CACHE = 'pilotlog-v2-2-24';
 
 export const pilotLogRouter = express.Router();
 
@@ -362,6 +362,11 @@ function _renderPilotLogChangelog(): string {
   return `
     ${renderCommunityLink()}
     <div class="pl-cl-v">${PILOT_LOG_VERSION}</div>
+    <div class="pl-cl-txt">
+      <b>📄 Log ATP 2 匯入支援 Realm system data 原始格式（自動辨識，可加組員檔把 ID 對回姓名）；跨 UTC 午夜時間正確。</b><br>
+      <b>📄 Log ATP 2 import now supports raw Realm system-data export (auto-detected; optional crew file maps IDs to names); times correct across UTC midnight.</b>
+    </div>
+    <div class="pl-cl-v old">V2.2.23</div>
     <div class="pl-cl-txt">
       <b>🔄 Airports 轉向自動重排——iPad 橫拿開、轉直拿時自動切成單欄（不再卡在三欄）。</b><br>
       <b>🔄 Airports now re-lays out on rotation — switches between 3-column and single-column when you rotate.</b>
@@ -1483,10 +1488,15 @@ pilotLogRouter.post('/api/pilot-log/import/wader', requireAuth, async (req: Auth
 
 // V2.1.09：LogATP 2 logbook CSV 匯入（OOOI/UTC + 班號代碼保留 + 機尾正規化 + 跨來源防重）
 pilotLogRouter.post('/api/pilot-log/import/logatp', requireAuth, async (req: AuthedRequest, res) => {
-  const text = typeof req.body === 'string' ? req.body : '';
-  if (!text) return res.status(400).json({ error: 'empty_body' });
+  const raw = typeof req.body === 'string' ? req.body : '';
+  if (!raw) return res.status(400).json({ error: 'empty_body' });
+  // system data 格式可選帶 crew 檔:前端把「航班檔 + 標記 + 組員檔」合併送,這裡切回兩段(把 crew1~4 的 Realm ID 對成名字)。
+  const MARK = '\n__LOGATP_CREW_FILE__\n';
+  const idx = raw.indexOf(MARK);
+  const text = idx >= 0 ? raw.slice(0, idx) : raw;
+  const crewText = idx >= 0 ? raw.slice(idx + MARK.length) : undefined;
   const dryRun = req.query.dryRun === '1' || req.query.dryRun === 'true';
-  const r = await importLogatp(req.pilotUserId!, text, { dryRun });
+  const r = await importLogatp(req.pilotUserId!, text, { dryRun }, crewText);
   res.json(r);
 });
 

@@ -273,7 +273,7 @@ app.get('/apps', (_req, res) => {
   // 版號自動抓（改版自動跟著變，不用手動更新這頁）：CrewSync 從 html-body 抓首個 V8.0.x；其餘用常數。
   const csVer = (getSpaHtmlBody().match(/V\d+\.\d+\.\d+/) || [''])[0];
   const apps = [
-    { icon: '🛬', name: 'CrewSync', ver: csVer, href: '/main', cn: '班表同步 · 機場天氣 · 跑道圖 · 即時雷達', en: 'Roster · Weather · Runway maps · Live radar' },
+    { icon: '🛬', name: 'CrewSync', ver: csVer, href: '/main', cn: '班表同步 · 機場天氣 · 跑道圖 · ATFM', en: 'Roster · Weather · Runway maps · ATFM' },
     { icon: '📒', name: 'Pilot Log', ver: PILOT_LOG_VERSION, href: '/pilot-log', cn: '電子飛行紀錄 · 班表匯入 · 統計分析', en: 'Electronic logbook · roster import · analytics' },
     { icon: '📰', name: '今日 Today', ver: APP_VERSION, href: '/morning', cn: '新聞 · 天氣 · 投資速覽', en: 'News · Weather · Portfolio' },
   ];
@@ -909,11 +909,13 @@ app.get('/sw.js', (_req, res) => {
 const CACHE = 'crewsync-${cacheVer}';
 // 預快取:入口 /apps + 今日 /morning。morning 自己的 SW scope 是 '/morning/'、管不到啟動頁 '/morning'(codex P2)→ 由 root SW(scope '/')預存+服務它離線。
 // /pilot-log 不放這:它自己的 SW(scope '/pilot-log')涵蓋得到、會自己預存,放這反而重複(更精確的 scope 會贏)。
-const SHELL = ['/', '/main', '/share', '/apps', '/morning'];
+// ⚠ 不放 '/':它 302 轉址到 /main，fetch 拿到的是 redirected response，cache.put 會丟錯 → 整個 Promise.all 掛掉 → install 失敗 → 三個 app 全卡「準備離線中」。離線啟動用 /main，'/'用不到。
+const SHELL = ['/main', '/share', '/apps', '/morning'];
 self.addEventListener('install', e => {
   e.waitUntil(
+    // 每個 url 各自 catch：任一個抓失敗(冷啟/網路/轉址)都不拖垮其他，能存多少先存多少（離線就緒不被單點失敗卡死）。
     caches.open(CACHE).then(c => Promise.all(SHELL.map(url =>
-      fetch(url, {cache:'no-store'}).then(r => c.put(url, r))
+      fetch(url, {cache:'no-store'}).then(r => { if (r && r.ok && !r.redirected) return c.put(url, r); }).catch(()=>{})
     )))
   );
   self.skipWaiting();
