@@ -310,7 +310,14 @@ function _wxBuildDetailHtml(icao, metarLines, tafText, atisSections, atisSource)
     var srcRight = srcBar ? '<span style="margin-left:auto">' + srcBar + '</span>' : '';
     if (atisOnly.length > 0) {
       cards += atisOnly.map(function(s, i) {
-        return '<div class="atis-card"><div class="atis-card-title" style="display:flex;align-items:center;gap:6px">' + s.title + (i === 0 ? srcRight : '') + '</div><pre>' + s.text + '</pre></div>';
+        // 來源 footer（學 coffee）：✈ Source: 航班號/註冊號 ｜ 🕒 Time（src 已在 server 端清洗、安全）
+        var foot = '';
+        if (s.src || s.time) {
+          foot = '<div class="atis-srcfoot" style="display:flex;justify-content:space-between;gap:8px;margin-top:6px;padding-top:6px;border-top:1px dashed var(--border,#3a3a3a);font-size:.8em;color:var(--muted)">'
+            + '<span>' + (s.src ? '\\u2708\\ufe0f Source: <b>' + s.src + '</b>' : '') + '</span>'
+            + '<span>' + (s.time ? '\\ud83d\\udd52 ' + s.time : '') + '</span></div>';
+        }
+        return '<div class="atis-card"><div class="atis-card-title" style="display:flex;align-items:center;gap:6px">' + s.title + (i === 0 ? srcRight : '') + '</div><pre>' + s.text + '</pre>' + foot + '</div>';
       }).join('');
     } else {
       cards += '<div class="atis-card"><div class="atis-card-title" style="display:flex;align-items:center;gap:6px">\\ud83d\\udcfb ATIS' + srcRight + '</div><pre>' + noData + '</pre></div>';
@@ -642,7 +649,41 @@ function wxRefreshRegion() {
   var airports = wxGetAirports(wxCurrentRegion);
   if (airports.length === 0) { _wxRefreshDone(btn, 0, '\\u21ba'); return; }
   var icaos = airports.map(function(a) { return a.icao; });
+  _wxRefreshRegionAtis(icaos);   // V9.4.18：區域一鍵更新「順便」刷該區 ATIS（暖 server 快取，開了秒出）
   _wxBatchRefresh(icaos, wxCurrentRegion, 'wx-region-refresh-btn', '\\u21ba');
+}
+
+/* V9.4.18：刷整個地區的 ATIS（裸查 1 次/場、bulk）。一區十幾場 < airframes 56/分限速，限併發 5 即可，不需長節流。
+   ⚠ 不帶 fresh：尊重 server 60 分快取（ATIS 約一小時才換一次）。連點/刷多區時，已暖的場直接回快取、不再打 airframes，
+   不會把 56/分 bucket 抽乾害正常點開變 fallback（codex P2）。暖 server 快取 → 點開任一場秒出；已開過的順手更新重繪。 */
+function _wxRefreshRegionAtis(icaos) {
+  var idx = 0, active = 0, CONC = 5, changed = false;
+  function done() {
+    active--;
+    if (idx < icaos.length) pump();
+    else if (active === 0 && changed) _wxSaveDetailCache();
+  }
+  function fetchOne(ic) {
+    fetch('/api/atis?icao=' + ic + '&bulk=1')
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        if (!d || !d.sections) return;        // fallback / 無資料 → 不動快取（保留舊的）
+        var sc = wxDetailRawCache[ic];
+        if (!sc) return;                       // 沒開過 → server 快取已暖，detail 快取留待點開時建
+        sc.atis = d.sections; sc.atisSrc = d.source || ''; changed = true;
+        delete wxDetailCache[ic];              // 清渲染快取下次重建
+        if (wxSelectedIcao === ic) {           // 正開著這場 → 立即重繪帶上新 ATIS
+          var html = _wxBuildDetailHtml(ic, sc.metar, sc.taf, sc.atis, sc.atisSrc);
+          wxDetailCache[ic] = html;
+          var el = document.getElementById('wx-detail-content');
+          if (el) el.innerHTML = html;
+        }
+      })
+      .catch(function () { })
+      .then(done);
+  }
+  function pump() { while (active < CONC && idx < icaos.length) { active++; fetchOne(icaos[idx++]); } }
+  pump();
 }
 
 `;

@@ -1536,7 +1536,7 @@ export function getSpaHtmlBody(): string {
       <button class="tab-util-btn tab-install-btn" id="tab-install-btn" onclick="showInstallGuide()" style="display:none">
         <span>📲</span>安裝
       </button>
-      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer;text-decoration:underline" onclick="showAbout()">V9.4.17</span>
+      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer;text-decoration:underline" onclick="showAbout()">V9.4.18</span>
     </div>
   </div>
 </div>
@@ -1570,7 +1570,12 @@ export function getSpaHtmlBody(): string {
     </div>
     <div style="max-height:50vh;overflow-y:auto;-webkit-overflow-scrolling:touch;margin-bottom:10px">
     ${renderCommunityLink()}
-    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V9.4.17</div>
+    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V9.4.18</div>
+    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
+      <div>📻 <b>ATIS 換用 airframes 即時 ACARS 來源,每則標示下傳的航班/機號與時間;各地區一鍵更新會順手刷該區 ATIS。</b></div>
+      <div>📻 <b>ATIS now streams from airframes' live ACARS feed, each tagged with the reporting flight/aircraft and time; per-region refresh also updates that region's ATIS.</b></div>
+    </div>
+    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V9.4.17</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
       <div>🔧 <b>修正 Gate Info 場站選單過寬跑版;更新隱私頁來源清單。</b></div>
       <div>🔧 <b>Fixed the wide Gate Info station selector; refreshed the privacy-page source list.</b></div>

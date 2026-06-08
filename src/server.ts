@@ -697,18 +697,22 @@ app.get('/api/taf', async (req, res) => {
   }
 });
 
-// ── ATIS：airframes（ACARS 解碼社群網）為主源 + allorigins 自動備援 ───────────────
-// 為什麼：atis.guru 沒 CORS（瀏覽器不能直連）又擋 Render 機房 IP（server 直連 502）。
-//   airframes 有公開 API（免費 500/天）、server 抓得到、有完整台灣 D-ATIS（實測 RCTP/RCKH/RCSS 都新）。
-// 設計：on-demand 單機場查（ARR+DEP 各 1 次）→ 60min 記憶體快取 → 每日額度上限（留 margin）。
-//   爆額度 / key 未設 / airframes 查無 → 回 {fallback:true}，前端改走 allorigins（舊的、不穩、但無限）。
-//   ⚠ 鐵律：ATIS 只在「點開單一機場」時抓，絕不放進一鍵更新（80 機場一次抓會瞬間爆 500/天）。
+// ── ATIS：airframes 匿名 /v1（ACARS）為主源 + atis.guru(allorigins) 前端備援 ───────────────
+// V9.4.18 大改：改用 airframes 匿名 /v1 端點（免 key、免額度、限速 60/分、全用戶可用，帶瀏覽器 UA 過 Cloudflare）。
+//   美國 K/P → 官方 FAA(atis.info) 權威主源 → 退 airframes；非美 → airframes 匿名。查無 → {fallback} → 前端走 atis.guru。
+//   單機場開啟：ARR/DEP 各專打挑最新（裸查缺 DEP 再補打）；區域一鍵更新(bulk=1)：裸查 1 次/場暖 60 分快取。
+//   來源 src（航班號/註冊號，學 coffee）+ time 隨 sections 回前端標示。自我節流 56/分（_afAllow）。
+// TODO（V9.4.18 遺留、留著不刪＝符專案規範）：下面整套「airframes 付費 key 額度 + founder/owner 身份閘門
+//   + cs_atis_rate/cs_atis_who + _atisFetchCoffee/_COFFEE_REF」匿名化後已停用 —— _atisUpdateRate / _atisAllowed
+//   / _atisRemainingNow / _atisRecordWho / AIRFRAMES_KEY / ATIS_OWNER_RESERVE 成孤兒（無人呼叫）。
+//   /api/atis-usage、/api/atis-level、getAtisUsage、_atisAuthLevel、_atisLoadState 仍掛著（Tower 後台讀，現恆為空）。
+//   日後確認 Tower 不需要後可整段移除。
 const AIRFRAMES_KEY = process.env.AIRFRAMES_KEY || '';
 const ATIS_TTL = 60 * 60 * 1000;          // 快取 60 分（ATIS 大約一小時更新一次）
 // airframes 免費額度（單一池 500/天）。owner（站長）可用到剩 0；其他 founder 只能用到「剩 RESERVE」就停，
 // 把最後這些保留給 owner。真實用量「直接讀 airframes 回應的 x-ratelimit-* 標頭」最準 —— 重啟、外部用量都不會錯，不自己數。
 const ATIS_OWNER_RESERVE = 50;
-const _atisCache = new Map<string, { sections: { title: string; text: string }[]; time: number; source: string }>();
+const _atisCache = new Map<string, { sections: { title: string; text: string; src?: string; time?: string }[]; time: number; source: string }>();
 let _atisRate: { limit: number; remaining: number; reset: number; updated: number } | null = null;
 
 // 從 airframes 回應標頭更新真實額度（+ 持久化到 DB，重啟不歸零）
@@ -844,22 +848,32 @@ async function _atisFetchCoffee(icao: string) {
   return sections.length ? sections : null;
 }
 
-async function _atisFetchAirframes(icao: string, kind: 'ARR' | 'DEP') {
-  // ⚠ airframes 回傳「不照時間排序」、且上限 100 則。舊版用 limit=1 → 抓到的是「隨便第一則」常常是舊的（實測踩過：
-  //   limit=1 撈到 0600Z，但 airframes 手上其實有更新的）。改成 limit=100 + 自己按 timestamp 挑最新那則。
-  //   （額度仍是「打幾次」算，limit 1 或 100 都是 1 次；ARR/DEP 各 1 次共 2 次，跟舊版一樣。）
-  const url = 'https://api.airframes.io/messages?text=' + encodeURIComponent(icao + ' ' + kind + ' ATIS') + '&limit=100';
-  const r = await fetch(url, { headers: { Authorization: 'Bearer ' + AIRFRAMES_KEY } });
-  _atisUpdateRate(r);                                     // 每次回應都帶 x-ratelimit-* → 更新真實額度
-  if (!r.ok) throw new Error('airframes ' + r.status);   // 429/5xx → 讓上層走 fallback
-  const a = await r.json() as any[];
-  if (!Array.isArray(a) || !a.length) return null;
-  const tag = kind + ' ATIS';                                                // 過濾真的含「ARR ATIS / DEP ATIS」的
-  const matches = a.filter((m) => String((m && m.text) || '').includes(tag));
+// ── airframes 匿名 /v1（V9.4.18 起改用，免 key、限速 60/分、帶瀏覽器 UA 過 Cloudflare）──────
+// 來源解析：airframes 把「飛機↔即時航班」對得上時，flight 是物件(含 flightIata/designator+number)→ 取航班號(BR772)；
+//   對不上 → 退取飛機註冊號 tail(B-18723)。⚠ station 欄含志工接收站個資(用戶名/IP/座標)，絕不取用。
+function _atisSrcOf(m: any): string {
+  const f = m && m.flight;
+  const raw = (f && typeof f === 'object')
+    ? String(f.flightIata || f.flight || f.flightIcao || ((f.designator || '') + (f.number != null ? f.number : '')) || '')
+    : String((m && m.tail) || (typeof f === 'string' ? f : '') || '');
+  return raw.trim().replace(/[^A-Za-z0-9\- ]/g, '').slice(0, 12);   // 只留安全字元（外部 API 來的，防 HTML 注入）+ 限長
+}
+// ISO 時間 → "2026-06-08 15:41Z"（UTC，給前端標「Time」用）
+function _atisFmtTime(iso: any): string {
+  const t = Date.parse(String(iso || ''));
+  if (!t) return '';
+  const d = new Date(t);
+  if (d.getUTCFullYear() < 2000) return '';   // 防呆：誤把 "1556"(HHMM) 之類當西元年份的，視為無效
+  const p = (n: number) => String(n).padStart(2, '0');
+  return d.getUTCFullYear() + '-' + p(d.getUTCMonth() + 1) + '-' + p(d.getUTCDate()) + ' ' + p(d.getUTCHours()) + ':' + p(d.getUTCMinutes()) + 'Z';
+}
+// 從一批 airframes 訊息挑某 kind(ARR/DEP)的「現行」那則 → {title,text,src,time}
+function _atisPickKind(msgs: any[], kind: 'ARR' | 'DEP'): { title: string; text: string; src: string; time: string } | null {
+  const tag = kind + ' ATIS';
+  const matches = msgs.filter((m) => String((m && m.text) || '').includes(tag));
   if (!matches.length) return null;
-  // ⚠ 不能用 ingest timestamp（airframes「收到時間」）挑最新：飛機會重新索取舊代碼的 ATIS，舊 ATIS 會用新的收到時間再進來，
-  //   照收到時間排會選到「剛收到的舊代碼」（實證：A 0600Z 收到 10:06 vs J 0930Z 收到 09:43 → 該選 J 卻選了 A）。
-  //   正解：解析文字裡的「發布時間 HHMMZ」，配收到日期推回真正 UTC 發布時刻（發布比收到晚＝前一天發的），挑最新。
+  // ⚠ 不能用 ingest 收到時間挑最新：飛機會重索舊代碼的 ATIS、用新收到時間再進來（A 0600Z 收到 10:06 vs J 0930Z 收到 09:43 → 該選 J）。
+  //   正解：解析文字裡「發布時間 HHMMZ」配收到日期推回真正 UTC 發布時刻（發布比收到晚＝前一天發的），挑最新。
   const issueScore = (m: any): number => {
     const t = String((m && m.text) || '');
     const ing = Date.parse(String((m && m.timestamp) || '')) || Date.now();
@@ -868,17 +882,52 @@ async function _atisFetchAirframes(icao: string, kind: 'ARR' | 'DEP') {
     const hh = parseInt(mm[1], 10), mi = parseInt(mm[2], 10);
     const d = new Date(ing);
     let issue = Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), hh, mi);
-    if (hh * 60 + mi > d.getUTCHours() * 60 + d.getUTCMinutes() + 5) issue -= 86400000;   // 發布時間比收到時間晚（容 5 分）→ 前一天發的
+    if (hh * 60 + mi > d.getUTCHours() * 60 + d.getUTCMinutes() + 5) issue -= 86400000;   // 發布晚於收到(容 5 分) → 前一天發的
     return issue;
   };
-  // ATIS 不可能「未來才發布」→ airframes 偶有壞掉的未來時戳記錄（實證踩過：1244Z 卻冒出 1300Z），排除掉不能挑它。
-  const future = Date.now() + 15 * 60000;
+  const future = Date.now() + 15 * 60000;   // ATIS 不可能未來才發布 → 排除壞掉的未來時戳（實證踩過 1244Z 冒出 1300Z）
   let best: any = null, bestScore = -Infinity;
   for (const m of matches) { const s = issueScore(m); if (s <= future && s > bestScore) { best = m; bestScore = s; } }
   if (!best) best = matches[0];   // 全被排除（極端）→ 退用第一則
   const text = String((best && best.text) || '').replace(/^\/[^/]*\//, '').trim();   // 去 ACARS 路由前綴 /TPECAYA.TI2/
   if (!text) return null;
-  return { title: kind + ' ATIS', text };
+  return { title: tag, text, src: _atisSrcOf(best), time: _atisFmtTime(best && best.timestamp) };
+}
+// airframes 匿名限速 60/分（整台 server 共用一個 IP）→ 自我節流到 56/分；bucket 不足就退前端 fallback，不白打成 429。
+let _afBucket = 56, _afBucketReset = 0;
+function _afAllow(n: number): boolean {
+  const now = Date.now();
+  if (now >= _afBucketReset) { _afBucket = 56; _afBucketReset = now + 60000; }
+  if (_afBucket < n) return false;
+  _afBucket -= n;
+  return true;
+}
+async function _afQuery(q: string): Promise<any[]> {
+  const url = 'https://api.airframes.io/v1/messages?text=' + encodeURIComponent(q) + '&perPage=100';
+  const r = await fetch(url, { headers: { 'User-Agent': _FIDS_UA } });
+  if (!r.ok) throw new Error('airframes ' + r.status);   // 429/5xx → 讓上層走 fallback
+  const a = await r.json() as any;
+  // 實測 /v1/messages 回「裸陣列」→ 直接用。防禦：萬一哪天 airframes 改成物件外包，試常見鍵抽出陣列（codex 誤報為「一定是 wrapper」，
+  //   實證目前是裸陣列；此分支現在不會觸發，純為未來 API 變動保底）。
+  if (Array.isArray(a)) return a;
+  const arr = a && (a.messages || a.data || a.results || a.items);
+  return Array.isArray(arr) ? arr : [];
+}
+// 抓某機場 ARR+DEP D-ATIS。bulk=true（一鍵更新）→ 只裸查 1 次省限速；單機場開啟 → 裸查沒撈到 DEP 時再專打 DEP 補一次。
+async function _atisFetchAirframes(icao: string, bulk: boolean) {
+  const base = await _afQuery(icao);                       // 裸查：回最近 100 則（ARR/DEP 混在一起）
+  let arr = _atisPickKind(base, 'ARR');
+  let dep = _atisPickKind(base, 'DEP');
+  // 單機場開啟：裸查若漏掉 ARR 或 DEP（繁忙場被其他訊息擠出 100 視窗、安靜場稀疏）→ 各自專打補抓，
+  //   每類用自己的 100 視窗，不會互相稀釋（codex P1：原本只補 DEP，繁忙場 ARR 也可能掉）。
+  if (!bulk && !arr) {
+    try { if (_afAllow(1)) arr = _atisPickKind(await _afQuery(icao + ' ARR ATIS'), 'ARR'); } catch { /* 補抓失敗就算了 */ }
+  }
+  if (!bulk && !dep) {
+    try { if (_afAllow(1)) dep = _atisPickKind(await _afQuery(icao + ' DEP ATIS'), 'DEP'); } catch { /* 補抓失敗就算了 */ }
+  }
+  const sections = [arr, dep].filter(Boolean) as { title: string; text: string; src: string; time: string }[];
+  return sections.length ? sections : null;
 }
 
 // 美國 D-ATIS：官方 FAA 源（經 atis.info，CORS*、免 key、免額度）。只有有 D-ATIS 的大場才有（關島等小場沒有 → 404）。
@@ -890,66 +939,41 @@ async function _atisFetchUsFaa(icao: string) {
   return a.map((o: any) => {
     const t = String(o.type || '').toLowerCase();
     const title = t === 'arr' ? 'ARR ATIS' : t === 'dep' ? 'DEP ATIS' : 'ATIS';
-    return { title, text: String(o.datis || '').trim() };
+    // 來源固定標 FAA（官方）；atis.info 的 time 是 HHMM（無日期）→ 格式化成 "1556Z"，沒有就留空（只顯示 Source: FAA）
+    const z = String(o.time || '').trim();
+    const time = /^\d{3,4}$/.test(z) ? z.padStart(4, '0') + 'Z' : '';
+    return { title, text: String(o.datis || '').trim(), src: 'FAA', time };
   }).filter((s: any) => s.text);
 }
 
 app.get('/api/atis', async (req, res) => {
   const icao = String(req.query.icao || '').toUpperCase();
   if (!/^[A-Z]{4}$/.test(icao)) return res.status(400).json({ error: 'bad icao' });
-  // 認證一次(memory 快取 10 分):回傳的 level 讓前端決定要不要顯示「換來源」鈕(創始會員才有)。
-  const auth = await _atisAuthLevel(String(req.headers['x-pl-at'] || ''), String(req.headers['x-cs-idt'] || ''));
-  const lv = auth.level;
-  const canRefresh = lv === 'owner' || lv === 'founder';
-  const fresh = req.query.fresh === '1' && canRefresh;   // 創始會員按「換來源/強抓」→ 跳過快取重抓(一般會員不得 fresh,免燒額度)
-  // 1. 快取命中（60 分內、非 fresh）→ 直接回，不花額度
+  const fresh = req.query.fresh === '1';      // 跳過 60 分快取重抓（區域一鍵更新會帶）
+  const bulk = req.query.bulk === '1';         // 區域一鍵更新：裸查 1 次省限速（單機場開啟不帶 → 裸查沒 DEP 時會專打補一次）
+  // 1. 快取命中（60 分內、非 fresh）→ 直接回
   if (!fresh) {
     const c = _atisCache.get(icao);
-    if (c && Date.now() - c.time < ATIS_TTL) return res.json({ sections: c.sections, source: c.source, cached: true, level: lv });
+    if (c && Date.now() - c.time < ATIS_TTL) return res.json({ sections: c.sections, source: c.source, cached: true });
   }
-  // 2. 美國機場（K/P 開頭）→ 官方 FAA 源 atis.info 為「權威主源」（免費、CORS*、不吃額度）。
-  //    FAA 沒有(如關島 PGUM)或掛 → 退 coffee(ACARS) → 再不行才 {fallback}。⚠ 美國「絕不」碰 airframes（沒 D-ATIS 的場 airframes 也沒有、純浪費額度）。
-  //    （codex P2：coffee 不可攔在 FAA 前面 → 美國要以官方 FAA 為主、coffee 只當美國備援。）
+  // 2. 美國機場（K/P 開頭）→ 官方 FAA 源 atis.info 為「權威主源」（免費、CORS*）。FAA 沒有(如關島 PGUM)或掛 → 往下退 airframes(ACARS)。
   if (icao[0] === 'K' || icao[0] === 'P') {
-    let us: { title: string; text: string }[] | null = null;
-    try { us = await _atisFetchUsFaa(icao); } catch (e: any) { /* atis.info 掛 → 退 coffee */ }
+    let us: { title: string; text: string; src?: string; time?: string }[] | null = null;
+    try { us = await _atisFetchUsFaa(icao); } catch (e: any) { /* atis.info 掛 → 退 airframes */ }
     if (us && us.length) {
       _atisCache.set(icao, { sections: us, time: Date.now(), source: 'faa' });
-      return res.json({ sections: us, source: 'faa', level: lv });
+      return res.json({ sections: us, source: 'faa' });
     }
-    try {
-      const cf = await _atisFetchCoffee(icao);
-      if (cf) { _atisCache.set(icao, { sections: cf, time: Date.now(), source: 'coffee' }); return res.json({ sections: cf, source: 'coffee', level: lv }); }
-    } catch (e: any) { /* coffee 也掛 → fallback */ }
-    return res.json({ fallback: true, level: lv });
   }
-  // 3. 非美（亞洲/歐洲/其他）→ coffeeteaorme（ACARS、全機場即時、免額度、全用戶可用）為主源。
-  //    那站掛了/無此機場 ATIS → 往下走 airframes 保底。（airframes 落後 + atis.guru 掛 → 改用這站當主源。見 ATIS 來源備註。）
+  // 3. airframes 匿名 /v1（ACARS）為主源（V9.4.18 起：免 key、全用戶可用、自我節流 56/分）。bucket 不足 → 退前端 fallback(atis.guru)。
+  if (!_afAllow(1)) return res.json({ fallback: true });   // 先佔 1 次（裸查）；非 bulk 的 DEP 補抓會在函式內自行再佔 1 次
   try {
-    const cf = await _atisFetchCoffee(icao);
-    if (cf) {
-      _atisCache.set(icao, { sections: cf, time: Date.now(), source: 'coffee' });
-      return res.json({ sections: cf, source: 'coffee', level: lv });
-    }
-  } catch (e: any) { /* 那站掛了/被擋 → 往下走 airframes 保底 */ }
-  // 4. airframes「只給名單上的人」。owner→自己的 50 池、founder→共用 450 池、none→備案。
-  //    註：快取命中已在最前面對所有人開放 → 非 founder 仍吃得到別人剛抓進 60 分快取的 airframes 資料。
-  if (lv === 'none') return res.json({ fallback: true, level: 'none' });
-  // 4. 依 airframes「真實剩餘額度」判斷（owner 用到剩 0、founder 用到剩 50 就停）；key 沒設或額度不足 → 備援。
-  if (!AIRFRAMES_KEY || !_atisAllowed(lv)) return res.json({ fallback: true, level: lv });
-  _atisRecordWho(auth.who, lv, icao);   // 記「誰、查了哪個機場、扣 2 次額度」
-  // 5. 抓 airframes ARR + DEP（過程用回應標頭更新真實額度，不自己數、不用退還）
-  try {
-    const [arr, dep] = await Promise.all([
-      _atisFetchAirframes(icao, 'ARR').catch(() => null),
-      _atisFetchAirframes(icao, 'DEP').catch(() => null),
-    ]);
-    const sections = [arr, dep].filter(Boolean) as { title: string; text: string }[];
-    if (!sections.length) return res.json({ fallback: true, level: lv });   // airframes 沒這機場 → 試 allorigins
-    _atisCache.set(icao, { sections, time: Date.now(), source: 'airframes' });
-    return res.json({ sections, source: 'airframes', level: lv });
+    const sections = await _atisFetchAirframes(icao, bulk);
+    if (!sections) return res.json({ fallback: true });    // airframes 沒這機場 → 試 allorigins(atis.guru)
+    _atisCache.set(icao, { sections, time: Date.now(), source: 'acars' });
+    return res.json({ sections, source: 'acars' });
   } catch (e: any) {
-    return res.json({ fallback: true, level: lv });
+    return res.json({ fallback: true });
   }
 });
 
