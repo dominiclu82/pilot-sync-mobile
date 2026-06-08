@@ -296,6 +296,13 @@ app.get('/apps', (_req, res) => {
 <meta name="mobile-web-app-capable" content="yes">
 <!-- 蓋「從 /apps 入口進來」的章：三個 app 靠這個 + standalone 判斷才顯示 ⊞ 回 Tools 鈕 -->
 <script>try{sessionStorage.setItem('cs_via_apps','1')}catch(e){}</script>
+<!-- 只裝入口頁也能全部離線:上線開一次入口 → 一次叫醒三個 app 的 SW，各自預快取自己的 shell（離線看最後一次資料）。各 app 也保留自己頁面的註冊（分開裝照樣有）。
+     ⚠ scope 必須與各 app 自己頁面的註冊「完全一致」:CrewSync=預設(/)、pilot-log=/pilot-log(該 sw route 有設 Service-Worker-Allowed)、morning=/morning/(尾斜線)。不一致會註冊失敗或重複。 -->
+<script>if('serviceWorker' in navigator){
+  navigator.serviceWorker.register('/sw.js').catch(function(){});
+  navigator.serviceWorker.register('/pilot-log/sw.js',{scope:'/pilot-log'}).catch(function(){});
+  navigator.serviceWorker.register('/morning/sw.js',{scope:'/morning/'}).catch(function(){});
+}</script>
 <style>
   :root { color-scheme: dark; }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -872,7 +879,9 @@ app.get('/sw.js', (_req, res) => {
   const cacheVer = verMatch ? verMatch[0].replace('V', 'v').replace(/\./g, '') : 'vunknown';
   res.send(`
 const CACHE = 'crewsync-${cacheVer}';
-const SHELL = ['/', '/main', '/share'];
+// 預快取:入口 /apps + 今日 /morning。morning 自己的 SW scope 是 '/morning/'、管不到啟動頁 '/morning'(codex P2)→ 由 root SW(scope '/')預存+服務它離線。
+// /pilot-log 不放這:它自己的 SW(scope '/pilot-log')涵蓋得到、會自己預存,放這反而重複(更精確的 scope 會贏)。
+const SHELL = ['/', '/main', '/share', '/apps', '/morning'];
 self.addEventListener('install', e => {
   e.waitUntil(
     caches.open(CACHE).then(c => Promise.all(SHELL.map(url =>
@@ -882,7 +891,8 @@ self.addEventListener('install', e => {
   self.skipWaiting();
 });
 self.addEventListener('activate', e => {
-  e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k=>k!==CACHE && k!=='plapt-maps').map(k=>caches.delete(k)))));
+  // ⚠ 只刪「自己的舊 crewsync 快取」(版本汰換)，絕不碰別 app 的(pilotlog-*/morning-*)或 plapt-maps/plcdn —— 否則 /apps 一次叫醒三個 SW 時會把剛預存好的子 app 快取砍掉(codex P1)。
+  e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k=>k.indexOf('crewsync-')===0 && k!==CACHE).map(k=>caches.delete(k)))));
   self.clients.claim();
 });
 const _offlinePage = '<html><body style="background:#111;color:#aaa;display:flex;align-items:center;justify-content:center;height:100vh;font-family:sans-serif"><div style="text-align:center"><h2>Offline</h2><p>Please connect to the internet and reload.</p></div></body></html>';

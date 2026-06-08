@@ -1290,6 +1290,7 @@ function _plCloseEditor() {
   //   寬螢幕 → 回三欄（保留選中機場）；窄螢幕 → 回該機場詳情頁（不是回最上層列表）。
   if (_pl.aptReturn) {
     if (_plAptIsWide()) _plRenderPlaces();
+    else if (_pl.aptDetailKey && _pl.aptFlightsFilt) _plOpenPlaceFlights(_pl.aptDetailKey, _pl.aptFlightsFilt);   // 從子頁點航班進來 → 回子頁(不是回詳情)
     else if (_pl.aptDetailKey) _plOpenPlaceDetail(_pl.aptDetailKey);
     else _plOpenPlaces();
     return;
@@ -3716,7 +3717,8 @@ function _plAptListHtml(list, sel) {
     '</div>';
   }).join('');
 }
-function _plAptIsWide() { return (typeof window !== 'undefined' && window.innerWidth >= 980); }
+// ≥1180=只有「真夠寬」的 iPad 橫拿(Air/Pro 11"+ 1180/1194、12.9" 1366)才用三欄;<1180(手機 + 所有直拿 + 小 iPad 橫拿 mini1133/10.2"1080)一律走窄版新單欄導覽 → 全機型全拿法不擠版/不裁切(贏過 LogTen)。使用者有意見再調。
+function _plAptIsWide() { return (typeof window !== 'undefined' && window.innerWidth >= 1180); }
 
 // 🗺️ Airports —— 寬螢幕三欄（列表 | 資訊 | 航班）；窄螢幕列表（點 → 詳情頁）
 function _plRenderPlaces() {
@@ -3838,14 +3840,21 @@ function _plAptInfoHtml(key) {
       '<textarea onblur="_plSaveAirportNote(\'' + _plJs(info.icao || key) + '\', this.value)" placeholder="新增機場筆記… · add a note" rows="2" style="width:100%;background:var(--bg,#0a0e1a);border:1px solid var(--border,#334155);border-radius:6px;color:var(--text);font-size:.82em;padding:6px 8px;resize:vertical;font-family:inherit;outline:none;box-sizing:border-box">' + _plEsc(_plAirportNote(info.icao || key)) + '</textarea></div>' +
   '</div>';
 }
-// 航班分頁 + 列表 HTML（三欄右欄 + 窄螢幕詳情共用）
-function _plAptFlightsHtml(key) {
+// 某機場的進出航班集合 {all, dep, arr}（已依日期新→舊排序）。三欄右欄 + 窄版詳情/子頁共用。
+function _plAptFlightSets(key) {
   var all = _plPlacesEntries().filter(function(e) { return _plCanonApt(e.origin) === key || _plCanonApt(e.dest) === key; });
-  var depF = all.filter(function(e) { return _plCanonApt(e.origin) === key; });
-  var arrF = all.filter(function(e) { return _plCanonApt(e.dest) === key; });
+  var dep = all.filter(function(e) { return _plCanonApt(e.origin) === key; });
+  var arr = all.filter(function(e) { return _plCanonApt(e.dest) === key; });
+  var byDate = function(a, b) { return (b.flight_date || '').localeCompare(a.flight_date || ''); };
+  all.sort(byDate); dep.sort(byDate); arr.sort(byDate);
+  return { all: all, dep: dep, arr: arr };
+}
+// 航班分頁 + 列表 HTML（≥1080 三欄右欄用；窄版改走 _plOpenPlaceDetail → _plOpenPlaceFlights 子頁）
+function _plAptFlightsHtml(key) {
+  var sets = _plAptFlightSets(key);
+  var all = sets.all, depF = sets.dep, arrF = sets.arr;
   var filt = _pl.placeFilter || 'all';
-  var flights = (filt === 'dep' ? depF : filt === 'arr' ? arrF : all).slice();
-  flights.sort(function(a, b) { return (b.flight_date || '').localeCompare(a.flight_date || ''); });
+  var flights = (filt === 'dep' ? depF : filt === 'arr' ? arrF : all);
   function ftab(f, lbl, n) {
     var on = (filt === f);
     return '<button onclick="_plSetPlaceFilter(\'' + f + '\',\'' + _plJs(key) + '\')" style="flex:1;background:' + (on ? '#3b82f6' : 'transparent') + ';color:' + (on ? '#fff' : 'var(--muted)') + ';border:1px solid ' + (on ? '#3b82f6' : 'var(--border,#334155)') + ';border-radius:6px;padding:7px 4px;font-size:.74em;font-weight:600;cursor:pointer">' + lbl + ' <b>' + n + '</b></button>';
@@ -3865,21 +3874,65 @@ function _plSetPlaceFilter(f, key) {
   if (_plAptIsWide()) { _pl.airportSel = key; _plRenderPlaces(); }
   else _plOpenPlaceDetail(key);
 }
-// 窄螢幕：單機場詳情頁（資訊 + 航班，← 回列表）
+// 窄版（手機 + iPad 直拿）：機場詳情頁＝資訊(衛星圖+note) + 三列導覽(All/Departing/Arriving →)，← 回列表。
+// 航班清單不再塞這頁(避免「一直滑」)，改點某列跳到 _plOpenPlaceFlights 子頁。仿 LogTen 但連 iPad 直拿都處理好。
 function _plOpenPlaceDetail(key) {
   var c = document.getElementById('pilotlog-content');
   if (!c) return;
   _pl.aptDetailKey = key;   // V2.0.01（codex P2）：記住正在看哪個機場 → 從這裡點航班、關閉時回到這頁（不是回列表）
+  _pl.aptFlightsFilt = null;   // 在詳情層(不是子頁)→ 清掉子頁返回標記
   var info = _plAptInfo(key);
   var disp = _plAptFmt(key);
+  var sets = _plAptFlightSets(key);
+  function navRow(f, label, n) {
+    return '<div onclick="_plOpenPlaceFlights(\'' + _plJs(key) + '\',\'' + f + '\')" style="display:flex;align-items:center;gap:10px;background:var(--card);border:1px solid var(--border,#1e293b);border-radius:10px;padding:13px 14px;margin-bottom:8px;cursor:pointer">' +
+      '<div style="flex:1;font-size:.92em;font-weight:700">' + label + '</div>' +
+      '<div style="font-size:.95em;font-weight:800">' + n + '</div>' +
+      '<div style="color:var(--muted);font-size:1.15em;line-height:1">›</div>' +
+    '</div>';
+  }
   c.innerHTML = '<div style="padding:10px 14px">' +
     '<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">' +
       '<button onclick="_plOpenPlaces()" style="background:transparent;border:0;color:var(--text);font-size:1.2em;cursor:pointer">←</button>' +
       '<div style="font-size:1.1em;font-weight:800">' + _plEsc(disp) +
         (info && info.icao && info.iata ? ' <span style="color:var(--muted);font-size:.66em;font-weight:400">' + _plEsc(info.icao) + ' / ' + _plEsc(info.iata) + '</span>' : '') + '</div>' +
     '</div>' +
-    '<div style="margin-bottom:10px">' + _plAptInfoHtml(key) + '</div>' +
-    _plAptFlightsHtml(key) +
+    '<div style="margin-bottom:12px">' + _plAptInfoHtml(key) + '</div>' +
+    navRow('all', 'All', sets.all.length) +
+    navRow('dep', '🛫 Departing', sets.dep.length) +
+    navRow('arr', '🛬 Arriving', sets.arr.length) +
+  '</div>';
+}
+// 窄版子頁：某機場的航班清單。釘頂 [← 機場名] + 三段鈕(All/Dep/Arr) + 純清單(上面不放衛星圖 → 不用一直滑)。
+function _plOpenPlaceFlights(key, filt) {
+  var c = document.getElementById('pilotlog-content');
+  if (!c) return;
+  filt = filt || 'all';
+  _pl.aptDetailKey = key;
+  _pl.aptFlightsFilt = filt;   // 記住在子頁 → 從這裡點航班看明細、返回時回到子頁(不是詳情頁)
+  var info = _plAptInfo(key);
+  var disp = _plAptFmt(key);
+  var sets = _plAptFlightSets(key);
+  var flights = (filt === 'dep' ? sets.dep : filt === 'arr' ? sets.arr : sets.all);
+  function seg(f, lbl, n) {
+    var on = (filt === f);
+    return '<button onclick="_plOpenPlaceFlights(\'' + _plJs(key) + '\',\'' + f + '\')" style="flex:1;background:' + (on ? '#3b82f6' : 'transparent') + ';color:' + (on ? '#fff' : 'var(--muted)') + ';border:1px solid ' + (on ? '#3b82f6' : 'var(--border,#334155)') + ';border-radius:6px;padding:7px 4px;font-size:.74em;font-weight:600;cursor:pointer">' + lbl + ' <b>' + n + '</b></button>';
+  }
+  var rows = flights.length === 0
+    ? '<div style="text-align:center;color:var(--muted);padding:24px;font-size:.85em">沒有航班。 · No flights.</div>'
+    : flights.map(_plRenderEntryRow).join('');
+  c.innerHTML = '<div style="padding:10px 14px">' +
+    '<div class="pl-stickhead">' +   // 釘頂:返回鈕+機場名+三段鈕,捲清單時不被推走
+      '<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">' +
+        '<button onclick="_plOpenPlaceDetail(\'' + _plJs(key) + '\')" style="background:transparent;border:0;color:var(--text);font-size:1.2em;cursor:pointer">←</button>' +
+        '<div style="font-size:1.05em;font-weight:800;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + _plEsc(disp) +
+          (info && info.icao && info.iata ? ' <span style="color:var(--muted);font-size:.66em;font-weight:400">' + _plEsc(info.icao) + '</span>' : '') + '</div>' +
+      '</div>' +
+      '<div style="display:flex;gap:6px;padding-bottom:8px">' +
+        seg('all', 'All', sets.all.length) + seg('dep', '🛫 Dep', sets.dep.length) + seg('arr', '🛬 Arr', sets.arr.length) +
+      '</div>' +
+    '</div>' +
+    rows +
   '</div>';
 }
 
@@ -5358,8 +5411,9 @@ function _plRenderAnalyzeContent() {
       '.pl-an-left{flex:0 0 268px;min-width:0}.pl-an-right{flex:1 1 0;min-width:0}' +
       /* 群組標題 base 是 sticky —— 手機(整頁捲)就是靠這個固定群組標題，不能動。 */
       '.pl-an-ghead{position:sticky;top:calc(var(--pl-head-h,0px));z-index:30;background:var(--bg);display:flex;justify-content:space-between;align-items:baseline;padding:4px 0 8px}' +
-      /* iPad/寬螢幕(≥768，對齊 Logbook 斷點)：完全照 Logbook detail —— 只「右欄」做 sticky+overflow 捲動盒，左欄隨頁捲；群組標題改 static(不黏、不蓋內容)。手機(<768 column)完全不動。 */
-      '@media(min-width:768px){.pl-an-wrap{align-items:flex-start}.pl-an-right{position:sticky;top:calc(var(--pl-head-h,0px) + 8px);max-height:calc(100dvh - 84px - var(--pl-head-h,0px) - env(safe-area-inset-bottom));overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain}.pl-an-ghead{position:static}}' +
+      /* iPad/寬螢幕(≥768，對齊 Logbook 斷點)：完全照 Logbook detail —— 只「右欄」做 sticky+overflow 捲動盒，左欄隨頁捲。
+         群組標題在「右捲動盒內」吸頂 top:0(內容從下面穿過)。⚠ 不可用 base 的 top:var(--pl-head-h)（那是外層頁首高度，在捲動盒內會浮在頂下方、蓋住內容，2026-06-06 踩過）→ 這裡覆寫成 top:0。手機(<768 column)完全不動。 */
+      '@media(min-width:768px){.pl-an-wrap{align-items:flex-start}.pl-an-right{position:sticky;top:calc(var(--pl-head-h,0px) + 8px);max-height:calc(100dvh - 84px - var(--pl-head-h,0px) - env(safe-area-inset-bottom));overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain}.pl-an-ghead{top:0}}' +
       '@media(max-width:767px){.pl-an-wrap{flex-direction:column}.pl-an-left{flex:none}}' +
     '</style>' +
     '<div style="padding:10px 14px">' +
