@@ -345,13 +345,17 @@ function _wxAtisProbeLevel() {
     .then(function (d) { if (d && typeof d.level !== 'undefined') { _atisLevel = d.level; _atisLevelKnown = true; } })
     .catch(function () { });
 }
-/* ATIS 卡的來源標籤;創始會員顯示成可點的「換來源」鈕 */
+/* ATIS 卡的來源標籤。創始會員=可按的切換鈕,顯示「按下去會切到的來源」(目標);一般會員=純標示,顯示現況來源。 */
 function _atisSrcBar(icao, source) {
   if (!source) return '';
-  var name = source === 'faa' ? 'FAA' : source === 'airframes' ? 'airframes' : source === 'atis.guru' ? 'atis.guru' : source;
+  var nm = function (s) { return s === 'faa' ? 'FAA' : s === 'airframes' ? 'airframes' : s === 'atis.guru' ? 'atis.guru' : s; };
   var founder = (_atisLevel === 'founder' || _atisLevel === 'owner');
-  if (founder) return '<button class="atis-src atis-src-btn" onclick="wxAtisSwitch(\\'' + icao + '\\')" title="\\u63db\\u4f86\\u6e90 Switch source">\\ud83d\\udce1 ' + name + ' \\u21c4</button>';
-  return '<span class="atis-src">\\ud83d\\udce1 ' + name + '</span>';
+  if (founder) {
+    var isUs = (icao[0] === 'K' || icao[0] === 'P');
+    var target = (source === 'atis.guru') ? (isUs ? 'FAA' : 'airframes') : 'atis.guru';   // 按鈕顯示「按下去會變成的來源」,不是現況
+    return '<button class="atis-src atis-src-btn" onclick="wxAtisSwitch(\\'' + icao + '\\')" title="\\u6309\\u4e00\\u4e0b\\u63db\\u5230 ' + target + '">\\ud83d\\udce1 ' + target + '</button>';
+  }
+  return '<span class="atis-src">\\ud83d\\udce1 ' + nm(source) + '</span>';   // 純標示=現況來源
 }
 /* 創始會員按「換來源」:在 server 源(FAA/airframes)⇄ atis.guru 之間切,重抓該機場 ATIS 並重繪 */
 function wxAtisSwitch(icao) {

@@ -105,7 +105,7 @@ function _atfmApplyScopeState() {
 }
 function _atfmRenderScope() {
   var b = document.getElementById('atfm-scope');
-  if (b) b.innerHTML = _atfmShowAll ? '🌐 Events' : '⭐ Key';
+  if (b) b.innerHTML = _atfmShowAll ? '⭐ Key' : '🌐 Events';   // 按鈕顯示「按下去會切到的模式」(目標),不是現況
 }
 // 依顯示範圍過濾:Key 模式只留清單內機場(base!==false);Events 全留(清單外事件機場 base===false)
 function _atfmScopeFilter(list) {
