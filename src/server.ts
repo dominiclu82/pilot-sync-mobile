@@ -582,7 +582,7 @@ app.get('/terms', (_req, res) => {
 </body></html>`);
 });
 
-const _viewTabMap: Record<string, string> = { sync: 'sync', ops: 'briefing', fr24: 'fr24', gate: 'gate' };
+const _viewTabMap: Record<string, string> = { sync: 'sync', ops: 'briefing', gate: 'gate' };   // fr24 已移除(見下方導回 /main)
 for (const [route, tab] of Object.entries(_viewTabMap)) {
   app.get('/' + route, (_req, res) => {
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
@@ -590,6 +590,8 @@ for (const [route, tab] of Object.entries(_viewTabMap)) {
     res.send(getSPAHtml(tab));
   });
 }
+// FR24 分頁已移除 → 舊書籤/分享連結 /fr24 導回主頁(否則 getSPAHtml('fr24') 找不到按鈕會壞，codex P2）
+app.get('/fr24', (_req, res) => res.redirect('/main'));
 
 app.get('/icon.svg', (_req, res) => {
   res.setHeader('Content-Type', 'image/svg+xml');
@@ -821,14 +823,60 @@ async function _nopLoadState() {
 }
 
 // 查 airframes 某機場的 ARR / DEP D-ATIS（text 片語搜尋，去掉 ACARS 路由前綴）
+// 主源：coffeeteaorme（衛星 ACARS、全機場即時、免額度、全用戶可用）。擋直連 → 帶 Referer。
+//   data[] 已「新→舊」排序且乾淨（不像 airframes 有舊代碼/未來時戳亂入），取最新一則 ARR/DEP ATIS 即現行。
+//   無此機場 ATIS（小場/亂碼 ICAO）→ data 有但無 ATIS → 回 null → 上層走 FAA/airframes 保底。
+const _COFFEE_REF = 'https://info.coffeeteaorme.vip/Public-D-ATIS/RCTP';
+async function _atisFetchCoffee(icao: string) {
+  const url = 'https://api.coffeeteaorme.vip/api/atis?text=' + encodeURIComponent(icao) + '&_t=' + Date.now();
+  const r = await fetch(url, { headers: { Referer: _COFFEE_REF, 'User-Agent': _FIDS_UA } });
+  if (!r.ok) throw new Error('coffee ' + r.status);
+  const j = (await r.json()) as any;
+  if (!j || !j.success || !Array.isArray(j.data)) return null;
+  const pick = (kind: 'ARR' | 'DEP'): { title: string; text: string } | null => {
+    const tag = kind + ' ATIS';
+    const hit = j.data.find((m: any) => String((m && m.message) || '').includes(tag));   // data 新→舊，第一筆即最新
+    if (!hit) return null;
+    const text = String(hit.message || '').trim();
+    return text ? { title: tag, text } : null;
+  };
+  const sections = [pick('ARR'), pick('DEP')].filter(Boolean) as { title: string; text: string }[];
+  return sections.length ? sections : null;
+}
+
 async function _atisFetchAirframes(icao: string, kind: 'ARR' | 'DEP') {
-  const url = 'https://api.airframes.io/messages?text=' + encodeURIComponent(icao + ' ' + kind + ' ATIS') + '&limit=1';
+  // ⚠ airframes 回傳「不照時間排序」、且上限 100 則。舊版用 limit=1 → 抓到的是「隨便第一則」常常是舊的（實測踩過：
+  //   limit=1 撈到 0600Z，但 airframes 手上其實有更新的）。改成 limit=100 + 自己按 timestamp 挑最新那則。
+  //   （額度仍是「打幾次」算，limit 1 或 100 都是 1 次；ARR/DEP 各 1 次共 2 次，跟舊版一樣。）
+  const url = 'https://api.airframes.io/messages?text=' + encodeURIComponent(icao + ' ' + kind + ' ATIS') + '&limit=100';
   const r = await fetch(url, { headers: { Authorization: 'Bearer ' + AIRFRAMES_KEY } });
   _atisUpdateRate(r);                                     // 每次回應都帶 x-ratelimit-* → 更新真實額度
   if (!r.ok) throw new Error('airframes ' + r.status);   // 429/5xx → 讓上層走 fallback
   const a = await r.json() as any[];
   if (!Array.isArray(a) || !a.length) return null;
-  const text = String(a[0].text || '').replace(/^\/[^/]*\//, '').trim();   // 去 ACARS 路由前綴 /TPECAYA.TI2/
+  const tag = kind + ' ATIS';                                                // 過濾真的含「ARR ATIS / DEP ATIS」的
+  const matches = a.filter((m) => String((m && m.text) || '').includes(tag));
+  if (!matches.length) return null;
+  // ⚠ 不能用 ingest timestamp（airframes「收到時間」）挑最新：飛機會重新索取舊代碼的 ATIS，舊 ATIS 會用新的收到時間再進來，
+  //   照收到時間排會選到「剛收到的舊代碼」（實證：A 0600Z 收到 10:06 vs J 0930Z 收到 09:43 → 該選 J 卻選了 A）。
+  //   正解：解析文字裡的「發布時間 HHMMZ」，配收到日期推回真正 UTC 發布時刻（發布比收到晚＝前一天發的），挑最新。
+  const issueScore = (m: any): number => {
+    const t = String((m && m.text) || '');
+    const ing = Date.parse(String((m && m.timestamp) || '')) || Date.now();
+    const mm = t.match(/ATIS\s+[A-Z]\s+(\d{2})(\d{2})Z/);
+    if (!mm) return ing;                                                      // 解不出發布時間 → 退用收到時間
+    const hh = parseInt(mm[1], 10), mi = parseInt(mm[2], 10);
+    const d = new Date(ing);
+    let issue = Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), hh, mi);
+    if (hh * 60 + mi > d.getUTCHours() * 60 + d.getUTCMinutes() + 5) issue -= 86400000;   // 發布時間比收到時間晚（容 5 分）→ 前一天發的
+    return issue;
+  };
+  // ATIS 不可能「未來才發布」→ airframes 偶有壞掉的未來時戳記錄（實證踩過：1244Z 卻冒出 1300Z），排除掉不能挑它。
+  const future = Date.now() + 15 * 60000;
+  let best: any = null, bestScore = -Infinity;
+  for (const m of matches) { const s = issueScore(m); if (s <= future && s > bestScore) { best = m; bestScore = s; } }
+  if (!best) best = matches[0];   // 全被排除（極端）→ 退用第一則
+  const text = String((best && best.text) || '').replace(/^\/[^/]*\//, '').trim();   // 去 ACARS 路由前綴 /TPECAYA.TI2/
   if (!text) return null;
   return { title: kind + ' ATIS', text };
 }
@@ -859,19 +907,32 @@ app.get('/api/atis', async (req, res) => {
     const c = _atisCache.get(icao);
     if (c && Date.now() - c.time < ATIS_TTL) return res.json({ sections: c.sections, source: c.source, cached: true, level: lv });
   }
-  // 2. 美國機場（K/P 開頭）→ 官方 FAA 源 atis.info 為權威（免費、CORS*、不吃 airframes 額度）。
-  //    ⚠ 有就回；沒有(如關島 PGUM 沒 D-ATIS)或 atis.info 掛 → 直接走備案，「絕不」往下試 airframes
-  //    —— 美國沒 D-ATIS 的場 airframes 也不會有，去試純粹浪費額度；atis.guru 備案有美國、可能補到。
+  // 2. 美國機場（K/P 開頭）→ 官方 FAA 源 atis.info 為「權威主源」（免費、CORS*、不吃額度）。
+  //    FAA 沒有(如關島 PGUM)或掛 → 退 coffee(ACARS) → 再不行才 {fallback}。⚠ 美國「絕不」碰 airframes（沒 D-ATIS 的場 airframes 也沒有、純浪費額度）。
+  //    （codex P2：coffee 不可攔在 FAA 前面 → 美國要以官方 FAA 為主、coffee 只當美國備援。）
   if (icao[0] === 'K' || icao[0] === 'P') {
     let us: { title: string; text: string }[] | null = null;
-    try { us = await _atisFetchUsFaa(icao); } catch (e: any) { /* atis.info 掛 → 走備案 */ }
+    try { us = await _atisFetchUsFaa(icao); } catch (e: any) { /* atis.info 掛 → 退 coffee */ }
     if (us && us.length) {
       _atisCache.set(icao, { sections: us, time: Date.now(), source: 'faa' });
       return res.json({ sections: us, source: 'faa', level: lv });
     }
-    return res.json({ fallback: true, level: lv });   // 美國機場一律不碰 airframes
+    try {
+      const cf = await _atisFetchCoffee(icao);
+      if (cf) { _atisCache.set(icao, { sections: cf, time: Date.now(), source: 'coffee' }); return res.json({ sections: cf, source: 'coffee', level: lv }); }
+    } catch (e: any) { /* coffee 也掛 → fallback */ }
+    return res.json({ fallback: true, level: lv });
   }
-  // 3. 亞洲/歐洲/其他：穩定的 airframes「只給名單上的人」。owner→自己的 50 池、founder→共用 450 池、none→備案。
+  // 3. 非美（亞洲/歐洲/其他）→ coffeeteaorme（ACARS、全機場即時、免額度、全用戶可用）為主源。
+  //    那站掛了/無此機場 ATIS → 往下走 airframes 保底。（airframes 落後 + atis.guru 掛 → 改用這站當主源。見 ATIS 來源備註。）
+  try {
+    const cf = await _atisFetchCoffee(icao);
+    if (cf) {
+      _atisCache.set(icao, { sections: cf, time: Date.now(), source: 'coffee' });
+      return res.json({ sections: cf, source: 'coffee', level: lv });
+    }
+  } catch (e: any) { /* 那站掛了/被擋 → 往下走 airframes 保底 */ }
+  // 4. airframes「只給名單上的人」。owner→自己的 50 池、founder→共用 450 池、none→備案。
   //    註：快取命中已在最前面對所有人開放 → 非 founder 仍吃得到別人剛抓進 60 分快取的 airframes 資料。
   if (lv === 'none') return res.json({ fallback: true, level: 'none' });
   // 4. 依 airframes「真實剩餘額度」判斷（owner 用到剩 0、founder 用到剩 50 就停）；key 沒設或額度不足 → 備援。

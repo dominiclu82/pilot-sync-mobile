@@ -347,16 +347,8 @@ function _wxAtisProbeLevel() {
 }
 /* ATIS 卡的來源標籤。創始會員=可按的切換鈕,顯示「按下去會切到的來源」(目標),且「一律顯示」連目前來源沒資料時也在(才切得回去);一般會員=純標示,顯示現況來源。 */
 function _atisSrcBar(icao, source) {
-  var founder = (_atisLevel === 'founder' || _atisLevel === 'owner');
-  if (founder) {
-    var isUs = (icao[0] === 'K' || icao[0] === 'P');
-    var curGuru = source ? (source === 'atis.guru') : (_atisSrc[icao] === 'guru');          // 目前在不在 guru:有實際來源就用實際顯示的(reopen 從快取重繪也對);沒資料才靠選的來源
-    var target = curGuru ? (isUs ? 'FAA' : 'airframes') : 'atis.guru';                     // 按了會切到的來源
-    return '<button class="atis-src atis-src-btn" onclick="wxAtisSwitch(\\'' + icao + '\\')" title="\\u6309\\u4e00\\u4e0b\\u63db\\u5230 ' + target + '">\\ud83d\\udce1 ' + target + '</button>';
-  }
-  if (!source) return '';                                                                   // 非創始會員又沒來源 → 不顯示
-  var nm = function (s) { return s === 'faa' ? 'FAA' : s === 'airframes' ? 'airframes' : s === 'atis.guru' ? 'atis.guru' : s; };
-  return '<span class="atis-src">\\ud83d\\udce1 ' + nm(source) + '</span>';                  // 純標示=現況來源
+  return '';   // 不標示來源(user 要求)：拿掉換來源鈕 + 來源標籤，ATIS 卡乾淨。
+  // TODO: wxAtisSwitch / _atisSrc / 創始 fresh=1 路徑已停用，留著不刪(專案規範)，日後若要做來源對比再啟用。
 }
 /* 創始會員按「換來源」:在 server 源(FAA/airframes)⇄ atis.guru 之間切,重抓該機場 ATIS 並重繪 */
 function wxAtisSwitch(icao) {

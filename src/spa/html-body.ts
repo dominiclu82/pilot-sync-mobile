@@ -1514,9 +1514,7 @@ export function getSpaHtmlBody(): string {
   <button class="tab-btn" id="tabBtn-cabin" onclick="switchTab('cabin',this)">
     <span class="tab-btn-icon">👥</span>Cabin Crew
   </button>
-  <button class="tab-btn" id="tabBtn-fr24" onclick="switchTab('fr24',this)">
-    <span class="tab-btn-icon">📡</span>FR24
-  </button>
+  <!-- FR24 tab UI 已拿掉(看不到歷史、比不上真 FR24 app)。程式保留:/api/fr24 proxy + fr24-radar.js + #tab-fr24 內容都 dormant，要復活把這顆按鈕加回來即可。 -->
   <button class="tab-btn" id="tabBtn-atfm" onclick="switchTab('atfm',this)">
     <span class="tab-btn-icon">🚦</span>ATFM
   </button>
@@ -1538,7 +1536,7 @@ export function getSpaHtmlBody(): string {
       <button class="tab-util-btn tab-install-btn" id="tab-install-btn" onclick="showInstallGuide()" style="display:none">
         <span>📲</span>安裝
       </button>
-      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer;text-decoration:underline" onclick="showAbout()">V9.4.14</span>
+      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer;text-decoration:underline" onclick="showAbout()">V9.4.15</span>
     </div>
   </div>
 </div>
@@ -1572,7 +1570,12 @@ export function getSpaHtmlBody(): string {
     </div>
     <div style="max-height:50vh;overflow-y:auto;-webkit-overflow-scrolling:touch;margin-bottom:10px">
     ${renderCommunityLink()}
-    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V9.4.14</div>
+    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V9.4.15</div>
+    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
+      <div>🎨 <b>介面優化:移除 FR24 分頁與多餘按鈕,ATIS 顯示更簡潔。</b></div>
+      <div>🎨 <b>UI cleanup: removed the FR24 tab and redundant buttons; cleaner ATIS display.</b></div>
+    </div>
+    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V9.4.14</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
       <div>📲 <b>入口頁連網開一次,順手把「今日」最新資料也抓下來存好——之後離線開今日就有剛更新的內容,不必先進今日。</b></div>
       <div>📲 <b>Opening the hub online now also fetches Today's latest data — so Today shows fresh content offline without opening it first.</b></div>
