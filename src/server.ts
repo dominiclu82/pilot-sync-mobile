@@ -763,9 +763,16 @@ async function _atisFetchUsFaa(icao: string) {
 app.get('/api/atis', async (req, res) => {
   const icao = String(req.query.icao || '').toUpperCase();
   if (!/^[A-Z]{4}$/.test(icao)) return res.status(400).json({ error: 'bad icao' });
-  // 1. 快取命中（60 分內）→ 直接回，不花額度
-  const c = _atisCache.get(icao);
-  if (c && Date.now() - c.time < ATIS_TTL) return res.json({ sections: c.sections, source: c.source, cached: true });
+  // 認證一次(memory 快取 10 分):回傳的 level 讓前端決定要不要顯示「換來源」鈕(創始會員才有)。
+  const auth = await _atisAuthLevel(String(req.headers['x-pl-at'] || ''), String(req.headers['x-cs-idt'] || ''));
+  const lv = auth.level;
+  const canRefresh = lv === 'owner' || lv === 'founder';
+  const fresh = req.query.fresh === '1' && canRefresh;   // 創始會員按「換來源/強抓」→ 跳過快取重抓(一般會員不得 fresh,免燒額度)
+  // 1. 快取命中（60 分內、非 fresh）→ 直接回，不花額度
+  if (!fresh) {
+    const c = _atisCache.get(icao);
+    if (c && Date.now() - c.time < ATIS_TTL) return res.json({ sections: c.sections, source: c.source, cached: true, level: lv });
+  }
   // 2. 美國機場（K/P 開頭）→ 官方 FAA 源 atis.info 為權威（免費、CORS*、不吃 airframes 額度）。
   //    ⚠ 有就回；沒有(如關島 PGUM 沒 D-ATIS)或 atis.info 掛 → 直接走備案，「絕不」往下試 airframes
   //    —— 美國沒 D-ATIS 的場 airframes 也不會有，去試純粹浪費額度；atis.guru 備案有美國、可能補到。
@@ -774,17 +781,16 @@ app.get('/api/atis', async (req, res) => {
     try { us = await _atisFetchUsFaa(icao); } catch (e: any) { /* atis.info 掛 → 走備案 */ }
     if (us && us.length) {
       _atisCache.set(icao, { sections: us, time: Date.now(), source: 'faa' });
-      return res.json({ sections: us, source: 'faa' });
+      return res.json({ sections: us, source: 'faa', level: lv });
     }
-    return res.json({ fallback: true });   // 美國機場一律不碰 airframes
+    return res.json({ fallback: true, level: lv });   // 美國機場一律不碰 airframes
   }
-  // 3. 亞洲/其他：穩定的 airframes「只給名單上的人」。owner→自己的 50 池、founder→共用 450 池、none→備案。
+  // 3. 亞洲/歐洲/其他：穩定的 airframes「只給名單上的人」。owner→自己的 50 池、founder→共用 450 池、none→備案。
   //    註：快取命中已在最前面對所有人開放 → 非 founder 仍吃得到別人剛抓進 60 分快取的 airframes 資料。
-  const auth = await _atisAuthLevel(String(req.headers['x-pl-at'] || ''), String(req.headers['x-cs-idt'] || ''));
-  if (auth.level === 'none') return res.json({ fallback: true });
+  if (lv === 'none') return res.json({ fallback: true, level: 'none' });
   // 4. 依 airframes「真實剩餘額度」判斷（owner 用到剩 0、founder 用到剩 50 就停）；key 沒設或額度不足 → 備援。
-  if (!AIRFRAMES_KEY || !_atisAllowed(auth.level)) return res.json({ fallback: true });
-  _atisRecordWho(auth.who, auth.level, icao);   // 記「誰、查了哪個機場、扣 2 次額度」
+  if (!AIRFRAMES_KEY || !_atisAllowed(lv)) return res.json({ fallback: true, level: lv });
+  _atisRecordWho(auth.who, lv, icao);   // 記「誰、查了哪個機場、扣 2 次額度」
   // 5. 抓 airframes ARR + DEP（過程用回應標頭更新真實額度，不自己數、不用退還）
   try {
     const [arr, dep] = await Promise.all([
@@ -792,12 +798,18 @@ app.get('/api/atis', async (req, res) => {
       _atisFetchAirframes(icao, 'DEP').catch(() => null),
     ]);
     const sections = [arr, dep].filter(Boolean) as { title: string; text: string }[];
-    if (!sections.length) return res.json({ fallback: true });   // airframes 沒這機場 → 試 allorigins
+    if (!sections.length) return res.json({ fallback: true, level: lv });   // airframes 沒這機場 → 試 allorigins
     _atisCache.set(icao, { sections, time: Date.now(), source: 'airframes' });
-    return res.json({ sections, source: 'airframes' });
+    return res.json({ sections, source: 'airframes', level: lv });
   } catch (e: any) {
-    return res.json({ fallback: true });
+    return res.json({ fallback: true, level: lv });
   }
+});
+
+// 只回「目前帳號身份」(owner/founder/none),不抓任何 ATIS、不扣額度。前端用來決定要不要顯示「換來源」鈕(綁當前帳號,免跨帳號繼承)。
+app.get('/api/atis-level', async (req, res) => {
+  const auth = await _atisAuthLevel(String(req.headers['x-pl-at'] || ''), String(req.headers['x-cs-idt'] || ''));
+  res.json({ level: auth.level });
 });
 
 // Tower 後台讀「今日 airframes 用量」（owner 池 / founder 池）。只給 owner。

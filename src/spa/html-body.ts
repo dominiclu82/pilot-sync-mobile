@@ -1538,7 +1538,7 @@ export function getSpaHtmlBody(): string {
       <button class="tab-util-btn tab-install-btn" id="tab-install-btn" onclick="showInstallGuide()" style="display:none">
         <span>📲</span>安裝
       </button>
-      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer;text-decoration:underline" onclick="showAbout()">V9.4.05</span>
+      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer;text-decoration:underline" onclick="showAbout()">V9.4.06</span>
     </div>
   </div>
 </div>
@@ -1572,7 +1572,12 @@ export function getSpaHtmlBody(): string {
     </div>
     <div style="max-height:50vh;overflow-y:auto;-webkit-overflow-scrolling:touch;margin-bottom:10px">
     ${renderCommunityLink()}
-    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V9.4.05</div>
+    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V9.4.06</div>
+    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
+      <div>📡 <b>ATIS 可換來源——創始會員一鍵切換資料來源（撈到舊的就換一家撈新的），一般會員照讀快取。</b></div>
+      <div>📡 <b>ATIS source switch — founders swap the data source in one tap for fresher ATIS; others read the shared cache.</b></div>
+    </div>
+    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V9.4.05</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
       <div>🌐 <b>ATFM 新增 Key/Events 切換——預設只看重點清單機場，一鍵切換看全部正在管制的機場（美國也補上 FAA 即時管制場）；點機場自動展開資訊面板；預設載入定位台灣。</b></div>
       <div>🌐 <b>ATFM adds Key/Events toggle — curated list by default, switch to all airports under active restriction (incl. US FAA); tap auto-opens the info panel; opens at Taiwan.</b></div>

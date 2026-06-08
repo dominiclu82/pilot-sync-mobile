@@ -73,6 +73,9 @@ body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSy
 .atis-card-title{font-weight:700;font-size:.9em;color:var(--accent-light);margin-bottom:.4em}
 .atis-card pre{margin:0;white-space:pre-wrap;word-break:break-word;font-family:'Courier New',monospace;font-size:.85em;line-height:1.5;color:var(--text)}
 .atis-loading{text-align:center;padding:2em;color:var(--muted)}
+.atis-src{font-weight:400;font-size:.82em;color:var(--muted);white-space:nowrap}
+.atis-src-btn{background:var(--card);border:1px solid var(--dim);border-radius:11px;padding:2px 9px;color:var(--accent-light);font-family:inherit;cursor:pointer}
+.atis-src-btn:active{background:var(--accent);color:#fff}
 .screen{display:none;width:100%;max-width:420px;animation:fadeIn .2s ease}
 .screen.active{display:flex;flex-direction:column;gap:20px}
 @keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}

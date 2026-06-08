@@ -9,7 +9,10 @@ var wxCacheTime = null;   // timestamp of last successful fetch (ms)
 var wxMetarRawMap = {};   // icao -> string[] of 6h METAR lines
 var wxMetarShowAll = {};  // icao -> bool (true = show all 6h, false = latest 1)
 var wxDetailCache = {};   // icao -> rendered HTML string (persists across airport switches)
-var wxDetailRawCache = {}; // icao -> { metar:[], taf:'', atis:[], time:number }
+var wxDetailRawCache = {}; // icao -> { metar:[], taf:'', atis:[], atisSrc:'', time:number }
+var _atisSrc = {};         // icao -> 選用來源:undefined/'primary'=server(FAA/airframes)、'guru'=atis.guru
+var _atisLevel = 'none';   // 創始身份(server 回傳),決定顯不顯示「換來源」鈕。不存 localStorage → 每次連線重問當前帳號,避免共用瀏覽器跨帳號繼承
+var _atisLevelKnown = false;   // 本次連線是否已確知身份(避免每次快取命中都重複探)
 var wxSelectedIcao = '';
 var wxSelectedName = '';
 var wxLoaded = false;
@@ -280,7 +283,7 @@ function _wxToggleRwyMap() {
   var arrows = document.querySelectorAll('.wx-rwymap-arrow');
   for (var j = 0; j < arrows.length; j++) arrows[j].textContent = c ? '\\u25b8' : '\\u25be';
 }
-function _wxBuildDetailHtml(icao, metarLines, tafText, atisSections) {
+function _wxBuildDetailHtml(icao, metarLines, tafText, atisSections, atisSource) {
   var noData = '<span style="color:var(--muted);font-style:italic">\\u7121\\u8cc7\\u6599</span>';
   wxMetarRawMap[icao] = metarLines;
   if (wxMetarShowAll[icao] === undefined) wxMetarShowAll[icao] = false;
@@ -304,8 +307,10 @@ function _wxBuildDetailHtml(icao, metarLines, tafText, atisSections) {
       var t = s.title.toLowerCase(); return !t.includes('metar') && !t.includes('taf');
     });
     if (atisOnly.length > 0) {
-      cards += atisOnly.map(function(s) {
-        return '<div class="atis-card"><div class="atis-card-title">' + s.title + '</div><pre>' + s.text + '</pre></div>';
+      var srcBar = _atisSrcBar(icao, atisSource);   // 來源標籤/切換鈕,只掛第一張 ATIS 卡右側
+      cards += atisOnly.map(function(s, i) {
+        var right = (i === 0 && srcBar) ? '<span style="margin-left:auto">' + srcBar + '</span>' : '';
+        return '<div class="atis-card"><div class="atis-card-title" style="display:flex;align-items:center;gap:6px">' + s.title + right + '</div><pre>' + s.text + '</pre></div>';
       }).join('');
     } else {
       cards += '<div class="atis-card"><div class="atis-card-title">\\ud83d\\udcfb ATIS</div><pre>' + noData + '</pre></div>';
@@ -314,17 +319,86 @@ function _wxBuildDetailHtml(icao, metarLines, tafText, atisSections) {
   return cards;
 }
 
+/* ── ATIS 來源切換(創始會員)──────────────────────────────────────────
+   美國場:FAA ⇄ atis.guru;其他全部:airframes ⇄ atis.guru。一般會員只看標籤、讀快取。 */
+function _wxAtisFallback(icao) {   // atis.guru(經 allorigins，client 端抓，免額度)
+  return fetch('https://api.allorigins.win/raw?url=' + encodeURIComponent('https://atis.guru/atis/' + icao))
+    .then(function (r) { return r.ok ? r.text() : ''; }).then(parseAtisHtml).catch(function () { return []; });
+}
+/* 抓 ATIS,回 {sections, source}。chosen==='guru' 用 atis.guru;否則用 server(FAA/airframes),fresh=強制跳快取重抓 */
+function _wxAtisFetch(icao, chosen, fresh) {
+  var viaGuru = function () { return _wxAtisFallback(icao).then(function (secs) { return { sections: secs, source: secs.length ? 'atis.guru' : '' }; }); };
+  if (chosen === 'guru') return viaGuru();
+  return fetch('/api/atis?icao=' + icao + (fresh ? '&fresh=1' : ''), { headers: (typeof _plAtHeaders === 'function' ? _plAtHeaders() : {}) })
+    .then(function (r) { return r.ok ? r.json() : null; })
+    .then(function (d) {
+      if (d && typeof d.level !== 'undefined') { _atisLevel = d.level; _atisLevelKnown = true; }
+      if (d && d.sections) return { sections: d.sections, source: d.source || '' };
+      return viaGuru();                                  // server 回 fallback → 退 atis.guru
+    })
+    .catch(function () { return viaGuru(); });            // server 非 JSON / 網路錯 → 退 atis.guru
+}
+/* 只探「創始身份」用:打輕端點 /api/atis-level(不抓 ATIS、不扣額度、不碰快取資料) */
+function _wxAtisProbeLevel() {
+  return fetch('/api/atis-level', { headers: (typeof _plAtHeaders === 'function' ? _plAtHeaders() : {}) })
+    .then(function (r) { return r.ok ? r.json() : null; })
+    .then(function (d) { if (d && typeof d.level !== 'undefined') { _atisLevel = d.level; _atisLevelKnown = true; } })
+    .catch(function () { });
+}
+/* ATIS 卡的來源標籤;創始會員顯示成可點的「換來源」鈕 */
+function _atisSrcBar(icao, source) {
+  if (!source) return '';
+  var name = source === 'faa' ? 'FAA' : source === 'airframes' ? 'airframes' : source === 'atis.guru' ? 'atis.guru' : source;
+  var founder = (_atisLevel === 'founder' || _atisLevel === 'owner');
+  if (founder) return '<button class="atis-src atis-src-btn" onclick="wxAtisSwitch(\\'' + icao + '\\')" title="\\u63db\\u4f86\\u6e90 Switch source">\\ud83d\\udce1 ' + name + ' \\u21c4</button>';
+  return '<span class="atis-src">\\ud83d\\udce1 ' + name + '</span>';
+}
+/* 創始會員按「換來源」:在 server 源(FAA/airframes)⇄ atis.guru 之間切,重抓該機場 ATIS 並重繪 */
+function wxAtisSwitch(icao) {
+  if (wxSelectedIcao !== icao) return;
+  var _tok = ++_wxDetailReqToken;                    // 佔最新 token:之後重開/刷新會蓋過這次切換,舊切換回來就丟棄(防 race)
+  var cached = wxDetailRawCache[icao] || {};
+  // 目前來源:優先看記憶體選擇;reload 後 _atisSrc 是空的 → 退看快取實際來源(避免第一次點變無效)
+  var curGuru = (_atisSrc[icao] === 'guru') || (_atisSrc[icao] === undefined && cached.atisSrc === 'atis.guru');
+  var goGuru = !curGuru;                              // 目前非 guru → 切到 guru;否則切回 server 源
+  _atisSrc[icao] = goGuru ? 'guru' : 'primary';
+  var mLines = cached.metar || [], tText = cached.taf || '';
+  var content = document.getElementById('wx-detail-content');
+  if (content) content.innerHTML = _wxBuildDetailHtml(icao, mLines, tText, null);   // ATIS 區顯示載入中,保留 METAR/TAF
+  _wxAtisFetch(icao, _atisSrc[icao], !goGuru).then(function (r) {                    // 切回 server 源時 fresh=強抓
+    if (wxSelectedIcao !== icao || _tok !== _wxDetailReqToken) return;              // 已被更新的開啟/刷新取代 → 丟棄,不蓋新資料(防 race)
+    _atisSrc[icao] = (r.source === 'atis.guru') ? 'guru' : 'primary';               // 用實際拿到的來源校正狀態:server 退回 guru 時也對,下次點才不會方向錯
+    // ⚠ 切換結果「絕不」寫進 wxDetailRawCache(那是會被 _wxSaveDetailCache 持久化的共享結構)→ 換來源永不殘留到 localStorage、不跨 reload/帳號。
+    //    只更新 DOM + HTML 渲染快取(wxDetailCache,純記憶體、reload 即清)→ 本次連線內 stick,reload 後回到共享的預設來源。
+    var html = _wxBuildDetailHtml(icao, mLines, tText, r.sections, r.source);
+    wxDetailCache[icao] = html;
+    var c2 = document.getElementById('wx-detail-content');
+    if (c2) c2.innerHTML = html;
+  });
+}
+
 var _wxDetailReqToken = 0;
 function fetchWxDetail(icao, name) {
   /* 每次 fetch 給一個遞增 token,只讓「最新那次」的結果(含背景 ATIS)生效,避免慢 ATIS 覆蓋新資料 */
   var _tok = ++_wxDetailReqToken;
-  /* check 24hr cache first */
+  /* check 24hr cache first。⚠ 舊版快取沒有 atisSrc 欄(undefined)→ 不走捷徑、落到下面正常重抓,讓來源徽章/切換鈕補上(升級一次性自癒)。空字串''=有抓過但無 ATIS,仍算有效快取。 */
   var cached = wxDetailRawCache[icao];
-  if (cached && (Date.now() - cached.time) < 86400000) {
-    var html = _wxBuildDetailHtml(icao, cached.metar, cached.taf, cached.atis);
+  if (cached && (Date.now() - cached.time) < 86400000 && cached.atisSrc !== undefined) {
+    if (_atisSrc[icao] === undefined && cached.atisSrc) _atisSrc[icao] = (cached.atisSrc === 'atis.guru' ? 'guru' : 'primary');   // 同步 toggle 狀態(P2-2)
+    var html = _wxBuildDetailHtml(icao, cached.metar, cached.taf, cached.atis, cached.atisSrc);
     wxDetailCache[icao] = html;
     var content = document.getElementById('wx-detail-content');
     if (content && wxSelectedIcao === icao) content.innerHTML = html;
+    // 還不知道創始身份 → 背景只探一次身份(不碰快取資料,免把共享 FAA/airframes 降級成 guru,P1)。學到後用「原快取資料」重繪,只多出切換鈕。已知就不再探。
+    if (!_atisLevelKnown) {
+      _wxAtisProbeLevel().then(function () {
+        if (wxSelectedIcao !== icao || _tok !== _wxDetailReqToken || !_atisLevelKnown) return;
+        var h2 = _wxBuildDetailHtml(icao, cached.metar, cached.taf, cached.atis, cached.atisSrc);   // 用原快取資料重繪,只是現在會帶切換鈕
+        wxDetailCache[icao] = h2;
+        var c = document.getElementById('wx-detail-content');
+        if (c && wxSelectedIcao === icao) c.innerHTML = h2;
+      });
+    }
     return;
   }
   var metarP = fetch('/api/metar?ids=' + icao + '&hours=6')
@@ -335,15 +409,9 @@ function fetchWxDetail(icao, name) {
     }).catch(function() { return []; });
   var tafP = fetch('/api/taf?ids=' + icao)
     .then(function(r) { return r.ok ? r.text() : ''; }).then(function(t) { return t.trim(); }).catch(function() { return ''; });
-  /* ATIS：先打我們 server(airframes,穩、有台灣)；回 {fallback:true}(爆額度/無資料)才退回舊的 allorigins→atis.guru。 */
-  var _atisFb = function() {
-    return fetch('https://api.allorigins.win/raw?url=' + encodeURIComponent('https://atis.guru/atis/' + icao))
-      .then(function(r) { return r.ok ? r.text() : ''; }).then(parseAtisHtml).catch(function() { return []; });
-  };
-  var atisP = fetch('/api/atis?icao=' + icao, { headers: (typeof _plAtHeaders === 'function' ? _plAtHeaders() : {}) })
-    .then(function(r) { return r.ok ? r.json() : null; })
-    .then(function(d) { return (d && d.sections) ? d.sections : _atisFb(); })   // 無 sections → 備案
-    .catch(function() { return _atisFb(); });                                   // server 非 JSON / 網路錯 → 也走備案(codex P1)
+  /* ATIS：主抓取「永遠」抓預設來源(server FAA/airframes)寫進共享快取 wxDetailRawCache → 持久化的一律是預設源、不會被個人切換污染。
+     創始會員的換來源是 wxAtisSwitch 的純記憶體覆蓋(不進這條路徑、不持久化)。回 {sections, source} → 顯示來源標籤。 */
+  var atisP = _wxAtisFetch(icao, undefined, false);
   /* 先等 METAR+TAF(快)就秒出(ATIS 標「載入中」、跑道圖照樣秒出);ATIS 背景補上 → 不卡載入。 */
   Promise.all([metarP, tafP]).then(function(res) {
     var metarLines = res[0], tafText = res[1];
@@ -351,11 +419,12 @@ function fetchWxDetail(icao, name) {
     if (!content || wxSelectedIcao !== icao || _tok !== _wxDetailReqToken) return;
     content.innerHTML = _wxBuildDetailHtml(icao, metarLines, tafText, null);
     _wxDetailRefreshDone();
-    atisP.then(function(atisSections) {
-      wxDetailRawCache[icao] = { metar: metarLines, taf: tafText, atis: atisSections, time: Date.now() };
+    atisP.then(function(r) {
+      var atisSections = r.sections, atisSource = r.source;
+      wxDetailRawCache[icao] = { metar: metarLines, taf: tafText, atis: atisSections, atisSrc: atisSource, time: Date.now() };
       _wxSaveDetailCache();
       if (wxSelectedIcao !== icao || _tok !== _wxDetailReqToken) return;
-      var html = _wxBuildDetailHtml(icao, metarLines, tafText, atisSections);
+      var html = _wxBuildDetailHtml(icao, metarLines, tafText, atisSections, atisSource);
       wxDetailCache[icao] = html;
       var c2 = document.getElementById('wx-detail-content');
       if (c2) c2.innerHTML = html;
@@ -521,7 +590,7 @@ function _wxBatchRefresh(icaos, updateListRegion, btn, btnLabel) {
     /* 重 render 當前開著的那個 */
     if (wxSelectedIcao && wxDetailRawCache[wxSelectedIcao]) {
       var c = wxDetailRawCache[wxSelectedIcao];
-      var html = _wxBuildDetailHtml(wxSelectedIcao, c.metar, c.taf, c.atis);
+      var html = _wxBuildDetailHtml(wxSelectedIcao, c.metar, c.taf, c.atis, c.atisSrc);
       wxDetailCache[wxSelectedIcao] = html;
       var el = document.getElementById('wx-detail-content');
       if (el) el.innerHTML = html;
