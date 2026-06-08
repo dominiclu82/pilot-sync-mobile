@@ -1538,7 +1538,7 @@ export function getSpaHtmlBody(): string {
       <button class="tab-util-btn tab-install-btn" id="tab-install-btn" onclick="showInstallGuide()" style="display:none">
         <span>📲</span>安裝
       </button>
-      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer;text-decoration:underline" onclick="showAbout()">V9.4.13</span>
+      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer;text-decoration:underline" onclick="showAbout()">V9.4.14</span>
     </div>
   </div>
 </div>
@@ -1572,7 +1572,12 @@ export function getSpaHtmlBody(): string {
     </div>
     <div style="max-height:50vh;overflow-y:auto;-webkit-overflow-scrolling:touch;margin-bottom:10px">
     ${renderCommunityLink()}
-    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V9.4.13</div>
+    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V9.4.14</div>
+    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
+      <div>📲 <b>入口頁連網開一次,順手把「今日」最新資料也抓下來存好——之後離線開今日就有剛更新的內容,不必先進今日。</b></div>
+      <div>📲 <b>Opening the hub online now also fetches Today's latest data — so Today shows fresh content offline without opening it first.</b></div>
+    </div>
+    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V9.4.13</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
       <div>🔧 <b>離線真的修好——啟動頁不再用 iOS 會拒存的 no-store 標頭;入口頁存完即驗證、存不進會明白標示。</b></div>
       <div>🔧 <b>Offline really fixed — launch pages no longer use the no-store header that iOS refuses to cache; the hub now verifies the cache and shows a clear status.</b></div>

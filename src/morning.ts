@@ -16,7 +16,7 @@ import { renderAppChangelog } from './app-changelog.js';
 
 // V2.0.0: 統一版號 — 跟 Portfolio 共用 APP_VERSION。MORNING_VERSION alias 保留向後相容
 export const MORNING_VERSION = APP_VERSION;
-const MORNING_CACHE = 'morning-v2-0-13';
+const MORNING_CACHE = 'morning-v2-0-14';
 
 // ─── Postgres ────────────────────────────────────────────────────────
 let _pgPool: pg.Pool | null = null;
@@ -1695,6 +1695,16 @@ body { padding-bottom: calc(64px + env(safe-area-inset-bottom, 0px)); }
   padding: 12px 14px;
   color: #ff8a8a;
   font-size: .82em;
+}
+.offline-banner {
+  background: #f59e0b;
+  color: #1a1205;
+  font-weight: 700;
+  font-size: .78em;
+  text-align: center;
+  padding: 7px 12px;
+  border-radius: 8px;
+  margin: 0 0 12px;
 }
 
 
@@ -4136,14 +4146,50 @@ function escapeHtml(s) {
   return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
 
-async function loadAndRender(date) {
-  try {
-    document.getElementById('root').innerHTML = '<div class="loading">載入中 Loading…</div>';
-    const data = await fetchReport(date);
-    renderReport(data);
-  } catch (e) {
-    document.getElementById('root').innerHTML = '<div class="error">載入失敗：' + e.message + '<br><br>今日資料尚未產生，請稍後再試。</div>';
+// 離線快取：抓成功存一份到 localStorage（按 user 分鑰），失敗（離線）就讀這份顯示，跟 Pilot Log 一樣。
+function _morningCacheKey() { try { return 'morning_last_report_' + (getUid() || ''); } catch (e) { return 'morning_last_report_'; } }
+function saveReportCache(data) {
+  try { localStorage.setItem(_morningCacheKey(), JSON.stringify({ data: data, savedAt: Date.now() })); } catch (e) {}
+}
+function loadReportCache() {
+  try { var raw = localStorage.getItem(_morningCacheKey()); return raw ? JSON.parse(raw) : null; } catch (e) { return null; }
+}
+function showOfflineBanner(savedAt) {
+  var when = '';
+  try { var d = new Date(savedAt); when = (d.getMonth() + 1) + '/' + d.getDate() + ' ' + String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0'); } catch (e) {}
+  var html = '<div class="offline-banner">📡 OFFLINE — 顯示上次快取的資料' + (when ? '（' + when + '）' : '') + ' · Showing last cached data</div>';
+  var root = document.getElementById('root');
+  if (root) root.insertAdjacentHTML('afterbegin', html);
+}
+
+// 統一渲染：任何 renderReport 都包這層 try，渲染出錯就顯示明確錯誤、絕不留空白頁（含舊格式快取，codex P2）。成功回 true。
+function safeRender(data) {
+  try { renderReport(data); return true; }
+  catch (e) {
+    document.getElementById('root').innerHTML = '<div class="error">顯示失敗 Render error：' + (e && e.message || e) + '</div>';
+    return false;
   }
+}
+
+async function loadAndRender(date) {
+  document.getElementById('root').innerHTML = '<div class="loading">載入中 Loading…</div>';
+  let data;
+  try {
+    data = await fetchReport(date);
+  } catch (e) {
+    // 只「抓資料」失敗走這裡。只在真的離線/連不到、且看今日(預設)時才退回快取；HTTP 4xx/5xx（伺服器有回應，如今日報告還沒產生）照實顯示、不遮蓋（codex P2）。
+    // 網路層失敗：navigator.onLine=false，或 fetch reject（Safari 離線丟 TypeError「Load failed」）。HTTP 錯誤是 throw new Error('HTTP ..')，name='Error'。
+    const networkDown = !navigator.onLine || (e && e.name === 'TypeError');
+    const cached = (!date && networkDown) ? loadReportCache() : null;
+    if (cached && cached.data) {
+      if (safeRender(cached.data)) showOfflineBanner(cached.savedAt);   // 舊格式快取渲染失敗 → 顯示錯誤、不掛橫條、不空白
+    } else {
+      document.getElementById('root').innerHTML = '<div class="error">載入失敗：' + e.message + '<br><br>今日資料尚未產生，請稍後再試。</div>';
+    }
+    return;
+  }
+  // 抓成功 → 渲染（出錯照實報，不被當離線遮掉）；渲染成功且看今日才存快取（歷史日不覆蓋，codex P1）。
+  if (safeRender(data) && !date) saveReportCache(data);
 }
 
 // About modal

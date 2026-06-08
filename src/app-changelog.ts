@@ -17,6 +17,9 @@ export function renderCommunityLink(): string {
 export interface ChangelogEntry { v: string; zh: string; en: string; }
 
 export const APP_CHANGELOG: ChangelogEntry[] = [
+  { v: 'V2.0.14',
+    zh: '[全域] 離線可看上次內容了：抓不到資料（飛航模式／斷網）時，自動退回上次成功更新的那份並標示「OFFLINE」，不再只顯示「載入失敗」。',
+    en: '[Global] Offline now shows your last content: when data cannot be fetched (airplane mode / no network) it falls back to the last successful update with an OFFLINE banner, instead of just "Load failed".' },
   { v: 'V2.0.13',
     zh: '[全域] 修正 iOS 離線：啟動頁改用可離線快取的標頭（原本 no-store 被 iPhone/iPad 拒存，導致飛航模式打不開）。',
     en: '[Global] iOS offline fix: the launch page now uses an offline-cacheable header (the old no-store was refused by iPhone/iPad, breaking airplane-mode launch).' },

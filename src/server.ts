@@ -349,6 +349,17 @@ app.get('/apps', (_req, res) => {
   }
   var T = setInterval(round, 2000); round();
 })();</script>
+<!-- 入口一鍵更新「今日」資料：連網開 /apps 時，順手把今日的最新報告抓下來、存進今日讀的同一個 localStorage 鑰（同源），
+     之後離線開今日就有「剛更新的」資料，不必先進今日一次。Pilot Log 自己已有本機資料、CrewSync 自有快取，這裡只補今日。 -->
+<script>(function(){
+  if (!navigator.onLine) return;
+  var uid = ''; try { uid = localStorage.getItem('morning_uid') || ''; } catch(e){}
+  var h = {}; if (uid) h['X-User-Id'] = encodeURIComponent(uid);
+  fetch('/api/morning-report', { headers: h, cache:'no-store' })
+    .then(function(r){ if(!r || !r.ok) return null; return r.json(); })
+    .then(function(j){ if(!j || j.error) return; try { localStorage.setItem('morning_last_report_' + uid, JSON.stringify({ data: j, savedAt: Date.now() })); } catch(e){} })
+    .catch(function(){});
+})();</script>
 <style>
   :root { color-scheme: dark; }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
