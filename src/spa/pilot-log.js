@@ -1046,8 +1046,8 @@ function _plYearIndexEl() {
   document.body.appendChild(el);
   // 視窗尺寸/轉向變化 → 重新定位 + 量 sticky 標題高
   try {
-    window.addEventListener('resize', function () { _plUpdateBannerHeight(); _plUpdateHeadHeight(); if (_pl.tab === 'logbook') _plRenderYearIndex(); });
-    window.addEventListener('orientationchange', function () { setTimeout(function () { _plUpdateBannerHeight(); _plUpdateHeadHeight(); if (_pl.tab === 'logbook') _plRenderYearIndex(); }, 250); });
+    window.addEventListener('resize', function () { _plUpdateBannerHeight(); _plUpdateHeadHeight(); if (_pl.tab === 'logbook') _plRenderYearIndex(); _plPlacesReflow(); });
+    window.addEventListener('orientationchange', function () { setTimeout(function () { _plUpdateBannerHeight(); _plUpdateHeadHeight(); if (_pl.tab === 'logbook') _plRenderYearIndex(); _plPlacesReflow(); }, 250); });
   } catch (_e) {}
   // #2：盯著內容區 —— 任何頁面切換/子頁（Aircraft/Crew/Airports/編輯器…）替換 #pilotlog-content 內容時
   // 都重判一次：①收起漏到別頁的年份索引 ②更新 sticky 標題高度 --pl-head-h（給編輯器下移/Analyze 標題固定用）。
@@ -3719,6 +3719,27 @@ function _plAptListHtml(list, sel) {
 }
 // ≥1180=只有「真夠寬」的 iPad 橫拿(Air/Pro 11"+ 1180/1194、12.9" 1366)才用三欄;<1180(手機 + 所有直拿 + 小 iPad 橫拿 mini1133/10.2"1080)一律走窄版新單欄導覽 → 全機型全拿法不擠版/不裁切(贏過 LogTen)。使用者有意見再調。
 function _plAptIsWide() { return (typeof window !== 'undefined' && window.innerWidth >= 1180); }
+// 轉向/縮放時,若正在 Airports 且跨越了寬窄斷點 → 重繪成對的版型。否則「橫拿渲染的三欄」轉直拿會留著(版型是渲染當下決定的,不會自己變)。
+function _plPlacesReflow() {
+  if (!_pl.aptReturn) return;                                   // 只在 Airports 區(list/詳情/子頁)才管
+  if (_pl.editing) return;                                      // ⚠ 編輯器開著就別重繪(從 Airports 點航班進編輯時 aptReturn 仍 true)→ 否則轉向會把編輯器砍掉、丟失未存編輯(codex P1)
+  var wide = _plAptIsWide();
+  if (_pl.placesWide === wide) return;                          // 沒跨斷點 → 不重繪(免每像素重畫)
+  // 重繪前先讓開著的「機場 note」textarea 失焦 → 觸發它的 onblur 存檔(note 只在 blur 存)→ 轉向不丟未存的字(codex P2)
+  try { var _ta = document.querySelector('#pilotlog-content textarea'); if (_ta) _ta.blur(); } catch (e) {}
+  _pl.placesWide = wide;
+  if (wide) {
+    if (_pl.aptDetailKey) _pl.airportSel = _pl.aptDetailKey;    // 窄版詳情/子頁轉寬 → 三欄選中那機場
+    if (_pl.aptFlightsFilt) _pl.placeFilter = _pl.aptFlightsFilt;   // 帶上目前 All/Dep/Arr 篩選 → 寬版三欄維持同一個(codex P2)
+    _plRenderPlaces();
+  } else if (_pl.aptDetailKey && _pl.aptFlightsFilt) {
+    _plOpenPlaceFlights(_pl.aptDetailKey, _pl.aptFlightsFilt);  // 子頁
+  } else if (_pl.aptDetailKey || _pl.airportSel) {
+    _plOpenPlaceDetail(_pl.aptDetailKey || _pl.airportSel);     // 寬版選中的機場轉窄 → 開它的詳情頁
+  } else {
+    _plRenderPlaces();                                          // 列表
+  }
+}
 
 // 🗺️ Airports —— 寬螢幕三欄（列表 | 資訊 | 航班）；窄螢幕列表（點 → 詳情頁）
 function _plRenderPlaces() {
@@ -3731,6 +3752,7 @@ function _plRenderPlaces() {
   var mode = _pl.aptMode || 'flown';
   var list = _plAirportAgg(mode);
   var wide = _plAptIsWide();
+  _pl.placesWide = wide;   // 記錄目前渲染的版型 → 轉向時 _plPlacesReflow 比對是否跨斷點
   var sel = _pl.airportSel;
   if (sel && !list.some(function(m) { return m.key === sel; })) sel = null;
   if (wide && !sel && list.length) sel = list[0].key;

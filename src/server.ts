@@ -280,9 +280,17 @@ app.get('/apps', (_req, res) => {
   const cards = apps.map(a =>
     `<a class="app" href="${a.href}">
        <div class="ico">${a.icon}</div>
-       <div class="meta"><div class="nm">${a.name}${a.ver ? ` <span class="ver">${a.ver}</span>` : ''}</div><div class="dz">${a.cn}</div><div class="dz en">${a.en}</div></div>
+       <div class="meta"><div class="nm">${a.name}${a.ver ? ` <span class="ver">${a.ver}</span>` : ''}</div><div class="dz">${a.cn}</div><div class="dz en">${a.en}</div><div class="off" id="off-${a.href.slice(1)}">⏳ 準備離線中…</div></div>
        <div class="go">開啟 ›</div>
      </a>`).join('');
+  // 離線就緒偵測:檢查「該 app 新版快取」裡有沒有它的啟動頁 → 有就 ✅(代表新版真的存好、可離線)。
+  // ⚠ 今日 /morning 是由 root SW 預存進 crewsync 快取(它自己 SW scope /morning/ 管不到啟動頁)→ 查 crewsync 快取。
+  const _csCacheName = 'crewsync-' + (csVer ? csVer.replace('V', 'v').replace(/\./g, '') : 'unknown');
+  const _offMap = [
+    { slug: 'main', url: '/main', cache: _csCacheName },
+    { slug: 'pilot-log', url: '/pilot-log', cache: 'pilotlog-v' + PILOT_LOG_VERSION.replace('V', '').replace(/\./g, '-') },
+    { slug: 'morning', url: '/morning', cache: _csCacheName },
+  ];
   res.send(`<!DOCTYPE html><html lang="zh-Hant"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Apps</title>
@@ -303,6 +311,24 @@ app.get('/apps', (_req, res) => {
   navigator.serviceWorker.register('/pilot-log/sw.js',{scope:'/pilot-log'}).catch(function(){});
   navigator.serviceWorker.register('/morning/sw.js',{scope:'/morning/'}).catch(function(){});
 }</script>
+<!-- 離線就緒指示:每秒查「該 app 新版快取」裡有沒有它的啟動頁,有就 ✅(代表新版存好、可離線)。每張卡各自顯示。 -->
+<script>(function(){
+  if(!('caches' in window)) return;
+  var M = ${JSON.stringify(_offMap)};
+  function tick(){
+    var left = 0;
+    M.forEach(function(a){
+      var el = document.getElementById('off-' + a.slug);
+      if (!el || el.getAttribute('data-ok')) return;
+      left++;
+      caches.open(a.cache).then(function(c){ return c.match(a.url); }).then(function(hit){
+        if (hit && el) { el.setAttribute('data-ok','1'); el.textContent='\\u2705 \\u96e2\\u7dda\\u5c31\\u7dd2'; el.className='off ok'; }
+      }).catch(function(){});
+    });
+    if (left === 0) clearInterval(T);
+  }
+  var T = setInterval(tick, 1000); tick();
+})();</script>
 <style>
   :root { color-scheme: dark; }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -321,6 +347,8 @@ app.get('/apps', (_req, res) => {
   .ver { font-size:.6em; font-weight:600; color:#64748b; vertical-align:middle; margin-left:5px; letter-spacing:.3px; }
   .dz { color:#94a3b8; font-size:.78em; }
   .dz.en { color:#64748b; font-size:.72em; }
+  .off { font-size:.72em; margin-top:4px; color:#64748b; display:flex; align-items:center; gap:4px; }
+  .off.ok { color:#22c55e; }
   .go { color:#3b82f6; font-weight:700; font-size:.85em; flex-shrink:0; }
   .install { margin-top:26px; background:#111827; border:1px solid #1f2a3d; border-radius:14px; padding:16px 18px; }
   .install h2 { font-size:.95em; margin:0 0 10px; color:#e2e8f0; }

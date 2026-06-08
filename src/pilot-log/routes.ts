@@ -54,8 +54,8 @@ import { getAirportDbJs } from '../spa/js-airport-db.js';
 
 // ── 版本（比照 CrewSync / Morning：每次推版必更新；SW cache 名稱跟著走） ────
 // 本機 preview build 會暫時加 -tNN 後綴方便對版；推正式版前拿掉只留乾淨版號。
-export const PILOT_LOG_VERSION = 'V2.2.22';
-const PILOT_LOG_CACHE = 'pilotlog-v2-2-22';
+export const PILOT_LOG_VERSION = 'V2.2.23';
+const PILOT_LOG_CACHE = 'pilotlog-v2-2-23';
 
 export const pilotLogRouter = express.Router();
 
@@ -362,6 +362,11 @@ function _renderPilotLogChangelog(): string {
   return `
     ${renderCommunityLink()}
     <div class="pl-cl-v">${PILOT_LOG_VERSION}</div>
+    <div class="pl-cl-txt">
+      <b>🔄 Airports 轉向自動重排——iPad 橫拿開、轉直拿時自動切成單欄（不再卡在三欄）。</b><br>
+      <b>🔄 Airports now re-lays out on rotation — switches between 3-column and single-column when you rotate.</b>
+    </div>
+    <div class="pl-cl-v old">V2.2.22</div>
     <div class="pl-cl-txt">
       <b>🗺️ Airports 手機／iPad 直拿改版——點機場看資訊、點進去看航班（釘頂可切 All／Dep／Arr），不用再一直滑；📊 Analyze 標題在 iPad 釘住。</b><br>
       <b>🗺️ Airports redesign (phone / iPad portrait) — tap an airport for info, tap in for its flights (pinned All / Dep / Arr); Analyze header now pinned on iPad.</b>
