@@ -517,12 +517,12 @@ app.get('/privacy', (_req, res) => {
 <tr style="border-bottom:2px solid #555"><th style="text-align:left;padding:8px">服務 Service</th><th style="text-align:left;padding:8px">用途 Purpose</th></tr>
 <tr style="border-bottom:1px solid #333"><td style="padding:8px"><strong>Google Calendar API</strong></td><td style="padding:8px">班表同步（需使用者授權）<br>Roster synchronization (user-authorized)</td></tr>
 <tr style="border-bottom:1px solid #333"><td style="padding:8px"><strong>Aviation Weather APIs</strong></td><td style="padding:8px">METAR/TAF 航空氣象<br>Aviation weather data</td></tr>
-<tr style="border-bottom:1px solid #333"><td style="padding:8px"><strong>atis.guru</strong></td><td style="padding:8px">D-ATIS 資料<br>D-ATIS data</td></tr>
+<tr style="border-bottom:1px solid #333"><td style="padding:8px"><strong>ACARS / D-ATIS sources</strong></td><td style="padding:8px">D-ATIS 即時資訊（ACARS）<br>Real-time D-ATIS (ACARS)<br><span style="opacity:.7;font-size:.9em">Data provided by Airframes.io and its community of feeders.</span></td></tr>
 <tr style="border-bottom:1px solid #333"><td style="padding:8px"><strong>CodeTabs CORS Proxy</strong></td><td style="padding:8px">前端跨域代理<br>Frontend cross-origin proxy</td></tr>
-<tr style="border-bottom:1px solid #333"><td style="padding:8px"><strong>OpenSky Network API</strong></td><td style="padding:8px">Live Radar 即時航機位置<br>Live aircraft positions</td></tr>
-<tr style="border-bottom:1px solid #333"><td style="padding:8px"><strong>FlightRadar24 (unofficial)</strong></td><td style="padding:8px">FR24 航班追蹤<br>Flight tracking data</td></tr>
-<tr style="border-bottom:1px solid #333"><td style="padding:8px"><strong>FlightAware (unofficial)</strong></td><td style="padding:8px">FR24 航班起訖地補充<br>Flight origin/destination supplement</td></tr>
-<tr style="border-bottom:1px solid #333"><td style="padding:8px"><strong>Taoyuan Airport FIDS API</strong></td><td style="padding:8px">Gate Info 航班資訊顯示<br>Flight information display</td></tr>
+<tr style="border-bottom:1px solid #333"><td style="padding:8px"><strong>FlightRadar24 (unofficial)</strong></td><td style="padding:8px">Gate Info 航班資訊補充<br>Gate Info flight data supplement</td></tr>
+<tr style="border-bottom:1px solid #333"><td style="padding:8px"><strong>FlightAware (unofficial)</strong></td><td style="padding:8px">Gate Info 航班起訖地補充<br>Gate Info origin/destination supplement</td></tr>
+<tr style="border-bottom:1px solid #333"><td style="padding:8px"><strong>Airport FIDS APIs</strong></td><td style="padding:8px">Gate Info 各站航班/登機門資訊（TPE / NRT / SIN / SFO / CTS / HKD）<br>Flight &amp; gate information (multiple airports)</td></tr>
+<tr style="border-bottom:1px solid #333"><td style="padding:8px"><strong>Regional ATFM authorities</strong></td><td style="padding:8px">ATFM 流量管制狀態（亞太多地區）<br>Air traffic flow management (ATFM) status</td></tr>
 </table>
 <p>Google Calendar API accesses calendar data with user authorization (see "Data Usage" above). No personal data is sent in any other third-party requests.<br><span class="zh">Google Calendar API 經使用者授權後存取日曆資料，詳見上方「資料使用方式」。其餘第三方服務請求均不包含任何個人資料。</span></p>
 

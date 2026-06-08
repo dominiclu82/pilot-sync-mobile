@@ -814,7 +814,7 @@ html:has(#tab-atfm.tab-active) body{overflow:hidden;height:100dvh}
   padding:3px 8px;font-size:.75em;cursor:pointer;-webkit-appearance:menulist;line-height:1.4}
 .gi-station-sel:active{opacity:.7}
 #gi-region{flex:0 0 auto;max-width:6em}
-#gi-station{flex:0 1 auto;min-width:0;max-width:60vw}
+#gi-station{flex:0 0 auto;width:fit-content;min-width:0;max-width:46vw}
 .gi-date-nav{display:flex;align-items:center;gap:6px}
 .gi-nav-btn{background:none;border:1px solid var(--dim);color:var(--muted);border-radius:6px;
   padding:2px 8px;font-size:.72em;cursor:pointer;-webkit-appearance:none;line-height:1.4}
