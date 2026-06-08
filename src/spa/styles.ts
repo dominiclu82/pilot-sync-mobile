@@ -750,7 +750,7 @@ input[type=radio]{width:15px;height:15px;aspect-ratio:1;accent-color:var(--accen
 #tab-gate.tab-active{display:flex;flex-direction:column;
   height:calc(100dvh - calc(56px + env(safe-area-inset-bottom,0px)))}
 #gate-content{display:flex;flex:1;flex-direction:column;min-height:0}
-.gi-header{display:flex;align-items:center;justify-content:space-between;padding:12px 14px;
+.gi-header{display:flex;align-items:flex-start;justify-content:space-between;padding:9px 14px;
   border-bottom:1px solid var(--dim);background:var(--bg);flex-shrink:0}
 .gi-header-left{display:flex;flex-direction:column;gap:2px}
 .gi-title{font-weight:700;font-size:.95em;color:var(--text)}
@@ -822,7 +822,7 @@ html:has(#tab-atfm.tab-active) body{overflow:hidden;height:100dvh}
 .gi-nav-btn:disabled{opacity:.25;cursor:default}
 .gi-today-btn{color:var(--accent);border-color:var(--accent)}
 .gi-refresh-btn{background:var(--accent);color:#fff;border:none;border-radius:8px;
-  padding:8px 14px;font-size:.82em;font-weight:600;cursor:pointer;white-space:nowrap;-webkit-appearance:none}
+  padding:6px 11px;font-size:.78em;font-weight:600;cursor:pointer;white-space:nowrap;-webkit-appearance:none}
 .gi-refresh-btn:active{opacity:.7}
 .gi-filter-bar{flex-shrink:0;border-bottom:1px solid rgba(148,163,184,.1)}
 .gi-search-bar{display:flex;align-items:center;gap:8px;padding:8px 14px}
@@ -847,7 +847,7 @@ html:has(#tab-atfm.tab-active) body{overflow:hidden;height:100dvh}
 .gi-table-wrap{flex:1;overflow:auto;-webkit-overflow-scrolling:touch;min-height:0;overscroll-behavior:none}
 .gi-table{table-layout:fixed;border-collapse:collapse;font-size:.75em;width:100%;min-width:900px}
 .gi-table thead{position:sticky;top:0;z-index:5;background:var(--surface)}
-.gi-table th{background:var(--surface);color:var(--muted);font-weight:700;padding:8px 6px;
+.gi-table th{background:var(--surface);color:var(--muted);font-weight:700;padding:5px 6px;
   text-align:center;border-bottom:2px solid var(--dim);white-space:nowrap;font-size:.85em}
 .gi-pinned-wrap{flex-shrink:0;overflow-x:auto;-webkit-overflow-scrolling:touch;max-height:35vh;overflow-y:auto;
   border-bottom:3px solid var(--accent);overscroll-behavior:none}
@@ -861,8 +861,8 @@ html:has(#tab-atfm.tab-active) body{overflow:hidden;height:100dvh}
 .gi-sortable::after{content:'△▽';margin-left:3px;font-size:.55em;opacity:.7;letter-spacing:-2px}
 .gi-sort-asc::after{content:'▲▽';opacity:1;color:var(--sort)}
 .gi-sort-desc::after{content:'△▼';opacity:1;color:var(--sort)}
-.gi-table td{padding:6px 6px;text-align:center;border-bottom:1px solid rgba(148,163,184,.15);
-  white-space:nowrap;color:var(--text);overflow:hidden;text-overflow:ellipsis}
+.gi-table td{padding:3px 6px;text-align:center;border-bottom:1px solid rgba(148,163,184,.15);
+  white-space:nowrap;color:var(--text);overflow:hidden;text-overflow:ellipsis;line-height:1.5}
 .gi-table tbody tr:hover{background:rgba(59,130,246,.08)}
 .gi-fno{font-weight:700;color:var(--accent-light)}
 .gi-sticky-col{position:sticky;left:0;z-index:3;background:var(--surface)}
@@ -875,9 +875,9 @@ html:has(#tab-atfm.tab-active) body{overflow:hidden;height:100dvh}
 @media(min-width:768px){.gi-view-btn{display:none!important}}
 .gi-header-btns{display:flex;gap:8px;align-items:center}
 .gi-view-btn{background:none;color:var(--muted);border:1.5px solid var(--dim);border-radius:8px;
-  padding:8px 12px;font-size:.82em;font-weight:600;cursor:pointer;white-space:nowrap;-webkit-appearance:none}
+  padding:5px 10px;font-size:.76em;font-weight:600;cursor:pointer;white-space:nowrap;-webkit-appearance:none}
 .gi-time-btn{background:none;color:var(--muted);border:1.5px solid var(--dim);border-radius:8px;
-  padding:8px 12px;font-size:.82em;font-weight:600;cursor:pointer;white-space:nowrap;-webkit-appearance:none}
+  padding:5px 10px;font-size:.76em;font-weight:600;cursor:pointer;white-space:nowrap;-webkit-appearance:none}
 .gi-time-btn-on{border-color:var(--accent);color:var(--accent)}
 .gi-notice-inline{font-size:.62em;color:var(--muted);margin-top:1px}
 .privacy-card{background:var(--card);border-radius:16px;padding:24px 20px;width:100%;

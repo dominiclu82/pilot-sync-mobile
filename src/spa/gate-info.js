@@ -12,8 +12,10 @@ var _giTimeSlot = '±2hr';
 
 // ── 場站切換（地區 → 場站）。桃園走原邏輯；外站走 /api/fids?airport= 正規化來源 ──
 var _giRegions = {
-  TW: { name: 'TW', stations: [ { code: 'TPE', name: '桃園', src: 'tpe' } ] },
-  JP: { name: 'JP', stations: [ { code: 'CTS', name: '新千歲', src: 'cts' }, { code: 'HKD', name: '函館', src: 'hkd' } ] }
+  TW: { name: 'TW', stations: [ { code: 'TPE', name: '桃園', src: 'tpe', tz: 'Asia/Taipei' } ] },
+  JP: { name: 'JP', stations: [ { code: 'NRT', name: '成田', src: 'nrt', tz: 'Asia/Tokyo' }, { code: 'CTS', name: '新千歲', src: 'cts', tz: 'Asia/Tokyo' }, { code: 'HKD', name: '函館', src: 'hkd', tz: 'Asia/Tokyo' } ] },
+  SG: { name: 'SG', stations: [ { code: 'SIN', name: '樟宜', src: 'sin', tz: 'Asia/Singapore' } ] },
+  US: { name: 'US', stations: [ { code: 'SFO', name: '舊金山', src: 'sfo', tz: 'America/Los_Angeles' } ] }
 };
 var _giRegion = 'TW';
 var _giAirport = 'TPE';      // 目前場站 code
@@ -23,7 +25,22 @@ var _giStationCache = {};    // key: src|date
 function _giCurrentStation() {
   var r = _giRegions[_giRegion];
   if (r) { for (var i = 0; i < r.stations.length; i++) { if (r.stations[i].code === _giAirport) return r.stations[i]; } }
-  return { code: 'TPE', name: '桃園', src: 'tpe' };
+  return { code: 'TPE', name: '桃園', src: 'tpe', tz: 'Asia/Taipei' };
+}
+// 目前場站「當地時間」的 {hh, min}。時段（±2hr / 高亮）要用機場當地的現在，不是台北，
+// 不然 SFO 等差好幾時區會整片錯位。用 Intl 算 DST 自動正確；不支援就退回台北。
+function _giLocalNow() {
+  var st = _giCurrentStation();
+  try {
+    var o = {};
+    new Intl.DateTimeFormat('en-US', { timeZone: st.tz || 'Asia/Taipei', hour12: false, hour: '2-digit', minute: '2-digit' })
+      .formatToParts(new Date()).forEach(function(x) { o[x.type] = x.value; });
+    var hh = parseInt(o.hour, 10) % 24, mm = parseInt(o.minute, 10) || 0;
+    return { hh: hh, min: hh * 60 + mm };
+  } catch (e) {
+    var tw = new Date(Date.now() + 8 * 60 * 60 * 1000);
+    return { hh: tw.getUTCHours(), min: tw.getUTCHours() * 60 + tw.getUTCMinutes() };
+  }
 }
 
 function giFmtTime(t) {
@@ -499,7 +516,7 @@ function loadGateFlights() {
   tableBody.innerHTML = '';
   gateFlightsList = [];
 
-  var dateStr = _giSelectedDate || _paDateOffset(0);
+  var dateStr = _giSelectedDate || _giTodayStr();   // 場站當地今天（外站跨時區才不會送成別天）
   var st = _giCurrentStation();
 
   if (st.code === 'TPE') {
@@ -696,13 +713,21 @@ function refreshGateFlights() {
   loadGateFlights();
 }
 
-function _giTodayStr() {
-  var now = new Date();
-  var tw = new Date(now.getTime() + 8 * 60 * 60 * 1000);
-  return tw.getUTCFullYear() + '/' +
-    String(tw.getUTCMonth() + 1).padStart(2, '0') + '/' +
-    String(tw.getUTCDate()).padStart(2, '0');
+// 目前場站「當地日期」YYYY/MM/DD（dayShift 天位移）。date nav 全用這個，跨時區外站才一致。
+// TPE=Asia/Taipei→等同台北，行為不變；北海道/NRT=JST、SIN、SFO 各用自己的當地日。
+function _giLocalDateStr(dayShift) {
+  var st = _giCurrentStation();
+  try {
+    var o = {};
+    new Intl.DateTimeFormat('en-CA', { timeZone: st.tz || 'Asia/Taipei', year: 'numeric', month: '2-digit', day: '2-digit' })
+      .formatToParts(new Date(Date.now() + (dayShift || 0) * 86400000)).forEach(function(x) { o[x.type] = x.value; });
+    return o.year + '/' + o.month + '/' + o.day;
+  } catch (e) {
+    var tw = new Date(Date.now() + 8 * 60 * 60 * 1000 + (dayShift || 0) * 86400000);
+    return tw.getUTCFullYear() + '/' + String(tw.getUTCMonth() + 1).padStart(2, '0') + '/' + String(tw.getUTCDate()).padStart(2, '0');
+  }
 }
+function _giTodayStr() { return _giLocalDateStr(0); }
 
 function _giShiftDate(dateStr, days) {
   var parts = dateStr.split('/');
@@ -812,6 +837,7 @@ function giSetStation(code) {
     _giAirline = 'ALL';
   }
   _giUpdateAirlineBtns();
+  _giHighlightCurrentSlot();   // 切站後「目前時段」高亮要跟著該站當地時間更新
   var titleEl = document.querySelector('.gi-title');
   if (titleEl) titleEl.textContent = (_giAirline === 'ALL' ? 'ALL' : _giAirline) + ' Flight Info';
   _giStationRows = null;
@@ -834,9 +860,7 @@ function _giTimeFilter(f) {
   var hh = parseInt(parts[0], 10);
   if (isNaN(hh)) return true;
   if (_giTimeSlot === '±2hr') {
-    var now = new Date();
-    var twNow = new Date(now.getTime() + 8 * 60 * 60 * 1000);
-    var nowMin = twNow.getUTCHours() * 60 + twNow.getUTCMinutes();
+    var nowMin = _giLocalNow().min;   // 機場當地的現在（非台北），跨時區才不錯位
     var mm = parseInt(parts[1], 10) || 0;
     var fMin = hh * 60 + mm;
     return Math.abs(fMin - nowMin) <= 120;
@@ -872,9 +896,7 @@ function _giUpdateTimeBtns() {
 }
 
 function _giHighlightCurrentSlot() {
-  var now = new Date();
-  var tw = new Date(now.getTime() + 8 * 60 * 60 * 1000);
-  var hh = tw.getUTCHours();
+  var hh = _giLocalNow().hh;   // 高亮「目前時段」也用機場當地的現在
   var slot = '';
   if (hh < 6) slot = '00-06';
   else if (hh < 12) slot = '06-12';

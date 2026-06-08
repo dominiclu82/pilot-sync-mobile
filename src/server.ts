@@ -1153,9 +1153,245 @@ async function _fidsOutstation(port: { slug: string; code: string; name: string;
     res.status(502).json({ error: e.message });
   }
 }
+
+// ── 客製外站 adapter（NRT/SIN/SFO，各家 API 長相不同、各寫一支，輸出統一 row）──────
+// 北海道是統一 API 走 _fidsOutstation；這三站各自端點/格式不同，正規化成同款 row 後前端表格不變。
+type _FidsPort = { code: string; name: string; tz: number };
+// 任意時區「當地日期」字串（YYYY-MM-DD，給各站 API 帶日期/篩日期用）
+function _localDateDash(offsetHours: number, dayShift = 0): string {
+  const d = new Date(Date.now() + offsetHours * 3600 * 1000 + dayShift * 86400 * 1000);
+  return d.getUTCFullYear() + '-' + String(d.getUTCMonth() + 1).padStart(2, '0') + '-' + String(d.getUTCDate()).padStart(2, '0');
+}
+// ISO("2026-06-08T05:54:00-07:00") 或 "2026-06-08 21:35" → "HH:MM"（時區偏移段的 : 不會誤抓，因前面要 T 或空白）
+function _hhmm(s: any): string { const m = String(s == null ? '' : s).match(/(?:T|\s)(\d{2}:\d{2})/); return m ? m[1] : ''; }
+// 統一航班號：去空白、ICAO 三字碼→IATA 兩字碼、去數字前導零（AY0074→AY74、JX0805→JX805），跟桃園不留 padding 一致
+function _outFno(raw: any): string {
+  const f = String(raw == null ? '' : raw).replace(/\s/g, '').toUpperCase();
+  const m = f.match(/^([A-Z]{2,3})0*(\d+[A-Z]?)$/);
+  if (!m) return f;
+  let pre = m[1];
+  if (pre.length === 3 && _ICAO2IATA[pre]) pre = _ICAO2IATA[pre];
+  return pre + m[2];
+}
+// 一筆正規化 row（沿用北海道 _hkdRow 慣例：到達 gate 放 parking 欄，沒有的欄位空字串→前端顯示「—」）
+function _outRow(port: _FidsPort, dir: 'D' | 'A', x: any): any {
+  const base = {
+    fno: x.fno, altFno: x.altFno || '', checkin: x.checkin || '',
+    depTerminal: dir === 'D' ? (x.terminal || '') : '', arrTerminal: dir === 'A' ? (x.terminal || '') : '',
+    carousel: x.carousel || ''
+  };
+  if (dir === 'D') {
+    return {
+      ...base, origin: port.code, originCode: port.code, originName: port.name,
+      dest: x.other, destCode: x.other, destName: x.otherName || x.other,
+      gate: x.gate || '', std: x.schedT || '', atd: x.actT || '', sta: '', ata: '', parking: ''
+    };
+  }
+  return {
+    ...base, origin: x.other, originCode: x.other, originName: x.otherName || x.other,
+    dest: port.code, destCode: port.code, destName: port.name,
+    gate: '', std: '', atd: '', sta: x.schedT || '', ata: x.actT || '', parking: x.gate || ''
+  };
+}
+
+// NRT 成田（GET BFF JSON，免 key）。只回未飛的班（滾動窗）。國際線（JX 等皆國際）。
+function _nrtRow(f: any, port: _FidsPort, dir: 'D' | 'A'): any | null {
+  const raw = String(f.displayFlightCode || f.flightCode || '').replace(/\s/g, '').toUpperCase();
+  const fno = _outFno(raw);
+  if (!fno) return null;
+  const ap = (f.airport && f.airport.original) || {};
+  const other = String(ap['3LetterCode'] || '').toUpperCase();
+  const otherName = ap.name || other;
+  const gate = (f.gate && f.gate[0] && f.gate[0].gateNo != null) ? String(f.gate[0].gateNo).trim() : '';
+  let checkin = '';
+  const ci = f.checkInCounterOrArrivalLobby;
+  if (dir === 'D' && ci && Array.isArray(ci.nameOfCheckInOrArrival) && ci.nameOfCheckInOrArrival[0]) checkin = String(ci.nameOfCheckInOrArrival[0].name || '');
+  const altFno = (raw && raw !== fno.toUpperCase()) ? raw : '';
+  return _outRow(port, dir, { fno, altFno, other, otherName, gate, schedT: String(f.scheduledTime || '').trim(), actT: '', terminal: String(f.displayTerminal || '').trim(), checkin, carousel: '' });
+}
+async function _fidsNrt(port: _FidsPort, dash: string, label: string): Promise<{ rows: any[]; date: string }> {
+  const getPage = async (da: 'D' | 'A', page: number): Promise<any> => {
+    const u = `https://www.narita-airport.jp/api/bff/searchFlight/?locale=en&domInter=I&flightDepArr=${da}&date=${dash}&page=${page}&size=200`;
+    const r = await fetch(u, { headers: { 'User-Agent': _FIDS_UA, 'Accept': 'application/json' } });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    return r.json();
+  };
+  const collect = async (da: 'D' | 'A'): Promise<any[]> => {
+    let out: any[] = [], page = 0, more = true;
+    while (more && page < 5) {
+      const j = await getPage(da, page);
+      out = out.concat((j && j.flights && j.flights.data) || []);
+      more = !!(j && j.flights && j.flights.hasNextPage);
+      page++;
+    }
+    return out;
+  };
+  const [dep, arr] = await Promise.all([collect('D'), collect('A')]);
+  const rows: any[] = [];
+  for (const f of dep) { const r = _nrtRow(f, port, 'D'); if (r) rows.push(r); }
+  for (const f of arr) { const r = _nrtRow(f, port, 'A'); if (r) rows.push(r); }
+  return { rows, date: label };
+}
+
+// SIN 樟宜（AppSync GraphQL）。x-api-key 從 departures 頁面動態抓（會輪替、不寫死），快取 10 分。
+let _sinKey: { key: string; ts: number } = { key: 'da2-umfoldhfsnhh7e3zgbtyr3p6um', ts: 0 };
+async function _sinApiKey(): Promise<string> {
+  if (_sinKey.key && Date.now() - _sinKey.ts < 600000) return _sinKey.key;
+  try {
+    const t = await (await fetch('https://www.changiairport.com/en/flights/departures.html', { headers: { 'User-Agent': _FIDS_UA } })).text();
+    const m = t.match(/da2-[a-z0-9]{26}/i);
+    if (m) _sinKey = { key: m[0], ts: Date.now() };
+  } catch { /* 抓不到就沿用上次/預設 key */ }
+  return _sinKey.key;
+}
+function _sinRow(f: any, port: _FidsPort, dir: 'D' | 'A'): any | null {
+  const raw = String(f.flight_number || '').replace(/\s/g, '').toUpperCase();
+  const fno = _outFno(raw);
+  if (!fno) return null;
+  const ad = f.airport_details || {};
+  const other = String(ad.code || f.airport || '').toUpperCase();
+  const otherName = ad.name || other;
+  const gate = String(f.display_gate || f.current_gate || '').trim();
+  const sched = String(f.scheduled_time || '').trim();
+  const eta = _hhmm(f.estimated_timestamp);
+  const act = _hhmm(f.actual_timestamp) || ((eta && eta !== sched) ? eta : '');
+  const altFno = (raw && raw !== fno.toUpperCase()) ? raw : '';
+  // terminal 不填：origin_dep_terminal 是「出發地機場的航廈」不是樟宜本站的，填了會誤導；樟宜本站航廈無乾淨欄位
+  return _outRow(port, dir, {
+    fno, altFno, other, otherName, gate, schedT: sched, actT: act,
+    terminal: '',
+    checkin: dir === 'D' ? String(f.check_in_row || '') : '',
+    carousel: dir === 'A' ? String(f.display_belt || '') : ''
+  });
+}
+async function _fidsSin(port: _FidsPort, dash: string, label: string): Promise<{ rows: any[]; date: string }> {
+  const apiKey = await _sinApiKey();
+  const FIELDS = 'flight_number airline airport airport_details { code name } current_gate display_gate display_belt check_in_row origin_dep_terminal scheduled_time estimated_timestamp actual_timestamp scheduled_date direction';
+  // ⚠ Changi 的 scheduled_date 是「起始日」不是過濾：會一路回未來幾天的班（日期遞增）。
+  // 必須自己只留當天、且一旦翻到隔天之後就停（否則前端 ±2hr 只比 HH:MM 會把明天的班當今天）。
+  const fetchDir = async (dir: 'DEP' | 'ARR'): Promise<any[]> => {
+    let out: any[] = [], token: string | null = null, page = 0;
+    while (page < 12) {
+      const args = `direction: "${dir}", scheduled_date: "${dash}"` + (token ? `, next_token: "${token}"` : '');
+      const q = `query { getFlights(${args}) { flights { ${FIELDS} } next_token } }`;
+      const r = await fetch('https://ca-appsync.lz.changiairport.com/graphql', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'Origin': 'https://www.changiairport.com', 'Referer': 'https://www.changiairport.com/', 'User-Agent': _FIDS_UA },
+        body: JSON.stringify({ query: q })
+      });
+      const j = await r.json();
+      const gf = j && j.data && j.data.getFlights;
+      if (!gf) break;
+      let passedDay = false;
+      for (const f of (gf.flights || [])) {
+        const sd = String(f.scheduled_date || '');
+        if (sd === dash) out.push(f);
+        else if (sd > dash) passedDay = true;   // 已排到隔天之後 → 當天的都收完了
+      }
+      token = gf.next_token || null;
+      page++;
+      if (!token || passedDay) break;
+    }
+    return out;
+  };
+  const [dep, arr] = await Promise.all([fetchDir('DEP'), fetchDir('ARR')]);
+  const rows: any[] = [];
+  for (const f of dep) { const r = _sinRow(f, port, 'D'); if (r) rows.push(r); }
+  for (const f of arr) { const r = _sinRow(f, port, 'A'); if (r) rows.push(r); }
+  return { rows, date: label };
+}
+
+// SFO（GET JSON，免 key）。一次回多日 arr+dep，server 端依日期篩。
+function _sfoRow(f: any, port: _FidsPort): any | null {
+  const dir: 'D' | 'A' = (String(f.flight_kind || '').toUpperCase()[0] === 'D') ? 'D' : 'A';
+  const al = f.airline || {};
+  if (!al.iata_code) return null;
+  const raw = (String(al.iata_code) + String(f.flight_number || '')).replace(/\s/g, '').toUpperCase();
+  const fno = _outFno(raw);
+  if (!fno) return null;
+  const ap = f.airport || {};
+  const other = String(ap.iata_code || '').toUpperCase();
+  const otherName = ap.airport_city || ap.airport_name || other;
+  const gate = (f.gate && f.gate.gate_number) ? String(f.gate.gate_number).trim() : '';
+  const sched = _hhmm(f.scheduled_in_off_block_time);
+  const act = _hhmm(f.actual_in_off_block_time) || _hhmm(f.estimated_in_off_block_time);
+  const term = (f.terminal && f.terminal.terminal_code) ? String(f.terminal.terminal_code) : '';
+  const car = (f.baggage_carousel && f.baggage_carousel.carousel_name) ? String(f.baggage_carousel.carousel_name) : '';
+  return _outRow(port, dir, { fno, altFno: '', other, otherName, gate, schedT: sched, actT: act, terminal: term, checkin: '', carousel: dir === 'A' ? car : '' });
+}
+async function _fidsSfo(port: _FidsPort, dash: string, label: string): Promise<{ rows: any[]; date: string }> {
+  const r = await fetch('https://www.flysfo.com/flysfo/api/flight-status', { headers: { 'User-Agent': _FIDS_UA, 'Accept': 'application/json' } });
+  if (!r.ok) throw new Error('HTTP ' + r.status);
+  const j: any = await r.json();
+  const arr: any[] = Array.isArray(j) ? j : (j.data || j.flights || []);
+  // ⚠ SFO 把同一架實體班依每個掛牌航司拆成多筆（同 aircraft_mvmt_id）。
+  // 機組要看實體班 + 操作航司的真航班號 → 按 mvmt 去重，優先留 callsign 對得上自家 ICAO 的那筆（操作方）。
+  const byMvmt = new Map<string, any>();
+  const loose: any[] = [];
+  for (const f of arr) {
+    if (String(f.scheduled_date || '') !== dash) continue;
+    const id = f.aircraft_mvmt_id;
+    if (id == null) { loose.push(f); continue; }
+    const key = String(id);
+    const prev = byMvmt.get(key);
+    if (!prev) { byMvmt.set(key, f); continue; }
+    const isOper = (g: any) => { const ic = String((g.airline || {}).icao_code || '').toUpperCase(); const cs = String(g.callsign || '').toUpperCase(); return ic && cs.startsWith(ic); };
+    if (isOper(f) && !isOper(prev)) byMvmt.set(key, f);   // 操作方優先；都不是就保留先到的
+  }
+  const rows: any[] = [];
+  for (const f of [...byMvmt.values(), ...loose]) { const row = _sfoRow(f, port); if (row) rows.push(row); }
+  return { rows, date: label };
+}
+
+// 用 IANA 時區算「現在」與 UTC 的時差（小時），DST 自動正確（SFO 夏 -7/冬 -8 等）
+function _ianaOffsetHours(tz: string): number {
+  const now = new Date();
+  const parts: any = {};
+  for (const p of new Intl.DateTimeFormat('en-US', { timeZone: tz, hour12: false, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }).formatToParts(now)) parts[p.type] = p.value;
+  const asUTC = Date.UTC(+parts.year, +parts.month - 1, +parts.day, +(parts.hour === '24' ? 0 : parts.hour), +parts.minute);
+  return Math.round((asUTC - now.getTime()) / 3600000);
+}
+// iana 有給就用它動態算偏移（DST 安全）；沒給就用固定 tz（日本+9、星+8 無 DST）
+const _FIDS_BESPOKE: Record<string, _FidsPort & { iana?: string; adapter: (p: _FidsPort, dash: string, label: string) => Promise<{ rows: any[]; date: string }> }> = {
+  nrt: { code: 'NRT', name: '成田', tz: 9, adapter: _fidsNrt },
+  sin: { code: 'SIN', name: '樟宜', tz: 8, adapter: _fidsSin },
+  sfo: { code: 'SFO', name: '舊金山', tz: -7, iana: 'America/Los_Angeles', adapter: _fidsSfo }   // 夏 PDT-7 / 冬 PST-8，動態算
+};
+const _fidsOutCache: Record<string, { ts: number; data: any }> = {};
+async function _fidsBespoke(src: string, reqDate: string, res: any) {
+  const ent = _FIDS_BESPOKE[src];
+  const tz = ent.iana ? _ianaOffsetHours(ent.iana) : ent.tz;
+  const port: _FidsPort = { code: ent.code, name: ent.name, tz };
+  // 外站只服務 today / yesterday（比照北海道）；其餘日期回空
+  const apToday = _localDateStr(tz, 0), apYest = _localDateStr(tz, -1);
+  const twToday = _twDateStr(0), twYest = _twDateStr(-1);
+  let shift = 0;
+  if (reqDate === apYest || reqDate === twYest) shift = -1;
+  else if (reqDate && reqDate !== apToday && reqDate !== twToday) { res.json({ rows: [], date: reqDate, airport: ent.code }); return; }
+  const dash = _localDateDash(tz, shift);
+  const label = _localDateStr(tz, shift);
+  const ck = src + '|' + dash;
+  const cached = _fidsOutCache[ck];
+  if (cached && Date.now() - cached.ts < 60000) { res.json(cached.data); return; }
+  try {
+    const { rows, date } = await ent.adapter(port, dash, label);
+    const data = { rows, date, airport: ent.code };
+    _fidsOutCache[ck] = { ts: Date.now(), data };
+    res.json(data);
+  } catch (e: any) {
+    console.error('FIDS bespoke error:', ent.code, e.message);
+    if (cached) { res.json(cached.data); return; }   // 上游暫時掛掉→退回上次成功的舊資料
+    res.status(502).json({ error: e.message });
+  }
+}
+
 app.get('/api/fids', async (req, res) => {
-  // 外站分流：?airport=cts|hkd → 北海道正規化來源；無/tpe → 維持桃園原邏輯
+  // 外站分流：?airport=nrt|sin|sfo → 客製 adapter；cts|hkd → 北海道統一來源；無/tpe → 維持桃園原邏輯
   const apParam = String(req.query.airport || '').toLowerCase();
+  if (apParam && _FIDS_BESPOKE[apParam]) {
+    await _fidsBespoke(apParam, String(req.query.date || ''), res);
+    return;
+  }
   if (apParam && apParam !== 'tpe' && _FIDS_PORTS[apParam]) {
     await _fidsOutstation(_FIDS_PORTS[apParam], String(req.query.date || ''), res);
     return;
