@@ -3925,23 +3925,22 @@ function _plOpenPlaceDetail(key) {
   var info = _plAptInfo(key);
   var disp = _plAptFmt(key);
   var sets = _plAptFlightSets(key);
-  function navRow(f, label, n) {
-    return '<div onclick="_plOpenPlaceFlights(\'' + _plJs(key) + '\',\'' + f + '\')" style="display:flex;align-items:center;gap:10px;background:var(--card);border:1px solid var(--border,#1e293b);border-radius:10px;padding:13px 14px;margin-bottom:8px;cursor:pointer">' +
-      '<div style="flex:1;font-size:.92em;font-weight:700">' + label + '</div>' +
-      '<div style="font-size:.95em;font-weight:800">' + n + '</div>' +
-      '<div style="color:var(--muted);font-size:1.15em;line-height:1">›</div>' +
-    '</div>';
+  // 頂部三段鈕：比照第三層子頁(seg 樣式)，點了一樣跳子頁(篩 all/dep/arr)。詳情層本身非選中狀態，故都不上色。
+  function seg(f, lbl, n) {
+    return '<button onclick="_plOpenPlaceFlights(\'' + _plJs(key) + '\',\'' + f + '\')" style="flex:1;background:transparent;color:var(--muted);border:1px solid var(--border,#334155);border-radius:6px;padding:7px 4px;font-size:.74em;font-weight:600;cursor:pointer">' + lbl + ' <b>' + n + '</b></button>';
   }
   c.innerHTML = '<div style="padding:10px 14px">' +
-    '<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">' +
-      '<button onclick="_plOpenPlaces()" style="background:transparent;border:0;color:var(--text);font-size:1.2em;cursor:pointer">←</button>' +
-      '<div style="font-size:1.1em;font-weight:800">' + _plEsc(disp) +
-        (info && info.icao && info.iata ? ' <span style="color:var(--muted);font-size:.66em;font-weight:400">' + _plEsc(info.icao) + ' / ' + _plEsc(info.iata) + '</span>' : '') + '</div>' +
+    '<div class="pl-stickhead">' +   // 釘頂:返回鈕+機場名+三段鈕(比照第三層)，捲機場圖時不被推走
+      '<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">' +
+        '<button onclick="_plOpenPlaces()" style="background:transparent;border:0;color:var(--text);font-size:1.2em;cursor:pointer">←</button>' +
+        '<div style="font-size:1.05em;font-weight:800;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + _plEsc(disp) +
+          (info && info.icao && info.iata ? ' <span style="color:var(--muted);font-size:.66em;font-weight:400">' + _plEsc(info.icao) + ' / ' + _plEsc(info.iata) + '</span>' : '') + '</div>' +
+      '</div>' +
+      '<div style="display:flex;gap:6px;padding-bottom:8px">' +
+        seg('all', 'All', sets.all.length) + seg('dep', '🛫 Dep', sets.dep.length) + seg('arr', '🛬 Arr', sets.arr.length) +
+      '</div>' +
     '</div>' +
     '<div style="margin-bottom:12px">' + _plAptInfoHtml(key) + '</div>' +
-    navRow('all', 'All', sets.all.length) +
-    navRow('dep', '🛫 Departing', sets.dep.length) +
-    navRow('arr', '🛬 Arriving', sets.arr.length) +
   '</div>';
 }
 // 窄版子頁：某機場的航班清單。釘頂 [← 機場名] + 三段鈕(All/Dep/Arr) + 純清單(上面不放衛星圖 → 不用一直滑)。
