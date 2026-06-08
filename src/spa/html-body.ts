@@ -1313,12 +1313,16 @@ export function getSpaHtmlBody(): string {
     <span class="atfm-notice">⚠ Non-operational Reference only</span>
   </div>
   <div id="atfm-regions" class="atfm-regions"></div>
-  <div class="atfm-legend">
-    <span><span class="atfm-dot" style="background:#6b7280"></span>No data</span>
-    <span><span class="atfm-dot" style="background:#22c55e"></span>Normal</span>
-    <span><span class="atfm-dot" style="background:#f59e0b"></span>GDP</span>
-    <span><span class="atfm-dot" style="background:#ef4444"></span>Ground Stop</span>
-    <span class="atfm-legend-hint">Tap airport for details</span>
+  <div class="atfm-legend" id="atfm-legend">
+    <button class="atfm-legend-tog" onclick="atfmToggleLegend()"><span class="atfm-legend-chev" id="atfm-legend-chev">▸</span>🚦 Legend 燈號說明</button>
+    <div class="atfm-legend-body">
+      <span><span class="atfm-dot" style="background:#ef4444"></span>Closed 關場·地停</span>
+      <span><span class="atfm-dot" style="background:#f59e0b"></span>Restriction 管制·天氣·罷工·跑道關</span>
+      <span><span class="atfm-dot" style="background:#38bdf8"></span>Info 告示(施工/設施)·不影響流量</span>
+      <span><span class="atfm-dot" style="background:#22c55e"></span>Normal 正常無管制</span>
+      <span><span class="atfm-dot" style="background:#6b7280"></span>No data 無資料</span>
+      <span class="atfm-legend-hint">Tap airport 點機場看詳情</span>
+    </div>
   </div>
   <div id="atfm-map"></div>
   <button class="atfm-bar-toggle" onclick="atfmToggleBar()" aria-label="收合/展開資訊面板"><span class="atfm-bar-grip"></span><span id="atfm-bar-chev">⌄</span></button>
@@ -1531,7 +1535,7 @@ export function getSpaHtmlBody(): string {
       <button class="tab-util-btn tab-install-btn" id="tab-install-btn" onclick="showInstallGuide()" style="display:none">
         <span>📲</span>安裝
       </button>
-      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer;text-decoration:underline" onclick="showAbout()">V9.4.03</span>
+      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer;text-decoration:underline" onclick="showAbout()">V9.4.04</span>
     </div>
   </div>
 </div>
@@ -1565,7 +1569,12 @@ export function getSpaHtmlBody(): string {
     </div>
     <div style="max-height:50vh;overflow-y:auto;-webkit-overflow-scrolling:touch;margin-bottom:10px">
     ${renderCommunityLink()}
-    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V9.4.03</div>
+    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V9.4.04</div>
+    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
+      <div>🟢🔵 <b>ATFM 歐洲大升級——加綠燈底圖（主要樞紐＋布拉格等航點平常顯綠）；事件分三級：紅＝關場、黃＝真管制（天氣／罷工／跑道關）、藍＝資訊告示（施工／設施，不影響流量），不再一片黃。燈號說明改可收合。</b></div>
+      <div>🟢🔵 <b>ATFM Europe overhaul — green baseline for major hubs &amp; destinations; events tiered red/amber/blue (closure / real restriction / info-only), no more all-amber. Collapsible legend.</b></div>
+    </div>
+    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V9.4.03</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
       <div>🚦 <b>ATFM 歐洲穩定性——保活加快 + 資料續用，歐洲不再突然熄燈、維持即時。</b></div>
       <div>🚦 <b>ATFM Europe stability — faster keep-alive + data fallback; Europe no longer goes dark, stays live.</b></div>

@@ -1187,12 +1187,22 @@ async function _atfmVn(): Promise<any> {
 let _nopRecipe: { cookie: string; url?: string; body?: string; permutation?: string } = { cookie: '' };
 let _atfmEuCache: { ts: number; data: any } | null = null;
 let _atfmEuLast: { ts: number; data: any } | null = null;   // 最後一次「成功抓到」的歐洲快照,抓不到時續用(stale 安全網,1 小時內)
+// 歐洲網路事件分三級(2026-06-07 用真資料校準):大多事件其實是施工/設施告示,不影響流量,降級 info 不搶眼。
+// 🔴 紅=整場關閉/地面停止;🟡 黃=真影響流量(關跑道/天氣/罷工/軍事/流量管制);🔵 info=資訊告示(施工/維護/程序/設施)。
+// 順序重要:先抓真嚴重的,設施維護放最後;抓不到關鍵字的未知事件保守當黃(寧可多提醒不漏真管制)。
 function _atfmEuClassify(text: string): { color: string; type: string } {
   const u = (text || '').toUpperCase();
-  if (/CLOSED|CLOSURE/.test(u)) return { color: 'red', type: 'CLOSURE' };
-  if (/STRIKE/.test(u)) return { color: 'amber', type: 'STRIKE' };
-  if (/FIRING|MILITARY|DANGER|MISSILE|EXERCISE/.test(u)) return { color: 'amber', type: 'MILITARY' };
-  if (/WEATHER|FOG|SNOW|STORM|WIND|THUNDER/.test(u)) return { color: 'amber', type: 'WEATHER' };
+  // 🔴 整場關閉 / 地面停止(只認整場,塔台/跑道不算)。含 NOTAM 縮寫 CLSD + AD/ARP;前向比對(機場詞在前)避免誤抓「closure of RWY…aerodrome」跑道關
+  if (/(AERODROME|AIRPORT|FIELD|\bAD\b|\bARP\b)[^.]{0,16}(CLOS|CLSD)|GROUND STOP/.test(u)) return { color: 'red', type: 'CLOSURE' };
+  // 🟡 真影響流量
+  if (/STRIKE|INDUSTRIAL ACTION/.test(u)) return { color: 'amber', type: 'STRIKE' };
+  if (/FIRING|MILITARY|DANGER AREA|MISSILE|\bEXERCISE\b/.test(u)) return { color: 'amber', type: 'MILITARY' };
+  if (/WEATHER|\bFOG\b|SNOW|\bSTORM|THUNDER|\bLVP\b|LOW VIS|DE-?ICING/.test(u)) return { color: 'amber', type: 'WEATHER' };
+  if (/(RWY|RUNWAY)[^.]{0,30}(CLOS|CLSD)|(CLOS|CLSD)[^.]{0,30}(RWY|RUNWAY)/.test(u)) return { color: 'amber', type: 'FLOW' };   // 跑道關閉=黃(機場還開)
+  if (/GDP|GROUND DELAY|REGULATION|CAPACITY|\bFLOW\b|\bSLOT\b|\bMDI\b|RESTRICT|ATFM|STAFFING|REDUCED FLOW/.test(u)) return { color: 'amber', type: 'FLOW' };
+  // 🔵 資訊告示 / 設施 / 程序,不影響流量 → 降級
+  if (/CONSTRUCT|REFURBISH|RENOVAT|RESURFAC|REPARATION|REPAIR|\bWORKS?\b|OBRAS|MAINTEN|TAXIWAY|TAXILANE|TWY|APRON|PARKING|\bSTANDS?\b|FREQUENC|CLEARANCE|\bDCL\b|LIGHTING|NAVAID|\bILS\b|\bDME\b|PAINT|SURVEY|INSPECT|SIGNAGE|PROCEDURE|TERMINAL|BUILDING|EXPANSION|CONFIGURAT|AODB|A-CDM/.test(u)) return { color: 'info', type: 'INFO' };
+  // 其餘未知 → 保守當黃
   return { color: 'amber', type: 'EVENT' };
 }
 async function _atfmEu(force = false): Promise<any> {
@@ -1204,16 +1214,37 @@ async function _atfmEu(force = false): Promise<any> {
   if (!ok && _atfmEuLast && Date.now() - _atfmEuLast.ts < 3600000) return _atfmEuLast.data;
   const db = getAirportDbJs();
   const status: Record<string, any> = {}; const airports: any[] = []; const measures: any[] = [];
+  const _euRank: Record<string, number> = { info: 0, amber: 1, red: 2 };
   for (const ev of events) {
     const text = ev.texts.filter(t => t.length > 4).sort((a, b) => b.length - a.length)[0] || ev.texts[0] || 'Network event';
     const { color, type } = _atfmEuClassify(text);
     for (const ic of ev.icaos) {                                       // 一事件可能影響多機場 → 全展開
-      if (status[ic] || db.indexOf('"' + ic + '","') < 0) continue;    // 已收 / 不在機場庫(濾假碼 IRAQ/NICE)
+      if (db.indexOf('"' + ic + '","') < 0) continue;                  // 不在機場庫(濾假碼 IRAQ/NICE)
+      const ex = status[ic];
+      if (ex && _euRank[ex.color] >= _euRank[color]) continue;          // 同機場多事件:已收同級或更嚴重 → 不蓋(嚴重者勝)
       const m = db.match(new RegExp('"' + ic + '","([^"]*)","[^"]*","[^"]*","[^"]*",(-?[\\d.]+),(-?[\\d.]+)'));
       if (!m) continue;
       status[ic] = { color, text, type };
-      airports.push({ icao: ic, lat: parseFloat(m[2]), lon: parseFloat(m[3]), color, text, type });
-      measures.push({ airport: ic, text, type, time: '' });
+      const ai = airports.find(a => a.icao === ic);
+      if (ai) { ai.color = color; ai.text = text; ai.type = type; }    // 升級覆蓋已畫的點
+      else airports.push({ icao: ic, lat: parseFloat(m[2]), lon: parseFloat(m[3]), color, text, type });
+    }
+  }
+  // 措施清單只列真影響流量的(紅/黃);info 資訊告示只在地圖可點選、不進清單,避免洗版
+  for (const ic in status) {
+    if (status[ic].color !== 'info') measures.push({ airport: ic, text: status[ic].text, type: status[ic].type, time: '' });
+  }
+  // 綠燈底圖:歐洲主要樞紐 + JX 確定/候選航點。抓取成功時,沒事件的塗綠(代表「確實查過 NOP、此刻無管制」);
+  // 有事件的上面已收(黃/紅),這裡 status[ic] 已存在會跳過 → 事件蓋過綠。讓歐洲看起來像正常狀態圖(一片綠、出事才跳黃紅)。
+  // ⭐LKPR 布拉格=JX 確定航點;LEBL/LSZH/EFHK=候選;其餘為亞洲航司常用大樞紐。未來開新歐洲航點加一行即可。
+  const EU_BASE = ['LKPR', 'LEBL', 'LSZH', 'EFHK', 'EGLL', 'EGKK', 'LFPG', 'EDDF', 'EDDM', 'EHAM', 'LOWW', 'LIMC', 'LIRF', 'LEMD', 'LTFM', 'EBBR', 'EKCH', 'ESSA', 'ENGM', 'EIDW', 'LPPT'];
+  if (ok) {
+    for (const ic of EU_BASE) {
+      if (status[ic] || db.indexOf('"' + ic + '","') < 0) continue;   // 已有事件(蓋過) / 不在機場庫
+      const m = db.match(new RegExp('"' + ic + '","([^"]*)","[^"]*","[^"]*","[^"]*",(-?[\\d.]+),(-?[\\d.]+)'));
+      if (!m) continue;
+      status[ic] = { color: 'green', text: 'No active ATFM event', type: '' };
+      airports.push({ icao: ic, lat: parseFloat(m[2]), lon: parseFloat(m[3]), color: 'green', text: 'No active ATFM event', type: '' });
     }
   }
   const _tw = new Date(Date.now() + 8 * 3600 * 1000);

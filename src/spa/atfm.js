@@ -27,7 +27,7 @@ var _atfmDepArrAuto = true;   // true=自動挑有資料的(預設DEP);使用者
 var _atfmSearch = '';
 var _atfmRegionData = null;   // 目前地區的資料(切 DEP/ARR 不重抓)
 var _atfmLastBase = null;     // 目前拖到第幾「圈」世界(經度 base)，換圈才重畫點
-var _atfmCLR = { grey: '#6b7280', green: '#22c55e', amber: '#f59e0b', red: '#ef4444' };
+var _atfmCLR = { grey: '#6b7280', green: '#22c55e', amber: '#f59e0b', red: '#ef4444', info: '#38bdf8' };  // info=淡藍:資訊告示(不影響流量)
 
 function _atfmEsc(s) { var d = document.createElement('div'); d.textContent = (s == null ? '' : s); return d.innerHTML; }
 function _atfmCur() { for (var i = 0; i < _atfmRegions.length; i++) if (_atfmRegions[i].code === _atfmRegion) return _atfmRegions[i]; return _atfmRegions[0]; }
@@ -44,7 +44,7 @@ function atfmInit() {
       if (b !== _atfmLastBase) _atfmPlotMarkers();
     });
   }
-  if (!_atfmUiReady) { _atfmRenderRegions(); _atfmApplyBarState(); _atfmUiReady = true; }
+  if (!_atfmUiReady) { _atfmRenderRegions(); _atfmApplyBarState(); _atfmApplyLegendState(); _atfmUiReady = true; }
   setTimeout(function () { if (_atfmMapObj) _atfmMapObj.invalidateSize(); }, 120);
   _atfmLoadAll();
   if (_atfmRegion !== 'all') _atfmLoadRegion(_atfmRegion);
@@ -71,6 +71,18 @@ function _atfmApplyBarState() {
   try {
     var t = document.getElementById('tab-atfm');
     if (t && localStorage.getItem('crewsync_atfm_bar') === '0') t.classList.add('atfm-bar-hidden');
+  } catch (e) { }
+}
+// 燈號說明:預設收合(手機省空間、不擠),點開展開並記住狀態
+function atfmToggleLegend() {
+  var el = document.getElementById('atfm-legend'); if (!el) return;
+  var open = el.classList.toggle('open');
+  try { localStorage.setItem('crewsync_atfm_legend', open ? '1' : '0'); } catch (e) { }
+}
+function _atfmApplyLegendState() {
+  try {
+    var el = document.getElementById('atfm-legend');
+    if (el && localStorage.getItem('crewsync_atfm_legend') === '1') el.classList.add('open');
   } catch (e) { }
 }
 
@@ -114,7 +126,7 @@ function _atfmPlotMarkers() {
     copies.forEach(function (off) {
       var mk = L.circleMarker([a.lat, canon + off], { radius: ctrl ? 8 : 5, color: '#0a0e1a', weight: 1, fillColor: _atfmCLR[a.color] || _atfmCLR.grey, fillOpacity: .95 });
       if (ctrl && off === base) mk.bindTooltip(a.icao, { permanent: true, direction: 'top', className: 'atfm-lbl', offset: [0, -8] });  // 常駐標籤只掛中央圈,免重複
-      else mk.bindTooltip(ctrl ? a.icao : ('<b>' + _atfmEsc(a.icao) + '</b> · ' + (a.color === 'grey' ? 'No data' : 'Normal')), { direction: 'top', offset: [0, -6] });
+      else mk.bindTooltip(ctrl ? a.icao : ('<b>' + _atfmEsc(a.icao) + '</b> · ' + (a.color === 'grey' ? 'No data' : a.color === 'info' ? 'ℹ Info' : 'Normal')), { direction: 'top', offset: [0, -6] });
       mk.on('click', (function (ic) { return function () { atfmTapAirport(ic); }; })(a.icao));
       mk.addTo(_atfmMarkerLayer);
     });
@@ -173,7 +185,7 @@ function _atfmRenderTapped() {
   var badge = '';
   if (ctrl) { var ty = a.type || 'GDP'; var bb = _atfmMBadge[ty] || _atfmMBadge['GDP']; badge = ' <span class="atfm-badge" style="background:' + bb[0] + ';color:' + bb[1] + '">' + _atfmEsc(ty) + '</span>'; }
   var h = '<div class="atfm-tap-h"><span><span class="atfm-dot" style="background:' + dotc + '"></span><b>' + _atfmEsc(icao) + '</b>' + badge + '</span><button class="atfm-clear" onclick="atfmClearTap()">✕ Show all</button></div>';
-  var st = ctrl ? a.text : (a.color === 'grey' ? 'No data' : 'Normal — no ATFM measure');
+  var st = ctrl ? a.text : (a.color === 'grey' ? 'No data' : a.color === 'info' ? ('ℹ️ ' + (a.text || 'Information notice') + '  ·  資訊告示,不影響流量') : 'Normal — no ATFM measure');
   if (st) h += '<div class="atfm-tap-txt">' + _atfmEsc(st) + '</div>';
   if (hasC) {
     h += '<div class="atfm-da">' +
