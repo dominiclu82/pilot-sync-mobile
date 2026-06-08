@@ -2344,21 +2344,54 @@ app.get('/api/users', requireAuth, async (req: AuthedRequest, res) => {
 });
 
 // ── Roster data API ──────────────────────────────────────────────────────────
+// 簡易記憶體流量限制器（防暴力猜/快速枚舉）。key 內含 IP，超過 max/視窗就擋；對正常用戶無感。
+const _rl = new Map<string, { n: number; reset: number }>();
+function _rateLimit(key: string, max: number, windowMs: number): boolean {
+  const now = Date.now();
+  const e = _rl.get(key);
+  if (!e || now > e.reset) {
+    _rl.set(key, { n: 1, reset: now + windowMs });
+    // 防止 Map 隨「每個曾出現過的 IP」無限長大（網路掃描會塞爆）→ 變大時順手清掉過期 entry（codex P2）。
+    if (_rl.size > 5000) { for (const [k, v] of _rl) if (now > v.reset) _rl.delete(k); }
+    return true;
+  }
+  if (e.n >= max) return false;
+  e.n++;
+  return true;
+}
+
 app.get('/api/roster-data', async (req, res) => {
   if (!_pool) return res.json({ error: 'No database' });
   const { eid, month } = req.query;
   if (!eid) return res.status(400).json({ error: 'Missing eid' });
   try {
+    // 只有「開啟分享」的人其班表才可被查（與 roster-friends 一致）。退出所有群組/關閉分享者即使資料還在，
+    //   也不會被 /api/roster-data 用 eid 撈出來（codex P1：補上 leave 不再刪資料後的隱私缺口）。
+    const shareChk = await _pool.query('SELECT 1 FROM cs_users WHERE employee_id = $1 AND sharing = true', [eid]);
+    if (shareChk.rowCount === 0) return res.json({ rosters: [], pictures: {} });
     const q = month
       ? await _pool.query('SELECT month, roster_data, updated_at FROM cs_rosters WHERE employee_id = $1 AND month = $2', [eid, month])
       : await _pool.query('SELECT month, roster_data, updated_at FROM cs_rosters WHERE employee_id = $1 ORDER BY month DESC LIMIT 3', [eid]);
-    // Get crew pictures from cs_users (match by employee_id)
-    const picQ = await _pool.query('SELECT employee_id, picture, name FROM cs_users WHERE employee_id IS NOT NULL AND picture IS NOT NULL');
+    // 只回「這份班表裡實際出現的組員」的照片，而不是整張 cs_users（原本無條件回全體姓名/員編/照片＝一次撈走通訊錄）。
+    const needIds = new Set<string>([String(eid)]);
+    const collectIds = (o: any) => {
+      if (!o || typeof o !== 'object') return;
+      if (Array.isArray(o)) { for (const x of o) collectIds(x); return; }
+      for (const k in o) {
+        if ((k === 'staffId' || k === 'employee_id' || k === 'employeeId' || k === 'eid') && o[k]) needIds.add(String(o[k]));
+        else collectIds(o[k]);
+      }
+    };
+    for (const r of q.rows) collectIds(r.roster_data);
     const picMap: Record<string, { picture: string; name: string }> = {};
+    const picQ = await _pool.query(
+      'SELECT employee_id, picture, name FROM cs_users WHERE employee_id = ANY($1) AND picture IS NOT NULL',
+      [Array.from(needIds)]
+    );
     for (const r of picQ.rows) picMap[r.employee_id] = { picture: r.picture, name: r.name };
     res.json({ rosters: q.rows, pictures: picMap });
   } catch (e: any) {
-    res.json({ error: e.message });
+    res.json({ error: 'query failed' });
   }
 });
 
@@ -2436,6 +2469,10 @@ app.get('/api/roster-friends', async (req, res) => {
   if (!_pool) return res.json({ error: 'No database' });
   const { month, eid, group } = req.query;
   if (!month) return res.status(400).json({ error: 'Missing month' });
+  // 批量回傳分享者資料 → 加流量限制擋快速枚舉（正常用戶打開朋友頁只查幾次，60/分綽綽有餘）。
+  if (!_rateLimit('friends:' + (req.ip || req.socket.remoteAddress || '?'), 60, 60000)) {
+    return res.status(429).json({ error: '請稍後再試 Too many requests' });
+  }
   try {
     let q;
     if (group && group !== 'all' && eid) {
@@ -2495,7 +2532,7 @@ app.get('/api/roster-friends', async (req, res) => {
     }));
     res.json({ friends });
   } catch (e: any) {
-    res.json({ error: e.message });
+    res.json({ error: 'query failed' });
   }
 });
 
@@ -2538,10 +2575,10 @@ app.post('/api/groups', async (req, res) => {
   const { eid, name } = req.body;
   if (!eid || !name) return res.status(400).json({ error: 'Missing eid or name' });
   try {
-    // 產生 4 碼邀請碼（重試避免碰撞）
+    // 產生 8 碼邀請碼（重試避免碰撞）。舊的 4 碼群組碼照常能用；新碼提高 entropy 防暴力猜。
     let code = '';
     for (let i = 0; i < 10; i++) {
-      code = randomBytes(2).toString('hex').toUpperCase().slice(0, 4);
+      code = randomBytes(4).toString('hex').toUpperCase().slice(0, 8);
       const dup = await _pool.query(`SELECT 1 FROM cs_groups WHERE invite_code = $1`, [code]);
       if (dup.rowCount === 0) break;
     }
@@ -2590,6 +2627,10 @@ app.post('/api/groups/join-code', async (req, res) => {
   if (!_pool) return res.json({ error: 'No database' });
   const { eid, inviteCode } = req.body;
   if (!eid || !inviteCode) return res.status(400).json({ error: 'Missing eid or inviteCode' });
+  // 防暴力猜邀請碼：每 IP 每分鐘最多 10 次嘗試（正常用戶輸一次就中，無感）。
+  if (!_rateLimit('joincode:' + (req.ip || req.socket.remoteAddress || '?'), 10, 60000)) {
+    return res.status(429).json({ error: '嘗試太頻繁，請稍後再試 Too many attempts' });
+  }
   try {
     const g = await _pool.query(`SELECT id, name FROM cs_groups WHERE invite_code = $1`, [inviteCode.toUpperCase().trim()]);
     if (g.rowCount === 0) return res.status(404).json({ error: '找不到此邀請碼 Invite code not found' });
@@ -2617,11 +2658,12 @@ app.post('/api/groups/leave', async (req, res) => {
         await _pool.query(`DELETE FROM cs_groups WHERE id = $1`, [groupId]);
       }
     }
-    // 退出後如果不在任何群組了 → 關閉 sharing + 刪除班表資料
+    // 退出後如果不在任何群組了 → 關閉 sharing（不再對外顯示）。
+    // ⚠ 不再「刪除班表資料」：原本會 DELETE cs_rosters，但那只靠 eid、任何人知道你員編就能觸發把你班表刪光（破壞性濫用）。
+    //    改成只關 sharing、保留資料（sharing=false 時 roster-friends 本來就不會顯示）；要真的清資料應由本人專屬動作做。
     const remaining = await _pool.query(`SELECT COUNT(*) AS c FROM cs_group_members WHERE employee_id = $1`, [eid]);
     if (+remaining.rows[0].c === 0) {
       await _pool.query(`UPDATE cs_users SET sharing = false WHERE employee_id = $1`, [eid]);
-      await _pool.query(`DELETE FROM cs_rosters WHERE employee_id = $1`, [eid]);
     }
     res.json({ ok: true });
   } catch (e: any) { res.json({ error: e.message }); }
@@ -2726,12 +2768,13 @@ app.get('/api/groups/:id/members', async (req, res) => {
 // ── End Groups API ───────────────────────────────────────────────────────────
 
 app.get('/api/db-test', async (_req, res) => {
-  if (!_pool) return res.json({ ok: false, error: 'No DATABASE_URL' });
+  // 健康檢查：只回 DB 是否可連線，不洩漏資料庫名稱／內部錯誤訊息給外部。
+  if (!_pool) return res.json({ ok: false });
   try {
-    const r = await _pool.query('SELECT NOW() as time, current_database() as db');
-    res.json({ ok: true, time: r.rows[0].time, db: r.rows[0].db });
-  } catch (e: any) {
-    res.json({ ok: false, error: e.message });
+    await _pool.query('SELECT 1');
+    res.json({ ok: true });
+  } catch {
+    res.json({ ok: false });
   }
 });
 

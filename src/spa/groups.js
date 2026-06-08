@@ -448,7 +448,7 @@ function _grpRenderFriends(data) {
   // 邀請碼表單
   html += '<div id="grp-joincode-form" style="display:none;margin-top:12px;padding:10px;background:var(--card);border-radius:8px;border:1px solid var(--dim)">';
   html += '<div style="font-size:.78em;color:var(--muted);margin-bottom:6px">邀請碼 Invite Code</div>';
-  html += '<input id="grp-join-code-input" type="text" maxlength="4" placeholder="e.g. X7K9" style="width:100%;padding:6px;border-radius:6px;border:1px solid var(--dim);background:var(--surface);color:var(--text);font-size:.85em;text-transform:uppercase;letter-spacing:4px;text-align:center;box-sizing:border-box">';
+  html += '<input id="grp-join-code-input" type="text" maxlength="8" placeholder="e.g. X7K9A2C4" style="width:100%;padding:6px;border-radius:6px;border:1px solid var(--dim);background:var(--surface);color:var(--text);font-size:.85em;text-transform:uppercase;letter-spacing:4px;text-align:center;box-sizing:border-box">';
   html += '<button onclick="_grpJoinCode()" style="margin-top:8px;width:100%;background:var(--accent);color:#fff;border:none;border-radius:8px;padding:8px;font-size:.82em;cursor:pointer">加入 Join</button>';
   html += '</div>';
 
