@@ -882,13 +882,20 @@ function _atisPickKind(msgs: any[], kind: 'ARR' | 'DEP'): { title: string; text:
     const hh = parseInt(mm[1], 10), mi = parseInt(mm[2], 10);
     const d = new Date(ing);
     let issue = Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), hh, mi);
-    if (hh * 60 + mi > d.getUTCHours() * 60 + d.getUTCMinutes() + 5) issue -= 86400000;   // 發布晚於收到(容 5 分) → 前一天發的
+    if (issue > ing + 5 * 60000) {
+      // 發布時間晚於收到時間：要嘛「跨午夜、昨晚發今晨收到（仍有效）」，要嘛飛機重索的過期 ATIS / 壞掉的未來時戳。
+      issue -= 86400000;   // 先當前一天發的試推回
+      // 推回後「收到當下這則已經多舊」>8hr → 判定非現行垃圾/重索；≤8hr 留著（涵蓋安靜場跨午夜整夜不更新的合法 ATIS）。
+      //   8hr 落在兩群中間：真跨午夜通常 ≤7hr；實證垃圾群最年輕的 M 1930Z(收 06:18→推回昨 19:30) 也有 10.8hr，X/U/N 更老 → 全濾掉。
+      //   coffee 也把這種濾掉、只留 O 0930Z。
+      if (ing - issue > 8 * 3600000) return -Infinity;
+    }
     return issue;
   };
   const future = Date.now() + 15 * 60000;   // ATIS 不可能未來才發布 → 排除壞掉的未來時戳（實證踩過 1244Z 冒出 1300Z）
   let best: any = null, bestScore = -Infinity;
-  for (const m of matches) { const s = issueScore(m); if (s <= future && s > bestScore) { best = m; bestScore = s; } }
-  if (!best) best = matches[0];   // 全被排除（極端）→ 退用第一則
+  for (const m of matches) { const s = issueScore(m); if (s > bestScore && s <= future) { best = m; bestScore = s; } }
+  if (!best) return null;   // 全是垃圾/未來時戳、無任何有效現行 → 此 kind 不顯示（原本退 matches[0] 會顯示垃圾，已移除）
   const text = String((best && best.text) || '').replace(/^\/[^/]*\//, '').trim();   // 去 ACARS 路由前綴 /TPECAYA.TI2/
   if (!text) return null;
   return { title: tag, text, src: _atisSrcOf(best), time: _atisFmtTime(best && best.timestamp) };
