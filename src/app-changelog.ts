@@ -17,6 +17,9 @@ export function renderCommunityLink(): string {
 export interface ChangelogEntry { v: string; zh: string; en: string; }
 
 export const APP_CHANGELOG: ChangelogEntry[] = [
+  { v: 'V2.0.15',
+    zh: '[投資] 修正「編輯交易按儲存沒反應」——存檔流程的例外被靜默吞掉，現在會正常儲存；真有問題也會跳出明確錯誤而非沒反應。',
+    en: '[Portfolio] Fixed "Save does nothing" when editing a transaction — the save flow no longer silently swallows errors; it now saves properly, and shows a clear message if anything fails.' },
   { v: 'V2.0.14',
     zh: '[全域] 離線可看上次內容了：抓不到資料（飛航模式／斷網）時，自動退回上次成功更新的那份並標示「OFFLINE」，不再只顯示「載入失敗」。',
     en: '[Global] Offline now shows your last content: when data cannot be fetched (airplane mode / no network) it falls back to the last successful update with an OFFLINE banner, instead of just "Load failed".' },
