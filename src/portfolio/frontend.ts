@@ -650,7 +650,19 @@ async function apiFetch(path, opts = {}) {
   const pin = getPin();
   if (pin) headers['X-Portfolio-Pin'] = pin;
 
-  const r = await fetch(API + path, { ...opts, headers });
+  // 加逾時：iOS 上 fetch 偶爾會卡住不回（不 resolve 也不 reject）→ 整個儲存無聲無息「按了沒反應」。
+  //   15 秒沒回就 abort，轉成可見錯誤，不再靜默卡死。
+  const ctrl = new AbortController();
+  const tid = setTimeout(() => ctrl.abort(), 15000);
+  let r;
+  try {
+    r = await fetch(API + path, { ...opts, headers, signal: ctrl.signal });
+  } catch (e) {
+    if (e && e.name === 'AbortError') throw new Error('請求逾時（15 秒沒回應）——可能是網路，請重試');
+    throw e;
+  } finally {
+    clearTimeout(tid);
+  }
   if (!r.ok) {
     const e = await r.json().catch(() => ({ error: 'http_' + r.status }));
     if (e.error === 'pin_required' || e.error === 'invalid_pin') {
@@ -659,7 +671,12 @@ async function apiFetch(path, opts = {}) {
       showPinUnlock();
       throw new Error(e.error);
     }
-    throw new Error(e.error || 'http_' + r.status);
+    // 把已知錯誤碼翻成看得懂、可行動的中文（原本只丟英文碼，使用者看不懂、又被鍵盤蓋住→以為沒反應）。
+    if (e.error === 'sell_exceeds_holding') {
+      throw new Error('賣出 ' + e.attempted_sell_qty + ' 股超過該日持股：系統記錄你在 ' + e.as_of_date + ' 只持有 ' + e.current_qty + ' 股。\n請先記錄「買進」且買進日期早於賣出日，或調整賣出日期／股數。');
+    }
+    const codeMsg = { invalid_txn_date: '日期格式不對', qty_must_be_positive: '股數要大於 0', invalid_price: '價格不可為負', invalid_fee: '手續費不可為負', invalid_symbol: '股票代號無效', not_found: '找不到這筆交易' };
+    throw new Error(codeMsg[e.error] || ('儲存失敗（' + (e.error || ('http_' + r.status)) + '）'));
   }
   return r.json();
 }
@@ -1374,7 +1391,9 @@ async function submitAdd() {
   // err / showErr 先安全取好（null-guard）。原本 err.hidden 在 try 外，modal-error 取不到就會同步 throw；
   //   因為 submitAdd 是 async + inline onclick，這種 throw 會變 unhandled rejection 被吃掉 → 「按了完全沒反應」(codex)。
   const err = document.getElementById('modal-error');
-  function showErr(m) { if (err) { err.textContent = m; err.hidden = false; } }
+  // 同時用 alert()：iOS 上 modal-error 常被鍵盤蓋住/在摺疊線下，使用者看不到 → 以為「按了沒反應」。
+  //   alert 是系統層對話框、一定蓋在最上面，保證看得到失敗原因（順便診斷到底卡在哪）。
+  function showErr(m) { if (err) { err.textContent = m; err.hidden = false; } try { alert(m); } catch (e) { } }
   if (err) err.hidden = true;
 
   // 整段(取 DOM 值 + 驗證 + PATCH/POST)都包進 try → 任何例外都用 showErr 顯示，不再靜默無反應。

@@ -17,6 +17,9 @@ export function renderCommunityLink(): string {
 export interface ChangelogEntry { v: string; zh: string; en: string; }
 
 export const APP_CHANGELOG: ChangelogEntry[] = [
+  { v: 'V2.0.16',
+    zh: '[投資] 儲存失敗時改跳「明確中文提示」（原本錯誤訊息被手機鍵盤蓋住、看起來像按了沒反應）；並加 15 秒逾時，避免請求卡住無聲無息。',
+    en: '[Portfolio] Save failures now show a clear popup message (the error was hidden behind the phone keyboard, looking like "no response"); added a 15s timeout so a stuck request can no longer fail silently.' },
   { v: 'V2.0.15',
     zh: '[投資] 修正「編輯交易按儲存沒反應」——存檔流程的例外被靜默吞掉，現在會正常儲存；真有問題也會跳出明確錯誤而非沒反應。',
     en: '[Portfolio] Fixed "Save does nothing" when editing a transaction — the save flow no longer silently swallows errors; it now saves properly, and shows a clear message if anything fails.' },

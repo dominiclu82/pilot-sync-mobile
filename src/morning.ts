@@ -16,7 +16,7 @@ import { renderAppChangelog } from './app-changelog.js';
 
 // V2.0.0: 統一版號 — 跟 Portfolio 共用 APP_VERSION。MORNING_VERSION alias 保留向後相容
 export const MORNING_VERSION = APP_VERSION;
-const MORNING_CACHE = 'morning-v2-0-15';
+const MORNING_CACHE = 'morning-v2-0-16';
 
 // ─── Postgres ────────────────────────────────────────────────────────
 let _pgPool: pg.Pool | null = null;
