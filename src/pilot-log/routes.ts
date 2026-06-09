@@ -54,8 +54,8 @@ import { getAirportDbJs } from '../spa/js-airport-db.js';
 
 // ── 版本（比照 CrewSync / Morning：每次推版必更新；SW cache 名稱跟著走） ────
 // 本機 preview build 會暫時加 -tNN 後綴方便對版；推正式版前拿掉只留乾淨版號。
-export const PILOT_LOG_VERSION = 'V2.2.26';
-const PILOT_LOG_CACHE = 'pilotlog-v2-2-26';
+export const PILOT_LOG_VERSION = 'V2.2.27';
+const PILOT_LOG_CACHE = 'pilotlog-v2-2-27';
 
 export const pilotLogRouter = express.Router();
 
@@ -362,6 +362,11 @@ function _renderPilotLogChangelog(): string {
   return `
     ${renderCommunityLink()}
     <div class="pl-cl-v">${PILOT_LOG_VERSION}</div>
+    <div class="pl-cl-txt">
+      <b>📥 匯入解析失敗的航班不再丟棄 → 改收成「待補強」（琥珀色、釘最上面）讓你補完；補好自動轉已完成、計入統計。LogTen / Log ATP 2 / WADER 都支援，重匯靠日期合併不重複。</b><br>
+      <b>📥 Import: flights that fail to parse are no longer dropped — kept as "needs-completion" entries (amber, pinned to top) to finish; completing one auto-marks it done and counts it. Works for LogTen / Log ATP 2 / WADER, with date-based merge on re-import.</b>
+    </div>
+    <div class="pl-cl-v old">V2.2.26</div>
     <div class="pl-cl-txt">
       <b>🗺️ 機場詳情頁 All / Dep / Arr 改成釘在頂部固定。</b><br>
       <b>🗺️ Airport detail: All / Dep / Arr now pinned at the top.</b>
@@ -1346,7 +1351,17 @@ pilotLogRouter.put('/api/pilot-log/entries/:id', requireAuth, async (req: Authed
     return res.status(500).json({ error: 'update_failed' });
   }
   if (r.rows.length === 0) return res.status(404).json({ error: 'not_found' });
-  res.json({ entry: r.rows[0] });
+  // 待補強補完：必填欄位（flight_no/origin/dest，flight_date 本就 NOT NULL）都齊了 → 自動清 needs_completion，
+  //   過去日期會自動轉「已完成（綠）」並納入統計，不需另設 status。
+  const row = r.rows[0];
+  if (row.needs_completion && String(row.flight_no || '').trim() && String(row.origin || '').trim() && String(row.dest || '').trim()) {
+    await pool.query(
+      `UPDATE pilot_log_entries SET needs_completion = FALSE, updated_at = NOW() WHERE id = $1 AND user_id = $2`,
+      [req.params.id, req.pilotUserId]
+    );
+    row.needs_completion = false;
+  }
+  res.json({ entry: row });
 });
 
 // ── Entries: 一鍵把「過去日期」的 draft 標成 confirmed（V1.2.05）────────────────
@@ -1358,7 +1373,8 @@ pilotLogRouter.post('/api/pilot-log/entries/confirm-drafts', requireAuth, async 
   if (!pool || !(await ensureTables())) return res.status(503).json({ error: 'database_unavailable' });
   const r = await pool.query(
     `UPDATE pilot_log_entries SET status = 'confirmed', updated_at = NOW()
-       WHERE user_id = $1 AND status = 'draft' AND flight_date < CURRENT_DATE RETURNING id`,
+       WHERE user_id = $1 AND status = 'draft' AND flight_date < CURRENT_DATE
+         AND needs_completion IS NOT TRUE RETURNING id`,
     [req.pilotUserId]
   );
   res.json({ confirmed: r.rowCount ?? 0 });

@@ -118,8 +118,26 @@ export async function generateICSHeadless(
     // ── 登入 ──────────────────────────────────────────────
     log('🌐 開啟登入頁面...');
     await page.goto('https://jxcrew.starlux-airlines.com/jxcrew/login', { waitUntil: 'domcontentloaded' });
-    await page.fill('#username', username);
-    await page.fill('#password', password);
+    // 帳密欄位填寫：包一層友善錯誤。原本逾時會直接吐 Playwright 生硬原文（page.fill: Timeout #username），
+    //   被外層當「未預期錯誤」，員工看不懂、還誤以為是密碼錯（其實是登入頁沒載出登入框）。
+    try {
+      await page.fill('#username', username);
+      await page.fill('#password', password);
+    } catch (e) {
+      const cause = e instanceof Error ? `${e.name}: ${e.message}` : String(e);
+      // 伺服器端留證據（管理員可用「員編」遠端查，不用使用者傳東西）：截圖 + 網址/標題。
+      //   username 就是員編（見 /sync：eid = employeeId || jxUsername）；失敗在填它時掛，所以一定在手上。
+      let where = '';
+      try { where = ` url=${page.url()} title="${await page.title()}"`; } catch { /* page 取不到就算了 */ }
+      try {
+        const eidKey = String(username).replace(/[^A-Za-z0-9_-]/g, '') || 'unknown';
+        const failShot = icsPath.replace(/[^/\\]+\.ics$/, `syncfail-${eidKey}.png`);
+        await page.screenshot({ path: failShot, fullPage: false });
+        log(`📸 已存登入失敗截圖（管理員用員編 ${eidKey} 開 /debug/sync?eid=${eidKey} 可看當下登入頁）`);
+      } catch { /* 截圖失敗不影響回報 */ }
+      log(`❌ 登入頁載入異常 (cause: ${cause})${where}`);
+      throw new Error('登入頁載入異常：開啟登入頁後找不到帳號/密碼欄位（非密碼錯誤）。可能 JX 網站當下壅塞或暫時異常，請稍後重試。');
+    }
 
     try {
       await Promise.all([

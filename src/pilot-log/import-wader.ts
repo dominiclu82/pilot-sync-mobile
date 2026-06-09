@@ -18,6 +18,7 @@ export interface ImportWaderResult {
   opening_types: number;
   duplicate_skipped: number;
   parse_errors: number;
+  needs_completion?: number;        // 待補強：有日期、缺航班號/起降 → 收為 needs_completion，不當正常匯入
   bad_rows?: Array<{ row: number; reason: string }>;
   dry_run: boolean;
   error?: string;
@@ -80,7 +81,7 @@ export async function importWader(
 ): Promise<ImportWaderResult> {
   const result: ImportWaderResult = {
     imported_flights: 0, imported_sims: 0, opening_types: 0,
-    duplicate_skipped: 0, parse_errors: 0, bad_rows: [], dry_run: !!opts.dryRun,
+    duplicate_skipped: 0, parse_errors: 0, needs_completion: 0, bad_rows: [], dry_run: !!opts.dryRun,
   };
 
   const pool = getPool();
@@ -112,6 +113,9 @@ export async function importWader(
   const flightInserts: any[][] = [];
   const simInserts: any[][] = [];
   const openings: Array<{ type: string; row: string[] }> = [];
+  // completeKeys（本次完整航班 日期|出發時間）→ 用 date+out 合併掉「已補完」的舊待補強（不依賴缺失欄位）。
+  //   缺欄位的待補強走正常 flight insert、帶 needs_completion 旗標（保留所有資料）。
+  const completeKeys = new Set<string>();
 
   for (let r = 1; r < grid.length; r++) {
     const cols = grid[r];
@@ -206,17 +210,24 @@ export async function importWader(
       }
       const flightRemarks = rp.length ? rp.join(' · ') : null;
 
-      const sourceRef = `wader:${date}:${flightNo || ''}:${origin || ''}:${dest || ''}:${get(cols, 'startTime')}`;
+      // 缺航班號/起降 → 待補強：仍完整保留所有時間/組員資料（codex P1-B），標 needs_completion；
+      //   source_ref 用「date+出發時間」當穩定鍵（不依賴缺失欄位，codex P1-A），補好重匯靠 date+out 合併。
+      const incomplete = !flightNo || !origin || !dest;
+      if (incomplete) result.needs_completion = (result.needs_completion || 0) + 1;
+      const sourceRef = incomplete
+        ? `wader:incomplete:${date}:${get(cols, 'startTime') || (outUtc ? outUtc.getTime() : 'r' + r)}`
+        : `wader:${date}:${flightNo || ''}:${origin || ''}:${dest || ''}:${get(cols, 'startTime')}`;
       if (existing.has(sourceRef)) { result.duplicate_skipped++; continue; }
       existing.add(sourceRef);
+      if (!incomplete) completeKeys.add(`${date}|${outUtc ? outUtc.toISOString() : ''}`);
 
       flightInserts.push([
-        randomUUID(), userId, 'wader', sourceRef, 'confirmed', date, flightNo, origin, dest,
+        randomUUID(), userId, 'wader', sourceRef, incomplete ? 'draft' : 'confirmed', date, flightNo, origin, dest,
         acType, tail, position, outUtc, offUtc, onUtc, inUtc,
         blockMin, airMin, nightMin, picMin, sicMin,
         int0(get(cols, 'dayTakeoffs')), int0(get(cols, 'nightTakeoffs')),
         int0(get(cols, 'dayLandings')), int0(get(cols, 'nightLandings')),
-        crewJson, approaches, sid, star, flightRemarks,
+        crewJson, approaches, sid, star, flightRemarks, incomplete,
       ]);
       result.imported_flights++;
     } catch (e: any) {
@@ -240,8 +251,8 @@ export async function importWader(
             aircraft_type, tail_no, position, out_utc, off_utc, on_utc, in_utc,
             block_minutes, air_minutes, night_minutes, pic_minutes, sic_minutes,
             day_takeoffs, night_takeoffs, day_landings, night_landings,
-            crew, approaches, sid, star, remarks)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26::jsonb,$27::jsonb,$28,$29,$30)
+            crew, approaches, sid, star, remarks, needs_completion)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26::jsonb,$27::jsonb,$28,$29,$30,$31)
          ON CONFLICT (user_id, source, source_ref) DO NOTHING`,
         p
       );
@@ -280,6 +291,18 @@ export async function importWader(
       );
       result.opening_types++;
     } catch (e: any) { result.parse_errors++; }
+  }
+
+  // ── 待補強合併：本次「完整航班」的 日期+出發時間 → 刪掉同一筆的舊待補強（補好重匯）→ 不留兩筆。
+  //   用 out_utc 配對（不依賴缺失的航班號/起降；codex P1-A）。待補強現在走正常 flight insert、已保留 out_utc。
+  for (const key of completeKeys) {
+    const ci = key.indexOf('|'); const d = key.slice(0, ci); const outIso = key.slice(ci + 1);
+    if (!outIso) continue;   // 無 out 不做 date-only 合併，免誤刪同日其他待補強
+    await pool.query(
+      `DELETE FROM pilot_log_entries WHERE user_id = $1 AND source = 'wader' AND needs_completion = TRUE
+         AND flight_date = $2 AND out_utc = $3::timestamptz`,
+      [userId, d, outIso]
+    ).catch(() => { /* 合併失敗不擋主匯入 */ });
   }
 
   return result;

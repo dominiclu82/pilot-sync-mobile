@@ -2328,6 +2328,22 @@ app.get('/debug/screenshot', (_req, res) => {
   } catch (err: any) { res.status(500).send(err.message); }
 });
 
+// 用「員編」遠端查某使用者最近一次「登入失敗當下的登入頁截圖」（同步是 server 端跑，失敗證據留在 server）。
+//   使用者回報問題時只要給員編，管理員開 /debug/sync?eid=<員編> 就看得到，不用使用者傳截圖。
+app.get('/debug/sync', (req, res) => {
+  // ⚠ owner 專用：必須帶正確 ?k=<SYNC_DEBUG_KEY>(env)。沒設 key → 整個停用(fail closed)。
+  //   否則任何人猜員編就能撈別人的登入失敗截圖(含員編+內部頁面)——codex P1。
+  const key = process.env.SYNC_DEBUG_KEY || '';
+  if (!key || String(req.query.k || '') !== key) return res.status(403).send('forbidden');
+  const eid = String(req.query.eid || '').replace(/[^A-Za-z0-9_-]/g, '');
+  if (!eid) return res.status(400).send('用法：/debug/sync?eid=員編&k=金鑰');
+  try {
+    const f = path.join(OUTPUT_DIR, `syncfail-${eid}.png`);
+    if (!fs.existsSync(f)) return res.status(404).send(`查無員編 ${eid} 的登入失敗截圖（可能未發生過、或檔案已被清理）。`);
+    res.sendFile(f);
+  } catch (err: any) { res.status(500).send(err.message); }
+});
+
 // ── Database admin endpoints ──────────────────────────────────────────────────
 // V8.0.45：拿掉「密碼寫在網址」(?pw=) 的舊機制，改成 owner Google 登入後才看得到
 // （比照 /tower：Bearer token + isOwnerUserId）。一般用戶/外洩網址都拿不到。

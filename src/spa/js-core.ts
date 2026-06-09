@@ -827,26 +827,30 @@ function closeLegal() {
   ov.style.display = 'none';
   document.getElementById('legal-iframe').src = '';
 }
+// 回報給管理員（使用者視角）：一鍵「複製錯誤 + 自動開啟 LINE 社群」→ 飛行員直接在社群貼上傳出，
+//   不用自己找管理員在哪、不用切 app 翻群組。錯誤紀錄已自帶診斷（網址/頁面狀態），管理員一看就懂。
+var _CS_COMMUNITY_URL = 'https://line.me/ti/g2/ArAw4k1D9vXEAMtBsButFLzSFjXzEvFXfKHQ2A?utm_source=invitation';
 function copyLog() {
   var log = document.getElementById('done-log');
-  var text = log ? log.innerText : '';
+  var text = '【CrewSync 同步問題回報】\\n' + (log ? log.innerText : '');
   var btn = document.getElementById('copy-log-btn');
-  navigator.clipboard.writeText(text).then(function() {
-    btn.textContent = '✅ 已複製';
-    setTimeout(function() { btn.textContent = '📋 複製紀錄'; }, 2000);
-  }).catch(function() {
-    // fallback for older browsers
-    var ta = document.createElement('textarea');
-    ta.value = text;
-    ta.style.position = 'fixed';
-    ta.style.opacity = '0';
-    document.body.appendChild(ta);
-    ta.select();
-    document.execCommand('copy');
-    document.body.removeChild(ta);
-    btn.textContent = '✅ 已複製';
-    setTimeout(function() { btn.textContent = '📋 複製紀錄'; }, 2000);
-  });
+  var go = function() {
+    btn.textContent = '✅ 已複製，開啟社群中…貼上傳出即可';
+    // 小延遲讓「已複製」先被看到，再開社群（手機會跳出 LINE，貼上即回報）
+    setTimeout(function() { try { window.open(_CS_COMMUNITY_URL, '_blank'); } catch (e) { location.href = _CS_COMMUNITY_URL; } }, 350);
+    setTimeout(function() { btn.textContent = '📤 回報給管理員 Report'; }, 3500);
+  };
+  if (navigator.clipboard) {
+    navigator.clipboard.writeText(text).then(go).catch(function() { _copyLegacy(text, go); });
+  } else { _copyLegacy(text, go); }
+}
+function _copyLegacy(text, done) {
+  var ta = document.createElement('textarea');
+  ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+  document.body.appendChild(ta); ta.select();
+  try { document.execCommand('copy'); } catch (e) {}
+  document.body.removeChild(ta);
+  done();
 }
 (function() {
   var isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||

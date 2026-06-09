@@ -877,7 +877,8 @@ function _plRenderEntryRow(e) {
   // V1.3.09：色條判斷已完成（user：「已完成綠、未完成藍；未來的跟未完成都是藍色」）
   // V1.3.24：改走 _plEntryIsDone（含 SIM / DHD 過去日期 = 已完成）
   var statusColor;
-  if (e.status === 'roster_removed') statusColor = '#94a3b8';        // gray - removed
+  if (e.needs_completion) statusColor = '#f59e0b';                    // amber - 待補強（飛了、缺資料、等你補；跟「還沒飛的未完成」不同色）
+  else if (e.status === 'roster_removed') statusColor = '#94a3b8';    // gray - removed
   else if (_plEntryIsDone(e)) statusColor = '#10b981';               // green - done
   else statusColor = '#3b82f6';                                       // blue - open (future or past-but-not-logged)
 
@@ -994,6 +995,8 @@ function _plRenderList() {
     _plRenderYearIndex();
     return;
   }
+  // 待補強釘最上面（不管日期）— 要顯眼逼使用者去補；其餘維持原本日期排序（API 已 ORDER BY flight_date DESC，sort 穩定）。
+  shown.sort(function(a, b) { return (b.needs_completion ? 1 : 0) - (a.needs_completion ? 1 : 0); });
   c.innerHTML = shown.map(_plRenderEntryRow).join('');
   _plRenderYearIndex();
   _plDeferYearIndex();   // 直接開 PWA 載入太快時，index 會搶在版面/字體排好前就建 → 位移或年份截斷；排好後再校正一次
@@ -2472,7 +2475,9 @@ function _plRenderEditor(target) {
   // V1.3.09：badge 改用 in_utc 判斷已完成（roster_removed → 灰；in_utc 有 → 綠 done；其餘 → 藍 open）
   var statusBadge = '';
   if (e.id) {
-    if (e.status === 'roster_removed') {
+    if (e.needs_completion) {
+      statusBadge = '<span style="background:#f59e0b;color:#fff;border-radius:10px;padding:2px 8px;font-size:.62em;margin-left:8px">待補強 needs fix</span>';
+    } else if (e.status === 'roster_removed') {
       statusBadge = '<span style="background:#94a3b8;color:#fff;border-radius:10px;padding:2px 8px;font-size:.62em;margin-left:8px">removed</span>';
     } else if (_plEntryIsDone(e)) {
       statusBadge = '<span style="background:#10b981;color:#fff;border-radius:10px;padding:2px 8px;font-size:.62em;margin-left:8px">flown 已完成</span>';
@@ -2816,6 +2821,7 @@ function _plTodayStr() {
 // 今天或更早（已發生）就算已完成；未來（roster 預排的 DHD）仍未完成（藍）。一般航班維持看 in_utc。
 function _plEntryIsDone(e) {
   if (!e || e.status === 'roster_removed') return false;
+  if (e.needs_completion) return false;   // 待補強＝未完成（缺資料），不管有沒有 in_utc 都不算「已完成」（codex P2）
   if (e.in_utc) return true;
   if ((e.is_sim || e.is_deadhead) && e.flight_date &&
       String(e.flight_date).slice(0, 10) <= _plTodayStr()) return true;
@@ -3317,7 +3323,7 @@ async function _plUploadWader(dryRun) {
   var msg = (dryRun ? '🔍 Dry-run（沒寫入 DB）：' : '✅ 匯入完成：') +
     '航班 <b>' + (j.imported_flights || 0) + '</b>、模擬機 <b>' + (j.imported_sims || 0) + '</b>、' +
     '起始累計 <b>' + (j.opening_types || 0) + '</b> 型、重複略過 <b>' + (j.duplicate_skipped || 0) + '</b>、' +
-    '解析失敗 <b>' + (j.parse_errors || 0) + '</b>';
+    '解析失敗 <b>' + (j.parse_errors || 0) + '</b>' + (j.needs_completion ? '、<span style="color:#fbbf24">待補強 <b>' + j.needs_completion + '</b> 筆（已收進來，可點開補完）</span>' : '');
   resBox.innerHTML = '<div style="background:' + (dryRun ? '#1e3a5f' : '#064e3b') + ';color:#fff;padding:10px;border-radius:8px;font-size:.78em">' + msg + '</div>';
   if (!dryRun) { await _plRefreshMain(); }
 }
@@ -3351,7 +3357,7 @@ async function _plUploadLogatp(dryRun) {
   var msg = (dryRun ? '🔍 Dry-run（沒寫入 DB）：' : '✅ 匯入完成：') +
     '新增 <b>' + (dryRun ? nNew : (j.inserted || 0)) + '</b>、更新 <b>' + (j.updated || 0) + '</b>、' +
     '跨來源重複略過 <b>' + (j.cross_source_skipped || 0) + '</b>、補航空代碼 <b>' + (j.code_backfilled || 0) + '</b>、' +
-    '解析失敗 <b>' + (j.parse_errors || 0) + '</b>';
+    '解析失敗 <b>' + (j.parse_errors || 0) + '</b>' + (j.needs_completion ? '、<span style="color:#fbbf24">待補強 <b>' + j.needs_completion + '</b> 筆（已收進來，可點開補完）</span>' : '');
   resBox.innerHTML = '<div style="background:' + (dryRun ? '#1e3a5f' : '#064e3b') + ';color:#fff;padding:10px;border-radius:8px;font-size:.78em">' + msg + '</div>';
   if (!dryRun) { await _plRefreshMain(); }
 }
@@ -3406,7 +3412,7 @@ async function _plUploadFlights(dryRun) {
     var preview = _plRenderPreviewRows(j.preview);
     resBox.innerHTML = '<div style="background:#1e3a5f;color:#fff;padding:10px;border-radius:8px;font-size:.78em">' +
       '🔍 Dry-run（沒寫入 DB）：新增 <b>' + nNew + '</b>、更新未完成 <b>' + nUpdate + '</b>、' +
-      doneLine + '解析失敗 <b>' + j.parse_errors + '</b><br>' +
+      doneLine + '解析失敗 <b>' + j.parse_errors + '</b>' + (j.needs_completion ? '、<span style="color:#fbbf24">待補強 <b>' + j.needs_completion + '</b> 筆（已收進來，可點開補完）</span>' : '') + '<br>' +
       '<span style="font-size:.85em;color:#bfdbfe">確認 OK 後按 Import 真的寫入。</span>' +
       headersInfo +
       preview +
@@ -3414,7 +3420,7 @@ async function _plUploadFlights(dryRun) {
   } else {
     resBox.innerHTML = '<div style="background:#064e3b;color:#fff;padding:10px;border-radius:8px;font-size:.78em">' +
       '✅ 匯入完成：新增 <b>' + (j.inserted || 0) + '</b>、更新 <b>' + (j.updated || 0) + '</b>、' +
-      doneLine + '解析失敗 <b>' + j.parse_errors + '</b>' +
+      doneLine + '解析失敗 <b>' + j.parse_errors + '</b>' + (j.needs_completion ? '、<span style="color:#fbbf24">待補強 <b>' + j.needs_completion + '</b> 筆（已收進來，可點開補完）</span>' : '') +
       '</div>';
     _plToast(overwrite && (j.crew_overwritten || 0) > 0 ? ('匯入完成（補組員 ' + j.crew_overwritten + ' 筆）') : '匯入完成');
   }

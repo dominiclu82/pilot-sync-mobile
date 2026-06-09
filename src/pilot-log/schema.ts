@@ -130,6 +130,10 @@ export async function ensureTables(): Promise<boolean> {
     await pool.query(`ALTER TABLE pilot_log_entries ADD COLUMN IF NOT EXISTS is_sim BOOLEAN DEFAULT FALSE`).catch(() => {});
     await pool.query(`ALTER TABLE pilot_log_entries ADD COLUMN IF NOT EXISTS sim_type TEXT`).catch(() => {});
     await pool.query(`ALTER TABLE pilot_log_entries ADD COLUMN IF NOT EXISTS sim_minutes INT`).catch(() => {});
+    // 「待補強」標記：logbook 匯入時解析失敗（缺日期/航班號/起降等）的筆不再丟棄，改成照樣收進來但標
+    //   needs_completion=true（屬「未完成」的一種，語意＝「飛了、缺資料、等你補」）。UI 釘最上面、琥珀色、
+    //   不計入統計；補完必填欄位後自動清旗標 → confirmed。僅 logbook 匯入（logten/logatp/wader）會用，班表不用。
+    await pool.query(`ALTER TABLE pilot_log_entries ADD COLUMN IF NOT EXISTS needs_completion BOOLEAN DEFAULT FALSE`).catch(() => {});
     // V1.3.17：source 加 'wader'。V2.1.09：再加 'logatp'。inline CHECK 只對新表生效，既有 prod 表用 ALTER 換 constraint。
     await pool.query(`ALTER TABLE pilot_log_entries DROP CONSTRAINT IF EXISTS pilot_log_entries_source_check`).catch(() => {});
     await pool.query(`ALTER TABLE pilot_log_entries ADD CONSTRAINT pilot_log_entries_source_check CHECK (source IN ('roster','logten','manual','wader','logatp'))`).catch(() => {});

@@ -186,6 +186,7 @@ const INSERT_COLS = [
   'day_takeoffs', 'night_takeoffs', 'day_landings', 'night_landings', 'autolands',
   'pax_count', 'sid', 'star', 'remarks',
   'position', 'pic_minutes', 'sic_minutes', 'is_deadhead', 'pilot_flying',
+  'needs_completion',                          // 待補強：缺起降但完整保留資料、補完轉綠
 ];
 const INSERT_N = INSERT_COLS.length;
 const JSONB_IDX = new Set([INSERT_COLS.indexOf('crew'), INSERT_COLS.indexOf('approaches')]);
@@ -208,6 +209,7 @@ export interface ImportLogatpResult {
   cross_source_skipped: number;     // 跨來源（已有 logten/roster 同班）跳過
   code_backfilled: number;          // 沒代碼 → 用機尾補上 IATA 代碼的筆數
   parse_errors: number;
+  needs_completion?: number;        // 待補強：有日期、缺起降 → 收為 needs_completion，不丟棄
   preview?: Array<{
     flight_date: string; flight_no: string; flight_no_raw: string; origin: string; dest: string;
     aircraft_type: string; tail_no: string;
@@ -230,7 +232,7 @@ export async function importLogatp(
 ): Promise<ImportLogatpResult> {
   const empty: ImportLogatpResult = {
     inserted: 0, updated: 0, duplicate_skipped: 0, cross_source_skipped: 0,
-    code_backfilled: 0, parse_errors: 0,
+    code_backfilled: 0, parse_errors: 0, needs_completion: 0,
   };
   const pool = getPool();
   if (!pool || !(await ensureTables())) return { ...empty, error: 'database_unavailable' };
@@ -275,22 +277,25 @@ export async function importLogatp(
   const insertBatch: any[][] = [];
   const updateBatch: Array<{ id: string; params: any[] }> = [];
   const aircraftUpsert = new Map<string, { type: string; operator: string | null }>();   // tail(B-xxxxx) → 機尾庫
-
   for (let i = 0; i < rows.length; i++) {
     const row = rows[i];
     try {
       const date = (row['Flight Date'] || '').trim();
       const origin = (row['Departure'] || '').trim().toUpperCase();
       const dest = (row['Destination'] || '').trim().toUpperCase();
-      if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !origin || !dest) { result.parse_errors++; continue; }
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) { result.parse_errors++; continue; }   // 日期壞 → flight_date NOT NULL，收不進
 
       const tailRaw = row['Aircraft Registration'] || '';
       const tail = formatTail(tailRaw);                                  // 存：B-xxxxx
       const fnRaw = row['Flight Number'] || '';
       const flightNo = resolveFlightNo(fnRaw, tailRaw);                  // 存：帶代碼、原樣
-      if (flightNo && !/^[A-Z]/.test(String(fnRaw).trim().toUpperCase()) && /^[A-Z]/.test(flightNo)) result.code_backfilled++;
-
       const acType = (row['Aircraft Type'] || '').trim().toUpperCase();
+
+      // 缺起降 → 待補強：仍完整解析、保留所有時間/組員資料（codex P1-B），標 needs_completion。
+      //   source_ref 用 Object ID（穩定、不依賴缺失欄位）→ 補好重匯同 objId 自然 UPDATE 合併，不會變兩筆。
+      const incomplete = !origin || !dest;
+      if (incomplete) result.needs_completion = (result.needs_completion || 0) + 1;
+      else if (flightNo && !/^[A-Z]/.test(String(fnRaw).trim().toUpperCase()) && /^[A-Z]/.test(flightNo)) result.code_backfilled++;
 
       const outUtc = parseHmAtDate(date, row['Out time']);
       const offUtc = parseHmAtDate(date, row['Off time'], outUtc);
@@ -332,7 +337,8 @@ export async function importLogatp(
       if (isTrue(row['Go around'])) notes.push('Go-around');
       const remarks = notes.length ? notes.join('; ') : null;
 
-      const status: 'draft' | 'confirmed' = 'confirmed';   // LogATP 都是已飛的歷史
+      // 待補強用 draft（否則重匯會被 skip_confirmed 跳過、補好的資料更新不進來）；完整航班照原本 confirmed。
+      const status: 'draft' | 'confirmed' = incomplete ? 'draft' : 'confirmed';   // LogATP 完整列都是已飛的歷史
       const objId = (row['Object ID'] || '').trim();
       // codex P1：Object ID 缺失（非典型匯出）→ fallback 要夠細，含 Out 時間 + 列序，避免同日同航線多段塌成一筆。
       const sourceRef = objId
@@ -393,6 +399,7 @@ export async function importLogatp(
         dayTO, nightTO, dayLdg, nightLdg, autolands,
         null, null, null, remarks,
         position, picMin, sicMin, false, isPF,
+        incomplete,                          // needs_completion（INSERT_COLS 最後一欄；update 用 $37）
       ];
       if (action === 'update') {
         updateBatch.push({ id: decidedId, params });
@@ -425,7 +432,7 @@ export async function importLogatp(
     for (const u of updateBatch) {
       await client.query(
         `UPDATE pilot_log_entries SET
-           status='confirmed', flight_date=$2, flight_no=$3, origin=$4, dest=$5,
+           status = CASE WHEN $37 THEN 'draft' ELSE 'confirmed' END, flight_date=$2, flight_no=$3, origin=$4, dest=$5,
            aircraft_type=$6, tail_no=$7,
            std_utc=$8, sta_utc=$9, out_utc=$10, off_utc=$11, on_utc=$12, in_utc=$13,
            block_minutes=$14, air_minutes=$15, night_minutes=$16, distance_nm=$17,
@@ -434,6 +441,7 @@ export async function importLogatp(
            day_takeoffs=$23, night_takeoffs=$24, day_landings=$25, night_landings=$26, autolands=$27,
            pax_count=$28, sid=$29, star=$30, remarks=$31,
            position=$32, pic_minutes=$33, sic_minutes=$34, is_deadhead=$35, pilot_flying=$36,
+           needs_completion=$37,
            updated_at=NOW()
          WHERE id=$1`,
         [u.id, ...u.params]
@@ -451,6 +459,8 @@ export async function importLogatp(
         [userId, tail, info.operator, info.type || null]
       ).catch(() => { /* 機尾庫補不進不該擋主匯入 */ });
     }
+    // 待補強：走正常 insert/update（帶 needs_completion 旗標、保留所有資料）；source_ref=Object ID 穩定，
+    //   補好重匯同 objId 自然 UPDATE 合併、不會變兩筆 → 不需額外 reconcile。
     await client.query('COMMIT');
     result.inserted = insertedCount;
     result.updated = updatedCount;

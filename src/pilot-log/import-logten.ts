@@ -112,6 +112,7 @@ const INSERT_COLS = [
   'pic_minutes', 'sic_minutes',                 // V1.2.04：LogTen 實際 PIC/SIC 時數
   'is_deadhead',                                // V1.2.05：deadhead/positioning 標記
   'pilot_flying',                               // V1.3.03：LogTen「Pilot Flying」欄；起降只在 PF 時計
+  'needs_completion',                           // 待補強：缺必填欄位（航班號/起降）但完整保留資料、補完轉綠
 ];
 const INSERT_N = INSERT_COLS.length; // 40
 
@@ -147,6 +148,7 @@ export interface ImportLogtenFlightsResult {
   duplicate_skipped: number;            // 命中 confirmed → 不動
   crew_overwritten?: number;            // V1.3.24：overwriteCrew 模式下，confirmed 航班被補/換組員的筆數
   parse_errors: number;
+  needs_completion?: number;            // 待補強：有日期、缺必填（航班號/起降）→ 收為 needs_completion，不丟棄
   bad_rows?: Array<{ row: number; flight_no?: string; date?: string; reason: string }>;
   preview?: Array<{
     flight_date: string; flight_no: string; origin: string; dest: string;
@@ -190,10 +192,14 @@ export async function importLogtenFlights(
 
   const result: ImportLogtenFlightsResult = {
     inserted: 0, updated: 0, duplicate_skipped: 0, crew_overwritten: 0, parse_errors: 0,
+    needs_completion: 0,
     bad_rows: [], preview: [],
     dry_run: !!opts.dryRun,
     headers,                                       // V1.2.04：回傳欄位 headers，方便確認 PIC/SIC 時數欄有沒有被讀到
   };
+  // completeKeys 記本次「完整航班」的 日期|出發時間(ISO) → TX 內用來合併掉「已被補完」的舊待補強（不留兩筆）。
+  //   缺欄位的待補強走正常 insert 路徑、帶 needs_completion 旗標（保留所有解析資料）；不再另存精簡記錄。
+  const completeKeys = new Set<string>();
 
   // 嚴格 Date 格式驗證 — 任何一筆爛掉就標記、整批不寫
   for (let i = 0; i < rows.length; i++) {
@@ -341,22 +347,27 @@ export async function importLogtenFlights(
       const flightNo = row['Flight #'];
       const from = row['From'];
       const to = row['To'];
-      if (!date || !flightNo || !from || !to) {
-        result.parse_errors++;
-        continue;
-      }
+      if (!date) { result.parse_errors++; continue; }   // 連日期都沒有 → flight_date NOT NULL，無法收（極少；批次日期檢查通常已先擋）
+      // 缺必填（航班號/起降）→ 待補強：仍走完整解析路徑、保留所有時間/組員資料（codex P1-B），只是標 needs_completion。
+      const incomplete = !flightNo || !from || !to;
 
-      const baseRef = `logten:${date}:${flightNo}:${from}:${to}`;
-      // 唯一的 base → 直接用（向後相容）；重複的 base → 加排程/實際出發時間戳記區分（穩定、不依列順序）
-      let sourceRef = baseRef;
-      if ((baseCount.get(baseRef) || 0) > 1) {
-        const stamp = String(row['Scheduled Out'] || '').replace(/[^0-9]/g, '') + '_' +
-                      String(row['Out'] || '').replace(/[^0-9]/g, '');
-        sourceRef = `${baseRef}:${stamp}`;
-      }
-
-      // 跨日 OOOI：Out → Off → On → In 順序遞增，若回繞則 +1 day
+      // 跨日 OOOI：Out → Off → On → In 順序遞增，若回繞則 +1 day（提前解析，待補強的穩定鍵要用 out）
       const outUtc = parseUtcAtDate(date, row['Out']);
+      // source_ref：完整航班用 date+班號+起降（重複再加 Out 戳，向後相容）；待補強改用「date + 出發時間」當穩定鍵——
+      //   不依賴缺失欄位（codex P1-A：用「缺的起降」當鍵，補好重匯會認不回、變兩筆）。
+      let sourceRef: string;
+      if (incomplete) {
+        sourceRef = `logten:incomplete:${date}:${outUtc ? outUtc.getTime() : 'r' + (i + 2)}`;
+      } else {
+        const baseRef = `logten:${date}:${flightNo}:${from}:${to}`;
+        sourceRef = baseRef;
+        if ((baseCount.get(baseRef) || 0) > 1) {
+          const stamp = String(row['Scheduled Out'] || '').replace(/[^0-9]/g, '') + '_' +
+                        String(row['Out'] || '').replace(/[^0-9]/g, '');
+          sourceRef = `${baseRef}:${stamp}`;
+        }
+        completeKeys.add(`${date}|${outUtc ? outUtc.toISOString() : ''}`);   // 完整航班的 日期+出發 → 合併掉同筆舊待補強
+      }
       const offUtc = parseUtcAtDate(date, row['Off'], outUtc);
       const onUtc = parseUtcAtDate(date, row['On'], offUtc || outUtc);
       const inUtc = parseUtcAtDate(date, row['In'], onUtc || offUtc || outUtc);
@@ -430,7 +441,9 @@ export async function importLogtenFlights(
       // 或飛行日期已過（LogTen 裡有的就是發生過的、可能忘了記 Out）→ confirmed；
       // 只有「未來日期 + 沒 Out + 非 deadhead」才是 draft（真正還沒飛的計畫）。
       const isPast = date < _PL_PAST_CUTOFF;
-      const newStatus: 'draft' | 'confirmed' = (outUtc || isDeadhead || isPast) ? 'confirmed' : 'draft';
+      // 待補強一律 draft（缺資料還沒算數，色條看 needs_completion 顯示琥珀）；其餘照原本「過去/有 Out/deadhead = confirmed」。
+      const newStatus: 'draft' | 'confirmed' = incomplete ? 'draft' : ((outUtc || isDeadhead || isPast) ? 'confirmed' : 'draft');
+      if (incomplete) result.needs_completion = (result.needs_completion || 0) + 1;
 
       // Smart re-import：用 Map 取代 SELECT，語意不變（V1.0.02 起）
       // confirmed → skip 保護使用者編輯；draft / roster_removed → 整筆覆蓋
@@ -516,6 +529,7 @@ export async function importLogtenFlights(
             picMin, sicMin,
             isDeadhead,
             isPF,
+            incomplete,
           ],
         });
       } else {
@@ -544,6 +558,7 @@ export async function importLogtenFlights(
           picMin, sicMin,
           isDeadhead,
           isPF,
+          incomplete,                          // needs_completion（INSERT_COLS 最後一欄）
         ]);
       }
     } catch (e: any) {
@@ -552,11 +567,12 @@ export async function importLogtenFlights(
     }
   }
 
-  // dry-run：到此為止，不寫 DB（preview/result 已組好）
+  // dry-run：到此為止，不寫 DB（preview/result 已組好；needs_completion 已在迴圈計數）
   if (opts.dryRun) return result;
 
-  // 沒任何寫入需求（全部 skip_confirmed）→ 直接回，省掉 TX 開銷
-  if (insertBatch.length === 0 && updateBatch.length === 0 && crewUpdateBatch.length === 0) return result;
+  // 沒任何寫入需求（全部 skip_confirmed、且無完整航班要合併舊待補強）→ 直接回，省掉 TX 開銷
+  if (insertBatch.length === 0 && updateBatch.length === 0 && crewUpdateBatch.length === 0
+      && completeKeys.size === 0) return result;
 
   // ── 包進單一 transaction：要嘛全寫成功，要嘛全 ROLLBACK，避免 partial 狀態 ──
   // codex 提醒：原本 bulk INSERT 後接 UPDATE，若中途任一失敗會留下部分寫入。
@@ -602,6 +618,7 @@ export async function importLogtenFlights(
            pic_minutes = $34, sic_minutes = $35,
            is_deadhead = $36,
            pilot_flying = $37,
+           needs_completion = $38,
            updated_at = NOW()
          WHERE id = $1`,
         [u.id, ...u.params]
@@ -628,6 +645,19 @@ export async function importLogtenFlights(
         [u.id, u.crewJson, u.picMin, u.sicMin, u.position]
       );
       crewUpdatedCount++;
+    }
+
+    // ── 待補強合併：本次「完整航班」的 日期+出發時間 → 刪掉同一筆的舊待補強（之前缺資料、現在補好重匯）→ 不留兩筆。
+    //   用 out_utc 配對（不依賴缺失的起降/航班號欄；codex P1-A）。待補強現在走正常 insert、已保留 out_utc。
+    for (const key of completeKeys) {
+      const ci = key.indexOf('|'); const d = key.slice(0, ci); const outIso = key.slice(ci + 1);
+      if (outIso) {
+        await client.query(
+          `DELETE FROM pilot_log_entries WHERE user_id = $1 AND source = 'logten' AND needs_completion = TRUE
+             AND flight_date = $2 AND out_utc = $3::timestamptz`,
+          [userId, d, outIso]
+        );
+      }   // 無 out 的完整航班（極少）不做 date-only 合併，避免誤刪同日其他待補強
     }
 
     await client.query('COMMIT');

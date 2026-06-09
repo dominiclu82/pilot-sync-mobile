@@ -1371,31 +1371,34 @@ function updateFeePreview() {
 }
 
 async function submitAdd() {
-  const symbol = document.getElementById('f-symbol').value.trim().toUpperCase();
-  const market = document.getElementById('f-market').value;
-  const txn_date = document.getElementById('f-date').value;
-  const qty = parseFloat(document.getElementById('f-qty').value);
-  const price = parseFloat(document.getElementById('f-price').value);
-  const feeRaw = document.getElementById('f-fee').value.trim();
-  const note = document.getElementById('f-note').value.trim() || undefined;
-
+  // err / showErr 先安全取好（null-guard）。原本 err.hidden 在 try 外，modal-error 取不到就會同步 throw；
+  //   因為 submitAdd 是 async + inline onclick，這種 throw 會變 unhandled rejection 被吃掉 → 「按了完全沒反應」(codex)。
   const err = document.getElementById('modal-error');
-  err.hidden = true;
-  function showErr(m) { err.textContent = m; err.hidden = false; }
+  function showErr(m) { if (err) { err.textContent = m; err.hidden = false; } }
+  if (err) err.hidden = true;
 
-  if (!symbol) return showErr('請輸入股票代號');
-  if (!txn_date) return showErr('請選日期');
-  if (!isFinite(qty) || qty <= 0) return showErr('股數要 > 0');
-  if (!isFinite(price) || price < 0) return showErr('價格不可為負');
-
-  // 手續費 optional override
-  let feeNum = undefined;
-  if (feeRaw !== '') {
-    feeNum = parseFloat(feeRaw);
-    if (!isFinite(feeNum) || feeNum < 0) return showErr('手續費不可為負');
-  }
-
+  // 整段(取 DOM 值 + 驗證 + PATCH/POST)都包進 try → 任何例外都用 showErr 顯示，不再靜默無反應。
   try {
+    const symbol = document.getElementById('f-symbol').value.trim().toUpperCase();
+    const market = document.getElementById('f-market').value;
+    const txn_date = document.getElementById('f-date').value;
+    const qty = parseFloat(document.getElementById('f-qty').value);
+    const price = parseFloat(document.getElementById('f-price').value);
+    const feeRaw = document.getElementById('f-fee').value.trim();
+    const note = document.getElementById('f-note').value.trim() || undefined;
+
+    if (!symbol) return showErr('請輸入股票代號');
+    if (!txn_date) return showErr('請選日期');
+    if (!isFinite(qty) || qty <= 0) return showErr('股數要 > 0');
+    if (!isFinite(price) || price < 0) return showErr('價格不可為負');
+
+    // 手續費 optional override
+    let feeNum = undefined;
+    if (feeRaw !== '') {
+      feeNum = parseFloat(feeRaw);
+      if (!isFinite(feeNum) || feeNum < 0) return showErr('手續費不可為負');
+    }
+
     if (_state.editingTxnId !== null) {
       // Edit mode: PATCH 只送可改的 fields (symbol / market / txn_type 不可改)
       const patchBody = { txn_date, qty, price, note: note || null };
@@ -1404,9 +1407,9 @@ async function submitAdd() {
         method: 'PATCH',
         body: JSON.stringify(patchBody),
       });
-      // 重新抓 detail
-      const title = document.getElementById('detail-title').textContent;
-      const parts = title.split(' ');
+      // 重新抓 detail（detail-title 取值也 null-guard，避免存好了卻在這 throw）
+      const titleEl = document.getElementById('detail-title');
+      const parts = (titleEl ? titleEl.textContent || '' : '').split(' ');
       const mkt = parts[0];
       const sym = parts[1];
       closeAddModal();
@@ -1423,7 +1426,7 @@ async function submitAdd() {
       refreshAll();
     }
   } catch (e) {
-    showErr('儲存失敗：' + e.message);
+    showErr('儲存失敗：' + (e && e.message ? e.message : e));
   }
 }
 
