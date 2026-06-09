@@ -1536,7 +1536,7 @@ export function getSpaHtmlBody(): string {
       <button class="tab-util-btn tab-install-btn" id="tab-install-btn" onclick="showInstallGuide()" style="display:none">
         <span>📲</span>安裝
       </button>
-      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer;text-decoration:underline" onclick="showAbout()">V9.4.23</span>
+      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer;text-decoration:underline" onclick="showAbout()">V9.4.24</span>
     </div>
   </div>
 </div>
@@ -1570,7 +1570,12 @@ export function getSpaHtmlBody(): string {
     </div>
     <div style="max-height:50vh;overflow-y:auto;-webkit-overflow-scrolling:touch;margin-bottom:10px">
     ${renderCommunityLink()}
-    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V9.4.23</div>
+    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V9.4.24</div>
+    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
+      <div>📻 <b>ATIS 快層重點機場改為常飛航點（桃園/成田/關西/新千歲/香港/樟宜/曼谷）；並清掉早期殘留的「ATIS 暫無」舊資料。</b></div>
+      <div>📻 <b>ATIS priority airports set to the regular network (Taipei/Narita/Kansai/Sapporo/HK/Singapore/Bangkok); also purged leftover "ATIS not available" placeholders.</b></div>
+    </div>
+    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V9.4.23</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
       <div>📻 <b>ATIS 背景累積調校：重點機場用更全面的雙重查法、輪得更勤，並濾掉「ATIS 暫無」佔位訊息，更快接到最新、更少舊資料。</b></div>
       <div>📻 <b>Tuned ATIS background accumulation: priority airports use a fuller dual query and poll more often, and "ATIS not available" placeholders are filtered — catching the latest faster with less stale data.</b></div>
