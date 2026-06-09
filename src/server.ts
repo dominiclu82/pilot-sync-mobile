@@ -97,6 +97,14 @@ async function _dbInit() {
         id INTEGER PRIMARY KEY,
         recipe JSONB NOT NULL, updated_at TIMESTAMPTZ DEFAULT NOW()
       );
+      -- ATIS 累積庫(V9.4.22):背景輪詢把每站每類「最新有效」D-ATIS 存這裡,重啟從 DB 載回 → 跟 coffee 同機制(撈到就 hold、不因滾出 airframes 視窗而消失)
+      CREATE TABLE IF NOT EXISTS cs_atis_store (
+        airport TEXT NOT NULL, kind TEXT NOT NULL,
+        issue_at TIMESTAMPTZ, received_at TIMESTAMPTZ,
+        text TEXT, src TEXT, text_hash TEXT,
+        updated_at TIMESTAMPTZ DEFAULT NOW(),
+        PRIMARY KEY (airport, kind)
+      );
     `);
     // V8.0.60：cs_atis_who 加 icao（記「誰查了哪個機場」）。舊表(PK day,who)要遷移：加欄、改主鍵。
     // ⚠ 不可刪舊列！舊聚合列 icao='' 保留(顯示時當「未分機場」)，避免清掉歷史用量。
@@ -188,7 +196,7 @@ async function _dbInit() {
     console.error('❌ Database init error:', e.message);
   }
 }
-_dbInit().then(() => { _atisLoadState(); _nopLoadState(); });   // 建表後從 DB 載回 ATIS 用量 + 歐洲 NOP cookie（重啟不歸零、不熄燈）
+_dbInit().then(() => { _atisLoadState(); _nopLoadState(); _atisStoreLoad().then(() => _atisStartPoller()); });   // 建表後從 DB 載回 ATIS 用量 + 歐洲 NOP cookie + ATIS 累積庫（重啟不歸零、不熄燈），載回後啟動背景輪詢
 
 // Determine redirect URI: env var > BASE_URL-derived > credentials.json
 const _creds = loadCredentials();
@@ -868,7 +876,7 @@ function _atisFmtTime(iso: any): string {
   return d.getUTCFullYear() + '-' + p(d.getUTCMonth() + 1) + '-' + p(d.getUTCDate()) + ' ' + p(d.getUTCHours()) + ':' + p(d.getUTCMinutes()) + 'Z';
 }
 // 從一批 airframes 訊息挑某 kind(ARR/DEP)的「現行」那則 → {title,text,src,time}
-function _atisPickKind(msgs: any[], kind: 'ARR' | 'DEP'): { title: string; text: string; src: string; time: string } | null {
+function _atisPickKind(msgs: any[], kind: 'ARR' | 'DEP'): { title: string; text: string; src: string; time: string; issueAt: number; receivedAt: number; hash: string } | null {
   const tag = kind + ' ATIS';
   const matches = msgs.filter((m) => String((m && m.text) || '').includes(tag));
   if (!matches.length) return null;
@@ -898,7 +906,8 @@ function _atisPickKind(msgs: any[], kind: 'ARR' | 'DEP'): { title: string; text:
   if (!best) return null;   // 全是垃圾/未來時戳、無任何有效現行 → 此 kind 不顯示（原本退 matches[0] 會顯示垃圾，已移除）
   const text = String((best && best.text) || '').replace(/^\/[^/]*\//, '').trim();   // 去 ACARS 路由前綴 /TPECAYA.TI2/
   if (!text) return null;
-  return { title: tag, text, src: _atisSrcOf(best), time: _atisFmtTime(best && best.timestamp) };
+  const receivedAt = Date.parse(String((best && best.timestamp) || '')) || Date.now();
+  return { title: tag, text, src: _atisSrcOf(best), time: _atisFmtTime(best && best.timestamp), issueAt: bestScore, receivedAt, hash: _atisHash(text) };
 }
 // airframes 匿名限速 60/分（整台 server 共用一個 IP）→ 自我節流到 56/分；bucket 不足就退前端 fallback，不白打成 429。
 let _afBucket = 56, _afBucketReset = 0;
@@ -953,18 +962,114 @@ async function _atisFetchUsFaa(icao: string) {
   }).filter((s: any) => s.text);
 }
 
+// ── ATIS 累積庫 + 背景輪詢（V9.4.22：追平 coffee 新鮮度）──────────────────────────
+// 為何要這套：airframes 即時搜尋只回最近 ~100 則，新 ATIS 幾分鐘就滾出視窗、即時查撈不到（實證翻 5 頁 500 筆都撈不到 4hr 前那筆）。
+// coffee 之所以比較新，就是「頻繁輪詢 + 把每站每類最新有效 ATIS 存起來 hold 住」。我們照做：背景輪詢→存庫→/api/atis 先吃庫。
+type AtisEntry = { text: string; src: string; issueAt: number; receivedAt: number; hash: string; updatedAt: number };
+const _atisStore = new Map<string, { ARR?: AtisEntry; DEP?: AtisEntry }>();   // key=ICAO；記憶體鏡像，背景輪詢維護、重啟從 DB 載回
+function _atisHash(s: string): string {   // djb2，給「同發布時刻但內文改了（修正版 ATIS）」判斷用
+  let h = 5381; for (let i = 0; i < s.length; i++) h = (((h << 5) + h) + s.charCodeAt(i)) | 0;
+  return (h >>> 0).toString(36);
+}
+// 併入庫：只在「更新」時覆蓋（發布時刻較新 / 同發布時刻但收到較新 / 內文改了）；回傳是否有實際更新。
+function _atisStoreMerge(icao: string, kind: 'ARR' | 'DEP', p: { text: string; src: string; issueAt: number; receivedAt: number; hash: string }): boolean {
+  const cur = _atisStore.get(icao) || {};
+  const old = cur[kind];
+  const newer = !old || p.issueAt > old.issueAt
+    || (p.issueAt === old.issueAt && p.receivedAt > old.receivedAt)
+    || (p.issueAt === old.issueAt && p.hash !== old.hash);
+  if (!newer) { if (old) old.updatedAt = Date.now(); return false; }   // 沒更新（同一筆又看到）→ 不動 receivedAt（保「首見時間」，跟 coffee 一致）
+  cur[kind] = { text: p.text, src: p.src, issueAt: p.issueAt, receivedAt: p.receivedAt, hash: p.hash, updatedAt: Date.now() };
+  _atisStore.set(icao, cur);
+  return true;
+}
+function _atisStorePersist(icao: string, kind: 'ARR' | 'DEP') {   // 寫回 DB（只在有更新時呼叫 → 寫入量很小）
+  if (!_pool) return;
+  const v = _atisStore.get(icao) && _atisStore.get(icao)![kind]; if (!v) return;
+  _pool.query(
+    `INSERT INTO cs_atis_store (airport,kind,issue_at,received_at,text,src,text_hash,updated_at)
+     VALUES ($1,$2,to_timestamp($3/1000.0),to_timestamp($4/1000.0),$5,$6,$7,NOW())
+     ON CONFLICT (airport,kind) DO UPDATE SET issue_at=EXCLUDED.issue_at, received_at=EXCLUDED.received_at,
+       text=EXCLUDED.text, src=EXCLUDED.src, text_hash=EXCLUDED.text_hash, updated_at=NOW()`,
+    [icao, kind, v.issueAt, v.receivedAt, v.text, v.src, v.hash]
+  ).catch(() => { /* 寫 DB 失敗不影響記憶體服務 */ });
+}
+// 從庫取某站的 ARR/DEP 段落（服務用形狀）；太舊（>18h）不當現行。time 顯示「收到時間」與 coffee 一致。
+function _atisStoreSections(icao: string): { title: string; text: string; src: string; time: string }[] | null {
+  const e = _atisStore.get(icao); if (!e) return null;
+  const now = Date.now(); const out: { title: string; text: string; src: string; time: string }[] = [];
+  for (const kind of ['ARR', 'DEP'] as const) {
+    const v = e[kind]; if (!v) continue;
+    if (now - v.issueAt > 18 * 3600000) continue;   // 超過 18hr 沒更新 → 不再當「現行」（避免顯示隔夜陳舊）
+    out.push({ title: kind + ' ATIS', text: v.text, src: v.src, time: _atisFmtTime(new Date(v.receivedAt).toISOString()) });
+  }
+  return out.length ? out : null;
+}
+async function _atisStoreLoad() {   // 開機從 DB 載回累積庫 → Render 重啟/部署不歸零（跟 coffee 一樣留得住）
+  if (!_pool) return;
+  try {
+    const rr = await _pool.query(
+      `SELECT airport, kind, EXTRACT(EPOCH FROM issue_at)*1000 AS issue_ms,
+              EXTRACT(EPOCH FROM received_at)*1000 AS recv_ms, text, src, text_hash FROM cs_atis_store`);
+    for (const r of rr.rows) {
+      if (!r.text || (r.kind !== 'ARR' && r.kind !== 'DEP')) continue;
+      const cur = _atisStore.get(r.airport) || {};
+      cur[r.kind as 'ARR' | 'DEP'] = { text: r.text, src: r.src || '', issueAt: Number(r.issue_ms) || 0, receivedAt: Number(r.recv_ms) || 0, hash: r.text_hash || '', updatedAt: Date.now() };
+      _atisStore.set(r.airport, cur);
+    }
+    console.log('[ATIS] store loaded:', _atisStore.size, 'airports');
+  } catch { /* 載入失敗不擋啟動，走即時查保底 */ }
+}
+// 背景輪詢：快層（台灣+主要 hub，~90s 全掃）、慢層（其餘非美國 WX 站，連續慢掃 ~5 分一圈）。用精準查 ICAO ARR/DEP ATIS（codex：整包查繁忙場會漏）。
+// ⚠ 額度安全（實測確認）：airframes 匿名源「只有 60/分、每 60 秒重置、無每日上限」（舊 500/天是已退役的 keyed API，別被舊註解誤導）。
+//   輪詢穩態 ~30/分（快層 ~9 + 慢層 ~21）穩在 56/分桶內；且 /api/atis 走「庫優先」、使用者幾乎不打 airframes → 背景輪詢不會餓死即時查、也沒有每日額度可被燒完。
+const _ATIS_FAST = ['RCTP', 'RCKH', 'RCSS', 'RJAA', 'RJTT', 'VHHH', 'WSSS'];
+const _atisMiss = new Map<string, number>();   // 連續撈到空的次數 → 長期沒 ATIS 的站降頻，省額度
+let _atisPollStarted = false;
+const _atisSleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+async function _atisPollOne(icao: string) {
+  const miss = _atisMiss.get(icao) || 0;
+  if (miss >= 6 && miss % 5 !== 0) { _atisMiss.set(icao, miss + 1); return; }   // 長期空的站：每 5 次才真打 1 次
+  let got = false;
+  for (const kind of ['ARR', 'DEP'] as const) {
+    if (!_afAllow(1)) break;   // 額度不足（使用者即時查在用）→ 讓出，下一圈再補
+    try {
+      const pick = _atisPickKind(await _afQuery(icao + ' ' + kind + ' ATIS'), kind);
+      if (pick) { got = true; if (_atisStoreMerge(icao, kind, pick)) _atisStorePersist(icao, kind); }
+    } catch { /* 單站單類失敗略過，不中斷整圈 */ }
+  }
+  _atisMiss.set(icao, got ? 0 : miss + 1);
+}
+function _atisStartPoller() {
+  if (_atisPollStarted || !_pool) return;   // 沒 DB → 不啟動（無處存）；/api/atis 自動退即時查
+  _atisPollStarted = true;
+  let all: string[] = [];
+  try { all = [...new Set([...getSpaAirportDataJs().matchAll(/icao:'([A-Z]{4})'/g)].map((m) => m[1]))]; } catch { /* 解析失敗就只輪快層 */ }
+  const nonUs = all.filter((ic) => ic[0] !== 'K' && ic[0] !== 'P');   // 美國/太平洋走官方 FAA、不輪詢 airframes
+  const fast = _ATIS_FAST.filter((ic) => nonUs.length === 0 || nonUs.includes(ic));
+  const slow = nonUs.filter((ic) => !fast.includes(ic));
+  console.log('[ATIS] poller start: fast', fast.length, 'slow', slow.length);
+  const runFast = async () => { for (const ic of fast) { await _atisPollOne(ic); await _atisSleep(800); } };
+  setInterval(() => { runFast().catch(() => { }); }, 90000);   // 快層每 90s
+  if (slow.length) {   // 慢層：連續慢掃，整圈 ~5 分（每站間隔 = 300000/站數，最少 2s）
+    let si = 0;
+    const gap = Math.max(2000, Math.floor(300000 / slow.length));
+    setInterval(() => { _atisPollOne(slow[si++ % slow.length]).catch(() => { }); }, gap);
+  }
+  setTimeout(() => { runFast().catch(() => { }); }, 3000);   // 開機 3s 先跑一輪快層，不等第一個 90s
+}
+
 app.get('/api/atis', async (req, res) => {
   const icao = String(req.query.icao || '').toUpperCase();
   if (!/^[A-Z]{4}$/.test(icao)) return res.status(400).json({ error: 'bad icao' });
-  const fresh = req.query.fresh === '1';      // 跳過 60 分快取重抓（區域一鍵更新會帶）
-  const bulk = req.query.bulk === '1';         // 區域一鍵更新：裸查 1 次省限速（單機場開啟不帶 → 裸查沒 DEP 時會專打補一次）
-  // 1. 快取命中（60 分內、非 fresh）→ 直接回
-  if (!fresh) {
-    const c = _atisCache.get(icao);
-    if (c && Date.now() - c.time < ATIS_TTL) return res.json({ sections: c.sections, source: c.source, cached: true });
-  }
-  // 2. 美國機場（K/P 開頭）→ 官方 FAA 源 atis.info 為「權威主源」（免費、CORS*）。FAA 沒有(如關島 PGUM)或掛 → 往下退 airframes(ACARS)。
+  const fresh = req.query.fresh === '1';
+  const bulk = req.query.bulk === '1';
+  // 1. 美國機場（K/P 開頭）→ 官方 FAA 源 atis.info 為「權威主源」（免費、CORS*、不佔 airframes）。FAA 沒有(關島等)或掛 → 往下退 airframes。
   if (icao[0] === 'K' || icao[0] === 'P') {
+    if (!fresh) {
+      const c = _atisCache.get(icao);
+      if (c && Date.now() - c.time < ATIS_TTL) return res.json({ sections: c.sections, source: c.source, cached: true });
+    }
     let us: { title: string; text: string; src?: string; time?: string }[] | null = null;
     try { us = await _atisFetchUsFaa(icao); } catch (e: any) { /* atis.info 掛 → 退 airframes */ }
     if (us && us.length) {
@@ -972,13 +1077,29 @@ app.get('/api/atis', async (req, res) => {
       return res.json({ sections: us, source: 'faa' });
     }
   }
-  // 3. airframes 匿名 /v1（ACARS）為主源（V9.4.18 起：免 key、全用戶可用、自我節流 56/分）。bucket 不足 → 退前端 fallback(atis.guru)。
-  if (!_afAllow(1)) return res.json({ fallback: true });   // 先佔 1 次（裸查）；非 bulk 的 DEP 補抓會在函式內自行再佔 1 次
+  // 2. fresh=1 且單機場（手動刷新）→ 立刻輪詢這站刷新累積庫，再走庫。
+  //    merge 只「升級」（發布較新才覆蓋），所以這次即時查就算撈到較舊的，也不會蓋掉累積庫裡較新的那筆（codex P1：fresh 要能刷新，但不能退化）。
+  //    區域一鍵刷新(bulk)不在此即時打：那批由背景輪詢維護的庫已夠新，避免一次噴一堆 airframes。
+  if (fresh && !bulk) { try { await _atisPollOne(icao); } catch { /* 刷新失敗就用庫裡現有的 */ } }
+  // 3. 非美：先吃背景累積庫（輪詢維護，最新鮮、跟 coffee 同機制）→ 命中直接回，不打 airframes。
+  const stored = _atisStoreSections(icao);
+  if (stored) return res.json({ sections: stored, source: 'acars' });
+  // 4. 庫裡還沒有（冷啟未及輪、非 WX 清單機場、或無 DB 部署）→ 先看 60 分快取（無 DB／輪詢未啟動時靠這層省額度，codex P1），再即時撈保底。
+  if (!fresh) {
+    const c = _atisCache.get(icao);
+    if (c && Date.now() - c.time < ATIS_TTL) return res.json({ sections: c.sections, source: c.source, cached: true });
+  }
+  if (!_afAllow(1)) return res.json({ fallback: true });   // bucket 不足 → 退前端 fallback(atis.guru)
   try {
-    const sections = await _atisFetchAirframes(icao, bulk);
-    if (!sections) return res.json({ fallback: true });    // airframes 沒這機場 → 試 allorigins(atis.guru)
-    _atisCache.set(icao, { sections, time: Date.now(), source: 'acars' });
-    return res.json({ sections, source: 'acars' });
+    const sections = await _atisFetchAirframes(icao, bulk) as any[];
+    if (!sections) return res.json({ fallback: true });
+    for (const s of sections) {   // 即時撈到的也存庫，下次就走庫
+      const kind = s.title === 'DEP ATIS' ? 'DEP' : s.title === 'ARR ATIS' ? 'ARR' : null;
+      if (kind && typeof s.issueAt === 'number' && _atisStoreMerge(icao, kind, s)) _atisStorePersist(icao, kind);
+    }
+    const clean = sections.map((s) => ({ title: s.title, text: s.text, src: s.src, time: s.time }));
+    _atisCache.set(icao, { sections: clean, time: Date.now(), source: 'acars' });   // 設快取（無 DB 部署靠它避免重打）
+    return res.json({ sections: clean, source: 'acars' });
   } catch (e: any) {
     return res.json({ fallback: true });
   }
