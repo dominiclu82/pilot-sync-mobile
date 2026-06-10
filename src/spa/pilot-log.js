@@ -548,12 +548,12 @@ async function _plApi(path, opts) {
     opts.headers['Content-Type'] = opts.headers['Content-Type'] || 'application/json';
     opts.body = JSON.stringify(opts.body);
   }
-  var res = await _plFetchTimeout(path, opts);
+  var res = await _plFetchTimeout(path, opts, opts.timeoutMs);   // V2.3：可帶自訂逾時（匯入這種慢動作用長的，否則吃預設 8 秒被 abort）
   if (res.status === 401 && _pl.refreshToken) {
     var ok = await _plTryRefresh();
     if (ok) {
       opts.headers['Authorization'] = 'Bearer ' + _pl.accessToken;
-      res = await _plFetchTimeout(path, opts);
+      res = await _plFetchTimeout(path, opts, opts.timeoutMs);
     }
   }
   return res;
@@ -3241,10 +3241,14 @@ async function _plWipeCategories() {
 }
 
 async function _plUploadFile(inputId, endpoint) {
+  // V2.3：並發守衛 —— 8 秒逾時時期 user 會「按了沒反應就再按」→ 多個匯入同時打 → DB 互撞變 500。
+  // 一次只允許一個匯入在跑（搭配 120 秒逾時，不會卡死）。
+  if (_pl.importing) { _plToast('已有匯入進行中，請稍候 / An import is already running', 'warn'); return null; }
   var input = document.getElementById(inputId);
   if (!input || !input.files || !input.files[0]) { _plToast('請先選檔案 / Pick a file first', 'warn'); return null; }
   var file = input.files[0];
   if (file.size > 5 * 1024 * 1024) { _plToast('檔案過大（>5MB）', 'error'); return null; }
+  _pl.importing = true;
   // V2.3：匯入中指示 —— 大檔解析/上傳要幾秒，沒提示會被當成「按了沒反應」（user 實際踩過）。
   // 把處理中狀態寫進結果框（按鈕正下方一定看得到）+ toast，並包 try/catch 避免網路錯誤靜默失敗。
   var resBox = document.getElementById('pl-import-result');
@@ -3259,6 +3263,7 @@ async function _plUploadFile(inputId, endpoint) {
       method: 'POST',
       headers: { 'Content-Type': 'text/plain' },
       body: text,
+      timeoutMs: 120000,   // V2.3：匯入大檔/重匯可能要 30-60 秒，給 2 分鐘逾時（不可吃預設 8 秒 → 否則 Fetch aborted）
     });
     if (!r.ok && r.status !== 400) {
       _plToast('上傳失敗 ' + r.status, 'error');
@@ -3271,6 +3276,8 @@ async function _plUploadFile(inputId, endpoint) {
     _plToast('匯入失敗：' + msg, 'error');
     if (resBox) resBox.innerHTML = '<div style="background:#7f1d1d;color:#fff;padding:10px;border-radius:8px;font-size:.78em">❌ 匯入失敗：' + _plEsc(msg) + '<br>（網路或檔案問題，請重試）</div>';
     return null;
+  } finally {
+    _pl.importing = false;   // V2.3：無論成功/失敗/逾時都解鎖，下次才能再匯
   }
 }
 
@@ -3519,6 +3526,8 @@ async function _plUploadWader(dryRun) {
 }
 
 async function _plUploadLogatp(dryRun) {
+  // V2.3（codex）：Log ATP 走兩檔合併、不經 _plUploadFile，所以同樣要自己帶並發守衛 + 長逾時 + 進度提示。
+  if (_pl.importing) { _plToast('已有匯入進行中，請稍候 / An import is already running', 'warn'); return; }
   var endpoint = '/api/pilot-log/import/logatp' + (dryRun ? '?dryRun=1' : '');
   // 讀航班檔(必填)+ 組員檔(選填,system data 要組員名字才需要)→ 合併送(用標記切),server 端對照 crew1~4 的 ID → 名字。
   var fin = document.getElementById('pl-logatp-file');
@@ -3528,28 +3537,41 @@ async function _plUploadLogatp(dryRun) {
   // ⚠ 兩檔合併送 → 合計要 < server body limit(5MB),否則 413(codex P2)。航班+組員合計檢查(+標記約 30 bytes)。
   var combinedBytes = fin.files[0].size + (hasCrew ? cin.files[0].size + 30 : 0);
   if (combinedBytes > 5 * 1024 * 1024) { _plToast('檔案太大：航班+組員合計需 <5MB', 'error'); return; }
-  var text = await fin.files[0].text();
-  if (hasCrew) text = text + '\n__LOGATP_CREW_FILE__\n' + (await cin.files[0].text());
-  var rr = await _plApi(endpoint, { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: text });
-  if (!rr.ok && rr.status !== 400) { _plToast('上傳失敗 ' + rr.status, 'error'); return; }
-  var j = await rr.json().catch(function() { return null; });
-  if (!j) return;
+  _pl.importing = true;
   var resBox = document.getElementById('pl-import-result');
-  if (j.error) {
-    // system data 帶了組員 ID 卻沒附組員檔 → 翻成白話,叫 user 補上組員檔(否則組員會被清空)。
-    var emsg = (j.error === 'system_data_needs_crew_file')
-      ? '這是 System Data 格式、航班裡有組員代碼，請一併在「組員檔 Crew CSV」放上組員 CSV，才對得到名字。<br>This is a System Data export with crew codes — please also attach the Crew CSV so names can be matched.'
-      : _plEsc(j.error);
-    resBox.innerHTML = '<div style="background:#7f1d1d;color:#fff;padding:10px;border-radius:8px;font-size:.78em">❌ ' + emsg + '</div>';
-    return;
+  if (resBox) resBox.innerHTML = '<div style="background:#1e3a5f;color:#fff;padding:12px;border-radius:8px;font-size:.82em;display:flex;align-items:center;gap:8px">' +
+    '<span style="display:inline-block;width:14px;height:14px;border:2px solid #93c5fd;border-top-color:transparent;border-radius:50%;animation:plspin .7s linear infinite"></span>' +
+    '<span>⏳ 匯入處理中…請稍候、勿重複按<br>Importing… please wait, don’t tap again.</span></div><style>@keyframes plspin{to{transform:rotate(360deg)}}</style>';
+  _plToast('⏳ 匯入中… Importing…');
+  try {
+    var text = await fin.files[0].text();
+    if (hasCrew) text = text + '\n__LOGATP_CREW_FILE__\n' + (await cin.files[0].text());
+    var rr = await _plApi(endpoint, { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: text, timeoutMs: 120000 });
+    if (!rr.ok && rr.status !== 400) { _plToast('上傳失敗 ' + rr.status, 'error'); if (resBox) resBox.innerHTML = '<div style="background:#7f1d1d;color:#fff;padding:10px;border-radius:8px;font-size:.78em">❌ 上傳失敗 ' + rr.status + '（請重試）</div>'; return; }
+    var j = await rr.json().catch(function() { return null; });
+    if (!j) return;
+    if (j.error) {
+      // system data 帶了組員 ID 卻沒附組員檔 → 翻成白話,叫 user 補上組員檔(否則組員會被清空)。
+      var emsg = (j.error === 'system_data_needs_crew_file')
+        ? '這是 System Data 格式、航班裡有組員代碼，請一併在「組員檔 Crew CSV」放上組員 CSV，才對得到名字。<br>This is a System Data export with crew codes — please also attach the Crew CSV so names can be matched.'
+        : _plEsc(j.error);
+      resBox.innerHTML = '<div style="background:#7f1d1d;color:#fff;padding:10px;border-radius:8px;font-size:.78em">❌ ' + emsg + '</div>';
+      return;
+    }
+    var nNew = (j.preview || []).filter(function(p) { return p.action === 'insert'; }).length;
+    var msg = (dryRun ? '🔍 Dry-run（沒寫入 DB）：' : '✅ 匯入完成 / Import done：') +
+      '新增 <b>' + (dryRun ? nNew : (j.inserted || 0)) + '</b>、更新 <b>' + (j.updated || 0) + '</b>、' +
+      '跨來源重複略過 <b>' + (j.cross_source_skipped || 0) + '</b>、補航空代碼 <b>' + (j.code_backfilled || 0) + '</b>、' +
+      '解析失敗 <b>' + (j.parse_errors || 0) + '</b>' + (j.needs_completion ? '、<span style="color:#fbbf24">待補強 <b>' + j.needs_completion + '</b> 筆（已收進來，可點開補完）</span>' : '');
+    resBox.innerHTML = '<div style="background:' + (dryRun ? '#1e3a5f' : '#064e3b') + ';color:#fff;padding:10px;border-radius:8px;font-size:.78em">' + msg + '</div>';
+    if (!dryRun) { _plToast('✅ 匯入完成 / Import done：新增 ' + (j.inserted || 0) + ' · 更新 ' + (j.updated || 0)); await _plRefreshMain(); }
+  } catch (e) {
+    var em = (e && e.message) ? e.message : 'unknown';
+    _plToast('匯入失敗：' + em, 'error');
+    if (resBox) resBox.innerHTML = '<div style="background:#7f1d1d;color:#fff;padding:10px;border-radius:8px;font-size:.78em">❌ 匯入失敗：' + _plEsc(em) + '<br>（網路或檔案問題，請重試）</div>';
+  } finally {
+    _pl.importing = false;
   }
-  var nNew = (j.preview || []).filter(function(p) { return p.action === 'insert'; }).length;
-  var msg = (dryRun ? '🔍 Dry-run（沒寫入 DB）：' : '✅ 匯入完成：') +
-    '新增 <b>' + (dryRun ? nNew : (j.inserted || 0)) + '</b>、更新 <b>' + (j.updated || 0) + '</b>、' +
-    '跨來源重複略過 <b>' + (j.cross_source_skipped || 0) + '</b>、補航空代碼 <b>' + (j.code_backfilled || 0) + '</b>、' +
-    '解析失敗 <b>' + (j.parse_errors || 0) + '</b>' + (j.needs_completion ? '、<span style="color:#fbbf24">待補強 <b>' + j.needs_completion + '</b> 筆（已收進來，可點開補完）</span>' : '');
-  resBox.innerHTML = '<div style="background:' + (dryRun ? '#1e3a5f' : '#064e3b') + ';color:#fff;padding:10px;border-radius:8px;font-size:.78em">' + msg + '</div>';
-  if (!dryRun) { await _plRefreshMain(); }
 }
 
 async function _plUploadFlights(dryRun) {
@@ -3612,7 +3634,7 @@ async function _plUploadFlights(dryRun) {
       '✅ 匯入完成：新增 <b>' + (j.inserted || 0) + '</b>、更新 <b>' + (j.updated || 0) + '</b>、' +
       doneLine + '解析失敗 <b>' + j.parse_errors + '</b>' + (j.needs_completion ? '、<span style="color:#fbbf24">待補強 <b>' + j.needs_completion + '</b> 筆（已收進來，可點開補完）</span>' : '') +
       '</div>';
-    _plToast(overwrite && (j.crew_overwritten || 0) > 0 ? ('匯入完成（補組員 ' + j.crew_overwritten + ' 筆）') : '匯入完成');
+    _plToast('✅ 匯入完成 / Import done：新增 ' + (j.inserted || 0) + ' · 更新 ' + (j.updated || 0) + (overwrite && (j.crew_overwritten || 0) > 0 ? ' · 補組員 ' + j.crew_overwritten : ''));
   }
 }
 

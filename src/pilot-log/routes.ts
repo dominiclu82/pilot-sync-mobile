@@ -55,8 +55,8 @@ import { getAirportDbJs } from '../spa/js-airport-db.js';
 
 // ── 版本（比照 CrewSync / Morning：每次推版必更新；SW cache 名稱跟著走） ────
 // 本機 preview build 會暫時加 -tNN 後綴方便對版；推正式版前拿掉只留乾淨版號。
-export const PILOT_LOG_VERSION = 'V2.3.0';
-const PILOT_LOG_CACHE = 'pilotlog-v2-3-0';
+export const PILOT_LOG_VERSION = 'V2.3.01';
+const PILOT_LOG_CACHE = 'pilotlog-v2-3-01';
 
 export const pilotLogRouter = express.Router();
 
@@ -363,6 +363,11 @@ function _renderPilotLogChangelog(): string {
   return `
     ${renderCommunityLink()}
     <div class="pl-cl-v">${PILOT_LOG_VERSION}</div>
+    <div class="pl-cl-txt">
+      <b>🛠️ 修正匯入大檔／重匯被 8 秒逾時中斷（Fetch aborted）與間歇 500：逾時放寬到 2 分鐘、防重複按、補上「匯入完成」提示。</b><br>
+      <b>🛠️ Fixed large/re-imports aborting at the 8s timeout (and intermittent 500s): raised timeout to 2 min, blocked double-tap, added a clear "import done" message.</b>
+    </div>
+    <div class="pl-cl-v old">V2.3.0</div>
     <div class="pl-cl-txt">
       <b>🧑‍✈️ 組員大升級（飛航組加 Relief／Observer、客艙最多 20 格、欄位名稱可自訂），並修好「匯出沒帶班號的航班不計時數」＋加上匯入進度提示。</b><br>
       <b>🧑‍✈️ Crew upgrade (more flight crew + up to 20 cabin slots, renameable field labels); fixed flights missing a flight number not counting toward hours, and added import progress.</b>
