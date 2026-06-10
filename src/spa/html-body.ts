@@ -1536,7 +1536,7 @@ export function getSpaHtmlBody(): string {
       <button class="tab-util-btn tab-install-btn" id="tab-install-btn" onclick="showInstallGuide()" style="display:none">
         <span>📲</span>安裝
       </button>
-      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer;text-decoration:underline" onclick="showAbout()">V9.4.25</span>
+      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer;text-decoration:underline" onclick="showAbout()">V9.4.26</span>
     </div>
   </div>
 </div>
@@ -1570,7 +1570,12 @@ export function getSpaHtmlBody(): string {
     </div>
     <div style="max-height:50vh;overflow-y:auto;-webkit-overflow-scrolling:touch;margin-bottom:10px">
     ${renderCommunityLink()}
-    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V9.4.25</div>
+    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V9.4.26</div>
+    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
+      <div>📻 <b>ATIS 時間顯示補正：「庫」服務的那筆也改標真實發布時刻（V9.4.25 漏了庫路徑、還顯示收到時間，舊資料看起來像剛收到）。</b></div>
+      <div>📻 <b>ATIS time-display fix: store-served entries now also show the real issue time (V9.4.25 missed the store path and still showed receipt time, making old data look fresh).</b></div>
+    </div>
+    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V9.4.25</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
       <div>📻 <b>ATIS 修正「有資料卻顯示空白」（日本場 DEP 等）：有 ATIS 就一定顯示（含較舊的），時間改標「真實發布時刻」誠實呈現新舊；宵禁的「NOT AVAILABLE」也照實顯示。</b></div>
       <div>📻 <b>Fixed ATIS showing blank despite having data (e.g. Japan DEP): now always shows an ATIS when one exists (incl. older), labels the real issue time honestly, and shows curfew "NOT AVAILABLE" states.</b></div>

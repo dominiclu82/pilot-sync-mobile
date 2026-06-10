@@ -1023,7 +1023,8 @@ function _atisStoreSections(icao: string): { title: string; text: string; src: s
   for (const kind of ['ARR', 'DEP'] as const) {
     const v = e[kind]; if (!v) continue;
     if (now - v.issueAt > 36 * 3600000) continue;   // 超過 36hr 才不顯示（放寬到容許隔夜舊資料：使用者寧可看舊的、也不要空白）
-    out.push({ title: kind + ' ATIS', text: v.text, src: v.src, time: _atisFmtTime(new Date(v.receivedAt).toISOString()) });
+    // time 顯示「真實發布時刻 issueAt」(不是收到時間 receivedAt) → 舊資料誠實標舊，不再「昨天的卻標今天下午收到」的誤導。
+    out.push({ title: kind + ' ATIS', text: v.text, src: v.src, time: _atisFmtTime(new Date(v.issueAt).toISOString()) });
   }
   return out.length ? out : null;
 }
