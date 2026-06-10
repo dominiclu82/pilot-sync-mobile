@@ -1536,7 +1536,7 @@ export function getSpaHtmlBody(): string {
       <button class="tab-util-btn tab-install-btn" id="tab-install-btn" onclick="showInstallGuide()" style="display:none">
         <span>📲</span>安裝
       </button>
-      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer;text-decoration:underline" onclick="showAbout()">V9.4.27</span>
+      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer;text-decoration:underline" onclick="showAbout()">V9.4.28</span>
     </div>
   </div>
 </div>
@@ -1570,7 +1570,12 @@ export function getSpaHtmlBody(): string {
     </div>
     <div style="max-height:50vh;overflow-y:auto;-webkit-overflow-scrolling:touch;margin-bottom:10px">
     ${renderCommunityLink()}
-    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V9.4.27</div>
+    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V9.4.28</div>
+    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
+      <div>📻 <b>ATIS 改用 airframes A9 專屬 label 抓取：只回 ATIS、視窗涵蓋約 9-10 小時，現行 ARR/DEP 幾乎不再漏、更新更即時。</b></div>
+      <div>📻 <b>ATIS now uses airframes' A9 (ATIS-only) label: the window holds ~9-10h of ATIS, so current ARR/DEP rarely scroll out — much fresher.</b></div>
+    </div>
+    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V9.4.27</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
       <div>📻 <b>ATIS 支援「合併 ATIS」（歐洲等不分到/離場的單一 ATIS）：這些場也走累積庫、不再只靠前端備援。</b></div>
       <div>📻 <b>ATIS supports combined ATIS (single ATIS not split into ARR/DEP, e.g. Europe) — these airports now use our accumulation store, not just the frontend fallback.</b></div>

@@ -942,7 +942,10 @@ function _afAllow(n: number): boolean {
   return true;
 }
 async function _afQuery(q: string): Promise<any[]> {
-  const url = 'https://api.airframes.io/v1/messages?text=' + encodeURIComponent(q) + '&perPage=100';
+  // V9.4.x：加 labels=A9（ACARS ATIS label，coffee 站長提供）→ 只回 ATIS 那層、不被其他 ACARS 稀釋。
+  //   實測 text=<ICAO>&labels=A9 仍以 text 限縮在該機場、且 100 則 ATIS 涵蓋約 9-10 小時（混合查只有 ~12% 是 ATIS、
+  //   現行 ATIS 幾分鐘就滾出視窗）。→ 即時查就很新，大幅減少漏抓。labels 用「複數」才生效（label 單數會被忽略）。
+  const url = 'https://api.airframes.io/v1/messages?text=' + encodeURIComponent(q) + '&labels=A9&perPage=100';
   const r = await fetch(url, { headers: { 'User-Agent': _FIDS_UA } });
   if (!r.ok) throw new Error('airframes ' + r.status);   // 429/5xx → 讓上層走 fallback
   const a = await r.json() as any;
