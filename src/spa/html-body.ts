@@ -1536,7 +1536,7 @@ export function getSpaHtmlBody(): string {
       <button class="tab-util-btn tab-install-btn" id="tab-install-btn" onclick="showInstallGuide()" style="display:none">
         <span>📲</span>安裝
       </button>
-      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer;text-decoration:underline" onclick="showAbout()">V9.4.26</span>
+      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer;text-decoration:underline" onclick="showAbout()">V9.4.27</span>
     </div>
   </div>
 </div>
@@ -1570,7 +1570,12 @@ export function getSpaHtmlBody(): string {
     </div>
     <div style="max-height:50vh;overflow-y:auto;-webkit-overflow-scrolling:touch;margin-bottom:10px">
     ${renderCommunityLink()}
-    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V9.4.26</div>
+    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V9.4.27</div>
+    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
+      <div>📻 <b>ATIS 支援「合併 ATIS」（歐洲等不分到/離場的單一 ATIS）：這些場也走累積庫、不再只靠前端備援。</b></div>
+      <div>📻 <b>ATIS supports combined ATIS (single ATIS not split into ARR/DEP, e.g. Europe) — these airports now use our accumulation store, not just the frontend fallback.</b></div>
+    </div>
+    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V9.4.26</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
       <div>📻 <b>ATIS 時間顯示補正：「庫」服務的那筆也改標真實發布時刻（V9.4.25 漏了庫路徑、還顯示收到時間，舊資料看起來像剛收到）。</b></div>
       <div>📻 <b>ATIS time-display fix: store-served entries now also show the real issue time (V9.4.25 missed the store path and still showed receipt time, making old data look fresh).</b></div>
