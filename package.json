@@ -28,7 +28,8 @@
     "ical": "^0.8.0",
     "jsdom": "^29.0.2",
     "pg": "^8.20.0",
-    "playwright": "^1.53.1"
+    "playwright": "^1.53.1",
+    "socket.io-client": "^4.8.3"
   },
   "devDependencies": {
     "@types/cors": "^2.8.17",

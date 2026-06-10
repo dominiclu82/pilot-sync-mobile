@@ -4,6 +4,7 @@ import fs from 'fs';
 import path from 'path';
 import { randomUUID, randomBytes, createHash } from 'crypto';
 import { Agent as UndiciAgent } from 'undici';
+import { io as _ioClient } from 'socket.io-client';   // ATIS 即時 feed（airframes 全量 socket.io firehose）
 import { fetchNopNetworkEvents } from './atfm-nop.js';
 import { config } from 'dotenv';
 import { OUTPUT_DIR, ROOT, loadCredentials } from './config.js';
@@ -196,7 +197,7 @@ async function _dbInit() {
     console.error('❌ Database init error:', e.message);
   }
 }
-_dbInit().then(() => { _atisLoadState(); _nopLoadState(); _atisStoreLoad().then(() => _atisStartPoller()); });   // 建表後從 DB 載回 ATIS 用量 + 歐洲 NOP cookie + ATIS 累積庫（重啟不歸零、不熄燈），載回後啟動背景輪詢
+_dbInit().then(() => { _atisLoadState(); _nopLoadState(); _atisStoreLoad().then(() => { _atisStartPoller(); _atisStartLiveFeed(); }); });   // 建表後從 DB 載回 ATIS 用量 + 歐洲 NOP cookie + ATIS 累積庫（重啟不歸零、不熄燈），載回後啟動背景輪詢 + 即時 feed
 
 // Determine redirect URI: env var > BASE_URL-derived > credentials.json
 const _creds = loadCredentials();
@@ -881,7 +882,7 @@ function _atisPickKind(msgs: any[], kind: 'ARR' | 'DEP' | 'ATIS'): { title: stri
   // ⚠ 不可濾掉「ATIS NOT AVAILABLE」：那是合法狀態（如 RJAA 宵禁、夜間無航班→無 D-ATIS），該照實顯示給飛行員。
   //   它沒有字母碼，issueScore 解不出發布時刻 → 退用收到時間排序（curfew 訊息「收到當下即有效」，這樣才比得贏舊的、也會被白天恢復的字母 ATIS 蓋過）。
   const matches = kind === 'ATIS'
-    ? msgs.filter((m) => { const t = String((m && m.text) || ''); return /\bATIS\s+[A-Z]\b/.test(t) && !t.includes('ARR ATIS') && !t.includes('DEP ATIS'); })   // 合併：含「ATIS 字母」但不含 ARR/DEP ATIS
+    ? msgs.filter((m) => { const t = String((m && m.text) || ''); if (t.includes('ARR ATIS') || t.includes('DEP ATIS')) return false; return /\bATIS\s+[A-Z]\b/.test(t) || /\bATIS\b[\s\S]{0,15}NOT\s+AVAIL/i.test(t); })   // 合併：含「ATIS 字母」，或「ATIS NOT AVAILABLE」(宵禁/夜間無 ATIS，照實顯示給飛行員，不可濾掉)；但排除 ARR/DEP
     : msgs.filter((m) => String((m && m.text) || '').includes(tag));
   if (!matches.length) return null;
   // 真實發布時刻 realIssueAt：
@@ -1091,6 +1092,47 @@ function _atisStartPoller() {
     setInterval(() => { _atisPollOne(slow[si++ % slow.length], false).catch(() => { }); }, gap);
   }
   setTimeout(() => { runFast().catch(() => { }); }, 3000);   // 開機 3s 先跑一輪快層，不等第一個 90s
+}
+
+// ── ATIS 即時 feed：airframes 全量 socket.io firehose（wss://ws.airframes.io，免 key、送空 token 即連）──
+//   REST 搜尋只索引一部分（忙場/衛星 ATIS 會滾出視窗 → RJAA DEP 卡舊）；live feed 是「全部」，邊收邊濾 A9 邊累積。
+//   這就是 coffee 的真正機制（站長講了 A9 label、沒講這條 feed）：吃整片 firehose、只撈 A9、塞進同一套累積庫。
+//   負擔：只是「收→看 label→丟」，A9 超稀疏（實測 243 筆/35s 才 1 筆 ATIS），CPU/記憶體極輕；inbound Render 不計費。
+let _atisLiveStarted = false;
+function _atisStartLiveFeed() {
+  if (_atisLiveStarted) return;   // 不限 DB：記憶體庫(_atisStoreMerge)沒 DB 也能跑、即時服務照樣鮮；_atisStorePersist 自身有 !_pool 守衛、沒 DB 就跳過落地
+  _atisLiveStarted = true;
+  let lastLog = 0, a9seen = 0, updates = 0;
+  const sock = _ioClient('https://ws.airframes.io', {
+    transports: ['websocket'],
+    auth: { token: '' },
+    reconnection: true, reconnectionDelay: 3000, reconnectionDelayMax: 30000,
+  });
+  sock.on('connect', () => console.log('[ATIS] live feed connected', sock.id));
+  sock.on('disconnect', (r: any) => console.log('[ATIS] live feed disconnect:', r));
+  sock.on('connect_error', () => { /* 自動重連，不洗 log */ });
+  sock.on('message', (m: any) => {
+    try {
+      const wrap = (m && m.acars && typeof m.acars === 'object') ? m.acars : null;   // 有些 socket payload 把內容包在 m.acars
+      const label = (m && m.label) || (wrap && wrap.label) || '';
+      if (label !== 'A9') return;   // 只要 ATIS 那層，其餘 firehose 直接丟
+      const base = wrap ? { ...m, ...wrap } : m;   // 只有 A9 才攤平（text/timestamp/flight 都升到頂層給 _atisPickKind 用）；firehose 其餘不付這成本
+      const text = String(base.text || '');
+      if (!text) return;
+      // 認機場 + 種類（ARR/DEP/合併 ATIS）
+      let icao = '', kind: 'ARR' | 'DEP' | 'ATIS' | '' = '';
+      const ad = text.match(/\b([A-Z]{4})\s+(ARR|DEP)\s+ATIS\b/);
+      if (ad) { icao = ad[1]; kind = ad[2] as 'ARR' | 'DEP'; }
+      else { const cb = text.match(/\b([A-Z]{4})\s+ATIS\b/); if (cb) { icao = cb[1]; kind = 'ATIS'; } }   // 合併 ATIS（含無字母碼的 NOT AVAILABLE）；ARR/DEP 已先在上面攔掉
+      if (!icao || !kind) return;
+      if (icao[0] === 'K' || icao[0] === 'P') return;   // 美國/太平洋走官方 FAA，不收進 acars 庫
+      a9seen++;
+      const p = _atisPickKind([base], kind);   // 沿用 REST 那套解析（realIssueAt/src/hash），單筆也適用
+      if (p && typeof p.issueAt === 'number' && _atisStoreMerge(icao, kind, p)) { _atisStorePersist(icao, kind); updates++; }
+      const now = Date.now();
+      if (now - lastLog > 600000) { console.log('[ATIS] live feed: A9 seen', a9seen, 'store updates', updates); lastLog = now; }
+    } catch { /* 單筆壞訊息略過，不中斷 feed */ }
+  });
 }
 
 app.get('/api/atis', async (req, res) => {
