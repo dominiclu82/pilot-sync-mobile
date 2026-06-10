@@ -5589,18 +5589,25 @@ function _plAddAcAutofillType(look) {
 
 // 依公司（operator）分析：先用機尾庫 _pl.aircraft 的 operator；沒填 → V1.3.15 用台灣機籍 tail 範圍推。
 // V1.3.21：entry → 公司（機尾庫 operator 優先；沒填用台灣機籍 tail 範圍推）。_pl.aircraft 換新才重建快取。
+// V2.3.06：沒機尾（或機尾推不出）時，用「班號字頭」推公司 —— LogTen Smart Group 用文字搜尋撈得到、
+// 我們靠機尾推不到的那幾班（連機尾都沒有），至少公司先歸對，不會掉出公司統計。
+var _PL_FLTNO_OP = { JX: 'Starlux', BR: 'EVA Air', CI: 'China Airlines', AE: 'Mandarin', B7: 'UNI Air', IT: 'Tigerair Taiwan' };
+function _plCompanyFromFlightNo(fno) {
+  var m = String(fno == null ? '' : fno).trim().toUpperCase().match(/^([A-Z][A-Z0-9])\s*\d/);
+  return (m && _PL_FLTNO_OP[m[1]]) || '';
+}
 function _plEntryCompany(e) {
   // V2.3.03：機尾正規化去 dash/空白再比 —— entry 寫 B16701、機隊庫寫 B-16701 也要對得起來
   var norm = function(t) { return String(t == null ? '' : t).toUpperCase().replace(/[-\s]/g, ''); };
   var tail = norm((e && e.tail_no));
-  if (!tail) return '—';
+  if (!tail) return _plCompanyFromFlightNo(e && e.flight_no) || '—';
   if (_pl._opMapSrc !== _pl.aircraft) {
     var m = {}; (_pl.aircraft || []).forEach(function(a) { if (a.tail_no) m[norm(a.tail_no)] = a.operator || ''; });
     _pl._opMap = m; _pl._opMapSrc = _pl.aircraft;
   }
   var o = _pl._opMap[tail];
   if (!o) { var look = _plTailLookup(tail); if (look) o = look.operator; }
-  return o || '—';
+  return o || _plCompanyFromFlightNo(e && e.flight_no) || '—';
 }
 function _plRenderCompanyBreakdown(entries) {
   return _plBreakdownTable('依公司明細 By Company（點公司看各機型 PIC/SIC）', 'Company', entries, _plEntryCompany, function(company) {
@@ -5806,6 +5813,12 @@ function _plRenderAnalyzeContent() {
     _plAnDetailCard(selSum) +
     '<div style="font-size:.62em;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin:14px 4px 7px">' + (dim === 'company' ? '依公司 By Company' : '依機型 By Type') + '（點看明細）</div>' +
     _plAnDimCards(sel.entries, dim) +
+    // V2.3.06：「—」群組（機型空白）把航班直接列出來 —— 只給統計卡看不到是哪幾班、無從補資料（user 抱怨）。
+    // 點任一班直接進編輯器補機型/機尾。
+    (sel.label === '—'
+      ? '<div style="font-size:.62em;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin:14px 4px 7px">航班 · Flights（' + sel.entries.length + '）— 點開補機型 Tap to fix</div>' +
+        sel.entries.slice().sort(function(a, b) { return String(b.flight_date || '').localeCompare(String(a.flight_date || '')); }).map(_plRenderEntryRow).join('')
+      : '') +
     (sel.id === 'all' ? _plRenderMonthlyChart(entries) + _plRenderOpeningSim() : '');
   c.innerHTML =
     '<style>' +

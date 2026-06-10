@@ -55,8 +55,8 @@ import { getAirportDbJs } from '../spa/js-airport-db.js';
 
 // ── 版本（比照 CrewSync / Morning：每次推版必更新；SW cache 名稱跟著走） ────
 // 本機 preview build 會暫時加 -tNN 後綴方便對版；推正式版前拿掉只留乾淨版號。
-export const PILOT_LOG_VERSION = 'V2.3.05';
-const PILOT_LOG_CACHE = 'pilotlog-v2-3-05';
+export const PILOT_LOG_VERSION = 'V2.3.06';
+const PILOT_LOG_CACHE = 'pilotlog-v2-3-06';
 
 export const pilotLogRouter = express.Router();
 
@@ -363,6 +363,11 @@ function _renderPilotLogChangelog(): string {
   return `
     ${renderCommunityLink()}
     <div class="pl-cl-v">${PILOT_LOG_VERSION}</div>
+    <div class="pl-cl-txt">
+      <b>🔎 「—」未知機型群組直接列出航班可點開補資料；沒機尾的航班改用班號字頭歸公司（JX→星宇）。</b><br>
+      <b>🔎 The "—" unknown-type group now lists its flights (tap to fix); tail-less flights fall back to flight-number prefix for company grouping (JX→Starlux).</b>
+    </div>
+    <div class="pl-cl-v old">V2.3.05</div>
     <div class="pl-cl-txt">
       <b>🛠️ 修班表同班列兩次造成的殘餘重複、Total Duty 預設 0 拿掉讓自動計算生效、客艙組員改預設收合。</b><br>
       <b>🛠️ Fixed leftover duplicates from twice-listed roster duties, removed Total Duty's default 0 so auto-calc works, cabin crew now collapsed by default.</b>
