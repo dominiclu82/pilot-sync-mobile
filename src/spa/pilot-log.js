@@ -789,6 +789,9 @@ async function _plFetchAll() {
       try { localStorage.setItem('pilotlog_crew_display_mode', _pl.crewDisplayMode); } catch (e) {}
       // V2.3：編輯器欄位自訂顯示名稱
       _pl.fieldLabels = (mj && mj.field_labels) || null;
+      // V2.3.07：報到時間規則（On Duty = STD − N 分，依公司×機場）
+      _pl.dutyRules = (mj && mj.duty_rules) || null;
+      try { localStorage.setItem('pilotlog_duty_rules', JSON.stringify(_pl.dutyRules || null)); } catch (e) {}
       try { localStorage.setItem('pilotlog_field_labels', JSON.stringify(_pl.fieldLabels || {})); } catch (e) {}
       // 會員身分（⭐ 創始會員 / 一般會員）— 帳號選單顯示用，順便存 localStorage 給離線
       if (_pl.user) _pl.user.isFounder = !!(mj && mj.isFounder);
@@ -1742,9 +1745,27 @@ function _plRerenderEditor() {
 // V2.3：LogTen 式「Configure Fields」開關。關 → 先存欄位名稱；開 → 進可編輯狀態。
 function _plToggleConfigFields() {
   if (_pl.configFields) { _plSaveFieldLabels(); }       // 退出 = 儲存（async 內會重畫）
-  else { _pl.configFields = true; _plRerenderEditor(); }
+  else { _pl.configFields = true; _pl._drEdit = null; _plRerenderEditor(); }   // 進設定：規則暫存重建（吃最新值）
 }
 async function _plSaveFieldLabels() {
+  // V2.3.07：✓ Done 同時存「報到時間規則」（獨立 endpoint；失敗回滾本機值，不擋欄位名稱儲存）
+  var dutyRules = _plDrCollect();
+  var prevRules = _pl.dutyRules;   // codex P2：存失敗要還原，否則本機用沒存進 server 的規則自動帶，跨裝置不一致
+  _pl.dutyRules = dutyRules;       // 樂觀更新；空陣列 = 使用者刻意全刪 = 關閉自動帶（不彈回預設）
+  try { localStorage.setItem('pilotlog_duty_rules', JSON.stringify(_pl.dutyRules)); } catch (e) {}
+  _pl._drEdit = null;
+  var _revertRules = function(msg) {
+    _pl.dutyRules = prevRules;
+    try { localStorage.setItem('pilotlog_duty_rules', JSON.stringify(prevRules || null)); } catch (e) {}
+    _plToast(msg, 'error');
+  };
+  // codex P2：await 到完成才往下 —— fire-and-forget 在使用者立刻關頁時會被瀏覽器取消、規則悄悄沒存到
+  try {
+    var drRes = await _plApi('/api/pilot-log/duty-rules', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: { rules: dutyRules },
+    });
+    if (!drRes.ok) _revertRules('報到規則儲存失敗、已還原 ' + drRes.status);
+  } catch (e) { _revertRules('報到規則儲存失敗、已還原（離線？）'); }
   // 從畫面所有 pl-fl-* 收集；以現有 fieldLabels 為底合併（沒渲染到的欄位標籤保留、不掉）。空字串 → 還原預設。
   var body = {};
   var prev = _pl.fieldLabels;   // V2.3（codex P2）：server 存失敗要還原，避免本機顯示成已存、跨裝置卻沒有。
@@ -2361,9 +2382,151 @@ function _plOffDutyGapMin() {
   var v = parseInt((_pl.fieldLabels || {}).off_duty_gap_min, 10);
   return (isNaN(v) || v < 0 || v > 600) ? 30 : v;
 }
+// ── V2.3.07：報到時間規則（On Duty = STD − N 分，依公司×機場；apt='*' = 該公司其他站）──
+// 預設帶星宇 + 長榮（user 提供）；使用者可在 ⚙ Fields 自行增刪改，存 server 跨裝置同步。
+// 星宇數字出自 FOM 4.7.4 Reporting for Duty（2026-06 版，user 提供截圖）：RCTP 110 / RCMQ 90 /
+// USA Territories 70（用 K* 開頭比對涵蓋美國本土）/ 其他 60。EVA RCTP 120 為 user 記憶值，可自行修。
+var PL_DUTY_RULES_DEFAULT = [
+  { co: 'Starlux', apt: 'RCTP', min: 110 },
+  { co: 'Starlux', apt: 'RCMQ', min: 90 },
+  { co: 'Starlux', apt: 'K*', min: 70 },
+  { co: 'Starlux', apt: '*', min: 60 },
+  { co: 'EVA Air', apt: 'RCTP', min: 120 },
+  { co: 'EVA Air', apt: '*', min: 60 },
+];
+// 語意（codex P2 round8）：null/從未設定 → 內建預設；空陣列 [] → 使用者刻意全刪 = 關閉自動帶。
+function _plDutyRules() {
+  if (Array.isArray(_pl.dutyRules)) return _pl.dutyRules;
+  try { var c = JSON.parse(localStorage.getItem('pilotlog_duty_rules') || 'null'); if (Array.isArray(c)) return c; } catch (e) {}
+  return PL_DUTY_RULES_DEFAULT;
+}
+// ── 規則設定 UI（⚙ Fields 面板內）：編輯中暫存 _pl._drEdit，✓ Done 才存 server ──
+// UX（user 指定）：預設「收合一行」，點開是文字清單不是一排格子 —— 按 ✏️ 那一條才變輸入格、
+// 按＋才長新格。不需要設定的人不會被一堆格子嚇到。
+function _plDrSync() {   // 把畫面上「編輯中列」的輸入讀回暫存（加/刪/切換前要先收，不然改一半的值會掉）
+  if (!_pl._drEdit) return;
+  for (var i = 0; i < _pl._drEdit.length; i++) {
+    if (!_pl._drEdit[i].edit) continue;
+    var co = document.getElementById('pl-dr-co-' + i), apt = document.getElementById('pl-dr-apt-' + i), mn = document.getElementById('pl-dr-min-' + i);
+    if (co) _pl._drEdit[i].co = co.value.trim();
+    if (apt) _pl._drEdit[i].apt = apt.value.trim().toUpperCase();
+    if (mn) _pl._drEdit[i].min = mn.value.trim();
+  }
+}
+function _plDrAdd() { _plDrSync(); _pl._drEdit.push({ co: '', apt: '', min: '', edit: true }); _plRerenderEditor(); }
+function _plDrDel(i) { _plDrSync(); _pl._drEdit.splice(i, 1); _plRerenderEditor(); }
+function _plDrEditRow(i) { _plDrSync(); _pl._drEdit[i].edit = true; _plRerenderEditor(); }
+function _plDrCollect() {   // 暫存 → 乾淨規則陣列（丟掉沒填齊的列）
+  _plDrSync();
+  var out = [];
+  (_pl._drEdit || []).forEach(function(r) {
+    var min = parseInt(r.min, 10);
+    if (r.co && r.apt && !isNaN(min) && min >= 0 && min <= 600) out.push({ co: r.co, apt: r.apt, min: min });
+  });
+  return out;
+}
+function _plDutyRulesEditHtml() {
+  if (!_pl._drEdit) _pl._drEdit = _plDutyRules().map(function(r) { return { co: r.co, apt: r.apt, min: r.min, edit: false }; });
+  var inCss = 'background:var(--bg,#0a0e1a);color:var(--text);border:1px solid #f59e0b;border-radius:5px;padding:3px 6px;font-size:1em';
+  var rows = _pl._drEdit.map(function(r, i) {
+    if (r.edit) {
+      return '<div style="display:flex;gap:5px;align-items:center;margin-top:4px">' +
+        '<input id="pl-dr-co-' + i + '" value="' + _plEsc(r.co) + '" placeholder="公司 Company" style="flex:1.4;min-width:0;' + inCss + '">' +
+        '<input id="pl-dr-apt-' + i + '" value="' + _plEsc(r.apt) + '" placeholder="機場/*" maxlength="8" style="flex:1;min-width:0;text-transform:uppercase;' + inCss + '">' +
+        '<span style="white-space:nowrap">STD −</span>' +
+        '<input id="pl-dr-min-' + i + '" type="number" inputmode="numeric" min="0" max="600" value="' + _plEsc(String(r.min)) + '" style="width:52px;text-align:center;' + inCss + '">' +
+        '<span>分</span>' +
+        '<button onclick="_plDrDel(' + i + ')" style="background:transparent;border:0;color:#ef4444;cursor:pointer;font-size:1em;padding:2px 4px">✕</button>' +
+      '</div>';
+    }
+    // 文字列（非編輯）：公司 · 機場 · STD−N分 ＋ ✏️/✕
+    return '<div style="display:flex;gap:7px;align-items:center;margin-top:3px;padding:1px 0">' +
+      '<span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' +
+        _plEsc(r.co) + ' · ' + _plEsc(r.apt === '*' ? '其他站 *' : r.apt) + ' · STD−' + _plEsc(String(r.min)) + '分</span>' +
+      '<button onclick="_plDrEditRow(' + i + ')" title="Edit" style="background:transparent;border:0;cursor:pointer;font-size:.95em;padding:1px 3px">✏️</button>' +
+      '<button onclick="_plDrDel(' + i + ')" title="Delete" style="background:transparent;border:0;color:#ef4444;cursor:pointer;font-size:1em;padding:1px 3px">✕</button>' +
+    '</div>';
+  }).join('');
+  var btnCss = 'background:transparent;border:1px solid #f59e0b;color:#fbbf24;border-radius:5px;padding:3px 9px;font-size:1em;cursor:pointer;margin-top:6px';
+  // 收合：預設閉合一行；展開狀態記在 _pl._drOpen（重畫不彈回）
+  return '<details style="margin-top:8px;border-top:1px dashed #f59e0b;padding-top:6px"' + (_pl._drOpen ? ' open' : '') + ' ontoggle="_pl._drOpen=this.open">' +
+    '<summary style="cursor:pointer">⏰ <b>報到時間 On Duty 自動帶</b>（STD − N 分，' + _pl._drEdit.length + ' 條規則，預設星宇 FOM）／Report-time rules</summary>' +
+    '<div style="opacity:.85;margin-top:4px">機場填 <b>*</b>＝該公司其他站、<b>K*</b>＝K 開頭（全美國）；公司名要跟 Analyze「依公司」顯示的一致（Starlux／EVA Air）。</div>' +
+    rows +
+    '<div style="display:flex;gap:8px">' +
+      '<button onclick="_plDrAdd()" style="' + btnCss + '">＋ 新增規則 Add</button>' +
+      '<button onclick="_plDutyBackfill()" style="' + btnCss + '">🪄 依規則回填舊航班 Backfill…</button>' +
+    '</div></details>';
+}
+// 回填：先 dry-run 報數字 → 使用者確認 → 真寫入（只補空白，含 Off Duty=In+gap、Total=Off−On）
+async function _plDutyBackfill() {
+  var rules = _plDrCollect();
+  if (!rules.length) { _plToast('先把規則填齊（公司/機場/分鐘）', 'warn'); return; }
+  // codex P2：gap 讀「畫面上正在編輯的值」優先（使用者改了還沒按 ✓ Done 就按回填，要用新值）
+  var gapEl = document.getElementById('pl-fl-off_duty_gap_min');
+  var gv = gapEl ? parseInt(gapEl.value, 10) : NaN;
+  var body = { rules: rules, off_gap_min: (!isNaN(gv) && gv >= 0 && gv <= 600) ? gv : _plOffDutyGapMin() };
+  try {
+    var r = await _plApi('/api/pilot-log/duty-backfill', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: Object.assign({ dry_run: true }, body) });
+    if (!r.ok) { _plToast('預覽失敗 ' + r.status, 'error'); return; }
+    var j = await r.json();
+    var n = (j.on_duty_filled || 0) + (j.off_duty_filled || 0) + (j.total_filled || 0);
+    if (!n) { _plToast('沒有可回填的空白欄位 / Nothing to backfill'); return; }
+    if (!confirm('將回填（只補空白、不動既有值）：\nOn Duty ' + j.on_duty_filled + ' 班、Off Duty ' + j.off_duty_filled + ' 班、Total Duty ' + j.total_filled + ' 班\n\n確定執行？')) return;
+    var r2 = await _plApi('/api/pilot-log/duty-backfill', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: body });
+    if (!r2.ok) { _plToast('回填失敗 ' + r2.status, 'error'); return; }
+    var j2 = await r2.json();
+    _plToast('✅ 回填完成：On ' + j2.on_duty_filled + ' / Off ' + j2.off_duty_filled + ' / Total ' + j2.total_filled);
+    await _plFetchAll();
+    _plRerenderEditor();
+  } catch (e) { _plToast('回填失敗：' + (e && e.message ? e.message : 'unknown'), 'error'); }
+}
+// 機場代碼正規化（codex P2）：3 碼 IATA → ICAO（機場庫載入後才查得到，沒載到原樣比對 = 舊行為）
+function _plNormApt(code) {
+  var c = String(code == null ? '' : code).trim().toUpperCase();
+  if (c.length === 3 && typeof _PL_AIRPORTS !== 'undefined') {
+    if (!_pl._iataIdx) {
+      var m = {};
+      for (var i = 0; i < _PL_AIRPORTS.length; i++) { var a = _PL_AIRPORTS[i]; if (a[1] && !m[a[1]]) m[a[1]] = a[0]; }
+      _pl._iataIdx = m;
+    }
+    if (_pl._iataIdx[c]) return _pl._iataIdx[c];
+  }
+  return c;
+}
+// 依「目前編輯器欄位」推這班的公司 + 套規則 → 提前分鐘；配不到回 null（不亂猜）
+function _plOnDutyRuleMin() {
+  var co = _plEntryCompany({ tail_no: _plGetVal('ple-tail_no'), flight_no: _plGetVal('ple-flight_no') });
+  if (!co || co === '—') return null;
+  var origin = _plNormApt(_plGetVal('ple-origin'));
+  if (!origin) return null;
+  // 優先序：機場精準 > 開頭比對（'K*' = 美國本土這類區域規則）> '*' 其他站
+  var star = null, prefix = null, rules = _plDutyRules();
+  for (var i = 0; i < rules.length; i++) {
+    var r = rules[i];
+    if (String(r.co || '').toUpperCase() !== co.toUpperCase()) continue;
+    var apt = String(r.apt || '').toUpperCase();
+    if (apt !== '*' && apt.slice(-1) !== '*' && _plNormApt(apt) === origin) return parseInt(r.min, 10);
+    if (apt === '*') { if (star == null) star = parseInt(r.min, 10); }
+    else if (apt.slice(-1) === '*' && origin.indexOf(apt.slice(0, -1)) === 0) { if (prefix == null) prefix = parseInt(r.min, 10); }
+  }
+  var pick = (prefix != null) ? prefix : star;
+  return (pick == null || isNaN(pick)) ? null : pick;
+}
 function _plAutoCalcDuty() {
+  var onEl = document.getElementById('ple-on_duty_utc');
   var offEl = document.getElementById('ple-off_duty_utc');
   var totEl = document.getElementById('ple-total_duty_minutes');
+  // V2.3.07：On Duty = STD − 規則分鐘（依公司×機場；手動優先、清空恢復自動）
+  var std = _plHHMMtoMin(_plGetVal('ple-std_utc'));
+  if (onEl && onEl.dataset.manual !== '1' && (onEl.dataset.auto === '1' || !onEl.value.trim())) {
+    var ruleMin = (std != null) ? _plOnDutyRuleMin() : null;
+    if (ruleMin != null) {
+      var on = ((std - ruleMin) % 1440 + 1440) % 1440;
+      onEl.value = ('0' + Math.floor(on / 60)).slice(-2) + ('0' + (on % 60)).slice(-2);
+      onEl.dataset.auto = '1';
+    } else if (onEl.dataset.auto === '1') { onEl.value = ''; }   // STD 清掉/規則配不到 → auto 值也清
+  }
   // Off Duty = In + gap
   var inn = _plHHMMtoMin(_plGetVal('ple-in_utc'));
   if (offEl && offEl.dataset.manual !== '1' && (offEl.dataset.auto === '1' || !offEl.value.trim())) {
@@ -2614,7 +2777,7 @@ function _plWireEditor() {
     _plUpdateAptNames();
     _plUpdateRwyLists();
     _plUpdateAptLists();
-    if (!_pl.editing.is_locked) _plAutoCalcTimes();
+    if (!_pl.editing.is_locked) { _plAutoCalcTimes(); _plAutoCalcDuty(); }   // V2.3.07：機場庫到位後 IATA→ICAO 才查得到，Duty 規則要補算一次（codex P2）
   });
   // V1.3.08：上鎖的航班 — 所有編輯欄位 disabled；Lock 按鈕仍可用以解鎖
   if (_pl.editing && _pl.editing.is_locked) {
@@ -2650,13 +2813,15 @@ function _plWireEditor() {
     var el = document.getElementById('ple-' + n);
     if (el) el.addEventListener('input', function() { el.dataset.manual = '1'; });
   });
-  // V2.3.04：Duty 連動 —— In / On Duty 變更觸發；Off Duty / Total Duty 手動輸入標 manual 停止覆寫，
+  // V2.3.04：Duty 連動 —— 來源欄位變更觸發；On/Off/Total Duty 手動輸入標 manual 停止覆寫，
   // 清空欄位則解除 manual（沒資料就恢復自動）。
-  ['in_utc', 'on_duty_utc'].forEach(function(n) {
+  // V2.3.07：On Duty 也改自動帶（STD−規則分鐘），觸發源加 std/origin/班號/機尾（公司與機場會影響規則）。
+  ['in_utc', 'std_utc', 'origin', 'flight_no', 'tail_no'].forEach(function(n) {
     var el = document.getElementById('ple-' + n);
-    if (el) el.addEventListener('input', _plAutoCalcDuty);
+    // codex P2：tail_no 是 <select>，部分瀏覽器只發 change 不發 input → 兩個都掛（重複觸發無害、計算冪等）
+    if (el) { el.addEventListener('input', _plAutoCalcDuty); el.addEventListener('change', _plAutoCalcDuty); }
   });
-  ['off_duty_utc', 'total_duty_minutes'].forEach(function(n) {
+  ['on_duty_utc', 'off_duty_utc', 'total_duty_minutes'].forEach(function(n) {
     var el = document.getElementById('ple-' + n);
     if (el) el.addEventListener('input', function() {
       if (el.value.trim()) { el.dataset.manual = '1'; delete el.dataset.auto; }
@@ -2664,7 +2829,7 @@ function _plWireEditor() {
       _plAutoCalcDuty();
     });
   });
-  _plAutoCalcDuty();   // 開編輯器先帶一次（已飛但 Off Duty / Total Duty 還空的，直接看到自動值）
+  _plAutoCalcDuty();   // 開編輯器先帶一次（已飛但 Duty 欄還空的，直接看到自動值）
   // V1.3.05：origin / dest / flight_date 變更也觸發夜航計算（不只 OOOI）
   ['origin', 'dest', 'flight_date'].forEach(function(n) {
     var el = document.getElementById('ple-' + n);
@@ -2752,7 +2917,9 @@ function _plRenderEditor(target) {
     // V2.3：Configure Fields 模式提示橫幅（英文）
     (_pl.configFields ? '<div style="background:#3b2f0a;border:1px solid #f59e0b;color:#fbbf24;border-radius:8px;padding:8px 10px;font-size:.68em;margin-bottom:10px;line-height:1.5">✏️ <b>Configure fields</b> — tap any field name to rename it, then <b>✓ Done</b> to save. Applies to all flights, synced across your devices.' +
       // V2.3.04：Off Duty 自動帶的間隔分鐘（公司規定不同可改；存 field_labels 保留 key，跨裝置同步）
-      '<br>⏱️ Off Duty 自動帶 = In + <input id="pl-fl-off_duty_gap_min" type="number" inputmode="numeric" min="0" max="600" value="' + _plOffDutyGapMin() + '" style="width:54px;background:var(--bg,#0a0e1a);color:var(--text);border:1px solid #f59e0b;border-radius:5px;padding:3px 6px;font-size:1em;text-align:center"> 分鐘 / Off Duty auto-fill = In + N min (company-specific).</div>' : '') +
+      '<br>⏱️ Off Duty 自動帶 = In + <input id="pl-fl-off_duty_gap_min" type="number" inputmode="numeric" min="0" max="600" value="' + _plOffDutyGapMin() + '" style="width:54px;background:var(--bg,#0a0e1a);color:var(--text);border:1px solid #f59e0b;border-radius:5px;padding:3px 6px;font-size:1em;text-align:center"> 分鐘 / Off Duty auto-fill = In + N min (company-specific).' +
+      // V2.3.07：報到時間規則（依公司×機場）+ 回填按鈕
+      _plDutyRulesEditHtml() + '</div>' : '') +
 
     // ── Flight：Date+Flight# / From+To / Type+Tail+Position ──
     '<div style="background:var(--card);border-radius:10px;padding:12px">' +
@@ -2927,6 +3094,25 @@ async function _plSaveEntry() {
     body.std_utc = null; body.sta_utc = null;
     body.out_utc = null; body.off_utc = null; body.on_utc = null; body.in_utc = null;
   }
+
+  // V2.3.07（codex P2）：Duty 時間跨午夜校正 —— time-utc 欄位存檔一律掛在 flight_date 上，
+  // 但 STD 剛過 00Z（台北早班很常見）時 On Duty = STD−110分 落在「前一天」22:xxZ，naive 存法會晚 24h。
+  // 錨定修正：On Duty 不可能晚於 STD/Out → 晚了就 −24h；Off Duty 不可能早於 In → 早了就 +24h。
+  // codex P2 round5：加 12h 護欄 —— 差距大到只可能是跨午夜（>12h）才校正；
+  // 幾小時內的偏差（大延誤晚報到、手動特例）視為使用者本意，原樣保存。
+  try {
+    var HALF_DAY = 12 * 3600 * 1000;
+    var _onAnchor = body.std_utc || body.out_utc;
+    if (body.on_duty_utc && _onAnchor && new Date(body.on_duty_utc).getTime() - new Date(_onAnchor).getTime() > HALF_DAY) {
+      body.on_duty_utc = new Date(new Date(body.on_duty_utc).getTime() - 86400000).toISOString();
+    }
+    // Off Duty 不可能早於落地/on-block/報到（codex P2 round9 補 on_duty 錨點）——
+    // 早於錨點一律視為跨午夜 +24h（這側沒有「合法提早」情境，不用 12h 護欄）。
+    var _offAnchor = body.in_utc || body.on_utc || body.on_duty_utc;
+    if (body.off_duty_utc && _offAnchor && new Date(body.off_duty_utc).getTime() < new Date(_offAnchor).getTime()) {
+      body.off_duty_utc = new Date(new Date(body.off_duty_utc).getTime() + 86400000).toISOString();
+    }
+  } catch (err) { /* 校正失敗就存原值（與舊行為相同） */ }
 
   // V1.3.12：6 槽，每槽存 {name, rank, eid}。員編優先用 hidden（roster 帶的/原本的），
   // 名字若對得到通訊錄唯一同名聯絡人就用那個員編（手動選了已知聯絡人 → 自動連結）。

@@ -41,6 +41,8 @@ export async function ensureTables(): Promise<boolean> {
     await pool.query(`ALTER TABLE pilot_users ADD COLUMN IF NOT EXISTS crew_display_mode TEXT DEFAULT 'flight'`).catch(() => {});
     // V2.3：編輯器欄位「顯示名稱」自訂（LogTen 式 Configure Fields）—— {fieldKey: 自訂標籤}，底層資料 key 不變。
     await pool.query(`ALTER TABLE pilot_users ADD COLUMN IF NOT EXISTS field_labels JSONB`).catch(() => {});
+    // V2.3.07：報到時間規則（On Duty = STD − N 分鐘，依公司×機場）。[{co,apt,min}]，apt='*' 為該公司其他站。
+    await pool.query(`ALTER TABLE pilot_users ADD COLUMN IF NOT EXISTS duty_rules JSONB`).catch(() => {});
 
     await pool.query(`
       CREATE TABLE IF NOT EXISTS pilot_user_emails (

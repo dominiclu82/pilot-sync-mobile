@@ -48,6 +48,8 @@ import { importLogtenAircraftTypes } from './import-aircraft-types.js';
 import { renderCommunityLink } from '../app-changelog.js';
 import { importRoster } from './import-roster.js';
 import { getTotals, getRollingTotals, getByAircraftType, getOpeningBalance, getSimTotals } from './stats.js';
+import { tailLookup } from './tw-fleet.js';            // V2.3.07：duty-backfill 公司判斷（機尾範圍推）
+import { normAirportKey } from './airport-codes.js';   // V2.3.07：duty 規則機場比對（IATA/ICAO 正規化）
 import { CREW_SLOT_IDS, CREW_DISPLAY_MODES, type CrewDisplayMode } from './crew-slots.js';
 import { loadCredentials } from '../config.js';
 import { getSpaPilotLogJs } from '../spa/js-pilot-log.js';
@@ -55,8 +57,8 @@ import { getAirportDbJs } from '../spa/js-airport-db.js';
 
 // ── 版本（比照 CrewSync / Morning：每次推版必更新；SW cache 名稱跟著走） ────
 // 本機 preview build 會暫時加 -tNN 後綴方便對版；推正式版前拿掉只留乾淨版號。
-export const PILOT_LOG_VERSION = 'V2.3.06';
-const PILOT_LOG_CACHE = 'pilotlog-v2-3-06';
+export const PILOT_LOG_VERSION = 'V2.3.07';
+const PILOT_LOG_CACHE = 'pilotlog-v2-3-07';
 
 export const pilotLogRouter = express.Router();
 
@@ -363,6 +365,11 @@ function _renderPilotLogChangelog(): string {
   return `
     ${renderCommunityLink()}
     <div class="pl-cl-v">${PILOT_LOG_VERSION}</div>
+    <div class="pl-cl-txt">
+      <b>⏰ 新增報到時間規則：On Duty 自動帶 = STD − N 分（依公司×機場，預設星宇 FOM、可自訂航司與場站），並可一鍵回填舊航班的 Duty 時間。</b><br>
+      <b>⏰ Report-time rules: On Duty auto-fills as STD − N min by company × airport (Starlux FOM defaults, fully customizable), with one-tap duty backfill for past flights.</b>
+    </div>
+    <div class="pl-cl-v old">V2.3.06</div>
     <div class="pl-cl-txt">
       <b>🔎 「—」未知機型群組直接列出航班可點開補資料；沒機尾的航班改用班號字頭歸公司（JX→星宇）。</b><br>
       <b>🔎 The "—" unknown-type group now lists its flights (tap to fix); tail-less flights fall back to flight-number prefix for company grouping (JX→Starlux).</b>
@@ -1135,7 +1142,7 @@ pilotLogRouter.get('/api/pilot-log/me', requireAuth, async (req: AuthedRequest, 
   const pool = getPool();
   if (!pool || !(await ensureTables())) return res.status(503).json({ error: 'database_unavailable' });
   const userId = req.pilotUserId!;
-  const u = await pool.query('SELECT id, created_at, last_login_at, crew_labels, crew_display_mode, field_labels FROM pilot_users WHERE id = $1', [userId]);
+  const u = await pool.query('SELECT id, created_at, last_login_at, crew_labels, crew_display_mode, field_labels, duty_rules FROM pilot_users WHERE id = $1', [userId]);
   const emails = await pool.query(
     'SELECT email, is_primary FROM pilot_user_emails WHERE user_id = $1 ORDER BY is_primary DESC, linked_at',
     [userId]
@@ -1156,7 +1163,8 @@ pilotLogRouter.get('/api/pilot-log/me', requireAuth, async (req: AuthedRequest, 
     isFounder = !!f.rows[0]?.founder;
   } catch { /* pilot_beta_applicants 不存在/查詢失敗 → 當一般會員 */ }
   res.json({ user: u.rows[0], emails: emails.rows, crew_labels: u.rows[0].crew_labels || null,
-    crew_display_mode: u.rows[0].crew_display_mode || 'flight', field_labels: u.rows[0].field_labels || null, isFounder });
+    crew_display_mode: u.rows[0].crew_display_mode || 'flight', field_labels: u.rows[0].field_labels || null,
+    duty_rules: u.rows[0].duty_rules || null, isFounder });
 });
 
 // V2.3：編輯器欄位顯示名稱自訂（LogTen 式）。key = 欄位 id（[a-z0-9_]，≤40 字）、值 = 標籤（≤24 字），整份取代、最多 120 個。
@@ -1198,6 +1206,132 @@ pilotLogRouter.post('/api/pilot-log/crew-display-mode', requireAuth, async (req:
     await pool.query('UPDATE pilot_users SET crew_display_mode = $2, updated_at = NOW() WHERE id = $1',
       [req.pilotUserId, mode]);
     res.json({ ok: true, crew_display_mode: mode });
+  } catch (e: any) {
+    res.status(500).json({ error: 'internal', detail: e.message });
+  }
+});
+
+// ── V2.3.07：報到時間規則（On Duty = STD − N 分，依公司×機場）────────────────
+// 規則格式：[{co:'Starlux', apt:'RCTP', min:110}, {co:'Starlux', apt:'*', min:60}, …]，apt='*' = 該公司其他站。
+function _sanitizeDutyRules(raw: any): Array<{ co: string; apt: string; min: number }> | null {
+  if (!Array.isArray(raw)) return null;
+  const out: Array<{ co: string; apt: string; min: number }> = [];
+  for (const r of raw.slice(0, 50)) {
+    const co = String(r?.co || '').trim().slice(0, 40);
+    const apt = String(r?.apt || '').trim().toUpperCase().slice(0, 8);
+    const min = parseInt(r?.min, 10);
+    if (!co || !apt || isNaN(min) || min < 0 || min > 600) continue;
+    out.push({ co, apt, min });
+  }
+  return out;
+}
+pilotLogRouter.post('/api/pilot-log/duty-rules', requireAuth, async (req: AuthedRequest, res) => {
+  const pool = getPool();
+  if (!pool) return res.status(503).json({ error: 'database_unavailable' });
+  let body: any;
+  try { body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body; }
+  catch { return res.status(400).json({ error: 'invalid_json' }); }
+  const rules = _sanitizeDutyRules(body && body.rules);
+  if (!rules) return res.status(400).json({ error: 'invalid_rules' });
+  try {
+    await pool.query('UPDATE pilot_users SET duty_rules = $2, updated_at = NOW() WHERE id = $1',
+      [req.pilotUserId, JSON.stringify(rules)]);
+    res.json({ ok: true, duty_rules: rules });
+  } catch (e: any) {
+    res.status(500).json({ error: 'internal', detail: e.message });
+  }
+});
+
+// V2.3.07：依規則回填過去航班的 Duty —— 只補空白：On Duty=STD−規則分鐘（依公司×機場）、
+// Off Duty=In+gap、Total=Off−On（原值 0 視為空白）。dry_run=true 只回報會補幾筆，不寫入。
+// 公司判斷與前端同邏輯：機尾庫 operator → 台灣機籍範圍 → 班號字頭。
+const _FLTNO_OP: Record<string, string> = { JX: 'Starlux', BR: 'EVA Air', CI: 'China Airlines', AE: 'Mandarin', B7: 'UNI Air', IT: 'Tigerair Taiwan' };
+pilotLogRouter.post('/api/pilot-log/duty-backfill', requireAuth, async (req: AuthedRequest, res) => {
+  const pool = getPool();
+  if (!pool) return res.status(503).json({ error: 'database_unavailable' });
+  let body: any;
+  try { body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body; }
+  catch { return res.status(400).json({ error: 'invalid_json' }); }
+  const rules = _sanitizeDutyRules(body && body.rules) || [];
+  const gapRaw = parseInt(body && body.off_gap_min, 10);
+  const gap = (isNaN(gapRaw) || gapRaw < 0 || gapRaw > 600) ? 30 : gapRaw;
+  const dryRun = !!(body && body.dry_run);
+  const userId = req.pilotUserId!;
+  try {
+    // 機尾 → operator（使用者機尾庫；正規化去 dash/空白）
+    const acQ = await pool.query('SELECT tail_no, operator FROM pilot_aircraft WHERE user_id = $1', [userId]);
+    const opMap: Record<string, string> = {};
+    for (const a of acQ.rows) {
+      const t = String(a.tail_no || '').toUpperCase().replace(/[-\s]/g, '');
+      if (t && a.operator) opMap[t] = a.operator;
+    }
+    const companyOf = (tail: string | null, fno: string | null): string => {
+      const t = String(tail || '').toUpperCase().replace(/[-\s]/g, '');
+      if (t) {
+        if (opMap[t]) return opMap[t];
+        const look = tailLookup(t);
+        if (look) return look.operator;
+      }
+      const m = String(fno || '').trim().toUpperCase().match(/^([A-Z][A-Z0-9])\s*\d/);
+      return (m && _FLTNO_OP[m[1]]) || '';
+    };
+    // 優先序：機場精準 > 開頭比對（'K*' = 美國本土這類區域規則）> '*' 其他站（與前端一致）
+    const ruleFor = (co: string, origin: string | null): number | null => {
+      if (!co) return null;
+      const apt = normAirportKey(origin);
+      let star: number | null = null, prefix: number | null = null;
+      for (const r of rules) {
+        if (r.co.toUpperCase() !== co.toUpperCase()) continue;
+        const ra = r.apt.toUpperCase();
+        if (normAirportKey(ra) === apt) return r.min;
+        if (ra === '*') { if (star == null) star = r.min; }
+        else if (ra.endsWith('*') && apt.startsWith(ra.slice(0, -1))) { if (prefix == null) prefix = r.min; }
+      }
+      return prefix != null ? prefix : star;
+    };
+    // codex P2 round6：只回填「已飛」（in_utc 非空）的航班 —— 未來班表草稿不動（規劃中的班不該被
+    // 今天的規則寫死）；上鎖（is_locked）的航班也不動（跟編輯/刪除同一套鎖定契約）。
+    const q = await pool.query(
+      `SELECT id, flight_no, tail_no, origin, std_utc, in_utc, on_duty_utc, off_duty_utc, total_duty_minutes
+       FROM pilot_log_entries
+       WHERE user_id = $1 AND is_sim IS NOT TRUE AND is_deadhead IS NOT TRUE AND status <> 'roster_removed'
+         AND is_locked IS NOT TRUE
+         AND in_utc IS NOT NULL
+         AND (
+           (on_duty_utc IS NULL AND std_utc IS NOT NULL) OR
+           off_duty_utc IS NULL OR
+           (COALESCE(total_duty_minutes, 0) = 0)
+         )`, [userId]);
+    let nOn = 0, nOff = 0, nTot = 0;
+    for (const r of q.rows) {
+      let onD: Date | null = r.on_duty_utc ? new Date(r.on_duty_utc) : null;
+      let offD: Date | null = r.off_duty_utc ? new Date(r.off_duty_utc) : null;
+      let setOn: Date | null = null, setOff: Date | null = null, setTot: number | null = null;
+      if (!onD && r.std_utc) {
+        const min = ruleFor(companyOf(r.tail_no, r.flight_no), r.origin);
+        if (min != null) { setOn = new Date(new Date(r.std_utc).getTime() - min * 60000); onD = setOn; }
+      }
+      if (!offD && r.in_utc) { setOff = new Date(new Date(r.in_utc).getTime() + gap * 60000); offD = setOff; }
+      if (!(r.total_duty_minutes > 0) && onD && offD && offD.getTime() > onD.getTime()) {
+        setTot = Math.round((offD.getTime() - onD.getTime()) / 60000);
+      }
+      if (!setOn && !setOff && setTot == null) continue;
+      if (setOn) nOn++;
+      if (setOff) nOff++;
+      if (setTot != null) nTot++;
+      if (!dryRun) {
+        await pool.query(
+          `UPDATE pilot_log_entries SET
+             on_duty_utc = COALESCE(on_duty_utc, $2),
+             off_duty_utc = COALESCE(off_duty_utc, $3),
+             total_duty_minutes = CASE WHEN COALESCE(total_duty_minutes, 0) = 0 AND $4::int IS NOT NULL THEN $4 ELSE total_duty_minutes END,
+             updated_at = NOW()
+           WHERE id = $1 AND user_id = $5`,
+          [r.id, setOn, setOff, setTot, userId]
+        );
+      }
+    }
+    res.json({ ok: true, dry_run: dryRun, on_duty_filled: nOn, off_duty_filled: nOff, total_filled: nTot });
   } catch (e: any) {
     res.status(500).json({ error: 'internal', detail: e.message });
   }
