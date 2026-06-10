@@ -5404,6 +5404,15 @@ var _PL_TW_REG = [
   { op: 'Starlux', s: 58551, e: 58568, t: 'A350-1000', c: 'A35K' },
   { op: 'Starlux', s: 58581, e: 58590, t: 'A350F', c: 'A35F' },
   // 長榮 EVA Air
+  // 退役機種（V2.3.03）：對照表原本只建現役範圍，飛過退役機的 logbook 推不出公司（A332 798h 歸「—」實案）。
+  // 範圍出處：airfleets/planespotters/airliners.net 交叉驗證，MD-11 客貨混列、747 客/Combi/貨分段。
+  { op: 'EVA Air', s: 16101, e: 16113, t: 'MD-11', c: 'MD11' },
+  { op: 'EVA Air', s: 16301, e: 16312, t: 'A330-200', c: 'A332' },
+  { op: 'EVA Air', s: 16401, e: 16412, t: '747-400', c: 'B744' },
+  { op: 'EVA Air', s: 16461, e: 16465, t: '747-400M', c: 'B744' },
+  { op: 'EVA Air', s: 16481, e: 16483, t: '747-400F', c: 'B74F' },
+  { op: 'EVA Air', s: 16601, e: 16605, t: '767-300ER', c: 'B763' },
+  { op: 'EVA Air', s: 16621, e: 16622, t: '767-200', c: 'B762' },
   { op: 'EVA Air', s: 16200, e: 16299, t: 'A321neo', c: 'A21N' },
   { op: 'EVA Air', s: 16331, e: 16340, t: 'A330-300', c: 'A333' },
   { op: 'EVA Air', s: 16501, e: 16527, t: 'A350-1000', c: 'A35K' },
@@ -5510,10 +5519,12 @@ function _plAddAcAutofillType(look) {
 // 依公司（operator）分析：先用機尾庫 _pl.aircraft 的 operator；沒填 → V1.3.15 用台灣機籍 tail 範圍推。
 // V1.3.21：entry → 公司（機尾庫 operator 優先；沒填用台灣機籍 tail 範圍推）。_pl.aircraft 換新才重建快取。
 function _plEntryCompany(e) {
-  var tail = String((e && e.tail_no) || '').trim().toUpperCase();
+  // V2.3.03：機尾正規化去 dash/空白再比 —— entry 寫 B16701、機隊庫寫 B-16701 也要對得起來
+  var norm = function(t) { return String(t == null ? '' : t).toUpperCase().replace(/[-\s]/g, ''); };
+  var tail = norm((e && e.tail_no));
   if (!tail) return '—';
   if (_pl._opMapSrc !== _pl.aircraft) {
-    var m = {}; (_pl.aircraft || []).forEach(function(a) { if (a.tail_no) m[String(a.tail_no).trim().toUpperCase()] = a.operator || ''; });
+    var m = {}; (_pl.aircraft || []).forEach(function(a) { if (a.tail_no) m[norm(a.tail_no)] = a.operator || ''; });
     _pl._opMap = m; _pl._opMapSrc = _pl.aircraft;
   }
   var o = _pl._opMap[tail];
@@ -5643,7 +5654,8 @@ function _plAnDimCards(entries, dim) {
   return order.map(function(k) {
     var s = _plAnSum(groups[k]);
     var click = '';
-    if (k && k !== '—') {
+    if (k) {
+      // 「—」（機型/公司空白）也開放點進明細 —— 不然這群航班沒有任何入口可以找出來補資料
       var fn = (dim === 'company') ? '_plOpenCompanyDetail' : '_plOpenTypeDetail';
       click = ' onclick="' + fn + "('" + _plJs(k) + "')" + '"';
     }

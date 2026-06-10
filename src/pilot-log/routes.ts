@@ -55,8 +55,8 @@ import { getAirportDbJs } from '../spa/js-airport-db.js';
 
 // ── 版本（比照 CrewSync / Morning：每次推版必更新；SW cache 名稱跟著走） ────
 // 本機 preview build 會暫時加 -tNN 後綴方便對版；推正式版前拿掉只留乾淨版號。
-export const PILOT_LOG_VERSION = 'V2.3.02';
-const PILOT_LOG_CACHE = 'pilotlog-v2-3-02';
+export const PILOT_LOG_VERSION = 'V2.3.03';
+const PILOT_LOG_CACHE = 'pilotlog-v2-3-03';
 
 export const pilotLogRouter = express.Router();
 
@@ -363,6 +363,11 @@ function _renderPilotLogChangelog(): string {
   return `
     ${renderCommunityLink()}
     <div class="pl-cl-v">${PILOT_LOG_VERSION}</div>
+    <div class="pl-cl-txt">
+      <b>🏷️ Analyze 公司歸類更準：認得長榮退役機隊（MD-11／747／767／A330-200），機尾有無「-」都通，「—」分組也可點進去看是哪幾筆。</b><br>
+      <b>🏷️ Analyze company grouping improved: EVA retired fleets (MD-11/747/767/A330-200) are now recognized, tails match with or without the dash, and the "—" group is tappable to reveal its flights.</b>
+    </div>
+    <div class="pl-cl-v old">V2.3.02</div>
     <div class="pl-cl-txt">
       <b>🗑️ 新增「勾選刪除」：logbook 工具列按「選取刪除」進多選、勾航班一次刪（鎖定的會跳過）。</b><br>
       <b>🗑️ Added multi-select delete in the logbook — tap “Select”, check flights, delete in one go (locked ones skipped).</b>
