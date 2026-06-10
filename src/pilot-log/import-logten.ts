@@ -264,7 +264,7 @@ export async function importLogtenFlights(
   const baseCount = new Map<string, number>();
   for (const row of rows) {
     const d = row['Date'], f = row['Flight #'], o = row['From'], t = row['To'];
-    if (!d || !f || !o || !t) continue;
+    if (!d || !f || !o || !t) continue;   // 沒班號的列走 incomplete-style ref（date+out 天然唯一），不靠 baseCount
     const b = `logten:${d}:${f}:${o}:${t}`;
     baseCount.set(b, (baseCount.get(b) || 0) + 1);
   }
@@ -339,6 +339,25 @@ export async function importLogtenFlights(
   if (pilotCols.length === 0) pilotCols = pilotCand.filter((c) => c !== colPic);   // 保險：全沒名字值才退回
   // position 推斷用：pilotCols 裡第一個 SIC/P2 姓名欄
   const colSic = pilotCols.find((c) => { const n = _norm(c); return n.includes('SIC') || /(^|[^A-Z])P2($|[^A-Z])/.test(n); });
+  // V2.3：客艙組員欄偵測 —— header 含客艙關鍵字、非時數欄、且未被機師/CIC/OBS 佔用 → 照 header 順序當 cabin1..20。
+  //   關鍵字採寬鬆比對（CABIN / ATTENDANT / STEWARD / HOSTESS / SCCM / CCM / FA# / CA#）；若使用者匯出欄名不在內，
+  //   需拿到實際 header 再補（whole feature 的不確定點 —— LogTen 欄名可自訂）。
+  const _isCabinHdr = (n: string): boolean =>
+    n.includes('CABIN') || n.includes('ATTENDANT') || n.includes('STEWARD') || n.includes('HOSTESS') ||
+    n.includes('SCCM') || n.includes('CCM') || n.includes('FLIGHTATTENDANT') ||
+    /(^|[^A-Z])FA\d*($|[^A-Z])/.test(n) || /(^|[^A-Z])CA\d*($|[^A-Z])/.test(n);
+  const _crewClaimed = new Set([colPic, colCic, colObs, colObs2, ...pilotCols].filter(Boolean) as string[]);
+  const cabinCols: string[] = [];
+  for (const h of headers) {
+    if (_crewClaimed.has(h)) continue;
+    const n = _norm(h);
+    if (_crewExclude.some((x) => n.includes(x))) continue;
+    if (!_isCabinHdr(n)) continue;
+    // V2.3（codex P2）：用「整份掃」的 _hasNameValues 取代只看前 30 列的 _looksLikeName ——
+    // 客艙欄常是早期航班全空、晚期才有人，30 列取樣會誤判沒名字而漏掉整欄。
+    if (!_hasNameValues(h)) continue;
+    cabinCols.push(h);
+  }
 
   for (let i = 0; i < rows.length; i++) {
     const row = rows[i];
@@ -348,15 +367,19 @@ export async function importLogtenFlights(
       const from = row['From'];
       const to = row['To'];
       if (!date) { result.parse_errors++; continue; }   // 連日期都沒有 → flight_date NOT NULL，無法收（極少；批次日期檢查通常已先擋）
-      // 缺必填（航班號/起降）→ 待補強：仍走完整解析路徑、保留所有時間/組員資料（codex P1-B），只是標 needs_completion。
-      const incomplete = !flightNo || !from || !to;
+      // V2.3：拆成兩個概念 ——
+      //   missingKeyFields = 缺關鍵欄位（含沒班號）→ 沿用既有 incomplete-style source_ref，
+      //     讓 V2.2 已匯入過的「沒班號」航段重匯時對得回去（codex：否則 ref 改格式 → 重匯變兩筆）。
+      //   needsCompletion = 真正待補強 = 只有「沒航線」(from/to)；沒班號但有航線+時間的是真飛過的航段、要計入統計。
+      const missingKeyFields = !flightNo || !from || !to;
+      const needsCompletion = !from || !to;
 
       // 跨日 OOOI：Out → Off → On → In 順序遞增，若回繞則 +1 day（提前解析，待補強的穩定鍵要用 out）
       const outUtc = parseUtcAtDate(date, row['Out']);
-      // source_ref：完整航班用 date+班號+起降（重複再加 Out 戳，向後相容）；待補強改用「date + 出發時間」當穩定鍵——
+      // source_ref：齊全航班用 date+班號+起降（重複再加 Out 戳，向後相容）；缺關鍵欄位改用「date + 出發時間」當穩定鍵——
       //   不依賴缺失欄位（codex P1-A：用「缺的起降」當鍵，補好重匯會認不回、變兩筆）。
       let sourceRef: string;
-      if (incomplete) {
+      if (missingKeyFields) {
         sourceRef = `logten:incomplete:${date}:${outUtc ? outUtc.getTime() : 'r' + (i + 2)}`;
       } else {
         const baseRef = `logten:${date}:${flightNo}:${from}:${to}`;
@@ -393,18 +416,28 @@ export async function importLogtenFlights(
       const pic = colPic ? String(row[colPic] || '').trim() : '';
       const sic = colSic ? String(row[colSic] || '').trim() : '';   // position 推斷用
       if (pic) crew.pic = pic;
-      const _slots = ['crew2', 'crew3', 'crew4'];
+      // V2.3：飛航組副/巡航機師槽位擴充 crew2..crew6（原本只到 crew4，>3 名會被丟）。
+      const _slots = ['crew2', 'crew3', 'crew4', 'crew5', 'crew6'];
       let _si = 0;
       for (const c of pilotCols) {
         const v = String(row[c] || '').trim();
         if (!v) continue;
-        if (_si >= _slots.length) break;     // >3 名副/巡航機師（罕見）就不再塞
+        if (_si >= _slots.length) break;     // >5 名副/巡航機師（極罕見）才不再塞
         crew[_slots[_si]] = v;
         _si++;
       }
       if (colCic) { const v = String(row[colCic] || '').trim(); if (v) crew.cic = v; }
       if (colObs) { const v = String(row[colObs] || '').trim(); if (v) crew.obs = v; }
-      if (colObs2) { const v = String(row[colObs2] || '').trim(); if (v) crew.observer2 = v; }   // 第 7 人：留存不顯示（無對應槽）
+      if (colObs2) { const v = String(row[colObs2] || '').trim(); if (v) crew.obs2 = v; }   // V2.3：obs2 已是正式槽
+      // V2.3：客艙組員（cabin1..20）—— 依偵測到的客艙欄照順序非空填。
+      let _cci = 0;
+      for (const c of cabinCols) {
+        const v = String(row[c] || '').trim();
+        if (!v) continue;
+        if (_cci >= 20) break;
+        crew['cabin' + (_cci + 1)] = v;
+        _cci++;
+      }
 
       // V1.2.03：Deadhead = LogTen 標記 positioning 的欄位。deadhead 是已發生事件
       // （你被載過去、沒操作），先判它，因為它會蓋掉 position 推斷。
@@ -441,9 +474,9 @@ export async function importLogtenFlights(
       // 或飛行日期已過（LogTen 裡有的就是發生過的、可能忘了記 Out）→ confirmed；
       // 只有「未來日期 + 沒 Out + 非 deadhead」才是 draft（真正還沒飛的計畫）。
       const isPast = date < _PL_PAST_CUTOFF;
-      // 待補強一律 draft（缺資料還沒算數，色條看 needs_completion 顯示琥珀）；其餘照原本「過去/有 Out/deadhead = confirmed」。
-      const newStatus: 'draft' | 'confirmed' = incomplete ? 'draft' : ((outUtc || isDeadhead || isPast) ? 'confirmed' : 'draft');
-      if (incomplete) result.needs_completion = (result.needs_completion || 0) + 1;
+      // 待補強（沒航線）一律 draft；沒班號但有航線+時間的航段照原本「過去/有 Out/deadhead = confirmed」、計入統計。
+      const newStatus: 'draft' | 'confirmed' = needsCompletion ? 'draft' : ((outUtc || isDeadhead || isPast) ? 'confirmed' : 'draft');
+      if (needsCompletion) result.needs_completion = (result.needs_completion || 0) + 1;
 
       // Smart re-import：用 Map 取代 SELECT，語意不變（V1.0.02 起）
       // confirmed → skip 保護使用者編輯；draft / roster_removed → 整筆覆蓋
@@ -529,7 +562,7 @@ export async function importLogtenFlights(
             picMin, sicMin,
             isDeadhead,
             isPF,
-            incomplete,
+            needsCompletion,
           ],
         });
       } else {
@@ -558,7 +591,7 @@ export async function importLogtenFlights(
           picMin, sicMin,
           isDeadhead,
           isPF,
-          incomplete,                          // needs_completion（INSERT_COLS 最後一欄）
+          needsCompletion,                     // needs_completion（INSERT_COLS 最後一欄；只有沒航線才 true）
         ]);
       }
     } catch (e: any) {

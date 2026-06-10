@@ -17,7 +17,10 @@ var _pl = {
   aircraft: [],                  // pilot_aircraft（tail 為主）
   aircraftTypes: [],              // pilot_aircraft_types（V1.0.11；type 為主，含 make/model）
   crew: [],                       // V1.0.11 crew 名單（含 pilots + cabin crew）
-  crewLabels: null,               // V1.3.12 crew 欄位自訂顯示名稱 {pic,crew2,crew3,crew4,cic,obs}；null=用預設
+  crewLabels: null,               // V1.3.12 crew 欄位自訂顯示名稱 {pic,crew2,...,cabin1..20}；null=用預設
+  crewDisplayMode: 'flight',      // V2.3 列表組員顯示：cic_only=只機長 / flight=飛航組 / all=含客艙
+  fieldLabels: null,              // V2.3 編輯器欄位自訂顯示名稱 {fieldKey: label}；null=用預設
+  configFields: false,            // V2.3 編輯器「設定欄位」模式（LogTen 式）：開了才能改欄位名稱（session-only）
   // Aircraft / Crew 頁共用的完整 entries 快照：不過 _pl.filter、不分頁，撈到所有 user 的 flights
   // 用 null 區別「還沒拉過」和「拉過但是空陣列」，進 Aircraft 或 Crew 頁第一次才 fetch
   aircraftEntries: null,
@@ -778,6 +781,12 @@ async function _plFetchAll() {
       var mj = await mRes.json();
       _pl.crewLabels = (mj && mj.crew_labels) || null;
       try { localStorage.setItem('pilotlog_crew_labels', JSON.stringify(_pl.crewLabels || {})); } catch (e) {}
+      // V2.3：列表組員顯示模式（cic_only/flight/all）
+      if (mj && typeof mj.crew_display_mode === 'string') _pl.crewDisplayMode = mj.crew_display_mode;
+      try { localStorage.setItem('pilotlog_crew_display_mode', _pl.crewDisplayMode); } catch (e) {}
+      // V2.3：編輯器欄位自訂顯示名稱
+      _pl.fieldLabels = (mj && mj.field_labels) || null;
+      try { localStorage.setItem('pilotlog_field_labels', JSON.stringify(_pl.fieldLabels || {})); } catch (e) {}
       // 會員身分（⭐ 創始會員 / 一般會員）— 帳號選單顯示用，順便存 localStorage 給離線
       if (_pl.user) _pl.user.isFounder = !!(mj && mj.isFounder);
       try { localStorage.setItem('pilotlog_is_founder', (mj && mj.isFounder) ? '1' : '0'); } catch (e) {}
@@ -1307,6 +1316,24 @@ function _plCloseEditor() {
   _plRenderMain();
 }
 
+// V2.3：欄位自訂顯示名稱（LogTen 式 Configure Fields）。name = 穩定欄位 key、def = 預設標籤。
+function _plFieldLabel(name, def) {
+  if (_pl.fieldLabels == null) {
+    try { var s = localStorage.getItem('pilotlog_field_labels'); if (s) _pl.fieldLabels = JSON.parse(s); } catch (e) {}
+  }
+  var lbl = _pl.fieldLabels && name && _pl.fieldLabels[name];
+  return (typeof lbl === 'string' && lbl.trim()) ? lbl.trim() : def;
+}
+// 欄位標籤的 HTML：config 模式 → 可編輯 input（id=pl-fl-<name>）；否則靜態文字。extraStyle 給排版微調。
+function _plFieldLabelHtml(name, def, extraStyle) {
+  var disp = _plFieldLabel(name, def);
+  if (_pl.configFields && name) {
+    return '<input id="pl-fl-' + name + '" value="' + _plEsc(disp) + '" placeholder="' + _plEsc(def) + '" maxlength="24" ' +
+      'onclick="event.stopPropagation()" ' +
+      'style="width:100%;box-sizing:border-box;background:#1e293b;color:#fbbf24;border:1px dashed #f59e0b;border-radius:5px;padding:3px 6px;font-size:.62em;margin-bottom:2px;' + (extraStyle || '') + '">';
+  }
+  return '<div style="font-size:.62em;color:var(--muted);margin-bottom:2px;' + (extraStyle || '') + '">' + _plEsc(disp) + '</div>';
+}
 function _plEditorField(label, name, type, opts) {
   opts = opts || {};
   var e = _pl.editing;
@@ -1399,9 +1426,12 @@ function _plEditorField(label, name, type, opts) {
   var sub = (type === 'time-utc' && opts.localOf)
     ? '<div id="ple-' + name + '-local" style="font-size:.58em;color:#60a5fa;margin-top:2px;min-height:1.1em;letter-spacing:.3px"></div>'
     : '';
-  return '<div style="margin-bottom:8px">' +
-    '<div' + (opts.labelId ? ' id="' + opts.labelId + '"' : '') + ' style="font-size:.62em;color:var(--muted);margin-bottom:2px">' + _plEsc(label) + '</div>' +
-    input + sub + '</div>';
+  // V2.3：label 走自訂顯示名稱。opts.labelId（From/To 會隨 IATA/ICAO 動態改寫）平常用可被 _plSyncRouteFmt
+  // 改寫的 <div>；config 模式（codex P3）則跟其他欄位一樣變可編輯 input，讓 From/To 也能改名。
+  var labelHtml = (opts.labelId && !_pl.configFields)
+    ? '<div id="' + opts.labelId + '" style="font-size:.62em;color:var(--muted);margin-bottom:2px">' + _plEsc(_plFieldLabel(name, label)) + '</div>'
+    : _plFieldLabelHtml(name, label);
+  return '<div style="margin-bottom:8px">' + labelHtml + input + sub + '</div>';
 }
 // time-utc 欄位 → 當地時間提示：用 flight_date + HHMM(UTC) 組 UTC 時間，再依 origin/dest 機場時區換算。
 // 顯示「16:30 (UTC+8)」格式；資料不全（無時間/日期/機場/時區）就清空，不擋排版。
@@ -1511,9 +1541,18 @@ function _plFieldRow(cols, fieldsHtml) {
 function _plFieldSub(label) {
   return '<div style="font-size:.58em;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;font-weight:700;margin:10px 0 3px">' + _plEsc(label) + '</div>';
 }
-// V1.3.12：6 個固定 crew 槽 + 預設顯示名稱（使用者可自訂，存 server）。
-var PL_CREW_KEYS = ['pic', 'crew2', 'crew3', 'crew4', 'cic', 'obs'];
-var PL_CREW_LABEL_DEFAULT = { pic: 'PIC', crew2: 'Crew 2', crew3: 'Crew 3', crew4: 'Crew 4', cic: 'CIC', obs: 'OBS' };
+// V2.3：組員槽位 —— 對齊後端 src/pilot-log/crew-slots.ts（瀏覽器端不能 import .ts，這裡平行定義；改一邊兩邊都要同步）。
+//   飛航組：pic / crew2(SIC) / crew3-6(Relief) / cic / obs / obs2 ；客艙組：cabin1..cabin20（預設 "Cabin N"，可自訂）。
+//   既有 6 槽（pic/crew2/crew3/crew4/cic/obs）key 不變 → 舊資料、舊自訂標籤、舊程式全相容。
+var PL_FLIGHT_KEYS = ['pic', 'crew2', 'crew3', 'crew4', 'crew5', 'crew6', 'cic', 'obs', 'obs2'];
+var PL_CABIN_KEYS = [];
+for (var _plCi = 1; _plCi <= 20; _plCi++) PL_CABIN_KEYS.push('cabin' + _plCi);
+var PL_CREW_KEYS = PL_FLIGHT_KEYS.concat(PL_CABIN_KEYS);
+var PL_CREW_LABEL_DEFAULT = {
+  pic: 'PIC', crew2: 'SIC', crew3: 'Relief 1', crew4: 'Relief 2', crew5: 'Relief 3', crew6: 'Relief 4',
+  cic: 'CIC', obs: 'Observer', obs2: 'Observer 2',
+};
+PL_CABIN_KEYS.forEach(function(k, i) { PL_CREW_LABEL_DEFAULT[k] = 'Cabin ' + (i + 1); });
 function _plCrewLabel(key) {
   if (_pl.crewLabels == null) {
     try { var s = localStorage.getItem('pilotlog_crew_labels'); if (s) _pl.crewLabels = JSON.parse(s); } catch (e) {}
@@ -1555,7 +1594,7 @@ function _plCrewDisplayName(v) {
 // 只在新槽是空的時候搬；observer2 無對應槽 → 留在物件裡（存檔時 _plSaveEntry 會保留，不丟）。
 function _plMigrateLegacyCrew(crew) {
   if (!crew || typeof crew !== 'object') return crew || {};
-  var map = { sic: 'crew2', fo1: 'crew3', fo2: 'crew4', purser: 'cic', observer1: 'obs' };
+  var map = { sic: 'crew2', fo1: 'crew3', fo2: 'crew4', purser: 'cic', observer1: 'obs', observer2: 'obs2' };
   Object.keys(map).forEach(function(oldK) {
     var newK = map[oldK];
     var hasOld = crew[oldK] != null && crew[oldK] !== '';
@@ -1582,17 +1621,21 @@ function _plResolveEid(name) {
 // V1.3.12：Crew 頁的「欄位名稱」設定（折疊）。static input，存檔才送 server，不踩搜尋的 focus bug。
 function _plCrewLabelsEditor() {
   var inputCss = 'flex:1;background:var(--bg,#0a0e1a);color:var(--text);border:1px solid var(--border,#334155);border-radius:6px;padding:5px 8px;font-size:.78em;box-sizing:border-box';
-  var rows = PL_CREW_KEYS.map(function(k) {
+  function _lblRow(k) {
     return '<div style="display:flex;align-items:center;gap:6px;margin-bottom:5px">' +
-      '<span style="font-size:.6em;color:var(--muted);width:46px;flex-shrink:0">' + k + '</span>' +
+      '<span style="font-size:.6em;color:var(--muted);width:54px;flex-shrink:0">' + k + '</span>' +
       '<input id="pl-cl-' + k + '" value="' + _plEsc(_plCrewLabel(k)) + '" placeholder="' + _plEsc(PL_CREW_LABEL_DEFAULT[k]) + '" maxlength="24" style="' + inputCss + '">' +
     '</div>';
-  }).join('');
+  }
+  var flightRows = PL_FLIGHT_KEYS.map(_lblRow).join('');
+  // V2.3：客艙 20 槽的標籤改名收進巢狀折疊，避免一長串塞爆設定區。
+  var cabinRows = '<details style="margin-top:4px"><summary style="font-size:.66em;color:var(--muted);cursor:pointer;padding:4px 2px">🧑‍✈️ 客艙組員標籤 / Cabin labels（cabin1..20）</summary>' +
+    '<div style="padding-top:4px">' + PL_CABIN_KEYS.map(_lblRow).join('') + '</div></details>';
   var btnCss = 'border:0;border-radius:6px;padding:6px 12px;font-size:.75em;font-weight:700;cursor:pointer';
   return '<details style="margin-bottom:10px;background:var(--card);border-radius:8px;padding:8px 10px">' +
     '<summary style="font-size:.72em;font-weight:700;color:var(--muted);cursor:pointer">⚙ 欄位名稱 / Crew field labels</summary>' +
     '<div style="font-size:.62em;color:var(--muted);margin:6px 0 8px">改成你公司的稱呼（JX=CIC、EVA=CP…），套用到航班編輯器的 crew 欄位、跨裝置同步。<br>Rename to your airline\'s terms; applies to the flight editor, synced across devices.</div>' +
-    rows +
+    flightRows + cabinRows +
     '<div style="display:flex;gap:8px;margin-top:6px">' +
       '<button onclick="_plSaveCrewLabels()" style="background:#10b981;color:#fff;' + btnCss + '">儲存 Save</button>' +
       '<button onclick="_plResetCrewLabels()" style="background:transparent;color:var(--muted);border:1px solid var(--border,#334155)!important;' + btnCss + '">恢復預設 Reset</button>' +
@@ -1625,6 +1668,95 @@ async function _plResetCrewLabels() {
   });
   await _plSaveCrewLabels();
 }
+// V2.3：列表組員顯示模式設定（cic_only / flight / all）。航班列表第 4 行的組員要顯示到哪一層。
+function _plCrewDisplayModeEditor() {
+  var cur = _plGetCrewDisplayMode();
+  var opts = [
+    { v: 'cic_only', t: '只機長 PIC only' },
+    { v: 'flight', t: '飛航組 Flight crew' },
+    { v: 'all', t: '全部含客艙 All incl. cabin' },
+  ];
+  var sel = opts.map(function(o) {
+    return '<option value="' + o.v + '"' + (o.v === cur ? ' selected' : '') + '>' + o.t + '</option>';
+  }).join('');
+  return '<details style="margin-bottom:10px;background:var(--card);border-radius:8px;padding:8px 10px">' +
+    '<summary style="font-size:.72em;font-weight:700;color:var(--muted);cursor:pointer">👁 列表組員顯示 / Crew shown in list</summary>' +
+    '<div style="font-size:.62em;color:var(--muted);margin:6px 0 8px">航班列表每筆第 4 行要列到哪些組員（編輯器與 CSV 匯出不受影響、一律完整）。<br>How many crew to show on each flight row (the editor & CSV export always keep everyone).</div>' +
+    '<select id="pl-crew-dispmode" onchange="_plSaveCrewDisplayMode(this.value)" style="width:100%;background:var(--bg,#0a0e1a);color:var(--text);border:1px solid var(--border,#334155);border-radius:6px;padding:7px 8px;font-size:.8em;box-sizing:border-box">' +
+    sel + '</select>' +
+  '</details>';
+}
+async function _plSaveCrewDisplayMode(mode) {
+  if (['cic_only', 'flight', 'all'].indexOf(mode) < 0) return;
+  var prev = _pl.crewDisplayMode;   // V2.3（codex P2）：server 存失敗要還原，避免本機跟雲端分叉。
+  _pl.crewDisplayMode = mode;
+  try { localStorage.setItem('pilotlog_crew_display_mode', mode); } catch (e) {}
+  try { if (_pl.tab === 'logbook' && !_pl.editing && document.getElementById('pl-list')) _plRenderList(); } catch (e) {}   // 在 logbook 才即時重畫
+  function _revert() {
+    _pl.crewDisplayMode = prev;
+    try { localStorage.setItem('pilotlog_crew_display_mode', prev || 'flight'); } catch (e) {}
+    try { if (_pl.tab === 'logbook' && !_pl.editing && document.getElementById('pl-list')) _plRenderList(); } catch (e) {}
+    var sel = document.getElementById('pl-crew-dispmode'); if (sel) sel.value = prev || 'flight';
+  }
+  try {
+    var r = await _plApi('/api/pilot-log/crew-display-mode', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: { mode: mode },
+    });
+    if (!r.ok) { _revert(); _plToast('顯示設定儲存失敗、已還原 / Save failed (reverted) ' + r.status, 'error'); return; }
+    _plToast('顯示設定已儲存');
+  } catch (e) {
+    _revert();
+    _plToast('顯示設定儲存失敗、已還原：' + (e && e.message ? e.message : 'unknown'), 'error');
+  }
+}
+// V2.3：把編輯器重畫到正確容器（iPad 右明細面板 / 全螢幕）—— 跟 _plOpenEditor 同邏輯。
+function _plRerenderEditor() {
+  if (_plWide() && document.getElementById('pl-detail-pane')) _plRenderEditor('pl-detail-pane');
+  else _plRenderEditor();
+}
+// V2.3：LogTen 式「Configure Fields」開關。關 → 先存欄位名稱；開 → 進可編輯狀態。
+function _plToggleConfigFields() {
+  if (_pl.configFields) { _plSaveFieldLabels(); }       // 退出 = 儲存（async 內會重畫）
+  else { _pl.configFields = true; _plRerenderEditor(); }
+}
+async function _plSaveFieldLabels() {
+  // 從畫面所有 pl-fl-* 收集；以現有 fieldLabels 為底合併（沒渲染到的欄位標籤保留、不掉）。空字串 → 還原預設。
+  var body = {};
+  var prev = _pl.fieldLabels;   // V2.3（codex P2）：server 存失敗要還原，避免本機顯示成已存、跨裝置卻沒有。
+  var existing = _pl.fieldLabels || {};
+  Object.keys(existing).forEach(function(k) { if (typeof existing[k] === 'string' && existing[k].trim()) body[k] = existing[k]; });
+  var inputs = document.querySelectorAll('[id^="pl-fl-"]');
+  for (var i = 0; i < inputs.length; i++) {
+    var el = inputs[i];
+    var key = el.id.slice(6);   // 去掉 'pl-fl-'
+    if (!/^[a-z0-9_]{1,40}$/.test(key)) continue;
+    var v = (el.value || '').trim().slice(0, 24);
+    if (v) body[key] = v; else delete body[key];
+  }
+  // 樂觀更新：先收 config 模式 + 套上新名字，立刻看到效果；server 回來再用正規版覆蓋。
+  _pl.fieldLabels = body;
+  try { localStorage.setItem('pilotlog_field_labels', JSON.stringify(body)); } catch (e) {}
+  _pl.configFields = false;
+  _plRerenderEditor();
+  function _revert() {
+    _pl.fieldLabels = prev;
+    try { localStorage.setItem('pilotlog_field_labels', JSON.stringify(prev || {})); } catch (e) {}
+    _plRerenderEditor();   // 重畫成舊標籤（已退出 config 模式）
+  }
+  try {
+    var r = await _plApi('/api/pilot-log/field-labels', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: body,
+    });
+    if (!r.ok) { _revert(); _plToast('儲存失敗、已還原 / Save failed (reverted) ' + r.status, 'error'); return; }
+    var j = await r.json();
+    _pl.fieldLabels = (j && j.field_labels) || {};
+    try { localStorage.setItem('pilotlog_field_labels', JSON.stringify(_pl.fieldLabels)); } catch (e) {}
+    _plToast('Field labels saved');
+  } catch (e) {
+    _revert();
+    _plToast('儲存失敗、已還原 / Save failed (reverted): ' + (e && e.message ? e.message : 'unknown'), 'error');
+  }
+}
 // crew.X 是 JSONB 巢狀欄位，用專屬 input id ple-crew-X（名字）/ ple-crewrank-X（rank）/ ple-crewid-X（員編 hidden），跟 _plSaveEntry 讀法對齊
 function _plCrewField(key, e) {
   var val = _plCrewVal(e.crew && e.crew[key]);
@@ -1655,6 +1787,34 @@ function _plCrewField(key, e) {
     '<input id="ple-crew-' + key + '" list="ple-crew-dl" placeholder="name" oninput="_plCrewSlotInput(\'' + key + '\')" style="flex:1;min-width:0;' + inputCss + '" value="' + _plEsc(dispName) + '">' +
     '<input id="ple-crewrank-' + key + '" placeholder="rank" style="flex:0 0 auto;width:52px;text-transform:uppercase;' + inputCss + '" value="' + _plEsc(val.rank) + '">' +
     editBtn + hidden + '</div>';
+}
+
+// V2.3：航班編輯器的整組 crew 欄位 —— 核心飛航組常駐，Relief/Observer2 與「客艙組員（cabin1..20）」各自收合，
+// 有值才預設展開。所有槽位一律渲染（即使收合）→ 存檔時 _plSaveEntry 讀得到、不會掉資料。
+function _plCrewFields(e) {
+  var crew = (e && e.crew) || {};
+  function has(k) { return !!_plCrewVal(crew[k]).name; }
+  // 核心飛航組（沿用既有 6 格版面：iPad 2-per-row、手機一列一個）—— 不動原設計。
+  var core = _plWide()
+    ? _plFieldRow(2, _plCrewField('pic', e) + _plCrewField('crew2', e)) +
+      _plFieldRow(2, _plCrewField('crew3', e) + _plCrewField('crew4', e)) +
+      _plFieldRow(2, _plCrewField('cic', e) + _plCrewField('obs', e))
+    : _plCrewField('pic', e) + _plCrewField('crew2', e) +
+      _plCrewField('crew3', e) + _plCrewField('crew4', e) +
+      _plCrewField('cic', e) + _plCrewField('obs', e);
+  var sumCss = 'font-size:.66em;font-weight:700;color:var(--muted);cursor:pointer;padding:5px 2px';
+  // 只收合「多出來的」：Relief 3/4 + Observer 2（有人才自動展開）
+  var moreKeys = ['crew5', 'crew6', 'obs2'];
+  var moreOpen = moreKeys.some(has);
+  var more = '<details style="margin-top:6px"' + (moreOpen ? ' open' : '') + '>' +
+    '<summary style="' + sumCss + '">＋ 更多飛航組員 / More flight crew</summary>' +
+    '<div style="padding-top:4px">' + moreKeys.map(function(k) { return _plCrewField(k, e); }).join('') + '</div></details>';
+  // 客艙組員 cabin1..20
+  var cabinOpen = PL_CABIN_KEYS.some(has);
+  var cabin = '<details style="margin-top:4px"' + (cabinOpen ? ' open' : '') + '>' +
+    '<summary style="' + sumCss + '">🧑‍✈️ 客艙組員 / Cabin crew（最多 20）</summary>' +
+    '<div style="padding-top:4px">' + PL_CABIN_KEYS.map(function(k) { return _plCrewField(k, e); }).join('') + '</div></details>';
+  return core + more + cabin;
 }
 
 // V1.3.24：crew 格有字才顯示 ✏️（手填即現、清空即藏）—— 對應 _plCrewField 的 oninput
@@ -2000,7 +2160,8 @@ function _plSyncRouteFmt() {
       if (info) { var c = (iata && info.iata) ? info.iata : info.icao; if (c) inp.value = c; }
     }
     var lb = document.getElementById('ple-' + p[0] + '-label');
-    if (lb) lb.textContent = p[1] + ' (' + tag + ')';
+    // V2.3（codex P3）：若使用者自訂了 From/To 名稱，尊重它（不被 IATA/ICAO 切換蓋掉）；沒自訂才用「From (ICAO)」。
+    if (lb) { var cl = _plFieldLabel(p[0], ''); lb.textContent = cl ? cl : (p[1] + ' (' + tag + ')'); }
   });
   _plUpdateAptLists();
 }
@@ -2499,11 +2660,15 @@ function _plRenderEditor(target) {
       '<button onclick="_plCloseEditor()" style="background:transparent;border:0;color:var(--text);font-size:1.2em;cursor:pointer">' + closeLabel + '</button>' +
       '<div style="font-size:1em;font-weight:700">' + (e.id ? 'Edit Entry' : 'New Entry') + '</div>' + statusBadge +
       '<div style="flex:1"></div>' +
+      // V2.3：⚙ Configure Fields（LogTen 式）—— 平常欄位名稱鎖住，點了才進可編輯狀態改名。UI 文案用英文。
+      '<button onclick="_plToggleConfigFields()" title="Configure field labels" style="background:' + (_pl.configFields ? '#f59e0b' : 'transparent') + ';color:' + (_pl.configFields ? '#fff' : 'var(--muted)') + ';border:1px solid ' + (_pl.configFields ? '#f59e0b' : 'var(--border,#334155)') + ';border-radius:6px;padding:6px 10px;font-size:.74em;cursor:pointer">' + (_pl.configFields ? '✓ Done' : '⚙ Fields') + '</button>' +
       // V1.3.08：拿掉 Confirm — Save 就是 Save。Lock 鈕（LogTen 風格）：鎖了不能改/不能刪；點一下解鎖
       (e.id ? '<button onclick="_plToggleLock()" style="background:transparent;color:' + (e.is_locked ? '#10b981' : 'var(--muted)') + ';border:1px solid ' + (e.is_locked ? '#10b981' : 'var(--border,#334155)') + ';border-radius:6px;padding:6px 10px;font-size:.74em;cursor:pointer">' + (e.is_locked ? '🔒 Locked' : '🔓 Lock') + '</button>' : '') +
       (!e.is_locked ? '<button onclick="_plSaveEntry()" style="background:#3b82f6;color:#fff;border:0;border-radius:6px;padding:6px 12px;font-size:.78em;font-weight:700;cursor:pointer">Save</button>' : '') +
       (e.id && !e.is_locked ? '<button onclick="_plDeleteEntry()" style="background:transparent;color:#ef4444;border:1px solid #ef4444;border-radius:6px;padding:6px 10px;font-size:.74em;cursor:pointer">Delete</button>' : '') +
     '</div>' +
+    // V2.3：Configure Fields 模式提示橫幅（英文）
+    (_pl.configFields ? '<div style="background:#3b2f0a;border:1px solid #f59e0b;color:#fbbf24;border-radius:8px;padding:8px 10px;font-size:.68em;margin-bottom:10px;line-height:1.5">✏️ <b>Configure fields</b> — tap any field name to rename it, then <b>✓ Done</b> to save. Applies to all flights, synced across your devices.</div>' : '') +
 
     // ── Flight：Date+Flight# / From+To / Type+Tail+Position ──
     '<div style="background:var(--card);border-radius:10px;padding:12px">' +
@@ -2574,18 +2739,11 @@ function _plRenderEditor(target) {
       '<div style="font-size:.6em;color:var(--muted);margin-top:4px">POB = Crew + Pax 自動加總 · auto-summed.</div>' +
     '</div>' +
 
-    // ── Crew：駕駛艙 PIC / Crew2-4，客艙 CIC / OBS（V1.3.12；欄位名可在 Crew 頁自訂）──
+    // ── Crew：飛航組（PIC/SIC/Relief/Observer）+ 客艙組（cabin1..20，收合）（V2.3；欄位名可在 Crew 頁自訂）──
     '<div style="margin-top:12px;background:var(--card);border-radius:10px;padding:12px">' +
       '<div style="font-size:.7em;font-weight:700;color:var(--muted);text-transform:uppercase;margin-bottom:8px">Crew</div>' +
       _plCrewDatalist() +
-      // V2.1.09：CREW 排版 —— 手機改 LogTen 式「一列一個、名字全寬」（長名不截斷）；iPad 維持原本 2-per-row。
-      (_plWide()
-        ? _plFieldRow(2, _plCrewField('pic', e) + _plCrewField('crew2', e)) +
-          _plFieldRow(2, _plCrewField('crew3', e) + _plCrewField('crew4', e)) +
-          _plFieldRow(2, _plCrewField('cic', e) + _plCrewField('obs', e))
-        : _plCrewField('pic', e) + _plCrewField('crew2', e) +
-          _plCrewField('crew3', e) + _plCrewField('crew4', e) +
-          _plCrewField('cic', e) + _plCrewField('obs', e)) +
+      _plCrewFields(e) +
     '</div>' +
 
     // ── Other：SID+STAR / Remarks ──
@@ -3084,20 +3242,36 @@ async function _plWipeCategories() {
 
 async function _plUploadFile(inputId, endpoint) {
   var input = document.getElementById(inputId);
-  if (!input || !input.files || !input.files[0]) { _plToast('請先選檔案', 'warn'); return null; }
+  if (!input || !input.files || !input.files[0]) { _plToast('請先選檔案 / Pick a file first', 'warn'); return null; }
   var file = input.files[0];
   if (file.size > 5 * 1024 * 1024) { _plToast('檔案過大（>5MB）', 'error'); return null; }
-  var text = await file.text();
-  var r = await _plApi(endpoint, {
-    method: 'POST',
-    headers: { 'Content-Type': 'text/plain' },
-    body: text,
-  });
-  if (!r.ok && r.status !== 400) {
-    _plToast('上傳失敗 ' + r.status, 'error');
+  // V2.3：匯入中指示 —— 大檔解析/上傳要幾秒，沒提示會被當成「按了沒反應」（user 實際踩過）。
+  // 把處理中狀態寫進結果框（按鈕正下方一定看得到）+ toast，並包 try/catch 避免網路錯誤靜默失敗。
+  var resBox = document.getElementById('pl-import-result');
+  if (resBox) resBox.innerHTML = '<div style="background:#1e3a5f;color:#fff;padding:12px;border-radius:8px;font-size:.82em;display:flex;align-items:center;gap:8px">' +
+    '<span style="display:inline-block;width:14px;height:14px;border:2px solid #93c5fd;border-top-color:transparent;border-radius:50%;animation:plspin .7s linear infinite"></span>' +
+    '<span>⏳ 匯入處理中…請稍候、勿重複按（' + Math.round(file.size / 1024) + ' KB）<br>Importing… please wait, don’t tap again.</span></div>' +
+    '<style>@keyframes plspin{to{transform:rotate(360deg)}}</style>';
+  _plToast('⏳ 匯入中… Importing…');
+  try {
+    var text = await file.text();
+    var r = await _plApi(endpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain' },
+      body: text,
+    });
+    if (!r.ok && r.status !== 400) {
+      _plToast('上傳失敗 ' + r.status, 'error');
+      if (resBox) resBox.innerHTML = '<div style="background:#7f1d1d;color:#fff;padding:10px;border-radius:8px;font-size:.78em">❌ 上傳失敗 ' + r.status + '（請重試）</div>';
+      return null;
+    }
+    return await r.json();
+  } catch (e) {
+    var msg = (e && e.message) ? e.message : 'unknown';
+    _plToast('匯入失敗：' + msg, 'error');
+    if (resBox) resBox.innerHTML = '<div style="background:#7f1d1d;color:#fff;padding:10px;border-radius:8px;font-size:.78em">❌ 匯入失敗：' + _plEsc(msg) + '<br>（網路或檔案問題，請重試）</div>';
     return null;
   }
-  return await r.json();
 }
 
 function _plRenderPreviewRows(rows) {
@@ -3176,19 +3350,35 @@ async function _plRosterListMonths() {
   // 避免誤匯一堆過去草稿，又不會把有效的未來班表漏掉。
   var _now = new Date();
   var _cm = _now.getFullYear() + '-' + String(_now.getMonth() + 1).padStart(2, '0');
-  var checks = months.map(function(mo) {
+  // 單列月份（含勾選盒）。當月及未來預設勾，過去不勾。
+  function _row(mo) {
     var on = (mo >= _cm);
     return '<label style="display:flex;align-items:center;gap:8px;padding:5px 6px;font-size:.8em;cursor:pointer">' +
       '<input type="checkbox" class="pl-rmonth" value="' + _plEsc(mo) + '"' + (on ? ' checked' : '') + ' style="width:16px;height:16px">' +
       '<span>' + _plEsc(mo) + (on ? '' : ' <span style="color:var(--muted);font-size:.85em">（過去 · 預設不勾）</span>') + '</span></label>';
+  }
+  // V2.3：避免月份越累積越長 — 最近 6 個月直接列出，更早的「按年份」收合（預設摺起、點開才展開）。
+  var RECENT_N = 6;
+  var recentHtml = months.slice(0, RECENT_N).map(_row).join('');
+  var byYear = {}, yearOrder = [];
+  months.slice(RECENT_N).forEach(function(mo) {
+    var y = mo.slice(0, 4);
+    if (!byYear[y]) { byYear[y] = []; yearOrder.push(y); }
+    byYear[y].push(mo);
+  });
+  var olderHtml = yearOrder.map(function(y) {
+    return '<details style="margin-top:2px;border-top:1px solid var(--border,#334155)">' +
+      '<summary style="cursor:pointer;font-size:.74em;color:var(--muted);padding:5px 6px">' +
+      _plEsc(y) + ' 年（' + byYear[y].length + ' 個月）</summary>' +
+      byYear[y].map(_row).join('') + '</details>';
   }).join('');
   box.innerHTML =
-    '<div style="font-size:.68em;color:var(--muted);margin-bottom:4px">勾選要匯入的月份（<b>當月及未來預設勾</b>，過去月份預設不勾、要補再自己勾）：</div>' +
+    '<div style="font-size:.68em;color:var(--muted);margin-bottom:4px">勾選要匯入的月份（<b>當月及未來預設勾</b>，過去月份預設不勾、要補再自己勾）。最近 6 個月直接顯示，更早的依年份收合：</div>' +
     '<div style="display:flex;gap:8px;margin-bottom:4px">' +
       '<button onclick="_plRosterMonthsAll(true)" style="background:transparent;border:1px solid var(--border,#334155);color:var(--muted);border-radius:6px;padding:3px 8px;font-size:.68em;cursor:pointer">全選</button>' +
       '<button onclick="_plRosterMonthsAll(false)" style="background:transparent;border:1px solid var(--border,#334155);color:var(--muted);border-radius:6px;padding:3px 8px;font-size:.68em;cursor:pointer">全不選</button>' +
     '</div>' +
-    '<div style="max-height:200px;overflow-y:auto;border:1px solid var(--border,#334155);border-radius:6px;padding:4px;margin-bottom:8px">' + checks + '</div>' +
+    '<div style="max-height:240px;overflow-y:auto;border:1px solid var(--border,#334155);border-radius:6px;padding:4px;margin-bottom:8px">' + recentHtml + olderHtml + '</div>' +
     '<button onclick="_plRosterImportSelected()" style="background:#10b981;color:#fff;border:0;border-radius:6px;padding:6px 12px;font-size:.78em;font-weight:700;cursor:pointer">📥 匯入選取月份 / Import selected</button>';
 }
 function _plRosterMonthsAll(on) {
@@ -4461,23 +4651,34 @@ async function _plOpenCrew() {
   _plRenderCrewList();
 }
 
-// 從 entry.crew JSONB 內所有欄位收集名字（pic/sic/fo1/fo2/purser/observer 都算）
-function _plEntryCrewNames(e) {
+// V2.3：列表組員顯示模式（含 localStorage 離線退路）。cic_only=只機長 / flight=飛航組（排除客艙）/ all=全部。
+function _plGetCrewDisplayMode() {
+  var m = _pl.crewDisplayMode;
+  if (!m) { try { m = localStorage.getItem('pilotlog_crew_display_mode'); } catch (e) {} }
+  return (m === 'cic_only' || m === 'flight' || m === 'all') ? m : 'flight';
+}
+// 從 entry.crew JSONB 收集要顯示的組員名字。mode 省略 → 用使用者偏好；CSV 匯出傳 'all' 強制全收。
+function _plEntryCrewNames(e, mode) {
   if (!e || !e.crew || typeof e.crew !== 'object') return [];
-  // V1.3.12：新 6 槽 PIC 先，再 Crew2-4 / CIC / OBS；後面接舊 key（相容已匯入的舊資料）。
-  // 槽值相容字串(舊)與 {name,...}(新)。
-  var primary = ['pic', 'crew2', 'crew3', 'crew4', 'cic', 'obs'];          // 正式 6 槽：一律列
-  var legacy = ['sic', 'fo1', 'fo2', 'purser', 'observer1', 'observer2'];  // 舊殘留槽：對正式槽去重
+  mode = mode || _plGetCrewDisplayMode();
+  // V2.3：飛航組擴充到 9 槽（含 Relief/Observer2）；後面接舊 key（相容已匯入的舊資料）。槽值相容字串(舊)與 {name,...}(新)。
+  var primary = ['pic', 'crew2', 'crew3', 'crew4', 'crew5', 'crew6', 'cic', 'obs', 'obs2'];  // 飛航組
+  var legacy = ['sic', 'fo1', 'fo2', 'purser', 'observer1', 'observer2'];                    // 舊殘留槽：對正式槽去重
+  function allowed(k) {
+    if (mode === 'cic_only') return k === 'pic';        // 只顯示在隊機長
+    if (mode === 'all') return true;                    // 全部（含 cabin1..20）
+    return !/^cabin\d+$/.test(k);                       // flight：排除客艙
+  }
   var names = [], seenName = {};
   function nm(v) { return _plCrewDisplayName(v); }   // V1.3.14：員編對得到 → 顯示通訊錄名
-  // 正式 6 槽：全列（即使兩位不同人剛好同名也都顯示，不誤併 — codex P2）。
-  primary.forEach(function(k) { var n = nm(e.crew[k]); if (n) { names.push(n); seenName[n] = 1; } });
-  // V1.3.37：舊殘留槽（如 observer2）只在「沒跟正式槽重名」時補 —— 解掉「最後一個重複」
-  // （同一人殘留在舊欄位），但不會把正式槽裡的合法同名誤併成一個。
-  legacy.forEach(function(k) { var n = nm(e.crew[k]); if (n && !seenName[n]) { names.push(n); seenName[n] = 1; } });
-  // 其他未列名的 key 也補在後面（保險，不漏人），同樣對已列名字去重
+  // 飛航組：全列（即使兩位不同人剛好同名也都顯示，不誤併 — codex P2）。
+  primary.forEach(function(k) { if (!allowed(k)) return; var n = nm(e.crew[k]); if (n) { names.push(n); seenName[n] = 1; } });
+  // V1.3.37：舊殘留槽（如 observer2）只在「沒跟正式槽重名」時補。
+  legacy.forEach(function(k) { if (!allowed(k)) return; var n = nm(e.crew[k]); if (n && !seenName[n]) { names.push(n); seenName[n] = 1; } });
+  // 其他未列名的 key（含 cabin1..20）也補在後面，同樣對已列名字去重。
   Object.keys(e.crew).forEach(function(k) {
     if (primary.indexOf(k) >= 0 || legacy.indexOf(k) >= 0) return;
+    if (!allowed(k)) return;
     var n = nm(e.crew[k]); if (n && !seenName[n]) names.push(n);
   });
   return names;
@@ -4574,6 +4775,7 @@ function _plRenderCrewList() {
         '<div style="font-size:.7em;color:var(--muted)">共 ' + _pl.crew.length + ' 人</div>' +
       '</div>' +
       _plCrewLabelsEditor() +
+      _plCrewDisplayModeEditor() +
       '<input id="pl-crew-search" type="search" placeholder="搜尋名字 / ID..." value="' + _plEsc(term) + '" ' +
         'oninput="_plCrewSearchInput(this.value)" ' +
         'style="width:100%;background:var(--bg,#0a0e1a);color:var(--text);border:1px solid var(--border,#334155);border-radius:6px;padding:8px 10px;font-size:.85em;margin-bottom:0;box-sizing:border-box">' +
@@ -6219,7 +6421,7 @@ function _plExportCsv() {
     var crew = e.crew || {};
     // V1.3.12：crew 槽值已物件化（{name,rank,eid}），相容舊字串。PIC 一欄、其餘合併一欄。
     var picName = _plCrewVal(crew.pic).name;
-    var otherNames = _plEntryCrewNames(e).filter(function(n) { return n !== picName; }).join('; ');
+    var otherNames = _plEntryCrewNames(e, 'all').filter(function(n) { return n !== picName; }).join('; ');
     var cells = [
       String(e.flight_date || '').slice(0, 10), e.flight_no, e.origin, e.dest,
       e.aircraft_type, e.tail_no, e.position,

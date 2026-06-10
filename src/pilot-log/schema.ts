@@ -35,8 +35,12 @@ export async function ensureTables(): Promise<boolean> {
     await pool.query(`ALTER TABLE pilot_users ADD COLUMN IF NOT EXISTS last_seen_at TIMESTAMPTZ`).catch(() => {});
     await pool.query(`ALTER TABLE pilot_users ADD COLUMN IF NOT EXISTS last_import_at TIMESTAMPTZ`).catch(() => {});
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_pilot_users_last_seen ON pilot_users(last_seen_at DESC NULLS LAST)`).catch(() => {});
-    // V1.3.12：crew 欄位顯示名稱自訂（CIC=JX、EVA=CP…）。JSONB {pic,crew2,crew3,crew4,cic,obs}
+    // V1.3.12：crew 欄位顯示名稱自訂（CIC=JX、EVA=CP…）。JSONB；V2.3 起槽位擴充到 CREW_SLOT_IDS（飛航 9 + 客艙 cabin1..20）。
     await pool.query(`ALTER TABLE pilot_users ADD COLUMN IF NOT EXISTS crew_labels JSONB`).catch(() => {});
+    // V2.3：組員顯示模式（cic_only / flight / all）—— 客艙組員預設收合，避免長班表把畫面塞爆。
+    await pool.query(`ALTER TABLE pilot_users ADD COLUMN IF NOT EXISTS crew_display_mode TEXT DEFAULT 'flight'`).catch(() => {});
+    // V2.3：編輯器欄位「顯示名稱」自訂（LogTen 式 Configure Fields）—— {fieldKey: 自訂標籤}，底層資料 key 不變。
+    await pool.query(`ALTER TABLE pilot_users ADD COLUMN IF NOT EXISTS field_labels JSONB`).catch(() => {});
 
     await pool.query(`
       CREATE TABLE IF NOT EXISTS pilot_user_emails (

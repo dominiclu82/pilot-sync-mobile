@@ -48,14 +48,15 @@ import { importLogtenAircraftTypes } from './import-aircraft-types.js';
 import { renderCommunityLink } from '../app-changelog.js';
 import { importRoster } from './import-roster.js';
 import { getTotals, getRollingTotals, getByAircraftType, getOpeningBalance, getSimTotals } from './stats.js';
+import { CREW_SLOT_IDS, CREW_DISPLAY_MODES, type CrewDisplayMode } from './crew-slots.js';
 import { loadCredentials } from '../config.js';
 import { getSpaPilotLogJs } from '../spa/js-pilot-log.js';
 import { getAirportDbJs } from '../spa/js-airport-db.js';
 
 // ── 版本（比照 CrewSync / Morning：每次推版必更新；SW cache 名稱跟著走） ────
 // 本機 preview build 會暫時加 -tNN 後綴方便對版；推正式版前拿掉只留乾淨版號。
-export const PILOT_LOG_VERSION = 'V2.2.27';
-const PILOT_LOG_CACHE = 'pilotlog-v2-2-27';
+export const PILOT_LOG_VERSION = 'V2.3.0';
+const PILOT_LOG_CACHE = 'pilotlog-v2-3-0';
 
 export const pilotLogRouter = express.Router();
 
@@ -362,6 +363,11 @@ function _renderPilotLogChangelog(): string {
   return `
     ${renderCommunityLink()}
     <div class="pl-cl-v">${PILOT_LOG_VERSION}</div>
+    <div class="pl-cl-txt">
+      <b>🧑‍✈️ 組員大升級（飛航組加 Relief／Observer、客艙最多 20 格、欄位名稱可自訂），並修好「匯出沒帶班號的航班不計時數」＋加上匯入進度提示。</b><br>
+      <b>🧑‍✈️ Crew upgrade (more flight crew + up to 20 cabin slots, renameable field labels); fixed flights missing a flight number not counting toward hours, and added import progress.</b>
+    </div>
+    <div class="pl-cl-v old">V2.2.27</div>
     <div class="pl-cl-txt">
       <b>📥 匯入解析失敗的航班不再丟棄 → 改收成「待補強」（琥珀色、釘最上面）讓你補完；補好自動轉已完成、計入統計。LogTen / Log ATP 2 / WADER 都支援，重匯靠日期合併不重複。</b><br>
       <b>📥 Import: flights that fail to parse are no longer dropped — kept as "needs-completion" entries (amber, pinned to top) to finish; completing one auto-marks it done and counts it. Works for LogTen / Log ATP 2 / WADER, with date-based merge on re-import.</b>
@@ -1099,7 +1105,7 @@ pilotLogRouter.get('/api/pilot-log/me', requireAuth, async (req: AuthedRequest, 
   const pool = getPool();
   if (!pool || !(await ensureTables())) return res.status(503).json({ error: 'database_unavailable' });
   const userId = req.pilotUserId!;
-  const u = await pool.query('SELECT id, created_at, last_login_at, crew_labels FROM pilot_users WHERE id = $1', [userId]);
+  const u = await pool.query('SELECT id, created_at, last_login_at, crew_labels, crew_display_mode, field_labels FROM pilot_users WHERE id = $1', [userId]);
   const emails = await pool.query(
     'SELECT email, is_primary FROM pilot_user_emails WHERE user_id = $1 ORDER BY is_primary DESC, linked_at',
     [userId]
@@ -1119,17 +1125,62 @@ pilotLogRouter.get('/api/pilot-log/me', requireAuth, async (req: AuthedRequest, 
     );
     isFounder = !!f.rows[0]?.founder;
   } catch { /* pilot_beta_applicants 不存在/查詢失敗 → 當一般會員 */ }
-  res.json({ user: u.rows[0], emails: emails.rows, crew_labels: u.rows[0].crew_labels || null, isFounder });
+  res.json({ user: u.rows[0], emails: emails.rows, crew_labels: u.rows[0].crew_labels || null,
+    crew_display_mode: u.rows[0].crew_display_mode || 'flight', field_labels: u.rows[0].field_labels || null, isFounder });
 });
 
-// V1.3.12：crew 欄位顯示名稱自訂（CIC=JX、EVA=CP…）。只收 6 個白名單 key、每個 ≤ 24 字。
+// V2.3：編輯器欄位顯示名稱自訂（LogTen 式）。key = 欄位 id（[a-z0-9_]，≤40 字）、值 = 標籤（≤24 字），整份取代、最多 120 個。
+pilotLogRouter.post('/api/pilot-log/field-labels', requireAuth, async (req: AuthedRequest, res) => {
+  const pool = getPool();
+  if (!pool) return res.status(503).json({ error: 'database_unavailable' });
+  let body: any;
+  try { body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body; }
+  catch { return res.status(400).json({ error: 'invalid_json' }); }
+  const labels: Record<string, string> = {};
+  let n = 0;
+  for (const k of Object.keys(body || {})) {
+    if (n >= 120) break;
+    if (!/^[a-z0-9_]{1,40}$/.test(k)) continue;
+    const v = body[k];
+    if (typeof v === 'string' && v.trim()) { labels[k] = v.trim().slice(0, 24); n++; }
+  }
+  try {
+    await pool.query('UPDATE pilot_users SET field_labels = $2, updated_at = NOW() WHERE id = $1',
+      [req.pilotUserId, JSON.stringify(labels)]);
+    res.json({ ok: true, field_labels: labels });
+  } catch (e: any) {
+    res.status(500).json({ error: 'internal', detail: e.message });
+  }
+});
+
+// V2.3：組員顯示模式（cic_only / flight / all）。客艙組員多、預設收合，使用者自選要看多少。
+pilotLogRouter.post('/api/pilot-log/crew-display-mode', requireAuth, async (req: AuthedRequest, res) => {
+  const pool = getPool();
+  if (!pool) return res.status(503).json({ error: 'database_unavailable' });
+  let body: any;
+  try { body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body; }
+  catch { return res.status(400).json({ error: 'invalid_json' }); }
+  const mode = body && body.mode;
+  if (!CREW_DISPLAY_MODES.includes(mode as CrewDisplayMode)) {
+    return res.status(400).json({ error: 'invalid_mode' });
+  }
+  try {
+    await pool.query('UPDATE pilot_users SET crew_display_mode = $2, updated_at = NOW() WHERE id = $1',
+      [req.pilotUserId, mode]);
+    res.json({ ok: true, crew_display_mode: mode });
+  } catch (e: any) {
+    res.status(500).json({ error: 'internal', detail: e.message });
+  }
+});
+
+// V1.3.12：crew 欄位顯示名稱自訂（CIC=JX、EVA=CP…）。白名單 = 全部組員槽位（V2.3 起含 cabin1..20），每個 ≤ 24 字。
 pilotLogRouter.post('/api/pilot-log/crew-labels', requireAuth, async (req: AuthedRequest, res) => {
   const pool = getPool();
   if (!pool) return res.status(503).json({ error: 'database_unavailable' });
   let body: any;
   try { body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body; }
   catch { return res.status(400).json({ error: 'invalid_json' }); }
-  const allow = ['pic', 'crew2', 'crew3', 'crew4', 'cic', 'obs'];
+  const allow = CREW_SLOT_IDS;
   const labels: Record<string, string> = {};
   for (const k of allow) {
     const v = body && body[k];
