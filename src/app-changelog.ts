@@ -17,6 +17,9 @@ export function renderCommunityLink(): string {
 export interface ChangelogEntry { v: string; zh: string; en: string; }
 
 export const APP_CHANGELOG: ChangelogEntry[] = [
+  { v: 'V2.0.17',
+    zh: '[投資] 緊急修復：V2.0.16 錯誤訊息的換行字元害整頁程式載不進來（全用戶空白），已修好。',
+    en: '[Portfolio] Hotfix: a stray newline in a V2.0.16 message broke the whole Portfolio page (blank for all users) — fixed.' },
   { v: 'V2.0.16',
     zh: '[投資] 儲存失敗時改跳「明確中文提示」（原本錯誤訊息被手機鍵盤蓋住、看起來像按了沒反應）；並加 15 秒逾時，避免請求卡住無聲無息。',
     en: '[Portfolio] Save failures now show a clear popup message (the error was hidden behind the phone keyboard, looking like "no response"); added a 15s timeout so a stuck request can no longer fail silently.' },

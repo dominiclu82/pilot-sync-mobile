@@ -673,7 +673,7 @@ async function apiFetch(path, opts = {}) {
     }
     // 把已知錯誤碼翻成看得懂、可行動的中文（原本只丟英文碼，使用者看不懂、又被鍵盤蓋住→以為沒反應）。
     if (e.error === 'sell_exceeds_holding') {
-      throw new Error('賣出 ' + e.attempted_sell_qty + ' 股超過該日持股：系統記錄你在 ' + e.as_of_date + ' 只持有 ' + e.current_qty + ' 股。\n請先記錄「買進」且買進日期早於賣出日，或調整賣出日期／股數。');
+      throw new Error('賣出 ' + e.attempted_sell_qty + ' 股超過該日持股：系統記錄你在 ' + e.as_of_date + ' 只持有 ' + e.current_qty + ' 股。\\n請先記錄「買進」且買進日期早於賣出日，或調整賣出日期／股數。');
     }
     const codeMsg = { invalid_txn_date: '日期格式不對', qty_must_be_positive: '股數要大於 0', invalid_price: '價格不可為負', invalid_fee: '手續費不可為負', invalid_symbol: '股票代號無效', not_found: '找不到這筆交易' };
     throw new Error(codeMsg[e.error] || ('儲存失敗（' + (e.error || ('http_' + r.status)) + '）'));
