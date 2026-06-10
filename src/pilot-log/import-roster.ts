@@ -18,6 +18,8 @@
 import { randomUUID } from 'crypto';
 import { getPool, ensureTables } from './schema.js';
 import { normFlightNoKey } from './tw-fleet.js';   // V2.2.00：跨來源班號正規化（JX031 vs 031 視為同班）
+import { normAirportKey } from './airport-codes.js';   // V2.3.04：機場 IATA/ICAO 正規化（TPE vs RCTP 視為同場）
+import { CREW_CABIN_SLOTS } from './crew-slots.js';     // V2.3.04：班表空服員進 cabin1..20 槽
 
 interface RosterCrewMember {
   position?: string;
@@ -178,18 +180,19 @@ function extractCrew(
   if (!crew || !crew.length) return null;
   const out: Record<string, CrewSlotVal> = {};
   const cockpit: RosterCrewMember[] = [];
+  const cabin: RosterCrewMember[] = [];      // V2.3.04：客艙組員（非 CIC）收進 cabin1..20，不再丟掉
   for (const m of crew) {
     if (!m.name || !m.position) continue;
     const pos = m.position.toUpperCase();
     const rank = (m.rank || '').toUpperCase();
     if (/DHD|DEADHEAD/.test(pos)) continue;   // V1.3.12：搭便機的人沒操作這班，不進槽
-    if (/CIC/.test(pos)) { if (!out.cic) out.cic = crewVal(m); }
-    else if (/OBS/.test(pos)) { if (!out.obs) out.obs = crewVal(m); }
+    if (/CIC/.test(pos)) { if (!out.cic) out.cic = crewVal(m); else cabin.push(m); }
+    else if (/OBS/.test(pos)) { if (!out.obs) out.obs = crewVal(m); else if (!out.obs2) out.obs2 = crewVal(m); }
     else if (/CAP|CMD|PIC/.test(pos) || /^P\d|^IS|SFO|FIRST OFFICER|^FO|SIC/.test(pos)
              || /CAP|SFO|FO|TFO|TCAP/.test(rank)) {
       cockpit.push(m);                         // 駕駛艙全收集，稍後分槽（不再當場丟人）
     }
-    // else：其他客艙（SC/CC/PC…非 CIC）→ 不記
+    else cabin.push(m);                        // 其他客艙（SC/CC/PC…）→ cabin 槽（V2.3 編輯器已有 20 格）
   }
   // pic 槽：① 這趟你是 PIC 且你在駕駛艙名單（員編認本人）→ 放你；② 否則第一個 position 標 PIC 的人；
   //         ③ 再否則名單第一位。解兩個 PIC 時「哪個是你」的歧義。
@@ -199,13 +202,15 @@ function extractCrew(
   if (picIdx < 0) picIdx = cockpit.findIndex((m) => /CAP|CMD|PIC/.test((m.position || '').toUpperCase()));
   if (picIdx < 0 && cockpit.length) picIdx = 0;
   if (picIdx >= 0) out.pic = crewVal(cockpit[picIdx]);
-  // 其餘駕駛艙 → crew2/crew3/crew4（依出現順序，不丟人；>4 人才溢位，加強組員最多 4 人剛好放滿）
-  const otherSlots = ['crew2', 'crew3', 'crew4'];
+  // 其餘駕駛艙 → crew2..crew6（V2.3.04 跟上槽位擴充：原本只到 crew4，Relief 3/4 會被丟掉）
+  const otherSlots = ['crew2', 'crew3', 'crew4', 'crew5', 'crew6'];
   let oi = 0;
   cockpit.forEach((m, i) => {
     if (i === picIdx) return;
     if (oi < otherSlots.length) out[otherSlots[oi++]] = crewVal(m);
   });
+  // V2.3.04：客艙組員依出現順序填 cabin1..cabin20（超過 20 人才溢位丟棄）
+  cabin.forEach((m, i) => { if (i < CREW_CABIN_SLOTS.length) out[CREW_CABIN_SLOTS[i]] = crewVal(m); });
   return Object.keys(out).length ? out : null;
 }
 
@@ -321,6 +326,50 @@ export async function importRoster(
     for (const r of sidQ.rows) { const s = (r.employee_id || '').trim(); if (s) selfIds.add(s); }
   } catch (e) { /* 認不到本人員編 → selfIds 空，extractCrew 退回 position 規則 */ }
 
+  // 「純班表草稿」判定（codex P1）：draft ≠ 沒碰過 —— 使用者可在 draft 上補很多手動欄位但 status 仍是 draft。
+  // 只有「所有手動欄位都還是空 / 預設」的純草稿才能安全直接刪；只要動過任何一個一律保留。
+  // 班表本來就帶的欄位（position/std/sta/duty/crew/deadhead/crew_count）不納入判定。
+  // 涵蓋全部手動欄位（schema 對照）：OOOI、機號、機型、時數(block/air/night/pic/sic)、距離、duty分鐘、
+  // approaches、起降(day/night takeoffs+landings)、autolands、pax、SID/STAR、remarks、pilot_flying。
+  // （V2.3.04 從 sweep 區搬上來：主迴圈的同班合併也要用）
+  const UNTOUCHED =
+    "out_utc IS NULL AND off_utc IS NULL AND on_utc IS NULL AND in_utc IS NULL" +
+    " AND COALESCE(tail_no,'')='' AND COALESCE(aircraft_type,'')='' AND COALESCE(remarks,'')=''" +
+    " AND COALESCE(sid,'')='' AND COALESCE(star,'')=''" +
+    " AND block_minutes IS NULL AND air_minutes IS NULL AND night_minutes IS NULL" +
+    " AND pic_minutes IS NULL AND sic_minutes IS NULL AND distance_nm IS NULL" +
+    " AND total_duty_minutes IS NULL AND pax_count IS NULL AND pilot_flying IS NULL AND approaches IS NULL" +
+    " AND COALESCE(day_takeoffs,0)=0 AND COALESCE(night_takeoffs,0)=0" +
+    " AND COALESCE(day_landings,0)=0 AND COALESCE(night_landings,0)=0 AND COALESCE(autolands,0)=0";
+
+  // codex P2（V2.3.04）：同日同班號同航線可能有兩腿（罕見但合法）。正規化比對會把兩腿看成同一班
+  // → 第二腿誤併掉第一腿、永遠少一筆。解法：「已認領」集合 —— 這輪匯入中，每筆既有列只能被一腿
+  // 認走（合併/補組員/刪除都算），第二腿配不到未認領的列就走正常新增，兩腿各自保留。
+  const consumedIds = new Set<string>();
+
+  // codex P1（V2.3.04）：雙腿邊角的第二層防護 —— 一筆既有列的 source_ref 若正好是「本批另一腿」
+  // 的 ref，那是那腿自己的列，不可被這腿 fuzzy 搶走（會把那腿使用者編輯過的資料覆寫成這腿的）。
+  // dutyIdx 漂移留下的舊列 ref 形狀跟本批不同、不在集合內 → 照常可被 fuzzy 認領（自癒不受影響）。
+  const batchRefs = new Set<string>();
+  // codex P1 round3（V2.3.04）：同 key（日+正規化班號+起降）在本批出現 ≥2 腿 → 該 key 完全停用
+  // fuzzy 比對、只認 exact source_ref。雙腿情境下 fuzzy 無論怎麼挑都可能挑錯腿（subset 匯入 / ref
+  // 漂移組合無法分辨），寧可留一筆重複草稿也不覆寫/誤刪另一腿。單腿 key（絕大多數）自癒不受影響。
+  const normKeyOf = (date: string | null, fno?: string, o?: string, d?: string): string | null => {
+    if (!date) return null;
+    const k = normFlightNoKey(fno || '');
+    return k ? date + '|' + k + '|' + normAirportKey(o) + '|' + normAirportKey(d) : null;
+  };
+  const batchKeyCount = new Map<string, number>();
+  for (let di = 0; di < duties.length; di++) {
+    const dctx = dutyCtx(duties[di]);
+    for (const ff of (duties[di].flights || [])) {
+      const ref = buildSourceRef(ff, di, dctx);
+      if (ref) batchRefs.add(ref);
+      const kk = normKeyOf(flightDate(ff, dctx), ff.flightNo, ff.origin, ff.dest);
+      if (kk) batchKeyCount.set(kk, (batchKeyCount.get(kk) || 0) + 1);
+    }
+  }
+
   for (let dutyIdx = 0; dutyIdx < duties.length; dutyIdx++) {
     const duty = duties[dutyIdx];
     // V1.3.14：班表月份脈絡（補 CrewSync UTC 戳記缺的年份）。
@@ -366,32 +415,59 @@ export async function importRoster(
         if (!contacts.has(key)) contacts.set(key, { staffId: sid || undefined, name: m.name });
       }
 
-      // 查現有（同 roster source_ref）
-      const existing = await pool.query(
-        `SELECT id, status FROM pilot_log_entries WHERE user_id = $1 AND source = 'roster' AND source_ref = $2`,
-        [userId, sourceRef]
+      // ── V2.3.04「同班」比對重寫 ───────────────────────────────────────────
+      // 班號用 normFlightNoKey（V2.2.00 既有：JX031 vs 031 vs JX31 同班）+ 機場用 normAirportKey
+      // （新增：班表帶 IATA `TPE`、LogTen 帶 ICAO `RCTP`，舊版字面比對永遠對不上 → 半年航班全部
+      // 重複兩份的實案）。同日同班號同起降（正規化後）就視為同一班。
+      const fnKey = normFlightNoKey(f.flightNo);
+      const oKey = normAirportKey(f.origin), dKey = normAirportKey(f.dest);
+      // codex P1 round4：fuzzy 多一道「表定起飛時間相近（±4h）」條件 —— 同日同班號同航線的「真雙腿」
+      // 表定時間差好幾小時、不會互相誤認（含 DB 已有兩腿、之後只重匯其中一腿的 subset 情境）；
+      // 漂移殘留的重複是同一班、表定相同 → 照樣合併。任一邊沒有時間（理論上 roster 真航班必有
+      // depTimeUtc、logten 必有 out_utc）才退回不限制。
+      const fStdMs = stdUtc ? stdUtc.getTime() : null;
+      const timeOk = (r: { std_utc?: any; out_utc?: any }) => {
+        if (fStdMs == null) return true;
+        const raw = r.std_utc || r.out_utc;
+        if (!raw) return true;
+        const t = new Date(raw).getTime();
+        return isNaN(t) || Math.abs(t - fStdMs) <= 4 * 3600 * 1000;
+      };
+      const isSameFlight = (r: { flight_no?: string; origin?: string; dest?: string; std_utc?: any; out_utc?: any }) =>
+        !!fnKey && normFlightNoKey(r.flight_no || '') === fnKey
+        && normAirportKey(r.origin) === oKey && normAirportKey(r.dest) === dKey
+        && timeOk(r);
+
+      // roster 自家既有列：exact source_ref **或** 正規化同班都算同一班。
+      // 後者解 dutyIdx 漂移：單匯 6 月 vs 整批匯 1-6 月，duty 順序不同 → source_ref 變
+      // → 舊版查 exact ref 落空又建一筆（使用者動過的舊草稿 sweep 不會清 → 雙胞胎實案）。
+      const rosterRowsQ = await pool.query(
+        `SELECT id, status, source_ref, flight_no, origin, dest, std_utc, (${UNTOUCHED}) AS untouched
+         FROM pilot_log_entries WHERE user_id = $1 AND source = 'roster' AND flight_date = $2`,
+        [userId, fDate]
+      );
+      // 雙腿 key（本批同 key ≥2 腿）→ fuzzy 全關，只認 exact ref（見 batchKeyCount 註解）。
+      const dualLeg = (batchKeyCount.get(normKeyOf(fDate, f.flightNo, f.origin, f.dest) || '') || 0) > 1;
+      const rosterMatches = rosterRowsQ.rows.filter(
+        (r: any) => !consumedIds.has(r.id)
+          && (r.source_ref === sourceRef
+              || (!dualLeg && isSameFlight(r) && !batchRefs.has(r.source_ref)))
       );
 
-      // V2.0.02（codex P1）：跨來源查重 —— 不管 roster 這邊有沒有都查。同一天+起降若已有「已完成」
-      // 紀錄（LogTen/手動/LogATP，confirmed 或有實際落地 in_utc），就不要 roster 草稿重複：既有 roster
-      // draft/removed 直接刪掉（完成版取代）、沒有就不建。confirmed 的 roster 不動（使用者已親自確認）。
-      // V2.2.00：班號改用「正規化比對」—— 抓同日同起降的候選列，JS 端用 normFlightNoKey 比，
-      // 跨格式才認得出同一班（roster 'JX031' vs LogTen '031' vs LogATP 'JX31' → 同班）。
+      // V2.0.02（codex P1）：跨來源查重 —— 同一天同班若已有「已完成」紀錄（LogTen/手動/LogATP，
+      // confirmed 或有實際落地 in_utc），就不要 roster 草稿重複。
       // 命中時把班表帶的「組員 / POB / position」只補空缺（COALESCE / 既有槽優先）到那筆已完成航班，
-      // 補上 logbook 來源常缺的加強組員、CIC、觀察員、後艙人數（不洗掉使用者既有資料）。
+      // 補上 logbook 來源常缺的加強組員、CIC、觀察員、空服員、後艙人數（不洗掉使用者既有資料）。
       {
         const cand = await pool.query(
-          `SELECT id, flight_no, crew, position, crew_count FROM pilot_log_entries
-           WHERE user_id = $1 AND flight_date = $2 AND origin = $3 AND dest = $4
+          `SELECT id, flight_no, origin, dest, std_utc, out_utc FROM pilot_log_entries
+           WHERE user_id = $1 AND flight_date = $2
              AND source <> 'roster' AND (status = 'confirmed' OR in_utc IS NOT NULL)`,
-          [userId, fDate, f.origin, f.dest]
+          [userId, fDate]
         );
-        const fnKey = normFlightNoKey(f.flightNo);
-        const dupRow = fnKey ? cand.rows.find((r: any) => normFlightNoKey(r.flight_no) === fnKey) : null;
+        const dupRow = cand.rows.find((r: any) => !consumedIds.has(r.id) && isSameFlight(r));
         if (dupRow) {
-          // V2.2.00：補組員 / POB / position 到已完成航班 —— 只補空缺，不覆蓋。
-          //  crew：JSONB 合併 `班表 || 既有`，既有槽（使用者 / logbook 已有的）勝出，只補既有沒有的槽。
-          //  position / crew_count：COALESCE(既有, 班表)，原本是空白才用班表補。
+          consumedIds.add(dupRow.id);
           if (crewJson || crewCount != null || position) {
             try {
               await pool.query(
@@ -406,15 +482,31 @@ export async function importRoster(
               result.crew_filled = (result.crew_filled || 0) + 1;
             } catch (e) { /* 補組員失敗不擋整個匯入 */ }
           }
-          if (existing.rows.length > 0 && existing.rows[0].status !== 'confirmed') {
-            await pool.query('DELETE FROM pilot_log_entries WHERE id = $1', [existing.rows[0].id]);
+          // 對應的 roster 草稿清掉（不只 exact ref —— 舊版機場比不上時留下的重複草稿一併自癒）。
+          // codex P2：只刪「沒動過」的純草稿 —— 動過的保留，寧可留一筆重複也不丟使用者手動補的資料。
+          for (const r of rosterMatches) {
+            if (r.status !== 'confirmed' && r.untouched) {
+              await pool.query('DELETE FROM pilot_log_entries WHERE id = $1', [r.id]);
+              consumedIds.add(r.id);
+            }
           }
           result.skipped_existing = (result.skipped_existing || 0) + 1;
           continue;
         }
       }
 
-      if (existing.rows.length === 0) {
+      const confirmedMatch = rosterMatches.find((r: any) => r.status === 'confirmed');
+      if (confirmedMatch) {
+        // 同班已被使用者 confirm → 不動它也不再建草稿；多餘「沒動過」的重複草稿順手清掉（自癒）
+        consumedIds.add(confirmedMatch.id);
+        for (const r of rosterMatches) {
+          if (r.id !== confirmedMatch.id && r.status !== 'confirmed' && r.untouched) {
+            await pool.query('DELETE FROM pilot_log_entries WHERE id = $1', [r.id]);
+            consumedIds.add(r.id);
+          }
+        }
+        result.skipped_confirmed++;
+      } else if (!rosterMatches.length) {
         // 新 draft
         await pool.query(
           `INSERT INTO pilot_log_entries
@@ -427,15 +519,28 @@ export async function importRoster(
           ]
         );
         result.inserted++;
-      } else if (existing.rows[0].status === 'confirmed') {
-        result.skipped_confirmed++;
       } else {
+        // 既有草稿 → 合併成一筆：挑主列（動過的優先 → exact ref → 第一筆），其餘「沒動過」的刪掉。
+        // 動過的優先 = 使用者手動補的機號/時數那筆活下來；多筆都動過則只更新主列、其餘保留（不敢亂合）。
+        const touched = rosterMatches.filter((r: any) => !r.untouched);
+        const primary =
+          (touched.find((r: any) => r.source_ref === sourceRef) || touched[0]) ||
+          rosterMatches.find((r: any) => r.source_ref === sourceRef) || rosterMatches[0];
+        consumedIds.add(primary.id);
+        for (const r of rosterMatches) {
+          if (r.id !== primary.id && r.untouched) {
+            await pool.query('DELETE FROM pilot_log_entries WHERE id = $1', [r.id]);
+            consumedIds.add(r.id);
+          }
+        }
         // draft 或 roster_removed → 更新並重設 draft
         // codex P2：原本用 COALESCE 會卡住已 non-null 的欄位（gate 改了/duty 改了/組員換了
         // 都不會反映）。改成直接覆寫 — 班表是新鮮的就該蓋舊的。
+        // V2.3.04：source_ref 同步更新成這次的 ref，下次重匯 exact 命中、sweep 也對得上。
         await pool.query(
           `UPDATE pilot_log_entries SET
              status = 'draft',
+             source_ref = $15,
              flight_date = $2, flight_no = $3, origin = $4, dest = $5,
              position = $6,
              std_utc = $7, sta_utc = $8,
@@ -448,9 +553,9 @@ export async function importRoster(
              updated_at = NOW()
            WHERE id = $1`,
           [
-            existing.rows[0].id, fDate, f.flightNo, f.origin, f.dest,
+            primary.id, fDate, f.flightNo, f.origin, f.dest,
             position, stdUtc, staUtc, onDuty, offDuty,
-            crewJson ? JSON.stringify(crewJson) : null, isDeadhead, rosterMonth, crewCount,
+            crewJson ? JSON.stringify(crewJson) : null, isDeadhead, rosterMonth, crewCount, sourceRef,
           ]
         );
         result.updated++;
@@ -487,20 +592,7 @@ export async function importRoster(
   // roster_month，所以「6 月班表的 SEA→TPE 回程（flight_date 落在 7/1）」會被 6 月 sweep 正確掃到，
   // 又不會誤動到真正屬於 7 月班表的 draft（它 roster_month='2026-07'）。舊資料 roster_month 為 NULL
   // → 退回原本的 flight_date 區間掃（非邊界腿都涵蓋；下次重匯就會補上 roster_month、自動升級成精準掃）。
-  // 「純班表草稿」判定（codex P1）：draft ≠ 沒碰過 —— 使用者可在 draft 上補很多手動欄位但 status 仍是 draft。
-  // 只有「所有手動欄位都還是空 / 預設」的純草稿才能在班表變更時安全直接刪；只要動過任何一個一律保留，
-  // 避免誤刪在記錄中或已飛的航班。班表本來就帶的欄位（position/std/sta/duty/crew/deadhead/crew_count）不納入判定。
-  // 涵蓋全部手動欄位（schema 對照）：OOOI、機號、機型、時數(block/air/night/pic/sic)、距離、duty分鐘、
-  // approaches、起降(day/night takeoffs+landings)、autolands、pax、SID/STAR、remarks、pilot_flying。
-  const UNTOUCHED =
-    "out_utc IS NULL AND off_utc IS NULL AND on_utc IS NULL AND in_utc IS NULL" +
-    " AND COALESCE(tail_no,'')='' AND COALESCE(aircraft_type,'')='' AND COALESCE(remarks,'')=''" +
-    " AND COALESCE(sid,'')='' AND COALESCE(star,'')=''" +
-    " AND block_minutes IS NULL AND air_minutes IS NULL AND night_minutes IS NULL" +
-    " AND pic_minutes IS NULL AND sic_minutes IS NULL AND distance_nm IS NULL" +
-    " AND total_duty_minutes IS NULL AND pax_count IS NULL AND pilot_flying IS NULL AND approaches IS NULL" +
-    " AND COALESCE(day_takeoffs,0)=0 AND COALESCE(night_takeoffs,0)=0" +
-    " AND COALESCE(day_landings,0)=0 AND COALESCE(night_landings,0)=0 AND COALESCE(autolands,0)=0";
+  // UNTOUCHED 定義已搬到主迴圈前（V2.3.04）—— sweep 與同班合併共用。
   for (const sw of sweeps) {
     // 班表變更：這次匯入的月份內，舊「純草稿」不在新班表 → 直接刪掉（不留「已移除」狀態；動過的保留）。
     const r = sw.month

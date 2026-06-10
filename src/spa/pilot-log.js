@@ -535,8 +535,9 @@ function _plJs(s) {
 function _plToast(msg, kind) {
   var bg = kind === 'error' ? '#ef4444' : (kind === 'warn' ? '#f59e0b' : '#10b981');
   var t = document.createElement('div');
-  t.style.cssText = 'position:fixed;top:20px;left:50%;transform:translateX(-50%);background:' + bg +
-    ';color:#fff;padding:10px 16px;border-radius:8px;font-size:.85em;z-index:99999;box-shadow:0 4px 12px rgba(0,0,0,.3)';
+  // V2.3.04：top 避開 iPhone 動態島/瀏海（PWA 全螢幕 content 鑽到狀態列下，固定 20px 會被蓋住）
+  t.style.cssText = 'position:fixed;top:calc(env(safe-area-inset-top, 0px) + 14px);left:50%;transform:translateX(-50%);background:' + bg +
+    ';color:#fff;padding:10px 16px;border-radius:8px;font-size:.85em;z-index:99999;box-shadow:0 4px 12px rgba(0,0,0,.3);max-width:88vw';
   t.textContent = msg;
   document.body.appendChild(t);
   setTimeout(function() { t.remove(); }, 3000);
@@ -1086,11 +1087,20 @@ function _plYearIndexEl() {
 }
 // 量目前頁面 sticky 標題（.pl-topstack / .pl-stickhead）實際高度 → 寫進 --pl-head-h。
 // 給 #7（iPad 編輯器 detail-pane 黏貼位置往下移過標題）與 #2（Analyze 群組標題固定在標題下）共用。
+var _plHeadRO = null, _plHeadROEl = null;
 function _plUpdateHeadHeight() {
   try {
     var h = document.querySelector('#pilotlog-content .pl-topstack, #pilotlog-content .pl-stickhead');
     var px = h ? Math.round(h.getBoundingClientRect().height) : 0;
     document.documentElement.style.setProperty('--pl-head-h', px + 'px');
+    // V2.3.04：頁首高度會在量完「之後」才變（工具列換行 / 字體載入 / 離線橫幅出現）→ --pl-head-h 過時
+    // → iPad sticky 編輯面板貼進頁首底下、Edit Entry 列被搜尋框蓋住拉不回來（user 實測）。
+    // 掛 ResizeObserver 盯著頁首元素，高度一變就重寫（值沒變不會重複觸發，不會迴圈）。
+    if (window.ResizeObserver && h !== _plHeadROEl) {
+      if (_plHeadRO) { _plHeadRO.disconnect(); _plHeadRO = null; }
+      _plHeadROEl = h;
+      if (h) { _plHeadRO = new ResizeObserver(function () { _plUpdateHeadHeight(); }); _plHeadRO.observe(h); }
+    }
   } catch (e) {}
 }
 function _plRenderYearIndex() {
@@ -1816,17 +1826,27 @@ function _plCrewFields(e) {
       _plCrewField('crew3', e) + _plCrewField('crew4', e) +
       _plCrewField('cic', e) + _plCrewField('obs', e);
   var sumCss = 'font-size:.66em;font-weight:700;color:var(--muted);cursor:pointer;padding:5px 2px';
+  // V2.3.04：收合區排版比照核心組（iPad 一行兩格、手機一列一個）—— 原本不分裝置一人一行，
+  // 20 格客艙在 iPad 拉超長（user 實測抱怨）。
+  function rows(keys) {
+    if (!_plWide()) return keys.map(function(k) { return _plCrewField(k, e); }).join('');
+    var out = '';
+    for (var i = 0; i < keys.length; i += 2) {
+      out += _plFieldRow(2, _plCrewField(keys[i], e) + (keys[i + 1] ? _plCrewField(keys[i + 1], e) : ''));
+    }
+    return out;
+  }
   // 只收合「多出來的」：Relief 3/4 + Observer 2（有人才自動展開）
   var moreKeys = ['crew5', 'crew6', 'obs2'];
   var moreOpen = moreKeys.some(has);
   var more = '<details style="margin-top:6px"' + (moreOpen ? ' open' : '') + '>' +
     '<summary style="' + sumCss + '">＋ 更多飛航組員 / More flight crew</summary>' +
-    '<div style="padding-top:4px">' + moreKeys.map(function(k) { return _plCrewField(k, e); }).join('') + '</div></details>';
+    '<div style="padding-top:4px">' + rows(moreKeys) + '</div></details>';
   // 客艙組員 cabin1..20
   var cabinOpen = PL_CABIN_KEYS.some(has);
   var cabin = '<details style="margin-top:4px"' + (cabinOpen ? ' open' : '') + '>' +
     '<summary style="' + sumCss + '">🧑‍✈️ 客艙組員 / Cabin crew（最多 20）</summary>' +
-    '<div style="padding-top:4px">' + PL_CABIN_KEYS.map(function(k) { return _plCrewField(k, e); }).join('') + '</div></details>';
+    '<div style="padding-top:4px">' + rows(PL_CABIN_KEYS) + '</div></details>';
   return core + more + cabin;
 }
 
@@ -2332,6 +2352,33 @@ function _plAutoCalcTimes() {
   // 路線變化時也順手讓 day/night 起降 re-evaluate（解 codex P1：先勾 PF 後填路線的情境）
   _plAutoCalcLandings();
 }
+// ── V2.3.04：Duty 連動 —— In → Off Duty（= In + 設定分鐘，預設 30）→ Total Duty（= Off Duty − On Duty）
+// 規則：欄位「本來就有值」（存過 / 班表帶的）或「被手動改過」→ 不覆寫；
+//       是這次 session 自動帶出來的（dataset.auto）→ 跟著 In / On Duty 持續更新。
+// gap 分鐘數存在 field_labels 的保留 key `off_duty_gap_min`（搭既有存檔機制、跨裝置同步，公司規定不同可改）。
+function _plOffDutyGapMin() {
+  var v = parseInt((_pl.fieldLabels || {}).off_duty_gap_min, 10);
+  return (isNaN(v) || v < 0 || v > 600) ? 30 : v;
+}
+function _plAutoCalcDuty() {
+  var offEl = document.getElementById('ple-off_duty_utc');
+  var totEl = document.getElementById('ple-total_duty_minutes');
+  // Off Duty = In + gap
+  var inn = _plHHMMtoMin(_plGetVal('ple-in_utc'));
+  if (offEl && offEl.dataset.manual !== '1' && (offEl.dataset.auto === '1' || !offEl.value.trim())) {
+    if (inn != null) {
+      var od = (inn + _plOffDutyGapMin()) % 1440;
+      offEl.value = ('0' + Math.floor(od / 60)).slice(-2) + ('0' + (od % 60)).slice(-2);
+      offEl.dataset.auto = '1';
+    } else if (offEl.dataset.auto === '1') { offEl.value = ''; }   // In 清掉 → auto 帶的也清，不留 stale
+  }
+  // Total Duty = Off Duty − On Duty（跨午夜 +24h）
+  var onD = _plHHMMtoMin(_plGetVal('ple-on_duty_utc')), offD = _plHHMMtoMin(_plGetVal('ple-off_duty_utc'));
+  if (totEl && totEl.dataset.manual !== '1' && (totEl.dataset.auto === '1' || !totEl.value.trim())) {
+    if (onD != null && offD != null) { totEl.value = _plMinToHHMM(_plDurDiff(onD, offD)); totEl.dataset.auto = '1'; }
+    else if (totEl.dataset.auto === '1') { totEl.value = ''; }
+  }
+}
 // 只在「沒被手動改過」時才覆寫 PIC/SIC（dataset.manual 由 _plWireEditor 標記）— 自動帶但保留手填
 function _plSetRoleField(id, val) {
   var el = document.getElementById(id);
@@ -2596,6 +2643,21 @@ function _plWireEditor() {
     var el = document.getElementById('ple-' + n);
     if (el) el.addEventListener('input', function() { el.dataset.manual = '1'; });
   });
+  // V2.3.04：Duty 連動 —— In / On Duty 變更觸發；Off Duty / Total Duty 手動輸入標 manual 停止覆寫，
+  // 清空欄位則解除 manual（沒資料就恢復自動）。
+  ['in_utc', 'on_duty_utc'].forEach(function(n) {
+    var el = document.getElementById('ple-' + n);
+    if (el) el.addEventListener('input', _plAutoCalcDuty);
+  });
+  ['off_duty_utc', 'total_duty_minutes'].forEach(function(n) {
+    var el = document.getElementById('ple-' + n);
+    if (el) el.addEventListener('input', function() {
+      if (el.value.trim()) { el.dataset.manual = '1'; delete el.dataset.auto; }
+      else { delete el.dataset.manual; }
+      _plAutoCalcDuty();
+    });
+  });
+  _plAutoCalcDuty();   // 開編輯器先帶一次（已飛但 Off Duty / Total Duty 還空的，直接看到自動值）
   // V1.3.05：origin / dest / flight_date 變更也觸發夜航計算（不只 OOOI）
   ['origin', 'dest', 'flight_date'].forEach(function(n) {
     var el = document.getElementById('ple-' + n);
@@ -2681,7 +2743,9 @@ function _plRenderEditor(target) {
       (e.id && !e.is_locked ? '<button onclick="_plDeleteEntry()" style="background:transparent;color:#ef4444;border:1px solid #ef4444;border-radius:6px;padding:6px 10px;font-size:.74em;cursor:pointer">Delete</button>' : '') +
     '</div>' +
     // V2.3：Configure Fields 模式提示橫幅（英文）
-    (_pl.configFields ? '<div style="background:#3b2f0a;border:1px solid #f59e0b;color:#fbbf24;border-radius:8px;padding:8px 10px;font-size:.68em;margin-bottom:10px;line-height:1.5">✏️ <b>Configure fields</b> — tap any field name to rename it, then <b>✓ Done</b> to save. Applies to all flights, synced across your devices.</div>' : '') +
+    (_pl.configFields ? '<div style="background:#3b2f0a;border:1px solid #f59e0b;color:#fbbf24;border-radius:8px;padding:8px 10px;font-size:.68em;margin-bottom:10px;line-height:1.5">✏️ <b>Configure fields</b> — tap any field name to rename it, then <b>✓ Done</b> to save. Applies to all flights, synced across your devices.' +
+      // V2.3.04：Off Duty 自動帶的間隔分鐘（公司規定不同可改；存 field_labels 保留 key，跨裝置同步）
+      '<br>⏱️ Off Duty 自動帶 = In + <input id="pl-fl-off_duty_gap_min" type="number" inputmode="numeric" min="0" max="600" value="' + _plOffDutyGapMin() + '" style="width:54px;background:var(--bg,#0a0e1a);color:var(--text);border:1px solid #f59e0b;border-radius:5px;padding:3px 6px;font-size:1em;text-align:center"> 分鐘 / Off Duty auto-fill = In + N min (company-specific).</div>' : '') +
 
     // ── Flight：Date+Flight# / From+To / Type+Tail+Position ──
     '<div style="background:var(--card);border-radius:10px;padding:12px">' +
