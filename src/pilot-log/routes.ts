@@ -55,8 +55,8 @@ import { getAirportDbJs } from '../spa/js-airport-db.js';
 
 // ── 版本（比照 CrewSync / Morning：每次推版必更新；SW cache 名稱跟著走） ────
 // 本機 preview build 會暫時加 -tNN 後綴方便對版；推正式版前拿掉只留乾淨版號。
-export const PILOT_LOG_VERSION = 'V2.3.01';
-const PILOT_LOG_CACHE = 'pilotlog-v2-3-01';
+export const PILOT_LOG_VERSION = 'V2.3.02';
+const PILOT_LOG_CACHE = 'pilotlog-v2-3-02';
 
 export const pilotLogRouter = express.Router();
 
@@ -363,6 +363,11 @@ function _renderPilotLogChangelog(): string {
   return `
     ${renderCommunityLink()}
     <div class="pl-cl-v">${PILOT_LOG_VERSION}</div>
+    <div class="pl-cl-txt">
+      <b>🗑️ 新增「勾選刪除」：logbook 工具列按「選取刪除」進多選、勾航班一次刪（鎖定的會跳過）。</b><br>
+      <b>🗑️ Added multi-select delete in the logbook — tap “Select”, check flights, delete in one go (locked ones skipped).</b>
+    </div>
+    <div class="pl-cl-v old">V2.3.01</div>
     <div class="pl-cl-txt">
       <b>🛠️ 修正匯入大檔／重匯被 8 秒逾時中斷（Fetch aborted）與間歇 500：逾時放寬到 2 分鐘、防重複按、補上「匯入完成」提示。</b><br>
       <b>🛠️ Fixed large/re-imports aborting at the 8s timeout (and intermittent 500s): raised timeout to 2 min, blocked double-tap, added a clear "import done" message.</b>

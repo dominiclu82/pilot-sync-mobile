@@ -21,6 +21,8 @@ var _pl = {
   crewDisplayMode: 'flight',      // V2.3 列表組員顯示：cic_only=只機長 / flight=飛航組 / all=含客艙
   fieldLabels: null,              // V2.3 編輯器欄位自訂顯示名稱 {fieldKey: label}；null=用預設
   configFields: false,            // V2.3 編輯器「設定欄位」模式（LogTen 式）：開了才能改欄位名稱（session-only）
+  selectMode: false,              // V2.3 logbook 多選模式（勾選刪除）
+  selectedIds: {},                // V2.3 多選模式選中的 entry id 集合 {id:true}
   // Aircraft / Crew 頁共用的完整 entries 快照：不過 _pl.filter、不分頁，撈到所有 user 的 flights
   // 用 null 區別「還沒拉過」和「拉過但是空陣列」，進 Aircraft 或 Crew 頁第一次才 fetch
   aircraftEntries: null,
@@ -864,6 +866,9 @@ function _plRenderToolbar() {
       // V1.3.33：一鍵上鎖 / 解鎖全部航班
       '<button onclick="_plLockAll(true)" style="background:transparent;color:var(--muted);border:1px solid var(--border,#334155);border-radius:6px;padding:6px 10px;font-size:.72em;cursor:pointer" title="一鍵上鎖全部航班 · Lock every flight">🔒 Lock all</button>' +
       '<button onclick="_plLockAll(false)" style="background:transparent;color:var(--muted);border:1px solid var(--border,#334155);border-radius:6px;padding:6px 10px;font-size:.72em;cursor:pointer" title="一鍵解鎖全部航班 · Unlock every flight">🔓 Unlock all</button>' +
+      // V2.3：多選勾選刪除（清非航班腿 / ground duty 用）
+      '<button onclick="_plToggleSelectMode()" style="background:' + (_pl.selectMode ? '#ef4444' : 'transparent') + ';color:' + (_pl.selectMode ? '#fff' : 'var(--muted)') + ';border:1px solid ' + (_pl.selectMode ? '#ef4444' : 'var(--border,#334155)') + ';border-radius:6px;padding:6px 10px;font-size:.72em;cursor:pointer" title="多選刪除 · Select to delete">' + (_pl.selectMode ? '✕ 取消 Cancel' : '☑️ 選取刪除 Select') + '</button>' +
+      (_pl.selectMode ? '<button onclick="_plDeleteSelected()" style="background:#ef4444;' + actBtn + '">🗑 刪除 Delete (<span id="pl-sel-count">' + Object.keys(_pl.selectedIds || {}).length + '</span>)</button>' : '') +
     '</div>' +
     '<div style="display:flex;flex-wrap:wrap;gap:4px;align-items:center">' +
       filterBtn('all', 'All') + filterBtn('done', '已完成 Done') +
@@ -958,8 +963,16 @@ function _plRenderEntryRow(e) {
     ? '<div style="font-size:.7em;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + _plEsc(crewNames) + '</div>'
     : '';
 
-  return '<div class="pl-row' + selCls + '" data-yr="' + (/^\d{4}/.test(ds) ? ds.slice(0, 4) : '') + '" onclick="_plOpenEditor(\'' + e.id + '\')" ' +
+  // V2.3：多選模式 —— 點列改成「勾選」而非開編輯器，左側加 checkbox。
+  var inSel = _pl.selectMode;
+  var isChk = inSel && _pl.selectedIds && _pl.selectedIds[e.id];
+  var rowOnclick = inSel ? '_plToggleSelect(\'' + e.id + '\')' : '_plOpenEditor(\'' + e.id + '\')';
+  var chkbox = inSel
+    ? '<div style="flex:0 0 auto;display:flex;align-items:center"><input type="checkbox"' + (isChk ? ' checked' : '') + ' onclick="event.stopPropagation();_plToggleSelect(\'' + e.id + '\')" style="width:20px;height:20px"></div>'
+    : '';
+  return '<div class="pl-row' + selCls + (isChk ? ' pl-row-sel' : '') + '" data-yr="' + (/^\d{4}/.test(ds) ? ds.slice(0, 4) : '') + '" onclick="' + rowOnclick + '" ' +
     'style="background:var(--card);border-radius:10px;padding:10px 12px;margin-bottom:8px;cursor:pointer;display:flex;gap:12px;align-items:stretch;scroll-margin-top:70px">' +
+    chkbox +
     '<div style="flex:0 0 4px;background:' + statusColor + ';border-radius:3px"></div>' +
     '<div style="flex:0 0 50px;padding-top:1px">' +
       '<div style="font-size:1.85em;font-weight:800;line-height:.9">' + dayNum + '</div>' +
@@ -3008,6 +3021,42 @@ async function _plDeleteEntry() {
   _pl.editing = null;
   _pl.selectedId = null;
   _plToast('Deleted');
+  _plRenderMain();
+  _plSync();
+}
+
+// V2.3：多選勾選刪除 —— 清掉跑進來的 ground duty / 非航班腿用。
+function _plToggleSelectMode() {
+  _pl.selectMode = !_pl.selectMode;
+  if (!_pl.selectMode) _pl.selectedIds = {};   // 離開選取模式清空
+  _plRenderMain();
+}
+function _plToggleSelect(id) {
+  if (!_pl.selectedIds) _pl.selectedIds = {};
+  if (_pl.selectedIds[id]) delete _pl.selectedIds[id]; else _pl.selectedIds[id] = true;
+  _plRenderList();   // 重畫列表反映勾選狀態
+  var c = document.getElementById('pl-sel-count'); if (c) c.textContent = Object.keys(_pl.selectedIds).length;
+}
+async function _plDeleteSelected() {
+  var ids = Object.keys(_pl.selectedIds || {});
+  if (!ids.length) { _plToast('沒有選取任何航班 / Nothing selected', 'warn'); return; }
+  // 鎖定的航班跳過（避免本機刪了、server 因鎖拒絕 → 下次同步又冒回來）。
+  var byId = {}; for (var i = 0; i < _pl.entries.length; i++) byId[_pl.entries[i].id] = _pl.entries[i];
+  var del = [], locked = [];
+  // codex P2：只刪「目前還在列表裡」的 id。選取後若該筆 local id 被同步 reconcile 成 server id（id 變了），
+  // 舊 id 已不在 byId → 跳過，否則會 enqueue 一個對不到的 delete、UI 報成功但實際沒刪（silent no-op）。
+  ids.forEach(function(id) { var e = byId[id]; if (!e) return; if (e.is_locked) locked.push(id); else del.push(id); });
+  if (!del.length) { _plToast('沒有可刪的航班（選取的都鎖定或已不存在）/ Nothing deletable (locked or gone)', 'warn'); return; }
+  if (!window.confirm('刪除選取的 ' + del.length + ' 筆航班？' + (locked.length ? '（' + locked.length + ' 筆鎖定會跳過）' : '') + '無法復原。\nDelete ' + del.length + ' flights?' + (locked.length ? ' (' + locked.length + ' locked skipped)' : '') + ' Cannot be undone.')) return;
+  var delset = {}; del.forEach(function(id) { delset[id] = true; });
+  _pl.entries = _pl.entries.filter(function(x) { return !delset[x.id]; });
+  if (_pl.aircraftEntries) _pl.aircraftEntries = _pl.aircraftEntries.filter(function(x) { return !delset[x.id]; });
+  _plCacheSaveEntries();
+  if (_pl.aircraftEntries) _plCacheSaveAircraftEntries();
+  del.forEach(function(id) { _plEnqueue('delete', id); });   // 逐筆排 delete op（離線優先、回連自動上傳）
+  _pl.selectedIds = {};
+  _pl.selectMode = false;
+  _plToast('已刪除 ' + del.length + ' 筆' + (locked.length ? '、' + locked.length + ' 鎖定跳過' : '') + ' / Deleted ' + del.length);
   _plRenderMain();
   _plSync();
 }
