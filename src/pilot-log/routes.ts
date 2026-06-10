@@ -55,8 +55,8 @@ import { getAirportDbJs } from '../spa/js-airport-db.js';
 
 // ── 版本（比照 CrewSync / Morning：每次推版必更新；SW cache 名稱跟著走） ────
 // 本機 preview build 會暫時加 -tNN 後綴方便對版；推正式版前拿掉只留乾淨版號。
-export const PILOT_LOG_VERSION = 'V2.3.04';
-const PILOT_LOG_CACHE = 'pilotlog-v2-3-04';
+export const PILOT_LOG_VERSION = 'V2.3.05';
+const PILOT_LOG_CACHE = 'pilotlog-v2-3-05';
 
 export const pilotLogRouter = express.Router();
 
@@ -363,6 +363,11 @@ function _renderPilotLogChangelog(): string {
   return `
     ${renderCommunityLink()}
     <div class="pl-cl-v">${PILOT_LOG_VERSION}</div>
+    <div class="pl-cl-txt">
+      <b>🛠️ 修班表同班列兩次造成的殘餘重複、Total Duty 預設 0 拿掉讓自動計算生效、客艙組員改預設收合。</b><br>
+      <b>🛠️ Fixed leftover duplicates from twice-listed roster duties, removed Total Duty's default 0 so auto-calc works, cabin crew now collapsed by default.</b>
+    </div>
+    <div class="pl-cl-v old">V2.3.04</div>
     <div class="pl-cl-txt">
       <b>🛠️ 修班表匯入重複建檔（重匯自動合併）、空服員帶入、Duty Time 自動計算、iPad 排版與提示修正。</b><br>
       <b>🛠️ Fixed duplicate flights on roster import (re-import auto-merges), cabin crew fill-in, duty time auto-calc, and iPad layout/toast fixes.</b>

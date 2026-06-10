@@ -1368,6 +1368,8 @@ function _plEditorField(label, name, type, opts) {
     var oninp = opts.localOf ? ' oninput="_plUpdateSchedLocal(\'' + name + '\',\'' + opts.localOf + '\')"' : '';
     input = '<input ' + attrs + oninp + ' value="' + _plEsc(_plFmtUtcHHMM(val)) + '" placeholder="HHMM UTC" maxlength="4">';
   } else if (type === 'hhmm-dur') {
+    // V2.3.05：Total Duty 存 0（匯入來源的「沒資料」寫法）→ 顯示空白。0:00 既誤導又擋自動計算。
+    if (name === 'total_duty_minutes' && (val === 0 || val === '0')) val = null;
     input = '<input ' + attrs + ' value="' + _plEsc(_plMinToHHMM(val)) + '" placeholder="H:MM">';
   } else if (type === 'select') {
     var optsHtml = (opts.options || []).map(function(o) {
@@ -1842,9 +1844,8 @@ function _plCrewFields(e) {
   var more = '<details style="margin-top:6px"' + (moreOpen ? ' open' : '') + '>' +
     '<summary style="' + sumCss + '">＋ 更多飛航組員 / More flight crew</summary>' +
     '<div style="padding-top:4px">' + rows(moreKeys) + '</div></details>';
-  // 客艙組員 cabin1..20
-  var cabinOpen = PL_CABIN_KEYS.some(has);
-  var cabin = '<details style="margin-top:4px"' + (cabinOpen ? ' open' : '') + '>' +
+  // 客艙組員 cabin1..20 —— V2.3.05：永遠預設收合（匯入帶滿名單後「有人就展開」變成每班都展開，user 反映很煩）
+  var cabin = '<details style="margin-top:4px">' +
     '<summary style="' + sumCss + '">🧑‍✈️ 客艙組員 / Cabin crew（最多 20）</summary>' +
     '<div style="padding-top:4px">' + rows(PL_CABIN_KEYS) + '</div></details>';
   return core + more + cabin;
@@ -2374,9 +2375,15 @@ function _plAutoCalcDuty() {
   }
   // Total Duty = Off Duty − On Duty（跨午夜 +24h）
   var onD = _plHHMMtoMin(_plGetVal('ple-on_duty_utc')), offD = _plHHMMtoMin(_plGetVal('ple-off_duty_utc'));
-  if (totEl && totEl.dataset.manual !== '1' && (totEl.dataset.auto === '1' || !totEl.value.trim())) {
-    if (onD != null && offD != null) { totEl.value = _plMinToHHMM(_plDurDiff(onD, offD)); totEl.dataset.auto = '1'; }
-    else if (totEl.dataset.auto === '1') { totEl.value = ''; }
+  if (totEl && totEl.dataset.manual !== '1') {
+    // V2.3.05：存過「0」的也當沒資料 —— 匯入來源會把沒有 duty 時數的班存成 0（顯示 0:00），
+    // duty 不可能是 0，0 被「有值不覆寫」保護住 → 永遠不會自動算（user 實測）。
+    var curT = (totEl.value || '').trim();
+    var curZero = /^0{1,2}:?0{0,2}$/.test(curT);
+    if (totEl.dataset.auto === '1' || !curT || curZero) {
+      if (onD != null && offD != null) { totEl.value = _plMinToHHMM(_plDurDiff(onD, offD)); totEl.dataset.auto = '1'; }
+      else if (totEl.dataset.auto === '1') { totEl.value = ''; }
+    }
   }
 }
 // 只在「沒被手動改過」時才覆寫 PIC/SIC（dataset.manual 由 _plWireEditor 標記）— 自動帶但保留手填

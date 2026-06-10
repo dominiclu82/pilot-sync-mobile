@@ -346,6 +346,7 @@ export async function importRoster(
   // → 第二腿誤併掉第一腿、永遠少一筆。解法：「已認領」集合 —— 這輪匯入中，每筆既有列只能被一腿
   // 認走（合併/補組員/刪除都算），第二腿配不到未認領的列就走正常新增，兩腿各自保留。
   const consumedIds = new Set<string>();
+  const batchProcessed = new Set<string>();   // V2.3.05：主迴圈已處理的「班 sig」（同班列兩次只跑第一份）
 
   // codex P1（V2.3.04）：雙腿邊角的第二層防護 —— 一筆既有列的 source_ref 若正好是「本批另一腿」
   // 的 ref，那是那腿自己的列，不可被這腿 fuzzy 搶走（會把那腿使用者編輯過的資料覆寫成這腿的）。
@@ -359,14 +360,26 @@ export async function importRoster(
     const k = normFlightNoKey(fno || '');
     return k ? date + '|' + k + '|' + normAirportKey(o) + '|' + normAirportKey(d) : null;
   };
+  // V2.3.05（實案修正）：CrewSync 班表會把「同一班」列兩次（原始 + 改版 duty 都在 duties 裡，
+  // dutyIdx 不同）。「同 key + 表定起飛時間相同」＝同一班重複列出，只算一份（第二份 ref 不進
+  // batchRefs、key 不重複計數）—— 不然會被誤判成「真雙腿」而關掉合併（user 重匯後剩 8 組沒清實案）。
+  // 「同 key + 表定時間不同」才是真雙腿，維持 round3 的保護。
+  const sigOf = (kk: string | null, std: Date | null): string | null =>
+    kk ? kk + '|' + (std ? std.toISOString() : '') : null;
   const batchKeyCount = new Map<string, number>();
+  const batchSigs = new Set<string>();
   for (let di = 0; di < duties.length; di++) {
     const dctx = dutyCtx(duties[di]);
     for (const ff of (duties[di].flights || [])) {
+      const kk = normKeyOf(flightDate(ff, dctx), ff.flightNo, ff.origin, ff.dest);
+      const sig = sigOf(kk, parseCrewSyncUtc(ff.depTimeUtc, dctx));
+      if (sig) {
+        if (batchSigs.has(sig)) continue;   // 同一班的重複列出 → 不算第二份
+        batchSigs.add(sig);
+        if (kk) batchKeyCount.set(kk, (batchKeyCount.get(kk) || 0) + 1);
+      }
       const ref = buildSourceRef(ff, di, dctx);
       if (ref) batchRefs.add(ref);
-      const kk = normKeyOf(flightDate(ff, dctx), ff.flightNo, ff.origin, ff.dest);
-      if (kk) batchKeyCount.set(kk, (batchKeyCount.get(kk) || 0) + 1);
     }
   }
 
@@ -395,6 +408,15 @@ export async function importRoster(
       // 6 月班表裡 UTC 落在 5/31 的 leg 仍屬 6 月，用 UTC 日期會誤漏。沒標 _rmonth 才退回 fDate。
       const rosterMonth = (duty as any)._rmonth || fDate.slice(0, 7);
       if (months && months.length && months.indexOf(rosterMonth) < 0) continue;
+      // V2.3.05：同一班在 duties 裡列兩次 → 只處理第一份。第二份的 ref 不進 seenRefs，
+      // 它對應的殘留草稿（舊版建出來的雙胞胎）會被下面的 sweep 當「不在新班表」清掉。
+      {
+        const dupSig = sigOf(normKeyOf(fDate, f.flightNo, f.origin, f.dest), parseCrewSyncUtc(f.depTimeUtc, ctx));
+        if (dupSig) {
+          if (batchProcessed.has(dupSig)) continue;
+          batchProcessed.add(dupSig);
+        }
+      }
       seenRefs.push(sourceRef);
 
       const stdUtc = parseCrewSyncUtc(f.depTimeUtc, ctx);
