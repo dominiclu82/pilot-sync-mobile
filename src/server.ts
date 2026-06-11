@@ -948,9 +948,39 @@ function _afAllow(n: number): boolean {
 //   一台 APAC L-band 站就涵蓋整個衛星波束的幾十個機場（RCTP/RJTT/VHHH/RKSS/VTBS/越南/印度/中東…），且比 text= 新很多。
 //   ⚠ 仍追不平 coffee（coffee 的源涵蓋到更多「靠近機場讀現行 ATIS」的飛機，airframes 衛星站收到的多是 en-route 回放舊字母）；
 //     但這條讓我們比原本的 text= 新一截。station id 來自 airframes /stations，可能變動 → 設成 env 可不改 code 更新。
-//   多波束覆蓋（每站分開查、各吃 100、合併）：APAC=亞洲、EMEA=歐洲/中東/非洲/印度、IOR=印度洋/澳洲。美洲(98W)站此刻多不活躍、暫略。
+//   多波束覆蓋（每站分開查、各吃 100、合併）：APAC=亞洲、EMEA=歐洲/中東/非洲/印度、IOR=印度洋、AMER=美洲。
 //   ⚠ 仍非 coffee 完整源：coffee 多看到「別顆衛星上零星讀目標機場的飛機」(實證 RJAA letter O 走 GES:D0、airframes 任何站都沒有)，那段追不到；但主要區域都涵蓋。
-const _AF_SAT_STATIONS = process.env.ATIS_SAT_STATIONS || '14799901,15254012,237322626,237339412';   // TBG-LBAND-APAC, JP-RJTY(APAC) / EDDF-SAT(EMEA歐洲) / YBBN-84E(IOR)
+//   ⚠ 衛星站常掛/不活躍(間歇 404、無 A9) → 不寫死，改「候選池按波束 + 每 30 分健康檢查、只留此刻有回 A9 的活站」，美洲一活躍就自動補上。
+const _AF_SAT_CANDIDATES: string[][] = [
+  ['14799901', '15254012'],                 // APAC 亞太：TBG-LBAND-APAC, JP-RJTY-LBAND
+  ['237322626', '237344145', '14918702'],    // EMEA 歐洲/中東/非洲/印度：EDDF-SAT, EGBB-25E, EGGD-25E
+  ['237339412'],                             // IOR 印度洋/澳洲：YBBN-84E
+  ['15254214', '14920420', '14918698'],      // AMER 美洲/大西洋：PC-KAMW9-98W, PC-KAMW2-98W, EGGD-54W
+];
+const _afStaticStations = (process.env.ATIS_SAT_STATIONS || '').trim();   // env 有設 → 手動釘住這些站、不跑健康檢查（除錯/微調用）
+let _afActiveStations: string[] = _afStaticStations ? _afStaticStations.split(',').map((s) => s.trim()).filter(Boolean)
+  : ['14799901', '15254012', '237322626', '237339412'];   // 開機預設（健康檢查跑完會更新成此刻真正活躍的）
+// 健康檢查：逐個候選站打一次，留「有回 A9 ATIS」的 → 更新活躍清單。每 30 分跑一次（便宜、自動避開掛站/補上活站）。
+async function _atisSatHealthCheck() {
+  if (_afStaticStations) return;   // env 釘住 → 尊重手動設定，不動
+  const active: string[] = [];
+  for (const st of _AF_SAT_CANDIDATES.flat()) {
+    // ⚠ airframes /messages 間歇性 404（API 不穩、非站台真的掛）→ 404 就重試最多 3 次，避免把好站誤判成死站
+    for (let attempt = 0; attempt < 3; attempt++) {
+      if (!_afAllow(1)) break;
+      try {
+        const r = await fetch('https://api.airframes.io/messages?station_ids=' + st + '&labels=A9&timeframe=last-2-hours', { headers: { 'User-Agent': _FIDS_UA } });
+        if (r.status === 404) { await new Promise((res) => setTimeout(res, 400)); continue; }   // 間歇 404 → 等一下重試
+        if (!r.ok) break;                                                                         // 其他錯 → 放棄這站
+        const a = await r.json() as any;
+        const arr: any[] = Array.isArray(a) ? a : ((a && (a.messages || a.data)) || []);
+        if (arr.some((m) => /\bATIS\b/.test(String((m && (m.text || m.message)) || '')))) active.push(st);   // 有 A9 → 活躍
+        break;   // 拿到 200（不管有沒有 A9）→ 不再重試
+      } catch { break; }
+    }
+  }
+  if (active.length) { _afActiveStations = active; console.log('[ATIS] sat stations active:', active.join(',')); }
+}
 async function _afQuery(q: string): Promise<any[]> {
   // V9.4.x：加 labels=A9（ACARS ATIS label，coffee 站長提供）→ 只回 ATIS 那層、不被其他 ACARS 稀釋。
   //   實測 text=<ICAO>&labels=A9 仍以 text 限縮在該機場、且 100 則 ATIS 涵蓋約 9-10 小時（混合查只有 ~12% 是 ATIS、
@@ -991,7 +1021,7 @@ async function _atisFetchAirframes(icao: string, bulk: boolean) {
 //   比 text=<ICAO> 逐站查新很多。⚠ 關鍵：「每次查詢」上限 100 則、且同波束多站合查會「重複洗掉一半」→
 //   必須「每站分開查、各吃自己的 100 則」再合併，覆蓋才滿（實證：兩站合查日本場消失、單站才有）。
 async function _atisFetchStationFeed(): Promise<number> {
-  const stations = _AF_SAT_STATIONS.split(',').map((s) => s.trim()).filter(Boolean);
+  const stations = _afActiveStations;   // 健康檢查維護的「此刻活躍」清單（env 釘住時即手動清單）
   // 分機場累積（跨站合併同機場的訊息，再挑現行）。正規化 text：/messages 文字在 text、少數在 message。
   const byApt = new Map<string, any[]>();
   for (const st of stations) {
@@ -1130,10 +1160,13 @@ function _atisStartPoller() {
   const fast = _ATIS_FAST.filter((ic) => nonUs.length === 0 || nonUs.includes(ic));
   const slow = nonUs.filter((ic) => !fast.includes(ic));
   console.log('[ATIS] poller start: fast', fast.length, 'slow', slow.length);
-  // 衛星站整串 A9：1 個請求更新幾十場、且比 text= 新 → 每 60s 跑一次（最便宜、覆蓋最廣，當主力）
+  // 衛星站健康檢查：每 30 分偵測哪些衛星站此刻活躍（有回 A9）→ 自動避開掛站、補上活站
+  setInterval(() => { _atisSatHealthCheck().catch(() => { }); }, 30 * 60000);
+  setTimeout(() => { _atisSatHealthCheck().catch(() => { }); }, 500);   // 開機先測一次
+  // 衛星站整串 A9：每站分開查、各吃 100、合併進庫 → 涵蓋多波束幾十場、比 text= 新 → 每 60s 跑一次（當主力）
   const runStationFeed = async () => { try { const n = await _atisFetchStationFeed(); if (n) console.log('[ATIS] station-feed updates', n); } catch { /* 失敗就靠下面逐站輪詢保底 */ } };
   setInterval(() => { runStationFeed(); }, 60000);
-  setTimeout(() => { runStationFeed(); }, 1500);   // 開機 1.5s 先跑一次
+  setTimeout(() => { runStationFeed(); }, 3000);   // 開機 3s 先跑一次（等健康檢查先更新活躍站）
   const runFast = async () => { for (const ic of fast) { await _atisPollOne(ic, true); await _atisSleep(800); } };   // 快層 deep（雙管，補衛星站沒覆蓋到的場）
   setInterval(() => { runFast().catch(() => { }); }, 90000);   // 快層每 90s
   if (slow.length) {   // 慢層：連續慢掃，整圈 ~5 分（每站間隔 = 300000/站數，最少 2s），只廣查省額度
