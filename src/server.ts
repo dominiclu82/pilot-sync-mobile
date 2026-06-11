@@ -942,6 +942,13 @@ function _afAllow(n: number): boolean {
   _afBucket -= n;
   return true;
 }
+// ── 衛星站「整串 A9」抓法（V9.4.30，codex 破解的正解）──────────────────────────
+//   關鍵：airframes 的 `text=<ICAO>` 機場文字搜尋索引爛、回舊的；正解是「抓某個 JAERO/L-band 衛星站的整串 A9
+//   （station_ids=...&labels=A9&timeframe=...，端點是 /messages 不是 /v1/messages），再本地過濾出各機場」。
+//   一台 APAC L-band 站就涵蓋整個衛星波束的幾十個機場（RCTP/RJTT/VHHH/RKSS/VTBS/越南/印度/中東…），且比 text= 新很多。
+//   ⚠ 仍追不平 coffee（coffee 的源涵蓋到更多「靠近機場讀現行 ATIS」的飛機，airframes 衛星站收到的多是 en-route 回放舊字母）；
+//     但這條讓我們比原本的 text= 新一截。station id 來自 airframes /stations，可能變動 → 設成 env 可不改 code 更新。
+const _AF_SAT_STATIONS = process.env.ATIS_SAT_STATIONS || '14799901,15254012';   // TBG-LBAND-APAC + JP-RJTY-LBAND-ACARS（APAC POR 波束，實測涵蓋最廣）
 async function _afQuery(q: string): Promise<any[]> {
   // V9.4.x：加 labels=A9（ACARS ATIS label，coffee 站長提供）→ 只回 ATIS 那層、不被其他 ACARS 稀釋。
   //   實測 text=<ICAO>&labels=A9 仍以 text 限縮在該機場、且 100 則 ATIS 涵蓋約 9-10 小時（混合查只有 ~12% 是 ATIS、
@@ -976,6 +983,37 @@ async function _atisFetchAirframes(icao: string, bulk: boolean) {
   }
   const sections = [arr, dep, combined].filter(Boolean) as { title: string; text: string; src: string; time: string }[];
   return sections.length ? sections : null;
+}
+
+// 衛星站整串 A9 → 一次涵蓋全亞太+全球幾十場，本地分機場挑現行、塞進累積庫。回傳更新筆數。
+//   比 text=<ICAO> 逐站查新很多、且 1 個請求就更新幾十場（省限速）。美國 K/P 仍走官方 FAA、跳過。
+async function _atisFetchStationFeed(): Promise<number> {
+  if (!_afAllow(1)) return 0;   // 額度不足 → 讓給即時查，下一輪再補
+  const url = 'https://api.airframes.io/messages?station_ids=' + _AF_SAT_STATIONS + '&labels=A9&timeframe=last-2-hours';
+  const r = await fetch(url, { headers: { 'User-Agent': _FIDS_UA } });
+  if (!r.ok) throw new Error('airframes station-feed ' + r.status);
+  const a = await r.json() as any;
+  const arr: any[] = Array.isArray(a) ? a : ((a && (a.messages || a.data || a.results || a.items)) || []);
+  // 分機場（正規化 text：/messages 的訊息文字在 text，少數情況在 message）
+  const byApt = new Map<string, any[]>();
+  for (const m of arr) {
+    if (!m) continue;
+    m.text = String(m.text || m.message || '');
+    const mt = m.text.match(/\b([A-Z]{4})\s+(?:ARR|DEP)?\s*ATIS/);
+    if (!mt) continue;
+    const ic = mt[1];
+    if (ic[0] === 'K' || ic[0] === 'P') continue;   // 美國/太平洋 → 官方 FAA，不收進 acars 庫
+    let list = byApt.get(ic); if (!list) { list = []; byApt.set(ic, list); }
+    list.push(m);
+  }
+  let updates = 0;
+  for (const [ic, msgs] of byApt) {
+    for (const kind of ['ARR', 'DEP', 'ATIS'] as const) {
+      const p = _atisPickKind(msgs, kind);
+      if (p && typeof p.issueAt === 'number' && _atisStoreMerge(ic, kind, p)) { _atisStorePersist(ic, kind); updates++; }
+    }
+  }
+  return updates;
 }
 
 // 美國 D-ATIS：官方 FAA 源（經 atis.info，CORS*、免 key、免額度）。只有有 D-ATIS 的大場才有（關島等小場沒有 → 404）。
@@ -1084,7 +1122,11 @@ function _atisStartPoller() {
   const fast = _ATIS_FAST.filter((ic) => nonUs.length === 0 || nonUs.includes(ic));
   const slow = nonUs.filter((ic) => !fast.includes(ic));
   console.log('[ATIS] poller start: fast', fast.length, 'slow', slow.length);
-  const runFast = async () => { for (const ic of fast) { await _atisPollOne(ic, true); await _atisSleep(800); } };   // 快層 deep（雙管）
+  // 衛星站整串 A9：1 個請求更新幾十場、且比 text= 新 → 每 60s 跑一次（最便宜、覆蓋最廣，當主力）
+  const runStationFeed = async () => { try { const n = await _atisFetchStationFeed(); if (n) console.log('[ATIS] station-feed updates', n); } catch { /* 失敗就靠下面逐站輪詢保底 */ } };
+  setInterval(() => { runStationFeed(); }, 60000);
+  setTimeout(() => { runStationFeed(); }, 1500);   // 開機 1.5s 先跑一次
+  const runFast = async () => { for (const ic of fast) { await _atisPollOne(ic, true); await _atisSleep(800); } };   // 快層 deep（雙管，補衛星站沒覆蓋到的場）
   setInterval(() => { runFast().catch(() => { }); }, 90000);   // 快層每 90s
   if (slow.length) {   // 慢層：連續慢掃，整圈 ~5 分（每站間隔 = 300000/站數，最少 2s），只廣查省額度
     let si = 0;
