@@ -948,7 +948,9 @@ function _afAllow(n: number): boolean {
 //   一台 APAC L-band 站就涵蓋整個衛星波束的幾十個機場（RCTP/RJTT/VHHH/RKSS/VTBS/越南/印度/中東…），且比 text= 新很多。
 //   ⚠ 仍追不平 coffee（coffee 的源涵蓋到更多「靠近機場讀現行 ATIS」的飛機，airframes 衛星站收到的多是 en-route 回放舊字母）；
 //     但這條讓我們比原本的 text= 新一截。station id 來自 airframes /stations，可能變動 → 設成 env 可不改 code 更新。
-const _AF_SAT_STATIONS = process.env.ATIS_SAT_STATIONS || '14799901,15254012';   // TBG-LBAND-APAC + JP-RJTY-LBAND-ACARS（APAC POR 波束，實測涵蓋最廣）
+//   多波束覆蓋（每站分開查、各吃 100、合併）：APAC=亞洲、EMEA=歐洲/中東/非洲/印度、IOR=印度洋/澳洲。美洲(98W)站此刻多不活躍、暫略。
+//   ⚠ 仍非 coffee 完整源：coffee 多看到「別顆衛星上零星讀目標機場的飛機」(實證 RJAA letter O 走 GES:D0、airframes 任何站都沒有)，那段追不到；但主要區域都涵蓋。
+const _AF_SAT_STATIONS = process.env.ATIS_SAT_STATIONS || '14799901,15254012,237322626,237339412';   // TBG-LBAND-APAC, JP-RJTY(APAC) / EDDF-SAT(EMEA歐洲) / YBBN-84E(IOR)
 async function _afQuery(q: string): Promise<any[]> {
   // V9.4.x：加 labels=A9（ACARS ATIS label，coffee 站長提供）→ 只回 ATIS 那層、不被其他 ACARS 稀釋。
   //   實測 text=<ICAO>&labels=A9 仍以 text 限縮在該機場、且 100 則 ATIS 涵蓋約 9-10 小時（混合查只有 ~12% 是 ATIS、
@@ -985,26 +987,32 @@ async function _atisFetchAirframes(icao: string, bulk: boolean) {
   return sections.length ? sections : null;
 }
 
-// 衛星站整串 A9 → 一次涵蓋全亞太+全球幾十場，本地分機場挑現行、塞進累積庫。回傳更新筆數。
-//   比 text=<ICAO> 逐站查新很多、且 1 個請求就更新幾十場（省限速）。美國 K/P 仍走官方 FAA、跳過。
+// 衛星站整串 A9 → 涵蓋整個衛星波束的幾十場，本地分機場挑現行、塞進累積庫。回傳更新筆數。
+//   比 text=<ICAO> 逐站查新很多。⚠ 關鍵：「每次查詢」上限 100 則、且同波束多站合查會「重複洗掉一半」→
+//   必須「每站分開查、各吃自己的 100 則」再合併，覆蓋才滿（實證：兩站合查日本場消失、單站才有）。
 async function _atisFetchStationFeed(): Promise<number> {
-  if (!_afAllow(1)) return 0;   // 額度不足 → 讓給即時查，下一輪再補
-  const url = 'https://api.airframes.io/messages?station_ids=' + _AF_SAT_STATIONS + '&labels=A9&timeframe=last-2-hours';
-  const r = await fetch(url, { headers: { 'User-Agent': _FIDS_UA } });
-  if (!r.ok) throw new Error('airframes station-feed ' + r.status);
-  const a = await r.json() as any;
-  const arr: any[] = Array.isArray(a) ? a : ((a && (a.messages || a.data || a.results || a.items)) || []);
-  // 分機場（正規化 text：/messages 的訊息文字在 text，少數情況在 message）
+  const stations = _AF_SAT_STATIONS.split(',').map((s) => s.trim()).filter(Boolean);
+  // 分機場累積（跨站合併同機場的訊息，再挑現行）。正規化 text：/messages 文字在 text、少數在 message。
   const byApt = new Map<string, any[]>();
-  for (const m of arr) {
-    if (!m) continue;
-    m.text = String(m.text || m.message || '');
-    const mt = m.text.match(/\b([A-Z]{4})\s+(?:ARR|DEP)?\s*ATIS/);
-    if (!mt) continue;
-    const ic = mt[1];
-    if (ic[0] === 'K' || ic[0] === 'P') continue;   // 美國/太平洋 → 官方 FAA，不收進 acars 庫
-    let list = byApt.get(ic); if (!list) { list = []; byApt.set(ic, list); }
-    list.push(m);
+  for (const st of stations) {
+    if (!_afAllow(1)) break;   // 額度不足 → 停，下一輪再補剩下的站
+    try {
+      const url = 'https://api.airframes.io/messages?station_ids=' + st + '&labels=A9&timeframe=last-2-hours';
+      const r = await fetch(url, { headers: { 'User-Agent': _FIDS_UA } });
+      if (!r.ok) continue;   // 間歇 404（airframes API 偶發）/ 壞站 → 跳過這站，不中斷其他站
+      const a = await r.json() as any;
+      const arr: any[] = Array.isArray(a) ? a : ((a && (a.messages || a.data || a.results || a.items)) || []);
+      for (const m of arr) {
+        if (!m) continue;
+        m.text = String(m.text || m.message || '');
+        const mt = m.text.match(/\b([A-Z]{4})\s+(?:ARR|DEP)?\s*ATIS/);
+        if (!mt) continue;
+        const ic = mt[1];
+        if (ic[0] === 'K' || ic[0] === 'P') continue;   // 美國/太平洋 → 官方 FAA，不收進 acars 庫
+        let list = byApt.get(ic); if (!list) { list = []; byApt.set(ic, list); }
+        list.push(m);
+      }
+    } catch { /* 單站失敗跳過，不影響其他站 */ }
   }
   let updates = 0;
   for (const [ic, msgs] of byApt) {
