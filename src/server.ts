@@ -1054,6 +1054,46 @@ async function _atisFetchStationFeed(): Promise<number> {
   return updates;
 }
 
+// 按 ACARS DSP 路由前綴跨「所有站」查（codex 破解）：text=/<DSP>.TI2/ 一個請求撈該區所有機場、從每一台收到的站
+//   → 哪台站（含英國/IRDM/任何站）剛好收到現行那則都涵蓋，比「只查固定幾台衛星站」完整很多（實證 RJAA 現行 letter 是英國站 SS-EGBB 收到的，固定站查法漏掉）。
+//   DSP→機場是穩定對應（從 feed 撈出 48 個，這裡放亞洲+主要全球；env ATIS_DSP_PREFIXES 可調）。仍用發布時刻挑現行、塞同一累積庫。
+const _AF_DSP_PREFIXES: string[] = (process.env.ATIS_DSP_PREFIXES
+  || 'FUKDLYA,TPECAYA,HKGATYA,ICNDLXA,SELATYA,SINCAYA,BJSATYA,BOMCDYA,HANATXA,ATSLYXA,AUHADYA,DOHATYA,JEDATYA,LONATXA,CDGATYA,MADAAYA,ATISAXS,ISTATYA')
+  .split(',').map((s) => s.trim()).filter(Boolean);
+async function _atisFetchRoutingFeed(): Promise<number> {
+  const byApt = new Map<string, any[]>();
+  for (const dsp of _AF_DSP_PREFIXES) {
+    if (!_afAllow(1)) break;   // 額度不足 → 停，保留 bucket 給 /api/atis 與其他輪詢（不一次燒光，codex P2）
+    let arr: any[] = [];
+    try {
+      // ⚠ 一定要 labels=A9：DSP 前綴在忙場(LONATXA/TPECAYA)會混進非 ATIS 流量、把現行 ATIS 擠出 100 視窗 → _atisPickKind 撈不到(codex P1)
+      const url = 'https://api.airframes.io/messages?text=' + encodeURIComponent('/' + dsp + '.TI2/') + '&labels=A9&timeframe=last-2-hours';
+      const r = await fetch(url, { headers: { 'User-Agent': _FIDS_UA } });
+      if (!r.ok) continue;   // 間歇 404 → 跳過這前綴、下一輪(60s)再補；不重試，避免燒爆共用 bucket(codex P2)
+      const a = await r.json() as any;
+      arr = Array.isArray(a) ? a : ((a && (a.messages || a.data || a.results || a.items)) || []);
+    } catch { continue; }
+    for (const m of arr) {
+      if (!m) continue;
+      m.text = String(m.text || m.message || '');
+      const mt = m.text.match(/\b([A-Z]{4})\s+(?:ARR|DEP)?\s*ATIS/);
+      if (!mt) continue;
+      const ic = mt[1];
+      if (ic[0] === 'K' || ic[0] === 'P') continue;   // 美國/太平洋 → 官方 FAA
+      let list = byApt.get(ic); if (!list) { list = []; byApt.set(ic, list); }
+      list.push(m);
+    }
+  }
+  let updates = 0;
+  for (const [ic, msgs] of byApt) {
+    for (const kind of ['ARR', 'DEP', 'ATIS'] as const) {
+      const p = _atisPickKind(msgs, kind);
+      if (p && typeof p.issueAt === 'number' && _atisStoreMerge(ic, kind, p)) { _atisStorePersist(ic, kind); updates++; }
+    }
+  }
+  return updates;
+}
+
 // 美國 D-ATIS：官方 FAA 源（經 atis.info，CORS*、免 key、免額度）。只有有 D-ATIS 的大場才有（關島等小場沒有 → 404）。
 async function _atisFetchUsFaa(icao: string) {
   const r = await fetch('https://atis.info/api/' + icao);
@@ -1167,6 +1207,10 @@ function _atisStartPoller() {
   const runStationFeed = async () => { try { const n = await _atisFetchStationFeed(); if (n) console.log('[ATIS] station-feed updates', n); } catch { /* 失敗就靠下面逐站輪詢保底 */ } };
   setInterval(() => { runStationFeed(); }, 60000);
   setTimeout(() => { runStationFeed(); }, 3000);   // 開機 3s 先跑一次（等健康檢查先更新活躍站）
+  // 路由前綴跨全站查（codex 破解，主力升級）：哪台站收到現行 ATIS 都涵蓋 → 追平機率大增 → 每 60s 跑一次（_afAllow 自我節流，額度不足自動跳過）
+  const runRoutingFeed = async () => { try { const n = await _atisFetchRoutingFeed(); if (n) console.log('[ATIS] routing-feed updates', n); } catch { /* 失敗靠 station-feed / 逐站輪詢保底 */ } };
+  setInterval(() => { runRoutingFeed(); }, 60000);
+  setTimeout(() => { runRoutingFeed(); }, 6000);   // 開機 6s 先跑一次（錯開 station-feed）
   const runFast = async () => { for (const ic of fast) { await _atisPollOne(ic, true); await _atisSleep(800); } };   // 快層 deep（雙管，補衛星站沒覆蓋到的場）
   setInterval(() => { runFast().catch(() => { }); }, 90000);   // 快層每 90s
   if (slow.length) {   // 慢層：連續慢掃，整圈 ~5 分（每站間隔 = 300000/站數，最少 2s），只廣查省額度
