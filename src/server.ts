@@ -912,6 +912,15 @@ function _atisPickKind(msgs: any[], kind: 'ARR' | 'DEP' | 'ATIS'): { title: stri
       if (issue > ing + 5 * 60000) issue -= 86400000;
       return issue;
     }
+    // 無字母、但「ATIS」後直接接 HHMMZ（如宵禁「ATIS 1706Z NOT AVAILABLE」）→ 那 HHMM 就是發布時分，不可退用收到時間
+    //   （否則昨晚的 NA 今天被飛機回放 → 算成今天收到時間 → 用今天的時刻蓋掉真正的現行字母 ATIS。實證 RJAA 踩過 2026-06-12）
+    const nm = t.match(/ATIS\s+(\d{2})(\d{2})Z/);
+    if (nm) {
+      const hh = parseInt(nm[1], 10), mi = parseInt(nm[2], 10);
+      let issue = Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), hh, mi);
+      if (issue > ing + 5 * 60000) issue -= 86400000;   // 發布晚於收到 → 前一天（昨晚 NA 今天回放）
+      return issue;
+    }
     if (mm && dd >= 1 && dd <= 31) {   // 有 METAR、無字母碼（極少，如 NOT AVAILABLE 反而有 METAR）→ 用 METAR 全時戳
       let ts = Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), dd, parseInt(mm[2], 10), parseInt(mm[3], 10));
       if (ts > ing + 6 * 3600000) ts = Date.UTC(d.getUTCFullYear(), d.getUTCMonth() - 1, dd, parseInt(mm[2], 10), parseInt(mm[3], 10));
