@@ -845,7 +845,7 @@ function _atisSrcOf(m: any): string {
   const f = m && m.flight;
   const raw = (f && typeof f === 'object')
     ? String(f.flightIata || f.flight || f.flightIcao || ((f.designator || '') + (f.number != null ? f.number : '')) || '')
-    : String((m && m.tail) || (typeof f === 'string' ? f : '') || '');
+    : String((typeof f === 'string' && f.trim() ? f : (m && m.tail)) || '');   // 優先航班號(BR6089)、沒有才退機尾號(B-16782)→ 比照 coffee「顯示哪班航機」
   return raw.trim().replace(/[^A-Za-z0-9\- ]/g, '').slice(0, 12);   // 只留安全字元（外部 API 來的，防 HTML 注入）+ 限長
 }
 // ISO 時間 → "2026-06-08 15:41Z"（UTC，給前端標「Time」用）
@@ -895,6 +895,9 @@ function _atisRealIssueAt(m: any): number {
   }
   return ing;
 }
+// ATIS 是否「完整」：含 QNH/高度表撥定（QNH/Q####/A####）→ 是完整的；被截在前半身（如停在 RWY... 還沒到天氣）就沒有。
+//   用「內容本身」判完整度，比「前綴比對」robust：不怕不同來源(coffee/airframes)換行空白格式不同（V9.4.37 前綴法在此破功、截斷版仍勝出）。
+function _atisHasQNH(t: string): boolean { return /\bQNH\b|\bQ\d{4}\b|\bA\d{4}\b|ALTIMETER/i.test(String(t || '')); }
 // 從一批 airframes 訊息挑某 kind(ARR/DEP)的「現行」那則 → {title,text,src,time}
 function _atisPickKind(msgs: any[], kind: 'ARR' | 'DEP' | 'ATIS'): { title: string; text: string; src: string; time: string; issueAt: number; receivedAt: number; hash: string } | null {
   const tag = kind === 'ATIS' ? 'ATIS' : kind + ' ATIS';   // 'ATIS' = 合併 ATIS（歐洲等不分 ARR/DEP 的場，格式 "ICAO ATIS X"）
@@ -907,24 +910,28 @@ function _atisPickKind(msgs: any[], kind: 'ARR' | 'DEP' | 'ATIS'): { title: stri
   // 挑「真實發布時刻最新」的那則（realIssueAt 抽成 _atisRealIssueAt 共用）。⚠ 永不變空：只要有 matches 就一定回一則。
   const future = Date.now() + 15 * 60000;   // 合成時刻不可能在未來：壞訊息（letter+METAR 湊出未來時戳）不可冒充現行（容 15 分時鐘誤差，codex P1）。
   let best: any = null, bestScore = -Infinity;
-  // 挑「發布最新」；同發布時刻：兩則若是「同訊息的截斷↔完整」(一個是另一個前綴)→留完整(長)，避免挑到被拆 frame 的半截那則；
-  //   若內容真的不同(同時刻的修正版)→留收到較新那則（codex：別讓「長的」蓋掉合法的短修正）。
+  // 挑「發布最新」；同發布時刻：挑「完整(有 QNH)」優先於「被截斷(無 QNH)」——完整版永遠勝過截斷版，不管誰先收到；
+  //   同樣完整(或同樣截斷) → 挑收到較新那則（同時刻修正版/刷新顯示時間，不誤殺合法短修正）。
   for (const m of matches) {
     const s = _atisRealIssueAt(m); if (s > future) continue;
     if (!best || s > bestScore) { best = m; bestScore = s; continue; }
     if (s === bestScore) {
-      // 比前綴關係前先去掉 ACARS 路由前綴 /.../（不同來源/航班帶的 header 不同，否則同訊息的截斷↔完整會被誤判成不相關，codex P1）。
-      const bt = String((best && best.text) || '').replace(/^\/[^/]*\//, '').trim(), mt = String((m && m.text) || '').replace(/^\/[^/]*\//, '').trim();
-      const prefixRel = bt.startsWith(mt) || mt.startsWith(bt);   // 一個是另一個前綴 = 同訊息的截斷/完整
+      const mt = String((m && m.text) || ''), bt = String((best && best.text) || '');
+      const mFull = _atisHasQNH(mt), bFull = _atisHasQNH(bt);
       const mRecv = Date.parse(String(m && m.timestamp)) || 0, bRecv = Date.parse(String(best && best.timestamp)) || 0;
-      if (prefixRel ? (mt.length > bt.length || (mt.length === bt.length && mRecv > bRecv)) : mRecv > bRecv) best = m;
+      // 完整度優先(有 QNH > 無)；同完整度挑「最長=最完整」(處理 QNH 之後才被截斷的 frag，codex)；長度也相同才比收到時間。
+      const take = mFull !== bFull ? mFull : (mt.length !== bt.length ? mt.length > bt.length : mRecv > bRecv);
+      if (take) best = m;
     }
   }
   if (!best) {   // 全是未來時戳（極少壞訊息）→ never-blank 保底：挑「收到最新」那則、用收到時間當分數，仍不變空。
     best = matches.reduce((a, b) => ((Date.parse(String(b && b.timestamp)) || 0) > (Date.parse(String(a && a.timestamp)) || 0) ? b : a), matches[0]);
     bestScore = Date.parse(String(best && best.timestamp)) || Date.now();
   }
-  const text = String((best && best.text) || '').replace(/^\/[^/]*\//, '').trim();   // 去 ACARS 路由前綴 /TPECAYA.TI2/
+  const text = String((best && best.text) || '')
+    .replace(/^\/[^/]*\//, '')                       // 去 ACARS 路由前綴 /TPECAYA.TI2/
+    .replace(/[\r\n]+\s*[0-9A-Fa-f]{4}\s*$/, '')     // 去結尾 ACARS frame 尾碼/檢查碼（4 位 hex，如 0DEE/B52B/9CA9，非 ATIS 內容，比照 coffee 不顯示）
+    .trim();
   if (!text) return null;
   const receivedAt = Date.parse(String((best && best.timestamp) || '')) || Date.now();
   // time 顯示「收到時間」（哪班機在什麼時候讀回的）→ 比照 coffee 的標法（Source: 機號 / Time: 收到時刻）。
@@ -1174,14 +1181,12 @@ function _atisStoreMerge(icao: string, kind: 'ARR' | 'DEP' | 'ATIS', p: { text: 
   let newer: boolean;
   if (!old || p.issueAt > old.issueAt) newer = true;                  // 發布較新 → 一定取代
   else if (p.issueAt === old.issueAt) {
-    const prefixRel = old.text.startsWith(p.text) || p.text.startsWith(old.text);
-    if (prefixRel) {
-      // 同訊息(截斷↔完整/完全相同)：更完整(長)→取代；一樣完整但收到較新→更新(刷新顯示的 receivedAt/src，否則現行 ATIS 時間卡在首見時刻，codex)；較短(截斷)→不取代。
-      newer = p.text.length > old.text.length || (p.text.length === old.text.length && p.receivedAt > old.receivedAt);
-    } else {
-      // 內容真的不同(同時刻修正版)→留最新收到/內文有變。
-      newer = p.receivedAt > old.receivedAt || (p.receivedAt === old.receivedAt && p.hash !== old.hash);
-    }
+    // 同發布時刻：完整(有 QNH)永遠勝過截斷(無 QNH)，半截不准蓋完整、收到較晚的半截也不行（V9.4.37 前綴法在此破功）；
+    //   同樣完整度 → 收到較新/內文有變才取代（修正版 + 刷新顯示時間，不誤殺合法短修正）。
+    const pFull = _atisHasQNH(p.text), oFull = _atisHasQNH(old.text);
+    if (pFull !== oFull) newer = pFull;                                          // 完整(有 QNH)勝截斷
+    else if (p.text.length !== old.text.length) newer = p.text.length > old.text.length;   // 同完整度 → 最長(最完整)勝，QNH 後被截的 frag 不准蓋完整版（codex）
+    else newer = p.receivedAt > old.receivedAt || (p.receivedAt === old.receivedAt && p.hash !== old.hash);
   } else newer = false;
   if (!newer) { if (old) old.updatedAt = Date.now(); return false; }   // 沒更新（同一筆又看到）→ 不動 receivedAt（保「首見時間」，跟 coffee 一致）
   cur[kind] = { text: p.text, src: p.src, issueAt: p.issueAt, receivedAt: p.receivedAt, hash: p.hash, updatedAt: Date.now() };
