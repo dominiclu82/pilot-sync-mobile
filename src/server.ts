@@ -526,7 +526,7 @@ app.get('/privacy', (_req, res) => {
 <tr style="border-bottom:2px solid #555"><th style="text-align:left;padding:8px">服務 Service</th><th style="text-align:left;padding:8px">用途 Purpose</th></tr>
 <tr style="border-bottom:1px solid #333"><td style="padding:8px"><strong>Google Calendar API</strong></td><td style="padding:8px">班表同步（需使用者授權）<br>Roster synchronization (user-authorized)</td></tr>
 <tr style="border-bottom:1px solid #333"><td style="padding:8px"><strong>Aviation Weather APIs</strong></td><td style="padding:8px">METAR/TAF 航空氣象<br>Aviation weather data</td></tr>
-<tr style="border-bottom:1px solid #333"><td style="padding:8px"><strong>ACARS / D-ATIS sources</strong></td><td style="padding:8px">D-ATIS 即時資訊（ACARS）<br>Real-time D-ATIS (ACARS)<br><span style="opacity:.7;font-size:.9em">Data provided by Airframes.io and its community of feeders.</span></td></tr>
+<tr style="border-bottom:1px solid #333"><td style="padding:8px"><strong>ACARS / D-ATIS sources</strong></td><td style="padding:8px">D-ATIS 即時資訊（ACARS）<br>Real-time D-ATIS (ACARS)<br><span style="opacity:.7;font-size:.9em">資料來自第三方 ACARS 資料來源。<br>Sourced from third-party ACARS data providers.</span></td></tr>
 <tr style="border-bottom:1px solid #333"><td style="padding:8px"><strong>CodeTabs CORS Proxy</strong></td><td style="padding:8px">前端跨域代理<br>Frontend cross-origin proxy</td></tr>
 <tr style="border-bottom:1px solid #333"><td style="padding:8px"><strong>FlightRadar24 (unofficial)</strong></td><td style="padding:8px">Gate Info 航班資訊補充<br>Gate Info flight data supplement</td></tr>
 <tr style="border-bottom:1px solid #333"><td style="padding:8px"><strong>FlightAware (unofficial)</strong></td><td style="padding:8px">Gate Info 航班起訖地補充<br>Gate Info origin/destination supplement</td></tr>
@@ -835,27 +835,8 @@ async function _nopLoadState() {
   } catch { /* 載入失敗不擋啟動 */ }
 }
 
-// 查 airframes 某機場的 ARR / DEP D-ATIS（text 片語搜尋，去掉 ACARS 路由前綴）
-// 主源：coffeeteaorme（衛星 ACARS、全機場即時、免額度、全用戶可用）。擋直連 → 帶 Referer。
-//   data[] 已「新→舊」排序且乾淨（不像 airframes 有舊代碼/未來時戳亂入），取最新一則 ARR/DEP ATIS 即現行。
-//   無此機場 ATIS（小場/亂碼 ICAO）→ data 有但無 ATIS → 回 null → 上層走 FAA/airframes 保底。
-const _COFFEE_REF = 'https://info.coffeeteaorme.vip/Public-D-ATIS/RCTP';
-async function _atisFetchCoffee(icao: string) {
-  const url = 'https://api.coffeeteaorme.vip/api/atis?text=' + encodeURIComponent(icao) + '&_t=' + Date.now();
-  const r = await fetch(url, { headers: { Referer: _COFFEE_REF, 'User-Agent': _FIDS_UA } });
-  if (!r.ok) throw new Error('coffee ' + r.status);
-  const j = (await r.json()) as any;
-  if (!j || !j.success || !Array.isArray(j.data)) return null;
-  const pick = (kind: 'ARR' | 'DEP'): { title: string; text: string } | null => {
-    const tag = kind + ' ATIS';
-    const hit = j.data.find((m: any) => String((m && m.message) || '').includes(tag));   // data 新→舊，第一筆即最新
-    if (!hit) return null;
-    const text = String(hit.message || '').trim();
-    return text ? { title: tag, text } : null;
-  };
-  const sections = [pick('ARR'), pick('DEP')].filter(Boolean) as { title: string; text: string }[];
-  return sections.length ? sections : null;
-}
+// TODO（2026-06-12）：舊 _atisFetchCoffee（讀 m.message、無 issueAt、未授權時停用）已被下方新版取代
+//   —— 站長正式授權後改用 rawMessage + realIssueAt 挑現行 + issueAt 併庫。保留此註解備查。
 
 // ── airframes 匿名 /v1（V9.4.18 起改用，免 key、限速 60/分、帶瀏覽器 UA 過 Cloudflare）──────
 // 來源解析：airframes 把「飛機↔即時航班」對得上時，flight 是物件(含 flightIata/designator+number)→ 取航班號(BR772)；
@@ -1019,6 +1000,56 @@ async function _atisFetchAirframes(icao: string, bulk: boolean) {
   }
   const sections = [arr, dep, combined].filter(Boolean) as { title: string; text: string; src: string; time: string }[];
   return sections.length ? sections : null;
+}
+
+// ── coffee（coffeeteaorme.vip）：站長 2026-06-12 正式授權、白名單綁 oops.h-peak.com origin（主源）──
+//   比 airframes 密、更接近現行（他自己也爬 ACARS + 私人接收機）。爬蟲型 API：每次 5-20s、回最新 100 筆、需自行濾現行。
+//   server 端帶 Origin/Referer 即過白名單（實證 200 + CORS allow-origin 回我們網域）。非營利助組員，站長同意免費。
+async function _atisFetchCoffee(icao: string) {
+  const headers = { 'Origin': 'https://oops.h-peak.com', 'Referer': 'https://oops.h-peak.com/', 'User-Agent': _FIDS_UA, 'Accept': 'application/json' };
+  const ctrl = new AbortController();
+  const to = setTimeout(() => ctrl.abort(), 25000);   // 爬蟲型最久 ~20s，留 25s 逾時
+  let j: any;
+  try {
+    const r = await fetch('https://api.coffeeteaorme.vip/api/atis?text=' + encodeURIComponent(icao), { headers, signal: ctrl.signal });
+    if (!r.ok) return null;   // 非 200（白名單/掛站）→ 回 null，上層走 airframes 備援
+    j = await r.json();
+  } catch { return null; } finally { clearTimeout(to); }
+  const data: any[] = (j && Array.isArray(j.data)) ? j.data : [];
+  if (!data.length) return null;
+  // rawMessage 形如 "AES:.. GES:50 N REG /TPECAYA.TI2/RCTP ARR ATIS T\n1130Z..." → 砍 AES/GES/rego/路由前綴，從「ICAO (ARR/DEP) ATIS」起留到尾
+  const records = data.map((d) => {
+    const raw = String((d && d.rawMessage) || '');
+    const m = raw.match(/[A-Z]{4}\s+(?:ARR\s+|DEP\s+)?ATIS\b[\s\S]*/);
+    return { text: m ? m[0] : raw, timestamp: String((d && d.timestamp) || '').trim().replace(' ', 'T') + 'Z', flight: (d && d.flight) || '', tail: (d && d.rego) || '' };
+  });
+  const arr = _atisPickKind(records, 'ARR');
+  const dep = _atisPickKind(records, 'DEP');
+  const combined = (!arr && !dep) ? _atisPickKind(records, 'ATIS') : null;   // 歐洲等不分 ARR/DEP
+  const sections = [arr, dep, combined].filter(Boolean) as { title: string; text: string; src: string; time: string; issueAt: number; receivedAt: number; hash: string }[];
+  return sections.length ? sections : null;
+}
+// 把一組 sections 併進累積庫（升級才覆蓋）→ coffee/airframes 共用，最新的自然勝出。回傳有沒有更新。
+function _atisMergeSections(icao: string, sections: any[] | null): boolean {
+  if (!sections) return false;
+  let any = false;
+  for (const s of sections) {
+    const kind = s.title === 'DEP ATIS' ? 'DEP' : s.title === 'ARR ATIS' ? 'ARR' : s.title === 'ATIS' ? 'ATIS' : null;
+    if (kind && typeof s.issueAt === 'number' && _atisStoreMerge(icao, kind, s)) { _atisStorePersist(icao, kind); any = true; }
+  }
+  return any;
+}
+// coffee 撈取節流：站長是人情爬蟲、每次冷打 5-20s 觸發他爬一輪 → 同一場一段時間內不重複打（ATIS ~30 分才換）。
+const _COFFEE_COOLDOWN = 15 * 60000;       // 成功(有回資料) → 15 分鐘內不重撈
+const _COFFEE_FAIL_COOLDOWN = 60000;       // 失敗(逾時/掛/空) → 只壓 1 分鐘，暫時掛點別鎖死 15 分（codex P2），但也不狂打
+const _coffeeNext = new Map<string, number>();   // 各場「下次可撈 coffee」的時間
+function _coffeeFresh(icao: string): boolean { return Date.now() < (_coffeeNext.get(icao) || 0); }   // 還在冷卻內 → 不重撈
+async function _coffeePull(icao: string): Promise<boolean> {   // 撈 coffee→併庫。回「有沒有真的拉到更新的」(給 fresh 判斷要不要退 airframes)。
+  let got = false, improved = false;
+  try { const cs = await _atisFetchCoffee(icao); if (cs) { got = true; improved = _atisMergeSections(icao, cs); } } catch { got = false; }
+  // 撈完才起算冷卻：有回資料(got，不管有沒有更新) → 正常 15 分；失敗/空 → 只 1 分，暫時掛點不鎖死、但也不狂打站長
+  _coffeeNext.set(icao, Date.now() + (got ? _COFFEE_COOLDOWN : _COFFEE_FAIL_COOLDOWN));
+  return improved;
 }
 
 // 衛星站整串 A9 → 涵蓋整個衛星波束的幾十場，本地分機場挑現行、塞進累積庫。回傳更新筆數。
@@ -1225,6 +1256,15 @@ function _atisStartPoller() {
   setTimeout(() => { runRoutingFeed(); }, 6000);   // 開機 6s 先跑一次（錯開 station-feed）
   const runFast = async () => { for (const ic of fast) { await _atisPollOne(ic, true); await _atisSleep(800); } };   // 快層 deep（雙管，補衛星站沒覆蓋到的場）
   setInterval(() => { runFast().catch(() => { }); }, 90000);   // 快層每 90s
+  // coffee 主源（站長授權）：重點站逐站輪（爬蟲型 5-20s/站，逐站不並發、不壓站長）；最新的 merge 自動勝過 airframes。
+  let _coffeeBusy = false;
+  const runCoffee = async () => {
+    if (_coffeeBusy) return;   // 上一輪還沒跑完 → 跳過，不疊（單站可能拖到 20s）
+    _coffeeBusy = true;
+    try { for (const ic of fast) { try { await _coffeePull(ic); } catch { /* 單站失敗略過 */ } await _atisSleep(600); } } finally { _coffeeBusy = false; }
+  };
+  setInterval(() => { runCoffee(); }, 15 * 60000);   // 主源每 15 分鐘輪一圈重點站（ATIS ~30 分才換、手動刷新可即時拉 → 不用更勤、尊重站長爬蟲）
+  setTimeout(() => { runCoffee(); }, 1500);          // 開機就先跑（主源優先於 airframes）
   if (slow.length) {   // 慢層：連續慢掃，整圈 ~5 分（每站間隔 = 300000/站數，最少 2s），只廣查省額度
     let si = 0;
     const gap = Math.max(2000, Math.floor(300000 / slow.length));
@@ -1295,7 +1335,19 @@ app.get('/api/atis', async (req, res) => {
   // 2. fresh=1 且單機場（手動刷新）→ 立刻輪詢這站刷新累積庫，再走庫。
   //    merge 只「升級」（發布較新才覆蓋），所以這次即時查就算撈到較舊的，也不會蓋掉累積庫裡較新的那筆（codex P1：fresh 要能刷新，但不能退化）。
   //    區域一鍵刷新(bulk)不在此即時打：那批由背景輪詢維護的庫已夠新，避免一次噴一堆 airframes。
-  if (fresh && !bulk) { try { await _atisPollOne(icao, true); } catch { /* 刷新失敗就用庫裡現有的 */ } }
+  if (fresh && !bulk) {
+    // coffee 主源先撈（手動一律打、不看冷卻，並更新冷卻時間）；只有「真的拉到更新的」才算數，否則仍退 airframes 保底，
+    //   避免「coffee 回了但不比庫新 → 跳過 airframes → 刷新卻沒真的更新」(codex 前一輪 P1)。merge 只升級，多打 airframes 也不會退化。
+    let improved = false;
+    if (icao[0] !== 'K' && icao[0] !== 'P') improved = await _coffeePull(icao);   // 非美 → coffee 主源（美國到這代表 FAA 已失敗 → 走 airframes）
+    if (!improved) { try { await _atisPollOne(icao, true); } catch { /* 刷新失敗就用庫裡現有的 */ } }
+  }
+  // 2.5 非美、非手動：開場聰明撈 coffee（主源）。庫 15 分內撈過 → 直接給、不重複打他；
+  //     有舊的 → 秒回舊的 + 背景撈最新暖庫（不卡使用者，下次就新）；從沒撈過 → 等一次(5-20s)拿真資料、不給空白。
+  if (!fresh && !bulk && icao[0] !== 'K' && icao[0] !== 'P' && !_coffeeFresh(icao)) {
+    if (_atisStoreSections(icao)) { _coffeePull(icao); }                       // 有舊的 → 背景撈，不擋回應
+    else { try { await _coffeePull(icao); } catch { /* 撈不到 → 往下走 airframes 保底 */ } }   // 從沒撈過 → 等一次
+  }
   // 3. 非美：先吃背景累積庫（輪詢維護，最新鮮、跟 coffee 同機制）→ 命中直接回，不打 airframes。
   const stored = _atisStoreSections(icao);
   if (stored) return res.json({ sections: stored, source: 'acars' });
