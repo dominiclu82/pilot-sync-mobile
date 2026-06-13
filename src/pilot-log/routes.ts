@@ -57,8 +57,8 @@ import { getAirportDbJs } from '../spa/js-airport-db.js';
 
 // ── 版本（比照 CrewSync / Morning：每次推版必更新；SW cache 名稱跟著走） ────
 // 本機 preview build 會暫時加 -tNN 後綴方便對版；推正式版前拿掉只留乾淨版號。
-export const PILOT_LOG_VERSION = 'V2.3.07';
-const PILOT_LOG_CACHE = 'pilotlog-v2-3-07';
+export const PILOT_LOG_VERSION = 'V2.4.01';
+const PILOT_LOG_CACHE = 'pilotlog-v2-4-01';
 
 export const pilotLogRouter = express.Router();
 
@@ -365,6 +365,11 @@ function _renderPilotLogChangelog(): string {
   return `
     ${renderCommunityLink()}
     <div class="pl-cl-v">${PILOT_LOG_VERSION}</div>
+    <div class="pl-cl-txt">
+      <b>📕 新增 Logbook PDF 產出：把飛行紀錄做成人類可讀的 PDF（轉職交件用），可選地區格式（通用／EASA-FCL／FAA／ICAO）＋紙張／橫直式＋附機型統計頁；中文支援（真文字、可選取、不是圖片）。</b><br>
+      <b>📕 New Logbook PDF export: turn your flights into a human-readable logbook PDF (for job applications) — pick a regional format (Generic / EASA-FCL / FAA / ICAO), paper & orientation, with an aircraft-type summary; Chinese supported (real selectable text, not an image).</b>
+    </div>
+    <div class="pl-cl-v old">V2.3.07</div>
     <div class="pl-cl-txt">
       <b>⏰ 新增報到時間規則：On Duty 自動帶 = STD − N 分（依公司×機場，預設星宇 FOM、可自訂航司與場站），並可一鍵回填舊航班的 Duty 時間。</b><br>
       <b>⏰ Report-time rules: On Duty auto-fills as STD − N min by company × airport (Starlux FOM defaults, fully customizable), with one-tap duty backfill for past flights.</b>
@@ -2125,6 +2130,34 @@ pilotLogRouter.get('/api/pilot-log/stats', requireAuth, async (req: AuthedReques
     getSimTotals(userId),
   ]);
   res.json({ totals, rolling, by_type: byType, opening, sim });
+});
+
+// ── 字型 subset（給 Logbook PDF 嵌入中日韓字）V2.4.01 ───────────────────────────
+//   前端 jsPDF 內建字型只支援拉丁；要印中文得嵌字型，但整包 CJK 十幾 MB → 每個 PDF 爆掉。
+//   做法：前端把「這份 logbook 真正用到的字」傳來，伺服器用 subset-font 只切那些字（4.5MB→幾十 KB）回傳，
+//   前端嵌進 jsPDF → 真·文字向量 PDF、中文正常、檔案小。字型：jf open 粉圓（justfont，免費可商用 TrueType）。
+import _subsetFont from 'subset-font';
+import { readFileSync as _plReadFile } from 'fs';
+import { dirname as _plDirname, join as _plJoin } from 'path';
+import { fileURLToPath as _plFileURL } from 'url';
+// 字型「隨程式打包在 repo」（不在 runtime 去 CDN 抓）→ 沒有外網/CDN 掛掉也不會壞，codex P1。
+let _plCjkFontBuf: Buffer | null = null;
+function _plLoadCjkFont(): Buffer {
+  if (!_plCjkFontBuf) {
+    _plCjkFontBuf = _plReadFile(_plJoin(_plDirname(_plFileURL(import.meta.url)), 'assets', 'jf-openhuninn-2.0.ttf'));
+  }
+  return _plCjkFontBuf;
+}
+pilotLogRouter.post('/api/pilot-log/font-subset', requireAuth, async (req: AuthedRequest, res) => {
+  try {
+    const chars = String((req.body && req.body.chars) || '').slice(0, 40000);
+    if (!chars) return res.status(400).json({ error: 'no_chars' });
+    const full = _plLoadCjkFont();
+    const subset = await _subsetFont(full, chars, { targetFormat: 'truetype' });
+    res.json({ font: Buffer.from(subset).toString('base64') });
+  } catch (e: any) {
+    res.status(500).json({ error: 'subset_failed' });
+  }
 });
 
 // ── Admin stats（V1.0.05；60s cache） ────────────────────────────────────────

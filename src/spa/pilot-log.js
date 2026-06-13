@@ -6722,9 +6722,10 @@ function _plRenderReportContent() {
       sumCell('Takeoffs', agg.takeoffs) +
     '</div>' +
     '<div style="display:flex;gap:8px;flex-wrap:wrap">' +
+      '<button onclick="_plOpenLogbookDialog()" style="background:#6366f1;color:#fff;border:0;border-radius:6px;padding:8px 14px;font-size:.8em;font-weight:700;cursor:pointer">📕 Logbook PDF</button>' +
       '<button onclick="_plExportCsv()" style="background:#10b981;color:#fff;border:0;border-radius:6px;padding:8px 14px;font-size:.8em;font-weight:700;cursor:pointer">⬇️ 航班 Flights CSV</button>' +
-      '<button onclick="window.print()" style="background:transparent;color:var(--text);border:1px solid var(--border);border-radius:6px;padding:8px 14px;font-size:.8em;font-weight:700;cursor:pointer">🖨️ Print</button>' +
     '</div>' +
+    '<div style="font-size:.62em;color:var(--muted);margin-top:6px">📕 PDF = 人類可讀的飛行紀錄簿（轉職交件用，可選地區格式：通用/EASA/FAA/ICAO）；⬇️ CSV = 給其他軟體匯入用。</div>' +
     '<div style="font-size:.62em;color:var(--muted);margin-top:8px">航班 CSV 為區間內已飛（confirmed）航班，含 PIC/SIC、起降、夜航時數（' + _plEsc(r.from) + ' → ' + _plEsc(r.to) + '）。</div>' +
     // V1.3.33：其他資料匯出集中在 Report（各頁也有，這裡一站全包）。通訊錄/飛機/機型不分區間、匯出全部。
     '<div style="font-size:.62em;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin:16px 0 6px">其他資料匯出 · Export data（全部，不分區間）</div>' +
@@ -6806,6 +6807,280 @@ function _plDownloadCsv(filename, head, rows) {
   var a = document.createElement('a'); a.href = url; a.download = filename;
   document.body.appendChild(a); a.click(); document.body.removeChild(a);
   setTimeout(function() { URL.revokeObjectURL(url); }, 1000);
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// 📕 Logbook PDF — 人類可讀飛行紀錄簿（設定驅動引擎 + 地區格式預設）
+//   前端 jsPDF + autotable 產 PDF、一鍵下載（iOS：開啟後「分享 → 儲存到檔案」）。
+//   每個格式 = 一組欄位設定（cols）；要加地區只要加一組設定、不動引擎。
+//   資料缺口（IFR/儀器、cross-country）法規欄留空；單/多發航司一律多發 → 多發欄帶 block、單發留空。
+// ══════════════════════════════════════════════════════════════════════════
+var _plJsPdfP = null;
+function _plLoadJsPdf() {
+  var ok = window.jspdf && window.jspdf.jsPDF && window.jspdf.jsPDF.API && window.jspdf.jsPDF.API.autoTable;
+  if (ok) return Promise.resolve();
+  if (_plJsPdfP) return _plJsPdfP;
+  _plJsPdfP = new Promise(function (res, rej) {
+    var s1 = document.createElement('script');
+    s1.src = 'https://unpkg.com/jspdf@2.5.2/dist/jspdf.umd.min.js';
+    s1.onload = function () {
+      var s2 = document.createElement('script');
+      s2.src = 'https://unpkg.com/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js';
+      s2.onload = function () { res(); };
+      s2.onerror = function () { _plJsPdfP = null; rej(new Error('autotable load failed')); };
+      document.head.appendChild(s2);
+    };
+    s1.onerror = function () { _plJsPdfP = null; rej(new Error('jspdf load failed')); };
+    document.head.appendChild(s1);
+  });
+  return _plJsPdfP;
+}
+
+// 時間戳 → "HHMM" UTC（logbook 起飛/落地時間欄）
+function _plUtcHHMM(ts) {
+  if (!ts) return '';
+  var d = new Date(ts);
+  if (isNaN(d.getTime())) return '';
+  return ('0' + d.getUTCHours()).slice(-2) + ('0' + d.getUTCMinutes()).slice(-2);
+}
+// PIC / SIC 分鐘：有明確值用明確值，否則依角色 × block（與後端 stats 一致）
+function _plPicMin(e) { return (typeof e.pic_minutes === 'number') ? e.pic_minutes : (e.position === 'PIC' ? (e.block_minutes || 0) : 0); }
+function _plSicMin(e) { return (typeof e.sic_minutes === 'number') ? e.sic_minutes : (_plIsSicPos(e.position) ? (e.block_minutes || 0) : 0); }
+function _plPicNameCell(e) { var c = e.crew || {}; var n = _plCrewVal(c.pic).name; return n || (e.position === 'PIC' ? 'SELF' : ''); }
+
+// 區間內已飛（confirmed、非 deadhead、有 in_utc），日期升冪 — 與 CSV/Report 同一套過濾
+function _plLogbookSrc(from, to) {
+  var src = (_pl.aircraftEntries || []).filter(function (e) {
+    if (e.is_deadhead || e.status === 'roster_removed') return false;
+    if (!e.in_utc) return false;
+    var fd = String(e.flight_date || '').slice(0, 10);
+    return (!from || fd >= from) && (!to || fd <= to);
+  });
+  src.sort(function (a, b) { return (a.flight_date || '').localeCompare(b.flight_date || ''); });
+  return src;
+}
+
+// 欄位 builder：_plT=時間欄(分鐘→HH:MM、加總) _plI=計數欄(整數、加總) _plX=文字欄(不加總)
+function _plT(h, val) { return { h: h, get: function (e) { return _plMinToHHMM(val(e)); }, val: val, tot: 'time' }; }
+function _plI(h, val) { return { h: h, get: function (e) { var v = val(e); return v ? String(v) : ''; }, val: val, tot: 'int' }; }
+function _plX(h, get) { return { h: h, get: get }; }
+
+// 各格式（欄位設定）。只列「有官方明確範本」的地區 + 通用擺第一。
+function _plLbFormats() {
+  var date = function (e) { return String(e.flight_date || '').slice(0, 10); };
+  var fno = function (e) { return e.flight_no || ''; };
+  var org = function (e) { return e.origin || ''; };
+  var dst = function (e) { return e.dest || ''; };
+  var typ = function (e) { return e.aircraft_type || ''; };
+  var reg = function (e) { return e.tail_no || ''; };
+  var rmk = function (e) { return e.remarks || ''; };
+  var blk = function (e) { return e.block_minutes || 0; };
+  var ngt = function (e) { return e.night_minutes || 0; };
+  var dTO = function (e) { return e.day_takeoffs || 0; }, nTO = function (e) { return e.night_takeoffs || 0; };
+  var dLd = function (e) { return e.day_landings || 0; }, nLd = function (e) { return e.night_landings || 0; };
+  var blank = function () { return ''; };
+
+  // EASA-FCL 12 欄（AMC1 FCL.050；分組欄攤平）。航司多機組：單發 SE 留空、多發 MP=block；IFR/Dual/Instr 留空。
+  var easaCols = [
+    _plX('Date', date),
+    _plX('Dep', org), _plX('Time', function (e) { return _plUtcHHMM(e.out_utc || e.off_utc); }),
+    _plX('Arr', dst), _plX('Time', function (e) { return _plUtcHHMM(e.in_utc || e.on_utc); }),
+    _plX('Type', typ), _plX('Reg', reg),
+    _plX('SE', blank), _plX('ME', blank),
+    _plT('Multi-Pilot', blk), _plT('Total', blk),
+    _plX('Name PIC', _plPicNameCell),
+    _plI('Ldg Day', dLd), _plI('Ldg Nt', nLd),
+    _plT('Night', ngt), _plX('IFR', blank),
+    _plT('PIC', _plPicMin), _plT('Co-Pilot', _plSicMin), _plX('Dual', blank), _plX('Instr', blank),
+    _plX('Remarks', rmk),
+  ];
+
+  return [
+    {
+      id: 'generic', name: '通用 Generic', orientation: 'landscape',
+      cols: [
+        _plX('Date', date), _plX('Flight', fno), _plX('From', org), _plX('To', dst),
+        _plX('Type', typ), _plX('Reg', reg),
+        _plT('Block', blk), _plT('Night', ngt), _plT('PIC', _plPicMin), _plT('SIC', _plSicMin),
+        _plI('Day TO', dTO), _plI('Nt TO', nTO), _plI('Day Ldg', dLd), _plI('Nt Ldg', nLd),
+        _plX('Remarks', rmk),
+      ],
+    },
+    { id: 'easa', name: 'EASA-FCL', orientation: 'landscape', cols: easaCols },
+    { id: 'icao', name: 'ICAO', orientation: 'landscape', cols: easaCols },
+    {
+      id: 'faa', name: 'FAA', orientation: 'landscape',
+      cols: [
+        _plX('Date', date), _plX('Make/Model', typ), _plX('Ident', reg),
+        _plX('From', org), _plX('To', dst),
+        _plT('Total', blk), _plT('Night', ngt),
+        _plX('Inst', blank), _plX('XC', blank),
+        _plI('Day TO', dTO), _plI('Nt TO', nTO), _plI('Day Ldg', dLd), _plI('Nt Ldg', nLd),
+        _plT('PIC', _plPicMin), _plT('SIC', _plSicMin), _plX('Dual', blank),
+        _plX('Remarks', rmk),
+      ],
+    },
+  ];
+}
+
+// 機型統計（區間內，給 PDF 附頁）：機型 → block/PIC/SIC/Night/班數
+function _plLbByType(src) {
+  var m = {};
+  for (var i = 0; i < src.length; i++) {
+    var e = src[i], t = e.aircraft_type || '—';
+    if (!m[t]) m[t] = { type: t, block: 0, pic: 0, sic: 0, night: 0, n: 0 };
+    m[t].block += e.block_minutes || 0; m[t].pic += _plPicMin(e); m[t].sic += _plSicMin(e);
+    m[t].night += e.night_minutes || 0; m[t].n++;
+  }
+  var arr = Object.keys(m).map(function (k) { return m[k]; });
+  arr.sort(function (a, b) { return b.block - a.block; });
+  return arr;
+}
+
+// 偵測非 Latin-1 字（中日韓等 → 需內嵌字型才印得出來）
+function _plLbHasCJK(s) { return /[^\u0000-\u00FF]/.test(String(s == null ? '' : s)); }
+// 收集整份 PDF 會用到的「所有字」→ 給伺服器 subset（只嵌這些字，檔案才小：4.5MB → 幾十 KB）
+function _plLbCollectChars(fmt, src, extra) {
+  var set = {};
+  function add(s) { s = String(s == null ? '' : s); for (var i = 0; i < s.length; i++) set[s[i]] = 1; }
+  add(extra || '');
+  fmt.cols.forEach(function (c) { add(c.h); });
+  for (var i = 0; i < src.length; i++) { for (var j = 0; j < fmt.cols.length; j++) { add(fmt.cols[j].get(src[i])); } }
+  return Object.keys(set).join('');
+}
+// 設字型：某段文字含中日韓且有嵌入 CJK 字型 → 用它；否則用內建 helvetica
+function _plLbFont(doc, text, CJK, style) { if (CJK && _plLbHasCJK(text)) { doc.setFont(CJK, 'normal'); } else { doc.setFont('helvetica', style || 'normal'); } }
+
+// 引擎：autotable 真·文字向量 PDF；內容含中日韓 → 跟伺服器要「只含用到的字」的 subset 字型嵌入（檔案小、可選取）
+function _plGenLogbookPdf(formatId, opts) {
+  opts = opts || {};
+  var r = _plReportRange();
+  var src = _plLogbookSrc(r.from, r.to);
+  if (!src.length) { _plToast('此區間沒有已飛航班 No flights in range'); return; }
+  var fmts = _plLbFormats(), fmt = null;
+  for (var i = 0; i < fmts.length; i++) { if (fmts[i].id === formatId) { fmt = fmts[i]; break; } }
+  if (!fmt) fmt = fmts[0];
+  var orient = opts.orientation || fmt.orientation || 'landscape';
+  var many = fmt.cols.length > 16;
+  var pilot = (_pl.user && (_pl.user.name || _pl.user.email)) || '';
+  var bt = _plLbByType(src);
+  // 收集所有會出現的字（含格式名/機長名/機型/靜態標籤 + 全部可印 ASCII）→ subset 用
+  //   含全部 ASCII：CJK 儲存格/標題裡夾的英數標點（如「機師考核 PC」的 PC、「-」）一定也在 subset 內，不會缺字。
+  var ASCII = ' !"#$%&\'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~';
+  var staticTxt = ASCII + ' Pilot Logbook Summary by Aircraft Type Flights Block PIC SIC Night TOTAL Page Total Generated by reference flights to ' + fmt.name + ' ' + pilot + ' ' + r.from + ' ' + r.to;
+  bt.forEach(function (t) { staticTxt += ' ' + t.type; });
+  var allChars = _plLbCollectChars(fmt, src, staticTxt);
+  var needCJK = _plLbHasCJK(allChars);
+  _plToast('產生 PDF… Generating');
+  _plLoadJsPdf().then(function () {
+    // 有中日韓 → 先跟伺服器拿 subset 字型（base64 truetype）
+    var fontP = needCJK
+      ? _plApi('/api/pilot-log/font-subset', { method: 'POST', body: JSON.stringify({ chars: allChars }) })
+          .then(function (res) { return res.json(); }).then(function (j) { return (j && j.font) ? j.font : null; })
+          .catch(function () { return null; })
+      : Promise.resolve(null);
+    fontP.then(function (fontB64) {
+      var jsPDF = window.jspdf.jsPDF;
+      var doc = new jsPDF({ orientation: orient, unit: 'mm', format: (opts.paper || 'a4') });
+      var CJK = null;
+      if (fontB64) { try { doc.addFileToVFS('plcjk.ttf', fontB64); doc.addFont('plcjk.ttf', 'plcjk', 'normal'); CJK = 'plcjk'; } catch (e) { CJK = null; } }
+      // 內容有中日韓但字型沒載成功 → 明確報錯、不產出「亂碼但假裝成功」的 PDF（codex P1）
+      if (needCJK && !CJK) { _plToast('中文字型載入失敗，請稍後再試 · CJK font failed, please retry'); return; }
+      var asciiName = { generic: 'Generic', easa: 'EASA-FCL', icao: 'ICAO', faa: 'FAA' }[fmt.id] || fmt.id;
+      // 標頭：格式名/機長名若含中文且有 CJK 字型就用它，否則退英文/helvetica
+      var title = 'Pilot Logbook - ' + ((CJK || !_plLbHasCJK(fmt.name)) ? fmt.name : asciiName);
+      doc.setFontSize(13); _plLbFont(doc, title, CJK, 'bold'); doc.text(title, 8, 11);
+      var sub = (pilot ? pilot + '    ' : '') + r.from + '  to  ' + r.to + '    -    ' + src.length + ' flights';
+      doc.setFontSize(8); _plLbFont(doc, sub, CJK, 'normal'); doc.text(sub, 8, 16);
+      // 主表 + 總計列；CJK 儲存格在 didParseCell 切到嵌入字型，其餘 helvetica（拉丁清晰）
+      var head = [fmt.cols.map(function (c) { return c.h; })];
+      var body = src.map(function (e) { return fmt.cols.map(function (c) { return c.get(e); }); });
+      var totals = fmt.cols.map(function (c, idx) {
+        if (c.val) { var s = 0; for (var j = 0; j < src.length; j++) s += (c.val(src[j]) || 0); return c.tot === 'time' ? _plMinToHHMM(s) : String(s); }
+        return idx === 0 ? 'TOTAL' : '';
+      });
+      body.push(totals);
+      var lastIdx = body.length - 1;
+      function cjkCell(data) {
+        if (CJK && _plLbHasCJK((data.cell.text || []).join(''))) { data.cell.styles.font = CJK; data.cell.styles.fontStyle = 'normal'; }
+      }
+      doc.autoTable({
+        head: head, body: body, startY: 20, theme: 'grid',
+        styles: { font: 'helvetica', fontSize: many ? 5.5 : 7, cellPadding: 1, overflow: 'linebreak', valign: 'middle' },
+        headStyles: { fillColor: [40, 60, 90], textColor: 255, fontSize: many ? 5.5 : 6.5, halign: 'center', fontStyle: 'bold' },
+        margin: { left: 8, right: 8 },
+        didParseCell: function (data) {
+          if (data.section === 'body' && data.row.index === lastIdx) { data.cell.styles.fontStyle = 'bold'; data.cell.styles.fillColor = [225, 232, 240]; }
+          cjkCell(data);
+        },
+      });
+      // 附頁：機型統計
+      if (opts.summary !== false) {
+        var sy = (doc.lastAutoTable ? doc.lastAutoTable.finalY : 20) + 8;
+        var ph0 = doc.internal.pageSize.getHeight();
+        if (sy > ph0 - 30) { doc.addPage(); sy = 14; }
+        doc.setFontSize(10); doc.setFont('helvetica', 'bold'); doc.text('Summary by Aircraft Type', 8, sy);
+        var sbody = bt.map(function (t) { return [t.type, String(t.n), _plMinToHHMM(t.block), _plMinToHHMM(t.pic), _plMinToHHMM(t.sic), _plMinToHHMM(t.night)]; });
+        var tot = { block: 0, pic: 0, sic: 0, night: 0, n: 0 };
+        bt.forEach(function (t) { tot.block += t.block; tot.pic += t.pic; tot.sic += t.sic; tot.night += t.night; tot.n += t.n; });
+        sbody.push(['TOTAL', String(tot.n), _plMinToHHMM(tot.block), _plMinToHHMM(tot.pic), _plMinToHHMM(tot.sic), _plMinToHHMM(tot.night)]);
+        doc.autoTable({
+          head: [['Type', 'Flights', 'Block', 'PIC', 'SIC', 'Night']], body: sbody, startY: sy + 3, theme: 'grid',
+          styles: { font: 'helvetica', fontSize: 8, cellPadding: 1.5 }, headStyles: { fillColor: [40, 60, 90], textColor: 255, fontSize: 8 },
+          margin: { left: 8, right: 8 }, tableWidth: 'wrap',
+          didParseCell: function (data) { if (data.section === 'body' && data.row.index === sbody.length - 1) { data.cell.styles.fontStyle = 'bold'; data.cell.styles.fillColor = [225, 232, 240]; } cjkCell(data); },
+        });
+      }
+      // 頁尾頁碼 + 免責（全 ASCII）
+      var pc = doc.internal.getNumberOfPages();
+      for (var p = 1; p <= pc; p++) {
+        doc.setPage(p); doc.setFontSize(6); doc.setFont('helvetica', 'normal'); doc.setTextColor(150);
+        var pw = doc.internal.pageSize.getWidth(), phh = doc.internal.pageSize.getHeight();
+        doc.text('Generated by Pilot Log - times in HH:MM - UTC - for reference', 8, phh - 5);
+        doc.text('Page ' + p + ' / ' + pc, pw - 22, phh - 5);
+      }
+      doc.setTextColor(0);
+      doc.save('logbook_' + fmt.id + '_' + r.from + '_' + r.to + '.pdf');
+      _plToast('PDF 已產生 ' + src.length + ' 航班（iOS：分享 → 儲存到檔案）');
+    }).catch(function (err) { _plToast('PDF 失敗：' + ((err && err.message) || err)); });
+  }).catch(function (err) { _plToast('PDF 載入失敗：' + ((err && err.message) || err)); });
+}
+
+// 產生 PDF 的對話框（選格式 / 紙張 / 方向 / 附統計頁）
+function _plOpenLogbookDialog() {
+  if (document.getElementById('pl-lb-overlay')) return;
+  var fmts = _plLbFormats(), r = _plReportRange();
+  var fopt = fmts.map(function (f) { return '<option value="' + f.id + '">' + _plEsc(f.name) + '</option>'; }).join('');
+  var iy = 'background:var(--input-bg);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:7px 8px;font-size:.82em;width:100%';
+  var lbl = 'font-size:.7em;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin:10px 0 3px;display:block';
+  var ov = document.createElement('div');
+  ov.id = 'pl-lb-overlay';
+  ov.setAttribute('style', 'position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:99999;display:flex;align-items:center;justify-content:center;padding:16px');
+  ov.onclick = function (ev) { if (ev.target === ov) _plCloseLogbookDialog(); };
+  ov.innerHTML =
+    '<div style="background:var(--card);border-radius:14px;max-width:420px;width:100%;padding:18px;box-shadow:0 10px 40px rgba(0,0,0,.45);max-height:90vh;overflow:auto">' +
+      '<div style="font-size:1.05em;font-weight:700;margin-bottom:4px">📕 產生 Logbook PDF</div>' +
+      '<div style="font-size:.66em;color:var(--muted);margin-bottom:6px">轉職交件用的人類可讀飛行紀錄簿 · Human-readable logbook for job applications</div>' +
+      '<label style="' + lbl + '">格式 Format</label><select id="pl-lb-fmt" style="' + iy + '">' + fopt + '</select>' +
+      '<label style="' + lbl + '">紙張 Paper</label><select id="pl-lb-paper" style="' + iy + '"><option value="a4">A4</option><option value="letter">Letter</option></select>' +
+      '<label style="' + lbl + '">方向 Orientation</label><select id="pl-lb-orient" style="' + iy + '"><option value="landscape">橫式 Landscape</option><option value="portrait">直式 Portrait</option></select>' +
+      '<label style="display:flex;align-items:center;gap:7px;margin-top:12px;font-size:.82em;cursor:pointer"><input type="checkbox" id="pl-lb-summary" checked> 附機型統計頁 Summary by type</label>' +
+      '<div style="font-size:.68em;color:var(--muted);margin-top:10px;background:var(--input-bg);border-radius:8px;padding:8px">區間 Range：<b>' + _plEsc(r.from) + '</b> → <b>' + _plEsc(r.to) + '</b><br>（在上方 📅 Hours Summary 調整日期）</div>' +
+      '<div style="display:flex;gap:8px;margin-top:16px;justify-content:flex-end">' +
+        '<button onclick="_plCloseLogbookDialog()" style="background:transparent;color:var(--text);border:1px solid var(--border);border-radius:6px;padding:8px 14px;font-size:.82em;font-weight:700;cursor:pointer">取消</button>' +
+        '<button onclick="_plLogbookGo()" style="background:#6366f1;color:#fff;border:0;border-radius:6px;padding:8px 18px;font-size:.82em;font-weight:700;cursor:pointer">產生 PDF</button>' +
+      '</div>' +
+    '</div>';
+  document.body.appendChild(ov);
+}
+function _plCloseLogbookDialog() { var o = document.getElementById('pl-lb-overlay'); if (o) o.parentNode.removeChild(o); }
+function _plLogbookGo() {
+  var fmt = (document.getElementById('pl-lb-fmt') || {}).value || 'generic';
+  var paper = (document.getElementById('pl-lb-paper') || {}).value || 'a4';
+  var orient = (document.getElementById('pl-lb-orient') || {}).value || 'landscape';
+  var summary = !!(document.getElementById('pl-lb-summary') || {}).checked;
+  _plCloseLogbookDialog();
+  _plGenLogbookPdf(fmt, { paper: paper, orientation: orient, summary: summary });
 }
 function _plExportCrewCsv() {
   var rows = (_pl.crew || []).map(function(c) {
