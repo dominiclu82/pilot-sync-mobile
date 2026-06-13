@@ -6,6 +6,7 @@
  */
 
 import { spawn, ChildProcess } from 'child_process';
+import { Script } from 'vm';
 
 const BASE = 'http://localhost:3000';
 let passed = 0;
@@ -69,6 +70,32 @@ async function fetchOk(path: string): Promise<string> {
   return await res.text();
 }
 
+// 抽出 HTML 裡所有「本地 inline <script>」內容（跳過外部 CDN src= 與非 JS 的資料區塊）。
+//   本專案 client JS 全部 inline 進 HTML（只有 leaflet/chart.js 走 CDN）→ 解析這些就涵蓋全部前端程式。
+function extractInlineScripts(html: string): string[] {
+  const out: string[] = [];
+  const re = /<script\b([^>]*)>([\s\S]*?)<\/script>/gi;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(html))) {
+    const attrs = m[1] || '';
+    if (/\bsrc\s*=/i.test(attrs)) continue;                                                   // 外部 CDN（leaflet/chart.js）→ 不檢
+    if (/\btype\s*=\s*["']?(application\/(ld\+)?json|text\/(template|html))/i.test(attrs)) continue;  // JSON/模板資料區塊，非 JS
+    const code = (m[2] || '').trim();
+    if (code) out.push(code);
+  }
+  return out;
+}
+
+// 解析（只編譯不執行）一段 client JS → 語法錯就拋。瀏覽器 global（document/window）在「編譯」階段不會被碰，所以不需要它們。
+function assertParses(code: string, label: string) {
+  try {
+    new Script(code);   // vm 編譯：解析 + 編譯成 bytecode，但不 run → 純抓 SyntaxError
+  } catch (e: any) {
+    const head = code.slice(0, 70).replace(/\s+/g, ' ');
+    throw new Error(`${label} 解析失敗：${e.message}｜開頭「${head}」`);
+  }
+}
+
 async function run() {
   console.log('\n🧪 CrewSync Smoke Test\n');
   console.log('⏳ 啟動 server...');
@@ -77,7 +104,7 @@ async function run() {
 
   // ── 頁面回應 ──
   console.log('📄 頁面回應:');
-  const pages = ['/', '/main', '/share', '/privacy', '/terms', '/faq', '/gate', '/fr24', '/ops', '/sync'];
+  const pages = ['/', '/main', '/share', '/privacy', '/terms', '/faq', '/gate', '/fr24', '/ops', '/sync', '/pilot-log', '/morning', '/apps'];
   for (const p of pages) {
     await check(`GET ${p} → 200`, async () => { await fetchOk(p); });
   }
@@ -175,6 +202,20 @@ async function run() {
     const res = await fetch(`${BASE}/oauth/url`);
     assert(res.status < 500, `/oauth/url returned ${res.status}`);
   });
+
+  // ── Client JS 解析（白畫面防線）──
+  // ⚠ 內容檢查（html.includes('Roster Sync')）只驗「字串在不在」，不驗「JS 跑不跑得起來」。
+  //    真正會白畫面的是 client JS 語法錯（template literal \n、regex 壞字元…），這節對每頁的 inline <script> 實際解析一遍，抓那類致命錯。
+  console.log('\n🧩 Client JS 解析（白畫面防線）:');
+  const jsPages = ['/main', '/share', '/gate', '/fr24', '/ops', '/sync', '/pilot-log', '/morning', '/apps'];
+  for (const p of jsPages) {
+    await check(`${p} inline JS 全部可解析`, async () => {
+      const pageHtml = await fetchOk(p);
+      const scripts = extractInlineScripts(pageHtml);
+      assert(scripts.length > 0, `找不到任何 inline <script>（頁面可能整個壞掉）`);
+      scripts.forEach((s, i) => assertParses(s, `${p} 第 ${i + 1}/${scripts.length} 段`));
+    });
+  }
 
   // ── 結果 ──
   console.log(`\n${'─'.repeat(40)}`);
