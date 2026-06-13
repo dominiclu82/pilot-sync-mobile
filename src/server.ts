@@ -912,13 +912,21 @@ function _atisBodyLen(t: string): number {
   return _atisStripFrame(String(t || '').replace(/^\/[^/]*\//, '')).replace(/\s+/g, ' ').trim().length;
 }
 // 從一批 airframes 訊息挑某 kind(ARR/DEP)的「現行」那則 → {title,text,src,time}
-function _atisPickKind(msgs: any[], kind: 'ARR' | 'DEP' | 'ATIS'): { title: string; text: string; src: string; time: string; issueAt: number; receivedAt: number; hash: string } | null {
+function _atisPickKind(msgs: any[], kind: 'ARR' | 'DEP' | 'ATIS', icao?: string): { title: string; text: string; src: string; time: string; issueAt: number; receivedAt: number; hash: string } | null {
   const tag = kind === 'ATIS' ? 'ATIS' : kind + ' ATIS';   // 'ATIS' = 合併 ATIS（歐洲等不分 ARR/DEP 的場，格式 "ICAO ATIS X"）
+  // ⚠ 比對必須「ICAO + 種類 + ATIS」整組，不可只 includes('DEP ATIS')：
+  //   公司飛行計畫(OFP) ACARS 裡常有空白「DEP ATIS」表單欄位，又夾帶備降場 ICAO（如 LOWW）→ 鬆比對會把整封 OFP（塞爾維亞文/油量/航路）當成 DEP ATIS（LOWW 踩過）。
+  //   綁定查詢的 icao（沒帶才退 [A-Z]{4} 通用）→ 只認真正的「LOWW DEP ATIS X / LOWW DEP ATIS NOT AVAILABLE」。
+  const ico = (icao || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+  const icoPat = /^[A-Z]{4}$/.test(ico) ? ico : '[A-Z]{4}';
+  const reKind = new RegExp('\\b' + icoPat + '\\s+' + kind + '\\s+ATIS\\b');            // ARR/DEP：ICAO + ARR/DEP + ATIS
+  const reCombo = new RegExp('\\b' + icoPat + '\\s+ATIS\\s+[A-Z]\\b');                  // 合併：ICAO + ATIS + 字母
+  const reComboNA = new RegExp('\\b' + icoPat + '\\s+ATIS\\b[\\s\\S]{0,15}NOT\\s+AVAIL', 'i');  // 合併宵禁：ICAO + ATIS ... NOT AVAILABLE
   // ⚠ 不可濾掉「ATIS NOT AVAILABLE」：那是合法狀態（如 RJAA 宵禁、夜間無航班→無 D-ATIS），該照實顯示給飛行員。
   //   它沒有字母碼，issueScore 解不出發布時刻 → 退用收到時間排序（curfew 訊息「收到當下即有效」，這樣才比得贏舊的、也會被白天恢復的字母 ATIS 蓋過）。
   const matches = kind === 'ATIS'
-    ? msgs.filter((m) => { const t = String((m && m.text) || ''); if (t.includes('ARR ATIS') || t.includes('DEP ATIS')) return false; return /\bATIS\s+[A-Z]\b/.test(t) || /\bATIS\b[\s\S]{0,15}NOT\s+AVAIL/i.test(t); })   // 合併：含「ATIS 字母」，或「ATIS NOT AVAILABLE」(宵禁/夜間無 ATIS，照實顯示給飛行員，不可濾掉)；但排除 ARR/DEP
-    : msgs.filter((m) => String((m && m.text) || '').includes(tag));
+    ? msgs.filter((m) => { const t = String((m && m.text) || ''); if (/\b[A-Z]{4}\s+(?:ARR|DEP)\s+ATIS\b/.test(t)) return false; return reCombo.test(t) || reComboNA.test(t); })   // 合併：ICAO+ATIS+字母 或 NOT AVAILABLE；排除真正的 ARR/DEP 專用
+    : msgs.filter((m) => reKind.test(String((m && m.text) || '')));
   if (!matches.length) return null;
   // 挑「真實發布時刻最新」的那則（realIssueAt 抽成 _atisRealIssueAt 共用）。⚠ 永不變空：只要有 matches 就一定回一則。
   const future = Date.now() + 15 * 60000;   // 合成時刻不可能在未來：壞訊息（letter+METAR 湊出未來時戳）不可冒充現行（容 15 分時鐘誤差，codex P1）。
@@ -1015,20 +1023,20 @@ async function _afQuery(q: string): Promise<any[]> {
 // 抓某機場 ARR+DEP D-ATIS。bulk=true（一鍵更新）→ 只裸查 1 次省限速；單機場開啟 → 裸查沒撈到 DEP 時再專打 DEP 補一次。
 async function _atisFetchAirframes(icao: string, bulk: boolean) {
   const base = await _afQuery(icao);                       // 裸查：回最近 100 則（ARR/DEP 混在一起）
-  let arr = _atisPickKind(base, 'ARR');
-  let dep = _atisPickKind(base, 'DEP');
+  let arr = _atisPickKind(base, 'ARR', icao);
+  let dep = _atisPickKind(base, 'DEP', icao);
   // 單機場開啟：裸查若漏掉 ARR 或 DEP（繁忙場被其他訊息擠出 100 視窗、安靜場稀疏）→ 各自專打補抓，
   //   每類用自己的 100 視窗，不會互相稀釋（codex P1：原本只補 DEP，繁忙場 ARR 也可能掉）。
   if (!bulk && !arr) {
-    try { if (_afAllow(1)) arr = _atisPickKind(await _afQuery(icao + ' ARR ATIS'), 'ARR'); } catch { /* 補抓失敗就算了 */ }
+    try { if (_afAllow(1)) arr = _atisPickKind(await _afQuery(icao + ' ARR ATIS'), 'ARR', icao); } catch { /* 補抓失敗就算了 */ }
   }
   if (!bulk && !dep) {
-    try { if (_afAllow(1)) dep = _atisPickKind(await _afQuery(icao + ' DEP ATIS'), 'DEP'); } catch { /* 補抓失敗就算了 */ }
+    try { if (_afAllow(1)) dep = _atisPickKind(await _afQuery(icao + ' DEP ATIS'), 'DEP', icao); } catch { /* 補抓失敗就算了 */ }
   }
   // 合併 ATIS（歐洲等不分 ARR/DEP 的場）：只有「完全沒有 ARR/DEP」時才試，避免分場誤抓。
-  let combined = (!arr && !dep) ? _atisPickKind(base, 'ATIS') : null;
+  let combined = (!arr && !dep) ? _atisPickKind(base, 'ATIS', icao) : null;
   if (!bulk && !arr && !dep && !combined) {
-    try { if (_afAllow(1)) combined = _atisPickKind(await _afQuery(icao + ' ATIS'), 'ATIS'); } catch { /* 補抓失敗就算了 */ }
+    try { if (_afAllow(1)) combined = _atisPickKind(await _afQuery(icao + ' ATIS'), 'ATIS', icao); } catch { /* 補抓失敗就算了 */ }
   }
   const sections = [arr, dep, combined].filter(Boolean) as { title: string; text: string; src: string; time: string }[];
   return sections.length ? sections : null;
@@ -1058,9 +1066,9 @@ async function _atisFetchCoffee(icao: string) {
     const text = (m ? m[0] : raw).replace(/\s*[0-9A-Fa-f]{4}\s*$/, '');
     return { text, timestamp: String((d && d.timestamp) || '').trim().replace(' ', 'T') + 'Z', flight: (d && d.flight) || '', tail: (d && d.rego) || '' };
   });
-  const arr = _atisPickKind(records, 'ARR');
-  const dep = _atisPickKind(records, 'DEP');
-  const combined = (!arr && !dep) ? _atisPickKind(records, 'ATIS') : null;   // 歐洲等不分 ARR/DEP
+  const arr = _atisPickKind(records, 'ARR', icao);
+  const dep = _atisPickKind(records, 'DEP', icao);
+  const combined = (!arr && !dep) ? _atisPickKind(records, 'ATIS', icao) : null;   // 歐洲等不分 ARR/DEP
   const sections = [arr, dep, combined].filter(Boolean) as { title: string; text: string; src: string; time: string; issueAt: number; receivedAt: number; hash: string }[];
   return sections.length ? sections : null;
 }
@@ -1117,7 +1125,7 @@ async function _atisFetchStationFeed(): Promise<number> {
   let updates = 0;
   for (const [ic, msgs] of byApt) {
     for (const kind of ['ARR', 'DEP', 'ATIS'] as const) {
-      const p = _atisPickKind(msgs, kind);
+      const p = _atisPickKind(msgs, kind, ic);
       if (p && typeof p.issueAt === 'number' && _atisStoreMerge(ic, kind, p)) { _atisStorePersist(ic, kind); updates++; }
     }
   }
@@ -1157,7 +1165,7 @@ async function _atisFetchRoutingFeed(): Promise<number> {
   let updates = 0;
   for (const [ic, msgs] of byApt) {
     for (const kind of ['ARR', 'DEP', 'ATIS'] as const) {
-      const p = _atisPickKind(msgs, kind);
+      const p = _atisPickKind(msgs, kind, ic);
       if (p && typeof p.issueAt === 'number' && _atisStoreMerge(ic, kind, p)) { _atisStorePersist(ic, kind); updates++; }
     }
   }
@@ -1351,7 +1359,7 @@ function _atisStartLiveFeed() {
       if (!icao || !kind) return;
       if (icao[0] === 'K' || icao[0] === 'P') return;   // 美國/太平洋走官方 FAA，不收進 acars 庫
       a9seen++;
-      const p = _atisPickKind([base], kind);   // 沿用 REST 那套解析（realIssueAt/src/hash），單筆也適用
+      const p = _atisPickKind([base], kind, icao);   // 沿用 REST 那套解析（realIssueAt/src/hash），單筆也適用
       if (p && typeof p.issueAt === 'number' && _atisStoreMerge(icao, kind, p)) { _atisStorePersist(icao, kind); updates++; }
       const now = Date.now();
       if (now - lastLog > 600000) { console.log('[ATIS] live feed: A9 seen', a9seen, 'store updates', updates); lastLog = now; }

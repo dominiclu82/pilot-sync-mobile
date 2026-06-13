@@ -1536,7 +1536,7 @@ export function getSpaHtmlBody(): string {
       <button class="tab-util-btn tab-install-btn" id="tab-install-btn" onclick="showInstallGuide()" style="display:none">
         <span>📲</span>安裝
       </button>
-      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer;text-decoration:underline" onclick="showAbout()">V9.4.43</span>
+      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer;text-decoration:underline" onclick="showAbout()">V9.4.44</span>
     </div>
   </div>
 </div>
@@ -1570,7 +1570,12 @@ export function getSpaHtmlBody(): string {
     </div>
     <div style="max-height:50vh;overflow-y:auto;-webkit-overflow-scrolling:touch;margin-bottom:10px">
     ${renderCommunityLink()}
-    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V9.4.43</div>
+    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V9.4.44</div>
+    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
+      <div>🛰️ <b>修正部分外站（如維也納 LOWW）把公司飛行計畫誤判成 ATIS。</b></div>
+      <div>🛰️ <b>Fixed some airports (e.g. LOWW) mistaking a company flight plan for ATIS.</b></div>
+    </div>
+    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V9.4.43</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
       <div>🛰️ <b>修正部分機場（如香港）偶爾只顯示半截 ATIS：庫裡若是缺天氣／QNH 的半截資料，改成先等完整來源再顯示，不再把半截 ATIS 端給你。</b></div>
       <div>🛰️ <b>Fixed some airports (e.g. HKG) occasionally showing a half ATIS: if the cached copy is missing weather/QNH, it now waits for the full source instead of serving the partial text.</b></div>
