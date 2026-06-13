@@ -1,6 +1,11 @@
 // ── 機隊機場分類資料 ─────────────────────────────────────────────────
 // 依據 Operations Specifications C-6 Authorized Airport List
-// Base: JAN 30 2026 + Amdt 069 (APR 01 2026) + Amdt 070 (MAY 11 2026) + Amdt 071 (MAY 29 2026)
+// Base: JAN 30 2026 + Amdt 069 (APR 01 2026) + Amdt 070 (MAY 11 2026) + Amdt 071 (MAY 29 2026) + Amdt 072 (JUN 12 2026)
+//
+// Amendment 072（JUN 12 2026）— USA / Pacific（page C-6-3）— 星宇 A350-1041 開航美國本土：
+//   1. A350-1041: 新增 KPHX（鳳凰城）為定期機場
+//   2. A350-1041: 新增 KLAS, KLAX, KSEA, KTUS, PACD, PAFA, PAKN, PANC, PASY, PGSN, PGUM, PHNL, PMDY 為備用機場
+//   3. A350-1041: 新增 KONT（安大略）為備用機場及特殊機場
 //
 // Amendment 069（APR 01 2026）— SE Asia / Vietnam（page C-6-5）:
 //   1. A321-252NX: WADD（峇里島）改為備用機場
@@ -88,8 +93,8 @@ var _wxFleetData = {
   thailand:    [{icao:'VTBS',name:'素萬那普',cls:'r'},{icao:'VTBD',name:'廊曼',cls:'a'},{icao:'VTBU',name:'芭達雅',cls:'a'},{icao:'VTCC',name:'清邁',cls:'a'}],
   vietnam:     [],
   seasia:      [],
-  usa:         [],
-  pacific:     [],
+  usa:         [{icao:'KPHX',name:'鳳凰城',cls:'r'},{icao:'KONT',name:'安大略',cls:'as'},{icao:'KLAS',name:'拉斯維加斯',cls:'a'},{icao:'KLAX',name:'洛杉磯',cls:'a'},{icao:'KSEA',name:'西雅圖',cls:'a'},{icao:'KTUS',name:'土森',cls:'a'}],
+  pacific:     [{icao:'PACD',name:'Cold Bay',cls:'a'},{icao:'PAFA',name:'費爾班克斯',cls:'a'},{icao:'PAKN',name:'King Salmon',cls:'a'},{icao:'PANC',name:'安克拉治',cls:'a'},{icao:'PASY',name:'Shemya',cls:'a'},{icao:'PGSN',name:'塞班',cls:'a'},{icao:'PGUM',name:'關島',cls:'a'},{icao:'PHNL',name:'檀香山',cls:'a'},{icao:'PMDY',name:'中途島',cls:'a'}],
   canada:      [],
   europe:      []
 }

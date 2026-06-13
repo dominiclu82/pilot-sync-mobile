@@ -368,10 +368,10 @@ export function getSpaHtmlBody(): string {
         onchange="wxSwitchFleet(this);switchBriefingTab('datis',document.getElementById('subtabBtn-datis'))"
         onblur="if(this.value===''){this.value=this._prev||'A350-900'}">
         <option value="" style="display:none">機型</option>
-        <option value="A321">A321</option>
-        <option value="A330">A330</option>
-        <option value="A350-900" selected>A350-900</option>
-        <option value="A350-1000">A350-1000</option>
+        <option value="A321">A21N</option>
+        <option value="A330">A339</option>
+        <option value="A350-900" selected>A359</option>
+        <option value="A350-1000">A35K</option>
       </select></button>
     </div>
     <div class="subtab-slot" style="display:none"><button class="briefing-subtab" id="subtabBtn-live" onclick="switchBriefingTab('live',this)"><span class="drag-grip">≡</span>📡 Live</button></div>
@@ -1536,7 +1536,7 @@ export function getSpaHtmlBody(): string {
       <button class="tab-util-btn tab-install-btn" id="tab-install-btn" onclick="showInstallGuide()" style="display:none">
         <span>📲</span>安裝
       </button>
-      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer;text-decoration:underline" onclick="showAbout()">V9.4.45</span>
+      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer;text-decoration:underline" onclick="showAbout()">V9.4.46</span>
     </div>
   </div>
 </div>
@@ -1570,7 +1570,12 @@ export function getSpaHtmlBody(): string {
     </div>
     <div style="max-height:50vh;overflow-y:auto;-webkit-overflow-scrolling:touch;margin-bottom:10px">
     ${renderCommunityLink()}
-    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V9.4.45</div>
+    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V9.4.46</div>
+    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
+      <div>⛅ <b>Airport WX 更新至 Ops Spec C-6 Amdt 072；機隊選單改用 ICAO 機型碼。</b></div>
+      <div>⛅ <b>Airport WX updated to Ops Spec C-6 Amdt 072; fleet uses ICAO type codes.</b></div>
+    </div>
+    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V9.4.45</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
       <div>🛰️ <b>一併清掉已誤存的飛行計畫殘留（如 LOWW DEP）。</b></div>
       <div>🛰️ <b>Also clears already-cached bogus flight-plan data (e.g. LOWW DEP).</b></div>
