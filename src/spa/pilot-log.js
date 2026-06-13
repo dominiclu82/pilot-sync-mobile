@@ -6975,7 +6975,7 @@ function _plGenLogbookPdf(formatId, opts) {
   _plLoadJsPdf().then(function () {
     // 有中日韓 → 先跟伺服器拿 subset 字型（base64 truetype）
     var fontP = needCJK
-      ? _plApi('/api/pilot-log/font-subset', { method: 'POST', body: JSON.stringify({ chars: allChars }) })
+      ? _plApi('/api/pilot-log/font-subset', { method: 'POST', body: { chars: allChars } })
           .then(function (res) { return res.json(); }).then(function (j) { return (j && j.font) ? j.font : null; })
           .catch(function () { return null; })
       : Promise.resolve(null);

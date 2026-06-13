@@ -57,8 +57,8 @@ import { getAirportDbJs } from '../spa/js-airport-db.js';
 
 // ── 版本（比照 CrewSync / Morning：每次推版必更新；SW cache 名稱跟著走） ────
 // 本機 preview build 會暫時加 -tNN 後綴方便對版；推正式版前拿掉只留乾淨版號。
-export const PILOT_LOG_VERSION = 'V2.4.01';
-const PILOT_LOG_CACHE = 'pilotlog-v2-4-01';
+export const PILOT_LOG_VERSION = 'V2.4.02';
+const PILOT_LOG_CACHE = 'pilotlog-v2-4-02';
 
 export const pilotLogRouter = express.Router();
 
@@ -365,6 +365,11 @@ function _renderPilotLogChangelog(): string {
   return `
     ${renderCommunityLink()}
     <div class="pl-cl-v">${PILOT_LOG_VERSION}</div>
+    <div class="pl-cl-txt">
+      <b>🛠️ 修正 Logbook PDF 含中文（組員名／格式名／備註）時產不出來的問題 — 中文格式現在能正常輸出。</b><br>
+      <b>🛠️ Fixed Logbook PDF failing to generate when it contains Chinese (crew names / format name / remarks) — Chinese now exports correctly.</b>
+    </div>
+    <div class="pl-cl-v old">V2.4.01</div>
     <div class="pl-cl-txt">
       <b>📕 新增 Logbook PDF 產出：把飛行紀錄做成人類可讀的 PDF（轉職交件用），可選地區格式（通用／EASA-FCL／FAA／ICAO）＋紙張／橫直式＋附機型統計頁；中文支援（真文字、可選取、不是圖片）。</b><br>
       <b>📕 New Logbook PDF export: turn your flights into a human-readable logbook PDF (for job applications) — pick a regional format (Generic / EASA-FCL / FAA / ICAO), paper & orientation, with an aircraft-type summary; Chinese supported (real selectable text, not an image).</b>
@@ -2158,16 +2163,6 @@ pilotLogRouter.post('/api/pilot-log/font-subset', requireAuth, async (req: Authe
   } catch (e: any) {
     console.error('[pilot-log] font-subset failed:', e && (e.stack || e.message || e));
     res.status(500).json({ error: 'subset_failed' });
-  }
-});
-// TEMP 診斷（無 auth）：回真正的錯誤，診斷完移除。
-pilotLogRouter.get('/api/pilot-log/font-selftest', async (_req, res) => {
-  try {
-    const full = _plLoadCjkFont();
-    const sub = await _subsetFont(full, '測試ABC123', { targetFormat: 'truetype' });
-    res.json({ ok: true, fontBytes: full.length, subsetBytes: (sub as Buffer).length, node: process.version });
-  } catch (e: any) {
-    res.json({ ok: false, node: process.version, error: String((e && e.message) || e), stack: String((e && e.stack) || '').slice(0, 600) });
   }
 });
 
