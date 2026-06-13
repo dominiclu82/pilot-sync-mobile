@@ -1536,7 +1536,7 @@ export function getSpaHtmlBody(): string {
       <button class="tab-util-btn tab-install-btn" id="tab-install-btn" onclick="showInstallGuide()" style="display:none">
         <span>📲</span>安裝
       </button>
-      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer;text-decoration:underline" onclick="showAbout()">V9.4.42</span>
+      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer;text-decoration:underline" onclick="showAbout()">V9.4.43</span>
     </div>
   </div>
 </div>
@@ -1570,7 +1570,12 @@ export function getSpaHtmlBody(): string {
     </div>
     <div style="max-height:50vh;overflow-y:auto;-webkit-overflow-scrolling:touch;margin-bottom:10px">
     ${renderCommunityLink()}
-    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V9.4.42</div>
+    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V9.4.43</div>
+    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
+      <div>🛰️ <b>修正部分機場（如香港）偶爾只顯示半截 ATIS：庫裡若是缺天氣／QNH 的半截資料，改成先等完整來源再顯示，不再把半截 ATIS 端給你。</b></div>
+      <div>🛰️ <b>Fixed some airports (e.g. HKG) occasionally showing a half ATIS: if the cached copy is missing weather/QNH, it now waits for the full source instead of serving the partial text.</b></div>
+    </div>
+    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V9.4.42</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
       <div>🛰️ <b>ATIS 結尾雜碼完全清乾淨（含黏在字尾的純數字訊號碼；QNH／高度表數值保留不誤砍）。</b></div>
       <div>🛰️ <b>ATIS trailing codes fully removed (incl. all-digit codes glued to the end; QNH / altimeter values preserved).</b></div>

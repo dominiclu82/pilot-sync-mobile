@@ -1390,8 +1390,15 @@ app.get('/api/atis', async (req, res) => {
   // 2.5 非美、非手動：開場聰明撈 coffee（主源）。庫 15 分內撈過 → 直接給、不重複打他；
   //     有舊的 → 秒回舊的 + 背景撈最新暖庫（不卡使用者，下次就新）；從沒撈過 → 等一次(5-20s)拿真資料、不給空白。
   if (!fresh && !bulk && icao[0] !== 'K' && icao[0] !== 'P' && !_coffeeFresh(icao)) {
-    if (_atisStoreSections(icao)) { _coffeePull(icao); }                       // 有舊的 → 背景撈，不擋回應
-    else { try { await _coffeePull(icao); } catch { /* 撈不到 → 往下走 airframes 保底 */ } }   // 從沒撈過 → 等一次
+    const st0 = _atisStoreSections(icao);
+    // 「完整」＝每段都有 QNH（天氣/氣壓那後半段在），或是「NOT AVAILABLE」這種合法宵禁/夜間短狀態（本來就沒 QNH，別逼它等 coffee，codex P2）。
+    //   香港等場 airframes 常只給到前一個 frame（半截、缺 QNH 又不是 NA）→ 這種別當「有舊的」秒回半截給飛行員，要等一次 coffee 拿完整版。
+    const complete = Array.isArray(st0) && st0.length > 0 && st0.every((s: any) => {
+      const t = String((s && s.text) || '');
+      return _atisHasQNH(t) || /NOT\s+AVAIL|UNAVAILABLE|NO\s+ATIS|NO\s+DATA/i.test(t);
+    });
+    if (complete) { _coffeePull(icao); }                                       // 有完整舊的 → 背景撈，不擋回應
+    else { try { await _coffeePull(icao); } catch { /* 撈不到 → 往下走 airframes 保底 */ } }   // 沒有/半截 → 等一次拿完整
   }
   // 3. 非美：先吃背景累積庫（輪詢維護，最新鮮、跟 coffee 同機制）→ 命中直接回，不打 airframes。
   const stored = _atisStoreSections(icao);
