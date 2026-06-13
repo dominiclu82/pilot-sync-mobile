@@ -5,7 +5,7 @@
  * 用法：npm test（自動啟動 server、測完自動關閉）
  */
 
-import { spawn, ChildProcess } from 'child_process';
+import { spawn, spawnSync, ChildProcess } from 'child_process';
 import { Script } from 'vm';
 
 const BASE = 'http://localhost:3000';
@@ -43,8 +43,13 @@ async function startServer(): Promise<void> {
 }
 
 function stopServer() {
-  if (server) {
-    server.kill();
+  // ⚠ Windows + shell:true 會多包一層 cmd，server.kill() 只殺 cmd、殺不到底下 tsx/node →
+  //   server 殘留卡住 port 3000，害下一個 test「fetch failed」(連跑 test:all 時 flaky)。用 taskkill /T 殺整棵 process tree。
+  if (server && server.pid) {
+    try {
+      if (process.platform === 'win32') spawnSync('taskkill', ['/F', '/T', '/PID', String(server.pid)], { stdio: 'ignore' });
+      else server.kill('SIGTERM');
+    } catch { /* 已關就算了 */ }
     server = null;
   }
 }

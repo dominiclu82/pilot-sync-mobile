@@ -13,7 +13,8 @@
     "test:pl": "tsx test/smoke-pl.ts",
     "test:parser": "tsx test/parsetab.test.ts",
     "test:addressbook": "tsx test/import-addressbook.test.ts",
-    "test:all": "tsx test/parsetab.test.ts && tsx test/import-addressbook.test.ts && tsx test/smoke.ts && tsx test/smoke-m.ts && tsx test/smoke-pl.ts"
+    "test:browser": "tsx test/smoke-browser.ts",
+    "test:all": "tsx test/parsetab.test.ts && tsx test/import-addressbook.test.ts && tsx test/smoke.ts && tsx test/smoke-m.ts && tsx test/smoke-pl.ts && tsx test/smoke-browser.ts"
   },
   "dependencies": {
     "@mozilla/readability": "^0.6.0",
