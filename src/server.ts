@@ -898,10 +898,16 @@ function _atisRealIssueAt(m: any): number {
 // ATIS 是否「完整」：含 QNH/高度表撥定（QNH/Q####/A####）→ 是完整的；被截在前半身（如停在 RWY... 還沒到天氣）就沒有。
 //   用「內容本身」判完整度，比「前綴比對」robust：不怕不同來源(coffee/airframes)換行空白格式不同（V9.4.37 前綴法在此破功、截斷版仍勝出）。
 function _atisHasQNH(t: string): boolean { return /\bQNH\b|\bQ\d{4}\b|\bA\d{4}\b|ALTIMETER/i.test(String(t || '')); }
-// 比「完整度」用的乾淨長度：去路由前綴 + 去結尾 frame 尾碼(4位hex) + 收斂空白 → 不被雜訊(尾碼/換行/來源格式差異)影響長度比較。
+// 去結尾 ACARS frame 尾碼（4 位 hex）。只在「含 hex 字母 A-F」或「自成一行(換行後)」才砍 →
+//   避免誤砍合法的 4 位數 QNH / 高度表(如 1013、2992，純數字、無 frame 時可能是內容結尾，codex P1 飛安)。
+//   實際 frame 多含字母(C455/817C/9F00/770F/C83B) 或自成一行(換行C455)，這條都涵蓋；純數字 frame(罕見)寧可留著也不砍掉 QNH。
+function _atisStripFrame(s: string): string {
+  return String(s == null ? '' : s).replace(/([\r\n]\s*)?([0-9A-Fa-f]{4})\s*$/, (m, nl, code) => (nl || /[A-Fa-f]/.test(code)) ? '' : m);
+}
+// 比「完整度」用的乾淨長度：去路由前綴 + 去結尾 frame 尾碼 + 收斂空白 → 不被雜訊(尾碼/換行/來源格式差異)影響長度比較。
 //   否則「去尾碼後的乾淨版」會比「沒去尾碼的舊版」短 → 被當成不完整而退回舊版（尾碼又冒出來，V9.4.38 踩過）。
 function _atisBodyLen(t: string): number {
-  return String(t || '').replace(/^\/[^/]*\//, '').replace(/[\r\n]+\s*[0-9A-Fa-f]{4}\s*$/, '').replace(/\s+/g, ' ').trim().length;
+  return _atisStripFrame(String(t || '').replace(/^\/[^/]*\//, '')).replace(/\s+/g, ' ').trim().length;
 }
 // 從一批 airframes 訊息挑某 kind(ARR/DEP)的「現行」那則 → {title,text,src,time}
 function _atisPickKind(msgs: any[], kind: 'ARR' | 'DEP' | 'ATIS'): { title: string; text: string; src: string; time: string; issueAt: number; receivedAt: number; hash: string } | null {
@@ -934,9 +940,7 @@ function _atisPickKind(msgs: any[], kind: 'ARR' | 'DEP' | 'ATIS'): { title: stri
     best = matches.reduce((a, b) => ((Date.parse(String(b && b.timestamp)) || 0) > (Date.parse(String(a && a.timestamp)) || 0) ? b : a), matches[0]);
     bestScore = Date.parse(String(best && best.timestamp)) || Date.now();
   }
-  const text = String((best && best.text) || '')
-    .replace(/^\/[^/]*\//, '')                       // 去 ACARS 路由前綴 /TPECAYA.TI2/
-    .replace(/[\r\n]+\s*[0-9A-Fa-f]{4}\s*$/, '')     // 去結尾 ACARS frame 尾碼/檢查碼（4 位 hex，如 0DEE/B52B/9CA9，非 ATIS 內容，比照 coffee 不顯示）
+  const text = _atisStripFrame(String((best && best.text) || '').replace(/^\/[^/]*\//, ''))   // 去路由前綴 + 結尾 frame 尾碼（N9F00/.C83B/APP.817C/換行C455；保留純數字 QNH）
     .trim();
   if (!text) return null;
   const receivedAt = Date.parse(String((best && best.timestamp) || '')) || Date.now();
