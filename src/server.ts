@@ -901,6 +901,8 @@ function _atisHasQNH(t: string): boolean { return /\bQNH\b|\bQ\d{4}\b|\bA\d{4}\b
 // 去結尾 ACARS frame 尾碼（4 位 hex）。只在「含 hex 字母 A-F」或「自成一行(換行後)」才砍 →
 //   避免誤砍合法的 4 位數 QNH / 高度表(如 1013、2992，純數字、無 frame 時可能是內容結尾，codex P1 飛安)。
 //   實際 frame 多含字母(C455/817C/9F00/770F/C83B) 或自成一行(換行C455)，這條都涵蓋；純數字 frame(罕見)寧可留著也不砍掉 QNH。
+//   ⚠ 只砍「含 hex 字母 A-F」或「自成一行(換行後)」的 4 碼 → 絕不砍純數字結尾（可能是 QNH 1013 / 能見度 8000 / RVR 1200 等
+//   合法內容；airframes 訊息沒有 frame 尾碼，結尾純數字一定是內容，codex P1 飛安）。coffee 的純數字 frame 在 _atisFetchCoffee 處理。
 function _atisStripFrame(s: string): string {
   return String(s == null ? '' : s).replace(/([\r\n]\s*)?([0-9A-Fa-f]{4})\s*$/, (m, nl, code) => (nl || /[A-Fa-f]/.test(code)) ? '' : m);
 }
@@ -1051,7 +1053,10 @@ async function _atisFetchCoffee(icao: string) {
   const records = data.map((d) => {
     const raw = String((d && d.rawMessage) || '');
     const m = raw.match(/[A-Z]{4}\s+(?:ARR\s+|DEP\s+)?ATIS\b[\s\S]*/);
-    return { text: m ? m[0] : raw, timestamp: String((d && d.timestamp) || '').trim().replace(' ', 'T') + 'Z', flight: (d && d.flight) || '', tail: (d && d.rego) || '' };
+    // coffee rawMessage 結尾一定有 ACARS frame 尾碼（4 hex，可能黏字尾/句點/換行後，如 N9F00、.1702、換行0DEE）→ 這裡砍掉。
+    //   coffee 結構保證 frame 在最後一段、砍「最後 4 hex」安全（含純數字 frame 也沒問題，真實內容值在 frame 之前不受影響）。
+    const text = (m ? m[0] : raw).replace(/\s*[0-9A-Fa-f]{4}\s*$/, '');
+    return { text, timestamp: String((d && d.timestamp) || '').trim().replace(' ', 'T') + 'Z', flight: (d && d.flight) || '', tail: (d && d.rego) || '' };
   });
   const arr = _atisPickKind(records, 'ARR');
   const dep = _atisPickKind(records, 'DEP');

@@ -1536,7 +1536,7 @@ export function getSpaHtmlBody(): string {
       <button class="tab-util-btn tab-install-btn" id="tab-install-btn" onclick="showInstallGuide()" style="display:none">
         <span>📲</span>安裝
       </button>
-      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer;text-decoration:underline" onclick="showAbout()">V9.4.41</span>
+      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer;text-decoration:underline" onclick="showAbout()">V9.4.42</span>
     </div>
   </div>
 </div>
@@ -1570,10 +1570,15 @@ export function getSpaHtmlBody(): string {
     </div>
     <div style="max-height:50vh;overflow-y:auto;-webkit-overflow-scrolling:touch;margin-bottom:10px">
     ${renderCommunityLink()}
-    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V9.4.41</div>
+    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V9.4.42</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
-      <div>🛰️ <b>ATIS 結尾雜碼去除更徹底（黏在字尾或句點後的訊號碼也清掉）。</b></div>
-      <div>🛰️ <b>ATIS trailing codes removed more thoroughly (incl. codes attached to the end or after a period).</b></div>
+      <div>🛰️ <b>ATIS 結尾雜碼完全清乾淨（含黏在字尾的純數字訊號碼；QNH／高度表數值保留不誤砍）。</b></div>
+      <div>🛰️ <b>ATIS trailing codes fully removed (incl. all-digit codes glued to the end; QNH / altimeter values preserved).</b></div>
+    </div>
+    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V9.4.41</div>
+    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
+      <div>🛰️ <b>ATIS 結尾雜碼去除更徹底。</b></div>
+      <div>🛰️ <b>ATIS trailing codes removed more thoroughly.</b></div>
     </div>
     <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V9.4.40</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
