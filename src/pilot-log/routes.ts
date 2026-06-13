@@ -2156,7 +2156,18 @@ pilotLogRouter.post('/api/pilot-log/font-subset', requireAuth, async (req: Authe
     const subset = await _subsetFont(full, chars, { targetFormat: 'truetype' });
     res.json({ font: Buffer.from(subset).toString('base64') });
   } catch (e: any) {
+    console.error('[pilot-log] font-subset failed:', e && (e.stack || e.message || e));
     res.status(500).json({ error: 'subset_failed' });
+  }
+});
+// TEMP 診斷（無 auth）：回真正的錯誤，診斷完移除。
+pilotLogRouter.get('/api/pilot-log/font-selftest', async (_req, res) => {
+  try {
+    const full = _plLoadCjkFont();
+    const sub = await _subsetFont(full, '測試ABC123', { targetFormat: 'truetype' });
+    res.json({ ok: true, fontBytes: full.length, subsetBytes: (sub as Buffer).length, node: process.version });
+  } catch (e: any) {
+    res.json({ ok: false, node: process.version, error: String((e && e.message) || e), stack: String((e && e.stack) || '').slice(0, 600) });
   }
 });
 
