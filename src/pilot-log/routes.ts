@@ -57,8 +57,8 @@ import { getAirportDbJs } from '../spa/js-airport-db.js';
 
 // ── 版本（比照 CrewSync / Morning：每次推版必更新；SW cache 名稱跟著走） ────
 // 本機 preview build 會暫時加 -tNN 後綴方便對版；推正式版前拿掉只留乾淨版號。
-export const PILOT_LOG_VERSION = 'V2.4.02';
-const PILOT_LOG_CACHE = 'pilotlog-v2-4-02';
+export const PILOT_LOG_VERSION = 'V2.4.03';
+const PILOT_LOG_CACHE = 'pilotlog-v2-4-03';
 
 export const pilotLogRouter = express.Router();
 
@@ -365,6 +365,11 @@ function _renderPilotLogChangelog(): string {
   return `
     ${renderCommunityLink()}
     <div class="pl-cl-v">${PILOT_LOG_VERSION}</div>
+    <div class="pl-cl-txt">
+      <b>⏱️ 新增 FDP Duty 上限：航班編輯器 Off Duty 旁顯示「Limit HHMM (Xh)」，依操作飛行員人數（2人14h／3人18h／4人24h），實際落地超過轉紅字。新增「Operating Crew」欄（自動偵測 PIC+SIC+Relief、可手動改）。當天來回（turnaround）自動串成一段：上限從第一段報到＋第一段人數起算（外站過夜會自動拆兩段）；Total Duty 統計同一段 duty 只算一次（最後解除−第一報到，不灌水）。各航段仍各自顯示自己的 On/Off Duty。</b><br>
+      <b>⏱️ New FDP duty limit: the flight editor shows "Limit HHMM (Xh)" beside Off Duty based on operating pilots (2→14h / 3→18h / 4→24h), turning red if your actual off-duty exceeds it. New "Operating Crew" field (auto-detected from PIC+SIC+Relief, editable). Same-day turnarounds are treated as one duty — the limit is measured from the first leg's report time and crew (an outstation overnight auto-splits into two); Total Duty stats count each duty once (last release − first report). Each leg still shows its own On/Off Duty.</b>
+    </div>
+    <div class="pl-cl-v old">V2.4.02</div>
     <div class="pl-cl-txt">
       <b>🛠️ 修正 Logbook PDF 含中文（組員名／格式名／備註）時產不出來的問題 — 中文格式現在能正常輸出。</b><br>
       <b>🛠️ Fixed Logbook PDF failing to generate when it contains Chinese (crew names / format name / remarks) — Chinese now exports correctly.</b>
@@ -1463,6 +1468,7 @@ const EDITABLE_FIELDS = [
   'crew', 'approaches',
   'day_takeoffs', 'night_takeoffs', 'day_landings', 'night_landings', 'autolands',
   'pax_count', 'crew_count',                        // V1.3.36：crew_count（POB = crew_count + pax_count）
+  'operating_crew',                                 // V2.4.03：操作飛行員人數 2/3/4（FDP duty 上限用）
   'dep_rwy', 'arr_rwy',                             // V1.3.36：起飛/落地跑道
   'sid', 'star', 'remarks',
 ] as const;

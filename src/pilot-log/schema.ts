@@ -150,6 +150,9 @@ export async function ensureTables(): Promise<boolean> {
     await pool.query(`ALTER TABLE pilot_log_entries ADD COLUMN IF NOT EXISTS dep_rwy TEXT`).catch(() => {});
     await pool.query(`ALTER TABLE pilot_log_entries ADD COLUMN IF NOT EXISTS arr_rwy TEXT`).catch(() => {});
     await pool.query(`ALTER TABLE pilot_log_entries ADD COLUMN IF NOT EXISTS crew_count INT`).catch(() => {});
+    // V2.4.03：Operating Crew（操作飛行員人數 2/3/4）——FDP duty 上限只看這個（PIC+SIC+Relief，OBS/CIC/cabin 不算）。
+    //   匯入時自動算好寫入；可手動改。跟 crew_count（POB 總組員）不同，別混。
+    await pool.query(`ALTER TABLE pilot_log_entries ADD COLUMN IF NOT EXISTS operating_crew INT`).catch(() => {});
 
     await pool.query(`
       CREATE TABLE IF NOT EXISTS pilot_aircraft (

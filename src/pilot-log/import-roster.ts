@@ -214,6 +214,16 @@ function extractCrew(
   return Object.keys(out).length ? out : null;
 }
 
+// V2.4.03：操作飛行員人數（FDP duty 上限用）= 數駕駛艙槽 pic+crew2..crew6（PIC+SIC+Relief，OBS/CIC/cabin 不算），夾 2~4。
+//   數不到（無組員）→ null（不顯示 limit）。跟 crew_count（POB 總人數）完全不同。
+const _PILOT_OP_SLOTS = ['pic', 'crew2', 'crew3', 'crew4', 'crew5', 'crew6'];
+function countOperatingCrew(crewObj: Record<string, CrewSlotVal> | null): number | null {
+  if (!crewObj) return null;
+  let n = 0;
+  for (const k of _PILOT_OP_SLOTS) { const v = crewObj[k]; if (v && v.name && String(v.name).trim()) n++; }
+  return n ? Math.max(2, Math.min(4, n)) : null;
+}
+
 // V1.3.12：哪些 roster 組員要自動進通訊錄 —— 跟 extractCrew 會進槽的角色一致：
 // 駕駛艙（PIC/P1~P4/IS）+ OBS + CIC，不灌整批客艙（SC/CC/PC）。
 function isLoggedCrew(m: RosterCrewMember): boolean {
@@ -429,6 +439,8 @@ export async function importRoster(
       const crewCount = (f.crew && f.crew.length) ? f.crew.length : null;
       // V1.3.12：DHD（搭便機 positioning）→ 標 deadhead，照建 entry 但飛時/PIC/night 全不計
       const isDeadhead = /DHD|DEADHEAD|POSITIONING/i.test((f.position || '') + ' ' + (f.workCode || ''));
+      // V2.4.03：DHD（搭便機）或本人是 OBSERVER（觀察、不操作）→ 不給 operating_crew、不顯示 duty 上限；否則照駕駛艙人數算。
+      const operatingCrew = (isDeadhead || position === 'OBSERVER') ? null : countOperatingCrew(crewJson);
       // V1.3.12：蒐集要進通訊錄的組員（去重）
       for (const m of (f.crew || [])) {
         if (!m.name || !isLoggedCrew(m)) continue;
@@ -490,16 +502,17 @@ export async function importRoster(
         const dupRow = cand.rows.find((r: any) => !consumedIds.has(r.id) && isSameFlight(r));
         if (dupRow) {
           consumedIds.add(dupRow.id);
-          if (crewJson || crewCount != null || position) {
+          if (crewJson || crewCount != null || position || operatingCrew != null) {
             try {
               await pool.query(
                 `UPDATE pilot_log_entries SET
                    crew = CASE WHEN $2::jsonb IS NULL THEN crew ELSE $2::jsonb || COALESCE(crew, '{}'::jsonb) END,
                    position = COALESCE(position, $3),
                    crew_count = COALESCE(crew_count, $4),
+                   operating_crew = COALESCE(operating_crew, $5),
                    updated_at = NOW()
                  WHERE id = $1`,
-                [dupRow.id, crewJson ? JSON.stringify(crewJson) : null, position, crewCount]
+                [dupRow.id, crewJson ? JSON.stringify(crewJson) : null, position, crewCount, operatingCrew]
               );
               result.crew_filled = (result.crew_filled || 0) + 1;
             } catch (e) { /* 補組員失敗不擋整個匯入 */ }
@@ -533,11 +546,11 @@ export async function importRoster(
         await pool.query(
           `INSERT INTO pilot_log_entries
            (id, user_id, source, source_ref, status, flight_date, flight_no, origin, dest,
-            position, std_utc, sta_utc, on_duty_utc, off_duty_utc, crew, is_deadhead, roster_month, crew_count)
-           VALUES ($1, $2, 'roster', $3, 'draft', $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)`,
+            position, std_utc, sta_utc, on_duty_utc, off_duty_utc, crew, is_deadhead, roster_month, crew_count, operating_crew)
+           VALUES ($1, $2, 'roster', $3, 'draft', $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)`,
           [
             randomUUID(), userId, sourceRef, fDate, f.flightNo, f.origin, f.dest,
-            position, stdUtc, staUtc, onDuty, offDuty, crewJson ? JSON.stringify(crewJson) : null, isDeadhead, rosterMonth, crewCount,
+            position, stdUtc, staUtc, onDuty, offDuty, crewJson ? JSON.stringify(crewJson) : null, isDeadhead, rosterMonth, crewCount, operatingCrew,
           ]
         );
         result.inserted++;
@@ -572,12 +585,16 @@ export async function importRoster(
              is_deadhead = $12,
              roster_month = $13,
              crew_count = COALESCE(crew_count, $14),
+             -- operating_crew：DHD 或本人 OBSERVER（不操作）→ 清空；否則 COALESCE 保留既有值（含使用者手動改的），只補空白。
+             --   比照 crew_count 與跨來源 confirmed 分支，一致且不會把使用者覆寫掉（最終定案，別再改成直接覆寫——會洗掉手動值）。
+             --   代價：人數一旦有值就不隨班表重算（同 crew_count 的既有特性，少數情境可手動改）。
+             operating_crew = CASE WHEN $12 OR $6 = 'OBSERVER' THEN NULL ELSE COALESCE(operating_crew, $16) END,
              updated_at = NOW()
            WHERE id = $1`,
           [
             primary.id, fDate, f.flightNo, f.origin, f.dest,
             position, stdUtc, staUtc, onDuty, offDuty,
-            crewJson ? JSON.stringify(crewJson) : null, isDeadhead, rosterMonth, crewCount, sourceRef,
+            crewJson ? JSON.stringify(crewJson) : null, isDeadhead, rosterMonth, crewCount, sourceRef, operatingCrew,
           ]
         );
         result.updated++;

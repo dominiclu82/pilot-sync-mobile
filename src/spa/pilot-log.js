@@ -1287,7 +1287,7 @@ function _plBlankEntry() {
     distance_nm: null, on_duty_utc: null, off_duty_utc: null, total_duty_minutes: null,
     crew: {}, approaches: [],
     day_takeoffs: 0, night_takeoffs: 0, day_landings: 0, night_landings: 0, autolands: 0,
-    pax_count: null, crew_count: null, dep_rwy: '', arr_rwy: '', sid: '', star: '', remarks: '',
+    pax_count: null, crew_count: null, operating_crew: null, dep_rwy: '', arr_rwy: '', sid: '', star: '', remarks: '',
   };
 }
 
@@ -1376,7 +1376,7 @@ function _plEditorField(label, name, type, opts) {
     input = '<input ' + attrs + ' value="' + _plEsc(_plMinToHHMM(val)) + '" placeholder="H:MM">';
   } else if (type === 'select') {
     var optsHtml = (opts.options || []).map(function(o) {
-      return '<option value="' + _plEsc(o) + '"' + (val === o ? ' selected' : '') + '>' + _plEsc(o || '—') + '</option>';
+      return '<option value="' + _plEsc(o) + '"' + (String(val) === String(o) ? ' selected' : '') + '>' + _plEsc((opts.optLabels && opts.optLabels[o]) || o || '—') + '</option>';
     }).join('');
     input = '<select ' + attrs + '>' + optsHtml + '</select>';
   } else if (type === 'check') {
@@ -1459,6 +1459,10 @@ function _plEditorField(label, name, type, opts) {
   var labelHtml = (opts.labelId && !_pl.configFields)
     ? '<div id="' + opts.labelId + '" style="font-size:.62em;color:var(--muted);margin-bottom:2px">' + _plEsc(_plFieldLabel(name, label)) + '</div>'
     : _plFieldLabelHtml(name, label);
+  // V2.4.03：labelSuffix —— 在 label 同一列右側塞東西（Off Duty 旁的 FDP Limit 標籤用）。
+  if (opts.labelSuffix) {
+    labelHtml = '<div style="display:flex;justify-content:space-between;align-items:flex-end;gap:6px;margin-bottom:2px">' + labelHtml + opts.labelSuffix + '</div>';
+  }
   return '<div style="margin-bottom:8px">' + labelHtml + input + sub + '</div>';
 }
 // time-utc 欄位 → 當地時間提示：用 flight_date + HHMM(UTC) 組 UTC 時間，再依 origin/dest 機場時區換算。
@@ -2497,8 +2501,12 @@ function _plNormApt(code) {
 // 依「目前編輯器欄位」推這班的公司 + 套規則 → 提前分鐘；配不到回 null（不亂猜）
 function _plOnDutyRuleMin() {
   var co = _plEntryCompany({ tail_no: _plGetVal('ple-tail_no'), flight_no: _plGetVal('ple-flight_no') });
+  return _plOnDutyRuleMinForCo(co, _plGetVal('ple-origin'));
+}
+// V2.4.03：抽出可帶參數版 —— 給「任一航段」算報到規則分鐘（turnaround 串接要算別段、不只表單那筆）。
+function _plOnDutyRuleMinForCo(co, originRaw) {
   if (!co || co === '—') return null;
-  var origin = _plNormApt(_plGetVal('ple-origin'));
+  var origin = _plNormApt(originRaw);
   if (!origin) return null;
   // 優先序：機場精準 > 開頭比對（'K*' = 美國本土這類區域規則）> '*' 其他站
   var star = null, prefix = null, rules = _plDutyRules();
@@ -2512,6 +2520,111 @@ function _plOnDutyRuleMin() {
   }
   var pick = (prefix != null) ? prefix : star;
   return (pick == null || isNaN(pick)) ? null : pick;
+}
+
+// ── V2.4.03：Operating Crew + FDP Duty 上限 + Turnaround 串接 ──────────────────────
+// FDP max duty 上限（分鐘），只看操作飛行員人數（CAR 07-02A）：2人14h／3人18h／4人24h。
+var DT_MAX_FDP_MIN = { 2: 14 * 60, 3: 18 * 60, 4: 24 * 60 };
+var PL_PILOT_OP_SLOTS = ['pic', 'crew2', 'crew3', 'crew4', 'crew5', 'crew6'];   // PIC+SIC+Relief（OBS/CIC/cabin 不算）
+// 從一筆 entry 的 crew 物件即時數操作飛行員（PIC+SIC+Relief 填了幾個），夾 2~4；數不到回 null。
+function _plDetectOpCrew(crewObj) {
+  if (!crewObj || typeof crewObj !== 'object') return null;
+  var n = 0;
+  for (var i = 0; i < PL_PILOT_OP_SLOTS.length; i++) {
+    var v = _plCrewVal(crewObj[PL_PILOT_OP_SLOTS[i]]);
+    if (v && v.name && String(v.name).trim()) n++;
+  }
+  return n ? Math.max(2, Math.min(4, n)) : null;
+}
+// 取一筆 entry 的操作人數：優先存好的 operating_crew，否則即時偵測。DHD/SIM/本人是 OBSERVER（觀察、不操作）不算 → null。
+function _plEntryOpCrew(e) {
+  if (!e || e.is_deadhead || e.is_sim || e.position === 'OBSERVER') return null;
+  var oc = parseInt(e.operating_crew, 10);
+  if (oc >= 2 && oc <= 4) return oc;
+  if (oc > 4) return 4;
+  return _plDetectOpCrew(e.crew);
+}
+// 一筆 entry 的「報到時刻」毫秒：優先存好的 on_duty_utc，否則 STD − 規則分鐘。算不出回 NaN。
+function _plEntryOnDutyMs(e) {
+  if (e && e.on_duty_utc) { var t = Date.parse(e.on_duty_utc); if (!isNaN(t)) return t; }
+  var std = (e && e.std_utc) ? Date.parse(e.std_utc) : NaN;
+  if (isNaN(std)) return NaN;
+  var rule = _plOnDutyRuleMinForCo(_plEntryCompany(e), e.origin);
+  if (rule == null) return NaN;
+  return std - rule * 60000;
+}
+// 一筆 entry 的「解除時刻」毫秒：優先存好的 off_duty_utc（尊重手動修正，codex P2），否則落地(實際 In→表定 STA)+gap。
+function _plEntryOffDutyMs(e, gapMin) {
+  if (e && e.off_duty_utc) { var t = Date.parse(e.off_duty_utc); if (!isNaN(t)) return t; }
+  var arrRaw = (e && (e.in_utc || e.sta_utc)) || null;
+  var arr = arrRaw ? Date.parse(arrRaw) : NaN;
+  if (isNaN(arr)) return NaN;
+  return arr + (gapMin || 0) * 60000;
+}
+// 把一批 entries 串成「duty 段」。規則：相鄰段「出發地==前段目的地」且「地面銜接時間 < 8h」→ 同一段。
+//   用「地面時間」分（不是用 FDP 上限分）—— 過夜會有長休息(地面 10h+)自然斷開；而「同日但超時的 turnaround」
+//   地面銜接仍短，會留在同一段 → 才能照常算 limit 並標紅警示（codex P1：別把超時的 turnaround 拆掉、警示就消失）。
+//   時間優先實際 OOOI、退表定。DHD/SIM 不參與。回 [{legs, onMs, offMs, opCrew, limitMs, lastArrMs}]。
+var PL_DUTY_MAX_GROUND_MS = 8 * 3600000;   // 段內銜接上限 8h；超過視為休息/過夜 → 斷開
+function _plDutyGroups(entries) {
+  var gap = _plOffDutyGapMin();
+  var list = [];
+  for (var i = 0; i < entries.length; i++) {
+    var e = entries[i];
+    if (!e || e.is_sim || e.is_deadhead || e.position === 'OBSERVER' || e.status === 'roster_removed') continue;   // SIM/DHD/本人觀察/已移除 不參與串接（codex P2）
+    var depRaw = e.out_utc || e.std_utc;
+    var dep = depRaw ? Date.parse(depRaw) : NaN;
+    if (isNaN(dep)) continue;            // 無出發時間 → 無法排序/串，跳過
+    list.push({ e: e, dep: dep });
+  }
+  list.sort(function(a, b) { return a.dep - b.dep; });
+  var groups = [], cur = null;
+  for (var j = 0; j < list.length; j++) {
+    var e2 = list[j].e, depMs = list[j].dep;
+    var offMs = _plEntryOffDutyMs(e2, gap);
+    var arrRaw = e2.in_utc || e2.sta_utc;
+    var arrMs = arrRaw ? Date.parse(arrRaw) : NaN;
+    if (cur) {
+      var prev = cur.legs[cur.legs.length - 1];
+      var contiguous = e2.origin && prev.dest && _plNormApt(e2.origin) === _plNormApt(prev.dest);
+      var ground = (!isNaN(depMs) && !isNaN(cur.lastArrMs)) ? (depMs - cur.lastArrMs) : NaN;   // 前段落地→本段起飛 的地面時間
+      var sameDuty = contiguous && !isNaN(ground) && ground >= 0 && ground < PL_DUTY_MAX_GROUND_MS;
+      if (sameDuty) {
+        cur.legs.push(e2);
+        if (!isNaN(offMs)) cur.offMs = offMs;
+        if (!isNaN(arrMs)) cur.lastArrMs = arrMs;
+        continue;
+      }
+    }
+    cur = { legs: [e2], onMs: _plEntryOnDutyMs(e2), offMs: offMs, opCrew: _plEntryOpCrew(e2), lastArrMs: arrMs };
+    cur.limitMs = (cur.opCrew && !isNaN(cur.onMs)) ? cur.onMs + DT_MAX_FDP_MIN[cur.opCrew] * 60000 : NaN;
+    groups.push(cur);
+  }
+  return groups;
+}
+// 找「包含某 entry」的 duty 段（用 id 比對；entry 自己會被換成傳入的最新版）。
+function _plDutyGroupForEntry(targetEntry, allEntries) {
+  // 效能：只看 target 日期 ±2 天的航班（一段 duty 最多跨一個午夜）→ 別在每次按鍵都排序整本 logbook（可達數萬筆）。
+  var tDate = targetEntry.flight_date ? Date.parse(String(targetEntry.flight_date).slice(0, 10) + 'T00:00:00Z') : NaN;
+  var WIN = 2 * 86400000;
+  var pool = isNaN(tDate) ? allEntries : allEntries.filter(function(e) {
+    var d = e.flight_date ? Date.parse(String(e.flight_date).slice(0, 10) + 'T00:00:00Z') : NaN;
+    return isNaN(d) || Math.abs(d - tDate) <= WIN;
+  });
+  var merged = [], replaced = false;
+  for (var i = 0; i < pool.length; i++) {
+    if (targetEntry.id && pool[i].id === targetEntry.id) { merged.push(targetEntry); replaced = true; }
+    else merged.push(pool[i]);
+  }
+  if (!replaced) merged.push(targetEntry);
+  var groups = _plDutyGroups(merged);
+  for (var g = 0; g < groups.length; g++) {
+    for (var k = 0; k < groups[g].legs.length; k++) {
+      var L = groups[g].legs[k];
+      if ((targetEntry.id && L.id === targetEntry.id) || L === targetEntry) return groups[g];
+    }
+  }
+  return null;
 }
 function _plAutoCalcDuty() {
   var onEl = document.getElementById('ple-on_duty_utc');
@@ -2547,6 +2660,89 @@ function _plAutoCalcDuty() {
       if (onD != null && offD != null) { totEl.value = _plMinToHHMM(_plDurDiff(onD, offD)); totEl.dataset.auto = '1'; }
       else if (totEl.dataset.auto === '1') { totEl.value = ''; }
     }
+  }
+  _plUpdateOpCrewLimit();   // V2.4.03：操作人數自動偵測 + turnaround On/Off + FDP Limit
+}
+// V2.4.03：從表單駕駛艙槽即時數操作飛行員（PIC+SIC+Relief 填了幾個），夾 2~4；數不到回 null。
+function _plDetectOpCrewFromForm() {
+  var n = 0;
+  for (var i = 0; i < PL_PILOT_OP_SLOTS.length; i++) {
+    var el = document.getElementById('ple-crew-' + PL_PILOT_OP_SLOTS[i]);
+    if (el && el.value.trim()) n++;
+  }
+  return n ? Math.max(2, Math.min(4, n)) : null;
+}
+// 用表單目前值組一筆 entry-like，給 turnaround 串接/limit 計算（含本人最新編輯值）。
+function _plEditingSnapshotForDuty() {
+  var ocv = parseInt(_plGetVal('ple-operating_crew'), 10);
+  return {
+    id: _pl.editing ? _pl.editing.id : null,
+    flight_date: _plGetVal('ple-flight_date'),
+    origin: _plGetVal('ple-origin'), dest: _plGetVal('ple-dest'),
+    tail_no: _plGetVal('ple-tail_no'), flight_no: _plGetVal('ple-flight_no'),
+    std_utc: _plReadField('std_utc', 'time-utc'), sta_utc: _plReadField('sta_utc', 'time-utc'),
+    out_utc: _plReadField('out_utc', 'time-utc'), in_utc: _plReadField('in_utc', 'time-utc'),
+    on_duty_utc: _plReadField('on_duty_utc', 'time-utc'), off_duty_utc: _plReadField('off_duty_utc', 'time-utc'),
+    is_deadhead: ((document.getElementById('ple-entry-type') || {}).value || (_pl.editing ? _plEntryType(_pl.editing) : 'flight')) === 'dhd',
+    is_sim: ((document.getElementById('ple-entry-type') || {}).value || (_pl.editing ? _plEntryType(_pl.editing) : 'flight')) === 'sim',
+    operating_crew: (ocv >= 2 && ocv <= 4) ? ocv : null,
+    crew: _plFormPilotCrew(),   // 用表單目前打的駕駛艙名字（不是上次存的）→ Auto 時即時偵測對得上（codex P2）
+  };
+}
+// 從表單駕駛艙槽即時組出 crew 物件（只含飛航組，供 operating crew 偵測 fallback 用）。
+function _plFormPilotCrew() {
+  var c = {};
+  for (var i = 0; i < PL_PILOT_OP_SLOTS.length; i++) {
+    var k = PL_PILOT_OP_SLOTS[i];
+    var el = document.getElementById('ple-crew-' + k);
+    if (el && el.value.trim()) c[k] = { name: el.value.trim() };
+  }
+  return c;
+}
+// 操作人數自動偵測 → 算這筆所屬 duty 段 → FDP Limit 顯示在 Off Duty 旁。
+// 註：On/Off Duty 欄位「不」覆寫成整段值 —— 每段保留自己的報到/解除（codex P2：寫進欄位後若 turnaround 被改散會殘留舊值、且 auto 旗標不持久無法乾淨還原）。
+//     整段 duty 的概念由 Limit（用第一段報到+maxFDP）與 Analyze 的 Total Duty 去重（用第一段報到~最後一段解除）體現，兩者都直接讀第一/最後段、不靠欄位覆寫。
+function _plUpdateOpCrewLimit() {
+  var ocEl = document.getElementById('ple-operating_crew');
+  var limEl = document.getElementById('ple-fdp-limit');
+  var _et = (document.getElementById('ple-entry-type') || {}).value || (_pl.editing ? _plEntryType(_pl.editing) : 'flight');
+  var _isObs = ((document.getElementById('ple-position') || {}).value || '') === 'OBSERVER';   // 本人是觀察員→不操作，比照 DHD/SIM 不顯示 limit（codex P2）
+  var isDhd = _et === 'dhd' || _isObs;   // 編輯器用 entry-type 下拉(Flight/DHD/SIM)，沒有 is_deadhead 勾選框（codex P2）
+  var isSim = _et === 'sim';
+  // 1. 操作人數：DHD/SIM 一律清空（非操作、不該帶 operating_crew，否則 _plSaveEntry 會存到殘值，codex P2）。
+  //    連 manual 旗標也清 → 切回一般航班時能重新自動偵測，不會卡在「manual 但空白」(codex P2)。
+  if (isDhd || isSim) {
+    if (ocEl) { ocEl.value = ''; delete ocEl.dataset.auto; delete ocEl.dataset.manual; }
+  } else if (ocEl && ocEl.dataset.manual !== '1') {
+    // 只在「目前空白」或「這次 session 自動帶的(auto)」才覆寫 → 已存的值(匯入或手動改的)開啟時保留、不被重偵測蓋掉（codex：可手動改要持久）。
+    // 數不到 → 留空(不顯示 limit)。不亂猜 2，否則 4 人長程缺組員會誤判 14h 超限紅字。
+    if (!ocEl.value || ocEl.dataset.auto === '1') {
+      var det = _plDetectOpCrewFromForm();
+      if (det != null) { ocEl.value = String(det); ocEl.dataset.auto = '1'; }
+      else if (ocEl.dataset.auto === '1') ocEl.value = '';
+    }
+  }
+  if (limEl) limEl.innerHTML = '';
+  if (isDhd || isSim) return;
+  // 2. 找這筆所屬 duty 段
+  var snap = _plEditingSnapshotForDuty();
+  var grp = null;
+  try { grp = _plDutyGroupForEntry(snap, _pl.entries || []); } catch (e) {}
+  if (!grp) return;
+  // 3. FDP Limit 標籤（無操作人數→不顯示；實際落地超過→紅字）。turnaround 一律用第一段報到+第一段人數。
+  if (limEl && grp.opCrew && !isNaN(grp.limitMs) && !isNaN(grp.onMs)) {
+    var hrs = DT_MAX_FDP_MIN[grp.opCrew] / 60;
+    var lim = _plFmtUtcHHMM(new Date(grp.limitMs).toISOString());
+    var dd = Math.floor(grp.limitMs / 86400000) - Math.floor(grp.onMs / 86400000);
+    var plus = dd > 0 ? '+' + dd : '';
+    var lastLeg = grp.legs[grp.legs.length - 1];
+    // 超限判定用「實際/已存的解除時刻」：優先存好的 off_duty_utc（手動或匯入改過的），否則實際落地 In+gap；
+    //   都沒有(只有表定)→ 不標紅(計畫中不算超)。跟編輯器顯示的 off_duty 一致（codex P2）。
+    var actualOff = lastLeg.off_duty_utc ? Date.parse(lastLeg.off_duty_utc)
+      : (lastLeg.in_utc ? (Date.parse(lastLeg.in_utc) + _plOffDutyGapMin() * 60000) : NaN);
+    var exceeded = !isNaN(actualOff) && actualOff > grp.limitMs;
+    var col = exceeded ? '#ef4444' : '#22c55e';
+    limEl.innerHTML = '<span style="color:' + col + '">' + (exceeded ? '🔴 ' : '🟢 ') + 'Limit ' + lim + plus + ' (' + hrs + 'h)</span>';
   }
 }
 // 只在「沒被手動改過」時才覆寫 PIC/SIC（dataset.manual 由 _plWireEditor 標記）— 自動帶但保留手填
@@ -2803,7 +2999,7 @@ function _plWireEditor() {
     if (el) el.addEventListener('input', _plAutoCalcTimes);
   });
   var pos = document.getElementById('ple-position');
-  if (pos) pos.addEventListener('change', _plAutoCalcRole);
+  if (pos) { pos.addEventListener('change', _plAutoCalcRole); pos.addEventListener('change', _plAutoCalcDuty); }   // 切 OBSERVER → 更新 FDP Limit
   var pf = document.getElementById('ple-pilot_flying');
   if (pf) pf.addEventListener('change', _plAutoCalcLandings);
   var ty = document.getElementById('ple-aircraft_type');
@@ -2828,6 +3024,18 @@ function _plWireEditor() {
       else { delete el.dataset.manual; }
       _plAutoCalcDuty();
     });
+  });
+  // V2.4.03：Operating Crew 手動改 → 標 manual（清空＝恢復自動偵測）＋ 重算 limit；
+  //   駕駛艙組員名字改 → 重新偵測操作人數。
+  var _ocEl = document.getElementById('ple-operating_crew');
+  if (_ocEl) _ocEl.addEventListener('change', function() {
+    if (_ocEl.value) { _ocEl.dataset.manual = '1'; delete _ocEl.dataset.auto; }   // 手動選 → 鎖住、不再自動帶
+    else { delete _ocEl.dataset.manual; delete _ocEl.dataset.auto; }              // 選回空白(Auto) → 恢復自動偵測
+    _plAutoCalcDuty();
+  });
+  PL_PILOT_OP_SLOTS.forEach(function(k) {
+    var el = document.getElementById('ple-crew-' + k);
+    if (el) { el.addEventListener('input', _plAutoCalcDuty); el.addEventListener('change', _plAutoCalcDuty); }
   });
   _plAutoCalcDuty();   // 開編輯器先帶一次（已飛但 Duty 欄還空的，直接看到自動值）
   // V1.3.05：origin / dest / flight_date 變更也觸發夜航計算（不只 OOOI）
@@ -2959,7 +3167,10 @@ function _plRenderEditor(target) {
         : _plFieldRow(2, _plEditorField('Out', 'out_utc', 'time-utc') + _plEditorField('Off', 'off_utc', 'time-utc')) +
           _plFieldRow(2, _plEditorField('On', 'on_utc', 'time-utc') + _plEditorField('In', 'in_utc', 'time-utc'))) +
       _plFieldSub('Duty') +
-      _plFieldRow(2, _plEditorField('On Duty', 'on_duty_utc', 'time-utc') + _plEditorField('Off Duty', 'off_duty_utc', 'time-utc')) +
+      _plFieldRow(2, _plEditorField('On Duty', 'on_duty_utc', 'time-utc') +
+        _plEditorField('Off Duty', 'off_duty_utc', 'time-utc', { labelSuffix: '<span id="ple-fdp-limit" style="font-size:.62em;font-weight:700;white-space:nowrap"></span>' })) +
+      _plFieldRow(2, _plEditorField('Operating Crew', 'operating_crew', 'select', { options: ['', '2', '3', '4'], optLabels: { '': '自動 Auto', '2': '2 人', '3': '3 人', '4': '4 人' } }) +
+        '<div style="font-size:.58em;color:var(--muted);align-self:center;line-height:1.3">操作飛行員數（FDP 上限用）<br>PIC+SIC+Relief · auto-detected</div>') +
     '</div>' +
 
     // ── Hours：時數獨立區，不再跟 OOOI 混在一起 ──
@@ -3036,6 +3247,7 @@ function _plEntryTypeChange() {
   if (sf) sf.style.display = (v === 'sim') ? 'block' : 'none';
   if (route) route.style.display = (v === 'sim') ? 'none' : '';
   if (times) times.style.display = (v === 'sim') ? 'none' : '';
+  if (typeof _plAutoCalcDuty === 'function') _plAutoCalcDuty();   // V2.4.03：切 DHD/SIM 即時更新 FDP Limit（DHD/SIM 不顯示）
 }
 
 async function _plSaveEntry() {
@@ -3081,6 +3293,7 @@ async function _plSaveEntry() {
     autolands: _plReadField('autolands', 'number') || 0,
     pax_count: _plReadField('pax_count', 'number'),
     crew_count: _plReadField('crew_count', 'number'),
+    operating_crew: (function() { var v = parseInt(_plGetVal('ple-operating_crew'), 10); return (v >= 2 && v <= 4) ? v : null; })(),
     dep_rwy: _plReadField('dep_rwy'),
     arr_rwy: _plReadField('arr_rwy'),
     sid: _plReadField('sid'),
@@ -5850,9 +6063,46 @@ function _plAnSum(entries) {
     s.autoland += e.autolands || 0;
     s.appr += (Array.isArray(e.approaches) ? e.approaches.length : 0);
     s.pax += e.pax_count || 0;
-    s.duty += e.total_duty_minutes || 0;
+    // V2.4.03：Total Duty 一段 duty 只算一次 —— 用「全 logbook」算好的 duty 表（整段時長掛在第一段），
+    //   每筆只加自己被分到的值。不在這裡用 subset 分組（subset 會切斷跨 bucket 的 turnaround，算錯邊界，codex P2）。
+    s.duty += _plDutyMinFor(e);
   }
   return s;
+}
+// 用「整個分析母集合」算 duty 段 → 建「每筆 entry 被分到的 duty 分鐘」表存進 _pl._dutyMap。
+//   多段 turnaround 整段時長(最後解除−第一報到)歸給「第一段」(duty 從哪開始就算在那)、其餘段 0；單段/DHD/SIM/算不出 → 各自 total_duty。
+//   ⚠ 一定要用母集合建（不是 _plAnSum 收到的 subset），否則跨 bucket 的 turnaround 邊界會被切錯（codex P2）。
+//   取捨：duty 歸第一段 → 「只含後段的 bucket」(如跨午夜 turnaround 的次月、duty 中途換機型/公司) 不計這段 duty。
+//     這是為了滿足使用者要的「整段只算一次、總計不灌水」必然的取捨；常見的同日同機 turnaround 各段同 bucket、不受影響。
+function _plRebuildDutyMap(fullEntries) {
+  var map = {}, all = fullEntries || [];
+  var grps = _plDutyGroups(all);
+  var inGroup = {};
+  for (var g = 0; g < grps.length; g++) {
+    var grp = grps[g];
+    var first = grp.legs[0], fid = first.id;
+    var dutyMin;
+    if (grp.legs.length > 1 && !isNaN(grp.onMs) && !isNaN(grp.offMs) && grp.offMs > grp.onMs) {
+      dutyMin = Math.round((grp.offMs - grp.onMs) / 60000);   // 整段時長
+    } else {
+      dutyMin = 0; for (var y = 0; y < grp.legs.length; y++) dutyMin += grp.legs[y].total_duty_minutes || 0;
+    }
+    for (var x = 0; x < grp.legs.length; x++) {
+      var lid = grp.legs[x].id; if (!lid) continue;
+      if (lid === fid) inGroup[lid] = dutyMin; else inGroup[lid] = 0;   // 整段掛第一段，其餘 0
+    }
+  }
+  for (var i = 0; i < all.length; i++) {
+    var e = all[i]; if (!e.id) continue;
+    map[e.id] = (e.id in inGroup) ? inGroup[e.id] : (e.total_duty_minutes || 0);   // 不在任何段(DHD/SIM/無時間) → 自己
+  }
+  _pl._dutyMap = map;
+}
+// 查一筆 entry 被分到的 duty 分鐘（讀 _plRebuildDutyMap 建好的表；沒建過或不在表 → 退回自己 total_duty，不重複算）。
+function _plDutyMinFor(e) {
+  if (!e || !e.id) return e ? (e.total_duty_minutes || 0) : 0;
+  var m = _pl._dutyMap;
+  return (m && (e.id in m)) ? m[e.id] : (e.total_duty_minutes || 0);
 }
 // V1.3.30：LogTen 風明細數字（起降 / 距離 / Approach / Pax / Duty）—— 給右欄選中組用
 function _plAnDetailCard(s) {
@@ -5956,6 +6206,7 @@ function _plRenderAnalyzeContent() {
     if (e.is_deadhead || e.status === 'roster_removed') return false;
     return !!e.in_utc;
   });
+  _plRebuildDutyMap(entries);   // V2.4.03：用整個母集合算 duty 去重表，供下面各 bucket 的 _plAnSum 查（避免 subset 切錯 turnaround）
   if (!entries.length) {
     // codex P1：沒有已飛航班但有起始累計 / SIM 時，仍要顯示那些區塊（不要只丟空訊息）
     var extra = _plRenderOpeningSim();
