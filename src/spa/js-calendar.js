@@ -142,8 +142,8 @@ function _gcalFetchMonth(year, month) {
   if (endMonth > 12) { endMonth = 1; endYear++; }
   var end = endYear + '-' + String(endMonth).padStart(2, '0') + '-01';
 
-  fetch('/api/calendar-events?refreshToken=' + encodeURIComponent(rt) +
-    '&start=' + encodeURIComponent(start) + '&end=' + encodeURIComponent(end))
+  fetch('/api/calendar-events?start=' + encodeURIComponent(start) + '&end=' + encodeURIComponent(end),
+    { headers: { 'X-Refresh-Token': rt } })   // token 走 header，別進 URL/log
   .then(function(r) { return r.json(); })
   .then(function(data) {
     if (data.error) { console.error('Calendar API:', data.error); gcalLoadedMonths[key] = false; return; }

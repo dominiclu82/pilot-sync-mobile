@@ -818,6 +818,32 @@ async function _atisGateOk(plToken: string, csIdt: string): Promise<boolean> {
   } catch { return false; }
 }
 
+// 回傳「呼叫者用簽章 token 證明自己擁有的 employee_id」，無法證明→null。
+// email（來自 csIdt 或 plToken，皆簽章驗過）→ cs_users 連結的員編。外人偽造不來。
+async function _verifiedEid(plToken: string, csIdt: string): Promise<string | null> {
+  if (!_pool) return null;
+  const emails: string[] = [];
+  try { const a = await _atisAuthLevel(plToken, csIdt); if (a.who) emails.push(a.who); } catch { /* 失敗就只靠 csIdt */ }
+  const em = csIdt ? verifyEmailToken(csIdt) : null;
+  if (em) emails.push(em);
+  if (!emails.length) return null;
+  try {
+    const q = await _pool.query('SELECT employee_id FROM cs_users WHERE email = ANY($1) AND employee_id IS NOT NULL LIMIT 1', [emails]);
+    return q.rows[0] && q.rows[0].employee_id ? String(q.rows[0].employee_id) : null;
+  } catch { return null; }
+}
+
+// 寫入授權：只能動「自己的」員編。回傳通過驗證的 eid（==claimed），不符/無法證明→null。
+// WRITE_AUTHZ_OFF=1 跳過驗證（dev/緊急回退用，回 claimed 不檢查）。
+async function _writeAuthzEid(req: any, claimedEid: any): Promise<string | null> {
+  const claimed = claimedEid == null ? '' : String(claimedEid);
+  if (process.env.WRITE_AUTHZ_OFF === '1') return claimed || null;
+  const mine = await _verifiedEid(String(req.headers['x-pl-at'] || ''), String(req.headers['x-cs-idt'] || ''));
+  if (!mine) return null;                          // 無法證明身份 → 拒
+  if (claimed && claimed !== mine) return null;    // 想動別人的員編 → 拒（防冒名）
+  return mine;
+}
+
 // 「誰觸發了 airframes 呼叫」計數 → 原子寫進 DB（cnt = cnt + 2），重啟不歸零、不會競態覆蓋（codex P2）。
 // 不存記憶體；顯示一律即時從 DB 撈（/api/atis-usage），避免記憶體/DB 不一致。只算實際打 airframes（快取命中不算）。
 function _atisRecordWho(who: string, level: AtisLevel, icao: string) {
@@ -2870,6 +2896,10 @@ app.get('/api/roster-data', async (req, res) => {
   if (!_pool) return res.json({ error: 'No database' });
   const { eid, month } = req.query;
   if (!eid) return res.status(400).json({ error: 'Missing eid' });
+  // 回傳分享者班表+照片 → 加流量限制擋工號枚舉批撈（正常用戶看朋友頁只查幾次，60/分綽綽有餘）。
+  if (!_rateLimit('rdata:' + (req.ip || req.socket.remoteAddress || '?'), 60, 60000)) {
+    return res.status(429).json({ error: '請稍後再試 Too many requests' });
+  }
   try {
     // 只有「開啟分享」的人其班表才可被查（與 roster-friends 一致）。退出所有群組/關閉分享者即使資料還在，
     //   也不會被 /api/roster-data 用 eid 撈出來（codex P1：補上 leave 不再刪資料後的隱私缺口）。
@@ -2907,6 +2937,7 @@ app.post('/api/roster-share', async (req, res) => {
   if (!_pool) return res.json({ error: 'No database' });
   const { eid, month, duties, crewName, nickname, fleet, rank, updateInfoOnly } = req.body;
   if (!eid) return res.status(400).json({ error: 'Missing eid' });
+  if (!(await _writeAuthzEid(req, eid))) return res.status(403).json({ error: '請先重新同步班表驗證身份 Please re-sync to verify identity', authz: true });
   try {
     // Add fleet/rank columns if needed
     await _pool.query(`ALTER TABLE cs_users ADD COLUMN IF NOT EXISTS fleet TEXT`).catch(() => {});
@@ -2961,6 +2992,7 @@ app.delete('/api/roster-share', async (req, res) => {
   if (!_pool) return res.json({ error: 'No database' });
   const { eid } = req.body;
   if (!eid) return res.status(400).json({ error: 'Missing eid' });
+  if (!(await _writeAuthzEid(req, eid))) return res.status(403).json({ error: '請先重新同步班表驗證身份 Please re-sync to verify identity', authz: true });
   try {
     await _pool.query('DELETE FROM cs_rosters WHERE employee_id = $1', [eid]);
     await _pool.query('UPDATE cs_users SET sharing = false WHERE employee_id = $1', [eid]);
@@ -3080,6 +3112,7 @@ app.post('/api/groups', async (req, res) => {
   if (!_pool) return res.json({ error: 'No database' });
   const { eid, name } = req.body;
   if (!eid || !name) return res.status(400).json({ error: 'Missing eid or name' });
+  if (!(await _writeAuthzEid(req, eid))) return res.status(403).json({ error: 'not_verified', authz: true });
   try {
     // 產生 8 碼邀請碼（重試避免碰撞）。舊的 4 碼群組碼照常能用；新碼提高 entropy 防暴力猜。
     let code = '';
@@ -3105,6 +3138,7 @@ app.delete('/api/groups/:id', async (req, res) => {
   const { eid } = req.body;
   const gid = req.params.id;
   if (!eid) return res.status(400).json({ error: 'Missing eid' });
+  if (!(await _writeAuthzEid(req, eid))) return res.status(403).json({ error: 'not_verified', authz: true });
   try {
     const g = await _pool.query(`SELECT created_by FROM cs_groups WHERE id = $1 AND type = 'custom'`, [gid]);
     if (g.rowCount === 0) return res.status(404).json({ error: 'Group not found' });
@@ -3119,6 +3153,7 @@ app.post('/api/groups/join', async (req, res) => {
   if (!_pool) return res.json({ error: 'No database' });
   const { eid, groupId } = req.body;
   if (!eid || !groupId) return res.status(400).json({ error: 'Missing eid or groupId' });
+  if (!(await _writeAuthzEid(req, eid))) return res.status(403).json({ error: 'not_verified', authz: true });
   try {
     await _pool.query(
       `INSERT INTO cs_group_members (group_id, employee_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`,
@@ -3133,6 +3168,7 @@ app.post('/api/groups/join-code', async (req, res) => {
   if (!_pool) return res.json({ error: 'No database' });
   const { eid, inviteCode } = req.body;
   if (!eid || !inviteCode) return res.status(400).json({ error: 'Missing eid or inviteCode' });
+  if (!(await _writeAuthzEid(req, eid))) return res.status(403).json({ error: 'not_verified', authz: true });
   // 防暴力猜邀請碼：每 IP 每分鐘最多 10 次嘗試（正常用戶輸一次就中，無感）。
   if (!_rateLimit('joincode:' + (req.ip || req.socket.remoteAddress || '?'), 10, 60000)) {
     return res.status(429).json({ error: '嘗試太頻繁，請稍後再試 Too many attempts' });
@@ -3155,6 +3191,7 @@ app.post('/api/groups/leave', async (req, res) => {
   if (!_pool) return res.json({ error: 'No database' });
   const { eid, groupId } = req.body;
   if (!eid || !groupId) return res.status(400).json({ error: 'Missing eid or groupId' });
+  if (!(await _writeAuthzEid(req, eid))) return res.status(403).json({ error: 'not_verified', authz: true });
   try {
     await _pool.query(`DELETE FROM cs_group_members WHERE group_id = $1 AND employee_id = $2`, [groupId, eid]);
     // 自動刪除 0 人的自訂群組
@@ -3180,6 +3217,7 @@ app.post('/api/groups/invite', async (req, res) => {
   if (!_pool) return res.json({ error: 'No database' });
   const { eid, groupId, targetEid } = req.body;
   if (!eid || !groupId || !targetEid) return res.status(400).json({ error: 'Missing fields' });
+  if (!(await _writeAuthzEid(req, eid))) return res.status(403).json({ error: 'not_verified', authz: true });
   try {
     // 確認邀請者是成員
     const mem = await _pool.query(`SELECT 1 FROM cs_group_members WHERE group_id = $1 AND employee_id = $2`, [groupId, eid]);
@@ -3225,6 +3263,7 @@ app.post('/api/groups/invites/:id/accept', async (req, res) => {
   const { eid } = req.body;
   const invId = req.params.id;
   if (!eid) return res.status(400).json({ error: 'Missing eid' });
+  if (!(await _writeAuthzEid(req, eid))) return res.status(403).json({ error: 'not_verified', authz: true });
   try {
     const inv = await _pool.query(`SELECT group_id, target_eid FROM cs_group_invites WHERE id = $1 AND status = 'pending'`, [invId]);
     if (inv.rowCount === 0) return res.status(404).json({ error: 'Invite not found' });
@@ -3246,6 +3285,7 @@ app.post('/api/groups/invites/:id/decline', async (req, res) => {
   const { eid } = req.body;
   const invId = req.params.id;
   if (!eid) return res.status(400).json({ error: 'Missing eid' });
+  if (!(await _writeAuthzEid(req, eid))) return res.status(403).json({ error: 'not_verified', authz: true });
   try {
     const inv = await _pool.query(`SELECT target_eid FROM cs_group_invites WHERE id = $1 AND status = 'pending'`, [invId]);
     if (inv.rowCount === 0) return res.status(404).json({ error: 'Invite not found' });
@@ -3286,7 +3326,9 @@ app.get('/api/db-test', async (_req, res) => {
 
 app.get('/api/calendar-events', async (req, res) => {
   try {
-    const { refreshToken, start, end } = req.query as Record<string, string>;
+    const { start, end } = req.query as Record<string, string>;
+    // refresh token 改從 header 帶（別進 URL/access log）；舊前端仍可走 query，過渡期相容。
+    const refreshToken = String(req.headers['x-refresh-token'] || (req.query.refreshToken as string) || '');
     if (!refreshToken || !start || !end) {
       res.status(400).json({ error: 'Missing refreshToken, start, or end' });
       return;
@@ -3516,6 +3558,7 @@ app.post('/api/briefing', async (req, res) => {
   const { eid, flight_no, flight_date, data } = req.body || {};
   if (!eid || !flight_no || !flight_date) return res.status(400).json({ error: 'Missing eid/flight_no/flight_date' });
   if (!data || typeof data !== 'object') return res.status(400).json({ error: 'Missing data' });
+  if (!(await _writeAuthzEid(req, eid))) return res.status(403).json({ error: 'not_verified', authz: true });
   try {
     await _pool.query(
       `INSERT INTO crewsync_briefings (employee_id, flight_no, flight_date, data, updated_at)
@@ -3535,6 +3578,7 @@ app.get('/api/briefing', async (req, res) => {
   if (!_pool) return res.status(503).json({ error: 'No database' });
   const { eid, flight_no, flight_date } = req.query;
   if (!eid || !flight_no || !flight_date) return res.status(400).json({ error: 'Missing eid/flight_no/flight_date' });
+  if (!(await _writeAuthzEid(req, eid))) return res.status(403).json({ error: 'not_verified', authz: true });
   try {
     const q = await _pool.query(
       'SELECT data, updated_at FROM crewsync_briefings WHERE employee_id = $1 AND flight_no = $2 AND flight_date = $3',
@@ -3553,6 +3597,7 @@ app.get('/api/briefing/list', async (req, res) => {
   const { eid } = req.query;
   const limit = Math.min(Number(req.query.limit) || 50, 200);
   if (!eid) return res.status(400).json({ error: 'Missing eid' });
+  if (!(await _writeAuthzEid(req, eid))) return res.status(403).json({ error: 'not_verified', authz: true });
   try {
     const q = await _pool.query(
       `SELECT flight_no, flight_date::text, updated_at,
@@ -3573,6 +3618,7 @@ app.delete('/api/briefing', async (req, res) => {
   if (!_pool) return res.status(503).json({ error: 'No database' });
   const { eid, flight_no, flight_date } = req.body || {};
   if (!eid || !flight_no || !flight_date) return res.status(400).json({ error: 'Missing eid/flight_no/flight_date' });
+  if (!(await _writeAuthzEid(req, eid))) return res.status(403).json({ error: 'not_verified', authz: true });
   try {
     const q = await _pool.query(
       'DELETE FROM crewsync_briefings WHERE employee_id = $1 AND flight_no = $2 AND flight_date = $3 RETURNING flight_no',

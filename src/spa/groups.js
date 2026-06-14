@@ -136,7 +136,7 @@ function _grpSyncName() {
   var fleet = localStorage.getItem('crewsync_my_fleet');
   var rank = localStorage.getItem('crewsync_my_rank');
   if (eid && fleet && rank) {
-    fetch('/api/roster-share', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+    fetch('/api/roster-share', { method: 'POST', headers: Object.assign({ 'Content-Type': 'application/json' }, (typeof _plAtHeaders === 'function' ? _plAtHeaders() : {})),
       body: JSON.stringify({ eid: eid, fleet: fleet, rank: rank, nickname: name, updateInfoOnly: true }) })
       .then(function(r) { return r.json(); })
       .then(function(d) { if (d.ok) _grpLoadGrid(); })
@@ -222,7 +222,7 @@ function _grpTogglePreset(groupId, join) {
   var eid = localStorage.getItem('crewsync_eid');
   if (!eid) return;
   var url = join ? '/api/groups/join' : '/api/groups/leave';
-  fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ eid: eid, groupId: groupId }) })
+  fetch(url, { method: 'POST', headers: Object.assign({ 'Content-Type': 'application/json' }, (typeof _plAtHeaders === 'function' ? _plAtHeaders() : {})), body: JSON.stringify({ eid: eid, groupId: groupId }) })
     .then(function(r) { return r.json(); })
     .then(function() {
       if (join) {
@@ -472,7 +472,7 @@ function _grpCreate() {
   var eid = localStorage.getItem('crewsync_eid');
   var nameEl = document.getElementById('grp-create-name');
   if (!eid || !nameEl || !nameEl.value.trim()) return;
-  fetch('/api/groups', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ eid: eid, name: nameEl.value.trim() }) })
+  fetch('/api/groups', { method: 'POST', headers: Object.assign({ 'Content-Type': 'application/json' }, (typeof _plAtHeaders === 'function' ? _plAtHeaders() : {})), body: JSON.stringify({ eid: eid, name: nameEl.value.trim() }) })
     .then(function(r) { return r.json(); })
     .then(function(data) {
       if (data.ok) {
@@ -488,7 +488,7 @@ function _grpJoinCode() {
   var eid = localStorage.getItem('crewsync_eid');
   var inp = document.getElementById('grp-join-code-input');
   if (!eid || !inp || !inp.value.trim()) return;
-  fetch('/api/groups/join-code', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ eid: eid, inviteCode: inp.value.trim() }) })
+  fetch('/api/groups/join-code', { method: 'POST', headers: Object.assign({ 'Content-Type': 'application/json' }, (typeof _plAtHeaders === 'function' ? _plAtHeaders() : {})), body: JSON.stringify({ eid: eid, inviteCode: inp.value.trim() }) })
     .then(function(r) { return r.json(); })
     .then(function(data) {
       if (data.ok) {
@@ -504,7 +504,7 @@ function _grpLeave(groupId) {
   if (!confirm('確定退出此群組？Leave this group?')) return;
   var eid = localStorage.getItem('crewsync_eid');
   if (!eid) return;
-  fetch('/api/groups/leave', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ eid: eid, groupId: groupId }) })
+  fetch('/api/groups/leave', { method: 'POST', headers: Object.assign({ 'Content-Type': 'application/json' }, (typeof _plAtHeaders === 'function' ? _plAtHeaders() : {})), body: JSON.stringify({ eid: eid, groupId: groupId }) })
     .then(function() { _grpRefreshFriends(); });
 }
 function _grpCopyCode(code) {
@@ -524,7 +524,7 @@ function _grpShowInvite(groupId) {
   if (!targetEid) return;
   var eid = localStorage.getItem('crewsync_eid');
   if (!eid) return;
-  fetch('/api/groups/invite', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ eid: eid, groupId: groupId, targetEid: targetEid.trim() }) })
+  fetch('/api/groups/invite', { method: 'POST', headers: Object.assign({ 'Content-Type': 'application/json' }, (typeof _plAtHeaders === 'function' ? _plAtHeaders() : {})), body: JSON.stringify({ eid: eid, groupId: groupId, targetEid: targetEid.trim() }) })
     .then(function(r) { return r.json(); })
     .then(function(data) {
       if (data.ok) alert(data.note || '邀請已送出 Invite sent');
@@ -555,13 +555,13 @@ function _grpLoadInvites() {
 function _grpAcceptInvite(invId) {
   var eid = localStorage.getItem('crewsync_eid');
   if (!eid) return;
-  fetch('/api/groups/invites/' + invId + '/accept', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ eid: eid }) })
+  fetch('/api/groups/invites/' + invId + '/accept', { method: 'POST', headers: Object.assign({ 'Content-Type': 'application/json' }, (typeof _plAtHeaders === 'function' ? _plAtHeaders() : {})), body: JSON.stringify({ eid: eid }) })
     .then(function() { _grpAutoUploadRoster(); _grpRefreshFriends(); });
 }
 function _grpDeclineInvite(invId) {
   var eid = localStorage.getItem('crewsync_eid');
   if (!eid) return;
-  fetch('/api/groups/invites/' + invId + '/decline', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ eid: eid }) })
+  fetch('/api/groups/invites/' + invId + '/decline', { method: 'POST', headers: Object.assign({ 'Content-Type': 'application/json' }, (typeof _plAtHeaders === 'function' ? _plAtHeaders() : {})), body: JSON.stringify({ eid: eid }) })
     .then(function() { _grpRefreshFriends(); });
 }
 // 機隊/職級改變時，自動退出不符合的預設群組
@@ -585,7 +585,7 @@ function _grpAutoLeavePresets(newFleet, newRank) {
     var p = _grpData.presets[i];
     if (p.joined && validIds.indexOf(p.id) === -1) {
       promises.push(
-        fetch('/api/groups/leave', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ eid: eid, groupId: p.id }) })
+        fetch('/api/groups/leave', { method: 'POST', headers: Object.assign({ 'Content-Type': 'application/json' }, (typeof _plAtHeaders === 'function' ? _plAtHeaders() : {})), body: JSON.stringify({ eid: eid, groupId: p.id }) })
       );
     }
   }
@@ -606,7 +606,7 @@ function _grpCheckAutoDisableSharing() {
       if (!hasAny) {
         localStorage.removeItem('crewsync_share_enabled');
         // 撤銷分享
-        fetch('/api/roster-share', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ eid: eid }) });
+        fetch('/api/roster-share', { method: 'DELETE', headers: Object.assign({ 'Content-Type': 'application/json' }, (typeof _plAtHeaders === 'function' ? _plAtHeaders() : {})), body: JSON.stringify({ eid: eid }) });
       }
     });
 }
@@ -629,7 +629,7 @@ function _grpAutoUploadRoster() {
       if (!duties || !duties.length) continue;
       fetch('/api/roster-share', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: Object.assign({ 'Content-Type': 'application/json' }, (typeof _plAtHeaders === 'function' ? _plAtHeaders() : {})),
         body: JSON.stringify({ eid: eid, month: monthKey, duties: duties, fleet: fleet, rank: rank, nickname: nickname })
       });
     } catch(e) {}

@@ -725,16 +725,23 @@ function _briefSaveHistory(forceImmediate) {
     var snap = _briefSnapshot();
     var eid = _briefGetEid();
     var done = function() { _briefSetSaveDot('saved'); };
-    if (eid) {
-      fetch('/api/briefing', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ eid: eid, flight_no: k.flight_no, flight_date: k.flight_date, data: snap }),
-      }).then(done).catch(done);
-    } else {
+    var saveLocal = function() {
       var map = _briefLocalHistGet();
       map[_briefLocalKey(k.flight_no, k.flight_date)] = { data: snap, updated_at: new Date().toISOString() };
       _briefLocalHistSet(map);
+    };
+    if (eid) {
+      fetch('/api/briefing', {
+        method: 'POST',
+        headers: Object.assign({ 'Content-Type': 'application/json' }, (typeof _plAtHeaders === 'function' ? _plAtHeaders() : {})),
+        body: JSON.stringify({ eid: eid, flight_no: k.flight_no, flight_date: k.flight_date, data: snap }),
+      }).then(function(r) {
+        // server 拒(403 驗證失敗/未登入)或非 200 → 退存本機，資料不丟、'saved' 才不會騙人(codex P2)。讀取端同樣會退本機。
+        if (!r || !r.ok) saveLocal();
+        done();
+      }).catch(function() { saveLocal(); done(); });   // 網路掛 → 也退本機
+    } else {
+      saveLocal();
       done();
     }
   };
@@ -751,7 +758,7 @@ async function _briefLoadHistoryEntry(fno, date) {
   var eid = _briefGetEid();
   if (eid) {
     try {
-      var r = await fetch('/api/briefing?eid=' + encodeURIComponent(eid) + '&flight_no=' + encodeURIComponent(fno) + '&flight_date=' + encodeURIComponent(date));
+      var r = await fetch('/api/briefing?eid=' + encodeURIComponent(eid) + '&flight_no=' + encodeURIComponent(fno) + '&flight_date=' + encodeURIComponent(date), { headers: (typeof _plAtHeaders === 'function' ? _plAtHeaders() : {}) });
       if (r.ok) { var j = await r.json(); return j.data || null; }
     } catch(e) {}
     return null;
@@ -764,7 +771,7 @@ async function _briefListHistory() {
   var eid = _briefGetEid();
   if (eid) {
     try {
-      var r = await fetch('/api/briefing/list?eid=' + encodeURIComponent(eid) + '&limit=100');
+      var r = await fetch('/api/briefing/list?eid=' + encodeURIComponent(eid) + '&limit=100', { headers: (typeof _plAtHeaders === 'function' ? _plAtHeaders() : {}) });
       if (r.ok) { var j = await r.json(); return j.items || []; }
     } catch(e) {}
     return [];
@@ -784,7 +791,7 @@ async function _briefDeleteHistoryEntry(fno, date) {
     try {
       await fetch('/api/briefing', {
         method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
+        headers: Object.assign({ 'Content-Type': 'application/json' }, (typeof _plAtHeaders === 'function' ? _plAtHeaders() : {})),
         body: JSON.stringify({ eid: eid, flight_no: fno, flight_date: date }),
       });
     } catch(e) {}

@@ -183,13 +183,25 @@ function _frToggleShare() {
     }
     // 否則等使用者選完，_frCheckReady 會觸發上傳
   } else {
-    _frShowShareUI(false);
-    localStorage.removeItem('crewsync_share_enabled');
+    // ⚠ 撤銷成功(server 真的關了)才把本地標記「已關分享」+ 清畫面。
+    //   若驗證失敗(403/未登入)伺服器其實還留著你的分享 → 不能騙使用者說已關（codex P1 隱私）。
     fetch('/api/roster-share', {
       method: 'DELETE',
-      headers: { 'Content-Type': 'application/json' },
+      headers: Object.assign({ 'Content-Type': 'application/json' }, (typeof _plAtHeaders === 'function' ? _plAtHeaders() : {})),
       body: JSON.stringify({ eid: eid })
-    }).then(function() { _frShowEmpty(); });
+    }).then(function(r) {
+      if (!r.ok) {
+        toggle.checked = true;   // 回復開啟狀態，分享其實還在
+        alert('撤銷失敗，請重新同步班表驗證身份後再試 Revoke failed — please re-sync your roster to verify identity');
+        return;
+      }
+      localStorage.removeItem('crewsync_share_enabled');
+      _frShowShareUI(false);
+      _frShowEmpty();
+    }).catch(function() {
+      toggle.checked = true;
+      alert('撤銷失敗，請稍後再試 Revoke failed, please try again');
+    });
   }
 }
 
@@ -205,7 +217,7 @@ function _frUploadAll(eid, fleet, rank) {
         if (data && data.duties && data.duties.length > 0) {
           promises.push(fetch('/api/roster-share', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: Object.assign({ 'Content-Type': 'application/json' }, (typeof _plAtHeaders === 'function' ? _plAtHeaders() : {})),
             body: JSON.stringify({ eid: eid, month: monthKey, duties: data.duties, crewName: localStorage.getItem('crewsync_crew_name') || eid, nickname: localStorage.getItem('crewsync_nickname') || '', fleet: fleet, rank: rank })
           }));
         }
