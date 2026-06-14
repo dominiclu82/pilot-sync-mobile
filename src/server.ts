@@ -794,6 +794,30 @@ async function _atisAuthLevel(plToken: string, csIdt: string): Promise<AtisAuth>
   return res;
 }
 
+// ATIS 通行閘：只有「同步過班表」的真組員（或站方 founder/owner）能取站長爬出來的 ATIS。
+// 同步成功才會把 email 連上 employee_id（server.ts 同步 link 處），故 employee_id IS NOT NULL == 已驗證組員。
+// 無 DB → fail-closed（鎖死）；dev/smoke 用 ATIS_GATE_OFF=1 放行。
+async function _atisGateOk(plToken: string, csIdt: string): Promise<boolean> {
+  if (process.env.ATIS_GATE_OFF === '1') return true;
+  if (!_pool) return false;                              // 無 DB → fail-closed
+  const emails: string[] = [];
+  try {
+    const a = await _atisAuthLevel(plToken, csIdt);
+    if (a.level === 'owner' || a.level === 'founder') return true;   // 站方不受鎖
+    // _atisAuthLevel 會把 plToken 解出的 email 放進 who（連非 founder 也帶）→ 收進候選，
+    //   讓「只用 Pilot Log 登入、沒帶 csIdt」的已同步組員也驗得過（codex P1：別把這種人誤鎖）。
+    if (a.who) emails.push(a.who);
+  } catch { /* 判定失敗就往下走班表驗證 */ }
+  const email = csIdt ? verifyEmailToken(csIdt) : null;   // 班表同步登入身份證（email）
+  if (email) emails.push(email);
+  if (!emails.length) return false;
+  try {
+    // 任一已驗證 email 是「同步過班表」（employee_id 有值）→ 放行。email 全來自簽章驗過的 token，外人偽造不來。
+    const q = await _pool.query('SELECT 1 FROM cs_users WHERE email = ANY($1) AND employee_id IS NOT NULL', [emails]);
+    return (q.rowCount || 0) > 0;
+  } catch { return false; }
+}
+
 // 「誰觸發了 airframes 呼叫」計數 → 原子寫進 DB（cnt = cnt + 2），重啟不歸零、不會競態覆蓋（codex P2）。
 // 不存記憶體；顯示一律即時從 DB 撈（/api/atis-usage），避免記憶體/DB 不一致。只算實際打 airframes（快取命中不算）。
 function _atisRecordWho(who: string, level: AtisLevel, icao: string) {
@@ -1388,6 +1412,12 @@ app.get('/api/atis', async (req, res) => {
     if (us && us.length) {
       _atisCache.set(icao, { sections: us, time: Date.now(), source: 'faa' });
       return res.json({ sections: us, source: 'faa' });
+    }
+  }
+  // 1.5 非美 ATIS（站長爬出來的資料）→ 只開放給「同步過班表」的真組員（或站方）。北美 K/P 走 FAA 公開源不鎖。
+  if (icao[0] !== 'K' && icao[0] !== 'P') {
+    if (!(await _atisGateOk(String(req.headers['x-pl-at'] || ''), String(req.headers['x-cs-idt'] || '')))) {
+      return res.status(403).json({ error: 'not_verified', locked: true });
     }
   }
   // 2. fresh=1 且單機場（手動刷新）→ 立刻輪詢這站刷新累積庫，再走庫。
@@ -3331,13 +3361,13 @@ function _syncNext() {
       job.result = result;
       if (newRefreshToken) job.newRefreshToken = newRefreshToken;
       // Partial vs full：有 duty 又標 partial 的話，狀態改為 'partial'
+      // 注意：完整成功的 'done' 不在這裡設 —— 延到 employee_id 連結（下方 UPDATE）完成後才設，
+      //   否則前端一看到 done 立刻打 ATIS，員編還沒連上 → 吃短暫 403（gate 競態）。
       if (rosterResult.partial) {
         job.status = 'partial';
         (job as any).partialReason = rosterResult.errorSummary;
         (job as any).debugFiles = rosterResult.debugFiles || [];
         onLog(`⚠️ 部分成功（${rosterResult.duties.length} 筆）：${rosterResult.errorSummary || 'unknown'}`);
-      } else {
-        job.status = 'done';
       }
 
       // Save employee ID + roster data to job for frontend
@@ -3397,6 +3427,8 @@ function _syncNext() {
           onLog(`⚠️ 資料庫儲存失敗: ${dbErr.message}`);
         }
       }
+      // employee_id 連結（上方 UPDATE）已完成 → 現在才放 done，前端打 ATIS 必能過 gate（partial 不動）。
+      if (!rosterResult.partial) job.status = 'done';
     } catch (err: any) {
       job.error = err.message;
       job.status = 'error';

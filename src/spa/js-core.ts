@@ -504,8 +504,11 @@ function fetchAtisData(url, icao, container) {
     .then(r => { if (!r.ok) throw new Error(); return r.text(); })
     .then(html => parseAtisHtml(html)).catch(() => []);
   const atisPromise = fetch('/api/atis?icao=' + icao, { headers: _plAtHeaders() })
-    .then(r => r.ok ? r.json() : null)
-    .then(d => (d && d.sections) ? d.sections : _atisFb())   // 無 sections(fallback/null)→ 備案
+    .then(r => { if (r.status === 403) return { locked: true }; return r.ok ? r.json() : null; })
+    .then(d => {
+      if (d && d.locked) return { locked: true };            // 未同步班表 → 鎖定，不退 atis.guru（否則鎖白做）
+      return (d && d.sections) ? d.sections : _atisFb();     // 無 sections(fallback/null)→ 備案
+    })
     .catch(() => _atisFb());                                  // server 非 JSON / 網路錯 → 也走備案(codex P1)
   const metarPromise = fetch('/api/metar?ids=' + icao + '&hours=12')
     .then(r => { if (!r.ok) throw new Error(); return r.text(); })
@@ -514,12 +517,24 @@ function fetchAtisData(url, icao, container) {
     .then(r => { if (!r.ok) throw new Error(); return r.text(); })
     .then(t => t.trim()).catch(() => '');
   Promise.all([atisPromise, metarPromise, tafPromise]).then(([atisSections, metarText, tafText]) => {
+    const noData = '<span style="color:var(--muted);font-style:italic">無資料</span>';
+    let cards = '';
+    if (atisSections && atisSections.locked) {   // 未同步 → 鎖定卡（METAR/TAF 仍照常顯示）
+      cards += '<div class="atis-card"><div class="atis-card-title">🔒 ATIS</div><pre style="white-space:normal;line-height:1.6">'
+        + '<span style="color:var(--text)">ATIS 僅限已同步班表的組員</span><br>'
+        + '<span style="color:var(--muted);font-size:.9em">即時 ATIS 資料僅開放給已驗證的星宇組員，同步後即解鎖（其餘天氣資訊不受影響）。</span><br>'
+        + '<span style="color:var(--muted);font-size:.82em">Real-time ATIS is available to verified STARLUX crew. Unlock by syncing your roster.</span>'
+        + '</pre><button onclick="switchTab(\\'sync\\', document.getElementById(\\'tabBtn-sync\\'))" style="margin-top:4px;width:100%;background:var(--accent);color:#fff;border:none;border-radius:8px;padding:9px;font-size:.85em;cursor:pointer">🔄 前往同步 Sync now</button></div>';
+      const lm0 = metarText ? metarText.split('\\n')[0] : '';
+      cards += '<div class="atis-card"><div class="atis-card-title">🌤️ METAR</div><pre>' + (lm0 || noData) + '</pre></div>';
+      cards += '<div class="atis-card"><div class="atis-card-title">📅 TAF</div><pre>' + (tafText || noData) + '</pre></div>';
+      container.innerHTML = cards;
+      return;
+    }
     const atisOnly = atisSections.filter(s => {
       const t = s.title.toLowerCase();
       return !t.includes('metar') && !t.includes('taf');
     });
-    const noData = '<span style="color:var(--muted);font-style:italic">無資料</span>';
-    let cards = '';
     if (atisOnly.length > 0) {
       cards += atisOnly.map(s =>
         '<div class="atis-card"><div class="atis-card-title">' + s.title + '</div><pre>' + s.text + '</pre></div>'

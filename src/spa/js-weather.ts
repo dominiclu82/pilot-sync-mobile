@@ -283,7 +283,7 @@ function _wxToggleRwyMap() {
   var arrows = document.querySelectorAll('.wx-rwymap-arrow');
   for (var j = 0; j < arrows.length; j++) arrows[j].textContent = c ? '\\u25b8' : '\\u25be';
 }
-function _wxBuildDetailHtml(icao, metarLines, tafText, atisSections, atisSource) {
+function _wxBuildDetailHtml(icao, metarLines, tafText, atisSections, atisSource, atisLocked) {
   var noData = '<span style="color:var(--muted);font-style:italic">\\u7121\\u8cc7\\u6599</span>';
   wxMetarRawMap[icao] = metarLines;
   if (wxMetarShowAll[icao] === undefined) wxMetarShowAll[icao] = false;
@@ -299,8 +299,14 @@ function _wxBuildDetailHtml(icao, metarLines, tafText, atisSections, atisSource)
   }
   cards += buildMetarCard(icao);
   cards += '<div class="atis-card"><div class="atis-card-title">\\ud83d\\udcc5 TAF</div><pre>' + (tafText || noData) + '</pre></div>';
-  // atisSections===null = 還在背景載(顯示「載入中」,不卡 METAR/TAF/跑道圖)；[] = 無資料；有 = 各 ATIS 卡。
-  if (atisSections === null) {
+  // atisLocked = 未同步班表 → 顯示鎖定卡(其餘 METAR/TAF/跑道圖照常)；不退 atis.guru。
+  if (atisLocked) {
+    cards += '<div class="atis-card"><div class="atis-card-title">\\ud83d\\udd12 ATIS</div><pre style="white-space:normal;line-height:1.6">'
+      + '<span style="color:var(--text)">ATIS \\u50c5\\u9650\\u5df2\\u540c\\u6b65\\u73ed\\u8868\\u7684\\u7d44\\u54e1</span><br>'
+      + '<span style="color:var(--muted);font-size:.9em">\\u5373\\u6642 ATIS \\u8cc7\\u6599\\u50c5\\u958b\\u653e\\u7d66\\u5df2\\u9a57\\u8b49\\u7684\\u661f\\u5b87\\u7d44\\u54e1\\uff0c\\u540c\\u6b65\\u5f8c\\u5373\\u89e3\\u9396\\uff08\\u5176\\u9918\\u5929\\u6c23\\u8cc7\\u8a0a\\u4e0d\\u53d7\\u5f71\\u97ff\\uff09\\u3002</span><br>'
+      + '<span style="color:var(--muted);font-size:.82em">Real-time ATIS is available to verified STARLUX crew. Unlock by syncing your roster.</span>'
+      + '</pre><button onclick="switchTab(\\'sync\\', document.getElementById(\\'tabBtn-sync\\'))" style="margin-top:4px;width:100%;background:var(--accent);color:#fff;border:none;border-radius:8px;padding:9px;font-size:.85em;cursor:pointer">\\ud83d\\udd04 \\u524d\\u5f80\\u540c\\u6b65 Sync now</button></div>';
+  } else if (atisSections === null) {
     cards += '<div class="atis-card"><div class="atis-card-title">\\ud83d\\udcfb ATIS</div><pre><span style="color:var(--muted)">\\u8f09\\u5165\\u4e2d\\u2026 Loading\\u2026</span></pre></div>';
   } else {
     var atisOnly = atisSections.filter(function(s) {
@@ -337,8 +343,9 @@ function _wxAtisFetch(icao, chosen, fresh) {
   var viaGuru = function () { return _wxAtisFallback(icao).then(function (secs) { return { sections: secs, source: secs.length ? 'atis.guru' : '' }; }); };
   if (chosen === 'guru') return viaGuru();
   return fetch('/api/atis?icao=' + icao + (fresh ? '&fresh=1' : ''), { headers: (typeof _plAtHeaders === 'function' ? _plAtHeaders() : {}) })
-    .then(function (r) { return r.ok ? r.json() : null; })
+    .then(function (r) { if (r.status === 403) return { locked: true }; return r.ok ? r.json() : null; })
     .then(function (d) {
+      if (d && d.locked) return { locked: true };        // 未同步班表 → 鎖定，不退 atis.guru（否則鎖白做）
       if (d && typeof d.level !== 'undefined') { _atisLevel = d.level; _atisLevelKnown = true; }
       if (d && d.sections) return { sections: d.sections, source: d.source || '' };
       return viaGuru();                                  // server 回 fallback → 退 atis.guru
@@ -376,7 +383,7 @@ function wxAtisSwitch(icao) {
     else if (r.source) _atisSrc[icao] = 'primary';
     // ⚠ 切換結果「絕不」寫進 wxDetailRawCache(那是會被 _wxSaveDetailCache 持久化的共享結構)→ 換來源永不殘留到 localStorage、不跨 reload/帳號。
     //    只更新 DOM + HTML 渲染快取(wxDetailCache,純記憶體、reload 即清)→ 本次連線內 stick,reload 後回到共享的預設來源。
-    var html = _wxBuildDetailHtml(icao, mLines, tText, r.sections, r.source);
+    var html = _wxBuildDetailHtml(icao, mLines, tText, r.locked ? null : r.sections, r.source, r.locked);
     wxDetailCache[icao] = html;
     var c2 = document.getElementById('wx-detail-content');
     if (c2) c2.innerHTML = html;
@@ -405,6 +412,19 @@ function fetchWxDetail(icao, name) {
         if (c && wxSelectedIcao === icao) c.innerHTML = h2;
       });
     }
+    // 非美 ATIS 受 gate 控管：即使有 24h 快取也要背景跟 server 確認還有沒有權限 → 失去權限(403 locked)就清掉
+    //   本地快取(免舊快取在 24h 內繞過 gate，codex P1)+ 改顯示鎖定卡；有權限就維持快取顯示、不多事。
+    if (icao[0] !== 'K' && icao[0] !== 'P' && cached.atis && cached.atis.length) {
+      _wxAtisFetch(icao, undefined, false).then(function (r) {
+        if (!r || !r.locked) return;
+        delete wxDetailRawCache[icao]; _wxSaveDetailCache();
+        delete wxDetailCache[icao];
+        if (wxSelectedIcao !== icao || _tok !== _wxDetailReqToken) return;
+        var hl = _wxBuildDetailHtml(icao, cached.metar, cached.taf, null, '', true);
+        var cl = document.getElementById('wx-detail-content');
+        if (cl && wxSelectedIcao === icao) cl.innerHTML = hl;
+      });
+    }
     return;
   }
   var metarP = fetch('/api/metar?ids=' + icao + '&hours=6')
@@ -427,11 +447,12 @@ function fetchWxDetail(icao, name) {
     _wxDetailRefreshDone();
     atisP.then(function(r) {
       var atisSections = r.sections, atisSource = r.source;
-      wxDetailRawCache[icao] = { metar: metarLines, taf: tafText, atis: atisSections, atisSrc: atisSource, time: Date.now() };
-      _wxSaveDetailCache();
+      // 鎖定時不寫快取(免把鎖定狀態持久化 → 同步後仍卡)；同步解鎖後下次開啟即正常抓。
+      if (!r.locked) { wxDetailRawCache[icao] = { metar: metarLines, taf: tafText, atis: atisSections, atisSrc: atisSource, time: Date.now() }; _wxSaveDetailCache(); }
       if (wxSelectedIcao !== icao || _tok !== _wxDetailReqToken) return;
-      var html = _wxBuildDetailHtml(icao, metarLines, tafText, atisSections, atisSource);
-      wxDetailCache[icao] = html;
+      var html = _wxBuildDetailHtml(icao, metarLines, tafText, r.locked ? null : atisSections, atisSource, r.locked);
+      // 鎖定卡「不」進渲染快取(且清掉舊的)→ selectWxAirport 不會重用它跳過重抓；同步解鎖後重開即正常抓 ATIS(codex P2)。
+      if (r.locked) delete wxDetailCache[icao]; else wxDetailCache[icao] = html;
       var c2 = document.getElementById('wx-detail-content');
       if (c2) c2.innerHTML = html;
     });
@@ -664,10 +685,10 @@ function _wxRefreshRegionAtis(icaos) {
     else if (active === 0 && changed) _wxSaveDetailCache();
   }
   function fetchOne(ic) {
-    fetch('/api/atis?icao=' + ic + '&bulk=1')
-      .then(function (r) { return r.json(); })
+    fetch('/api/atis?icao=' + ic + '&bulk=1', { headers: (typeof _plAtHeaders === 'function' ? _plAtHeaders() : {}) })
+      .then(function (r) { return r.status === 403 ? null : r.json(); })   // 未同步 → 403 → 不動快取
       .then(function (d) {
-        if (!d || !d.sections) return;        // fallback / 無資料 → 不動快取（保留舊的）
+        if (!d || !d.sections) return;        // fallback / 無資料 / 鎖定 → 不動快取（保留舊的）
         var sc = wxDetailRawCache[ic];
         if (!sc) return;                       // 沒開過 → server 快取已暖，detail 快取留待點開時建
         sc.atis = d.sections; sc.atisSrc = d.source || ''; changed = true;
