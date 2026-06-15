@@ -57,8 +57,8 @@ import { getAirportDbJs } from '../spa/js-airport-db.js';
 
 // ── 版本（比照 CrewSync / Morning：每次推版必更新；SW cache 名稱跟著走） ────
 // 本機 preview build 會暫時加 -tNN 後綴方便對版；推正式版前拿掉只留乾淨版號。
-export const PILOT_LOG_VERSION = 'V2.4.08';
-const PILOT_LOG_CACHE = 'pilotlog-v2-4-08';
+export const PILOT_LOG_VERSION = 'V2.4.09';
+const PILOT_LOG_CACHE = 'pilotlog-v2-4-09';
 
 export const pilotLogRouter = express.Router();
 
@@ -365,6 +365,11 @@ function _renderPilotLogChangelog(): string {
   return `
     ${renderCommunityLink()}
     <div class="pl-cl-v">${PILOT_LOG_VERSION}</div>
+    <div class="pl-cl-txt">
+      <b>🕒 SIM／地面勤務的 Schedule 也顯示當地時間（TPE）。</b><br>
+      <b>🕒 SIM / ground-duty schedule times now show local time (TPE) too.</b>
+    </div>
+    <div class="pl-cl-v old">V2.4.08</div>
     <div class="pl-cl-txt">
       <b>🖥️ 班表可選擇帶入模擬機／地面勤務（匯入頁三選一）。SIM 自動帶報到+進出箱子時間、機型、1號機與組員（Crew1-3／IP·CP），時數自動算；地面勤務記時間、過了自動變綠。待命永不匯。</b><br>
       <b>🖥️ Roster import can now include simulator / ground duties (three-way toggle). SIM auto-fills report + box-in/out times, type, lead aircraft and crew (Crew1-3 / IP·CP) with auto-computed hours; ground duties log their time and turn green once past. Standby never imported.</b>

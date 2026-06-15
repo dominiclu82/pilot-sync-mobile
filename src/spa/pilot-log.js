@@ -1373,7 +1373,9 @@ function _plEditorField(label, name, type, opts) {
   var attrs = 'id="ple-' + name + '" style="width:100%;box-sizing:border-box;background:var(--bg,#0a0e1a);color:var(--text);border:1px solid var(--border,#334155);border-radius:6px;padding:6px 8px;font-size:.78em"';
   var input;
   if (type === 'time-utc') {
-    var oninp = opts.localOf ? ' oninput="_plUpdateSchedLocal(\'' + name + '\',\'' + opts.localOf + '\')"' : '';
+    // localOf：依 origin/dest 機場時區算當地時間（飛班用）；localTz：固定時區（SIM/Ground 沒機場 → 用 TPE）。
+    // 一律走 _plRefreshSchedLocal（它讀「下拉當下類型」決定機場/TPE）→ 切換類型後也正確（codex P2）。
+    var oninp = (opts.localOf || opts.localTz) ? ' oninput="_plRefreshSchedLocal()"' : '';
     input = '<input ' + attrs + oninp + ' value="' + _plEsc(_plFmtUtcHHMM(val)) + '" placeholder="HHMM UTC" maxlength="4">';
   } else if (type === 'hhmm-dur') {
     // V2.3.05：Total Duty 存 0（匯入來源的「沒資料」寫法）→ 顯示空白。0:00 既誤導又擋自動計算。
@@ -1455,8 +1457,8 @@ function _plEditorField(label, name, type, opts) {
     input = '<input ' + attrs + ' value="' + _plEsc(dval) + '"' + (opts.placeholder ? ' placeholder="' + _plEsc(opts.placeholder) + '"' : '') + '>';
   }
   if (type === 'check') return '<div style="margin-bottom:8px">' + input + '</div>';
-  // time-utc 帶 localOf：欄位下方一行藍字顯示「當地時間 (UTC+x)」，依 origin/dest 時區換算（不影響排版，獨占一行）
-  var sub = (type === 'time-utc' && opts.localOf)
+  // time-utc 帶 localOf/localTz：欄位下方一行藍字顯示「當地時間 (UTC+x)」（不影響排版，獨占一行）
+  var sub = (type === 'time-utc' && (opts.localOf || opts.localTz))
     ? '<div id="ple-' + name + '-local" style="font-size:.58em;color:#60a5fa;margin-top:2px;min-height:1.1em;letter-spacing:.3px"></div>'
     : '';
   // V2.3：label 走自訂顯示名稱。opts.labelId（From/To 會隨 IATA/ICAO 動態改寫）平常用可被 _plSyncRouteFmt
@@ -1497,9 +1499,32 @@ function _plUpdateSchedLocal(name, side) {
   var off = _plTzOffsetStr(info.tz, utc);
   el.textContent = '🕒 ' + local + (off ? ' (' + off + ')' : '');
 }
+// V2.4.08：固定時區的當地時間提示（SIM/Ground 無機場，用 TPE）。同 _plUpdateSchedLocal 但 tz 寫死。
+function _plUpdateSchedLocalTz(name, tz) {
+  var el = document.getElementById('ple-' + name + '-local');
+  if (!el) return;
+  el.textContent = '';
+  var hhmm = (_plGetVal('ple-' + name) || '').replace(/[^0-9]/g, '');
+  var m = /^(\d{2})(\d{2})$/.exec(hhmm);
+  var dateStr = (_plGetVal('ple-flight_date') || '').slice(0, 10);
+  if (!m || !/^\d{4}-\d{2}-\d{2}$/.test(dateStr) || !tz) return;
+  var utc = new Date(dateStr + 'T' + m[1] + ':' + m[2] + ':00Z');
+  if (isNaN(utc.getTime())) return;
+  var local = '';
+  try { local = new Intl.DateTimeFormat('en-GB', { timeZone: tz, hour: '2-digit', minute: '2-digit', hour12: false }).format(utc); } catch (e) { return; }
+  var off = _plTzOffsetStr(tz, utc);
+  el.textContent = '🕒 ' + local + (off ? ' (' + off + ')' : '');
+}
 function _plRefreshSchedLocal() {
-  _plUpdateSchedLocal('std_utc', 'origin');
-  _plUpdateSchedLocal('sta_utc', 'dest');
+  // 讀「下拉當下的類型」（不是 _pl.editing 的舊值）→ 切換類型時提示即時跟著對（codex P2）。
+  var t = (document.getElementById('ple-entry-type') || {}).value || _plEntryType(_pl.editing || {});
+  if (t === 'sim' || t === 'ground') {
+    _plUpdateSchedLocalTz('std_utc', 'Asia/Taipei');
+    _plUpdateSchedLocalTz('sta_utc', 'Asia/Taipei');
+  } else {
+    _plUpdateSchedLocal('std_utc', 'origin');
+    _plUpdateSchedLocal('sta_utc', 'dest');
+  }
 }
 // From/To 即時天氣：點開才抓 METAR/TAF（展開式 panel，收合時不佔空間、不動原排版）。
 // 沿用 roster 同一組 server proxy（/api/metar、/api/taf），輸入碼一律先轉 ICAO。
@@ -3456,7 +3481,10 @@ function _plRenderEditor(target) {
     '<div id="ple-times-sec" style="display:block;margin-top:12px;background:var(--card);border-radius:10px;padding:12px">' +   /* V2.4.08：SIM/Ground 也要顯示 Times（Duty/Schedule 時間） */
       '<div style="font-size:.7em;font-weight:700;color:var(--muted);text-transform:uppercase;margin-bottom:2px">Times (UTC HHMM)</div>' +
       _plFieldSub('Scheduled') +
-      _plFieldRow(2, _plEditorField('Sched Out', 'std_utc', 'time-utc', { localOf: 'origin' }) + _plEditorField('Sched In', 'sta_utc', 'time-utc', { localOf: 'dest' })) +
+      // V2.4.08：飛班依機場時區算當地；SIM/Ground 無機場 → 用 TPE（Asia/Taipei）顯示當地時間
+      ((_plEntryType(e) === 'sim' || _plEntryType(e) === 'ground')
+        ? _plFieldRow(2, _plEditorField('Sched Out', 'std_utc', 'time-utc', { localTz: 'Asia/Taipei' }) + _plEditorField('Sched In', 'sta_utc', 'time-utc', { localTz: 'Asia/Taipei' }))
+        : _plFieldRow(2, _plEditorField('Sched Out', 'std_utc', 'time-utc', { localOf: 'origin' }) + _plEditorField('Sched In', 'sta_utc', 'time-utc', { localOf: 'dest' }))) +
       _plFieldSub('Actual · OOOI') +
       // V2.2.02：OOOI —— iPad 維持 4 欄一排；手機改 2×2（4 欄太擠、placeholder「HHMM UTC」被切）。
       (_plWide()
@@ -3554,6 +3582,7 @@ function _plEntryTypeChange() {
     // Ground：清掉組員 inputs（不只隱藏）→ 存檔不會把殘留 crew 序列化進去（codex P2）；切回非 ground 再重建。
     cs.innerHTML = (v === 'ground') ? '' : _plCrewSectionInner(_pl.editing || {}, v);
   }
+  if (typeof _plRefreshSchedLocal === 'function') _plRefreshSchedLocal();   // V2.4.08：切換類型後 Schedule 當地時間提示改用對應時區（機場/TPE）
   if (typeof _plAutoCalcDuty === 'function') _plAutoCalcDuty();   // V2.4.03：切 DHD/SIM 即時更新 FDP Limit（DHD/SIM 不顯示）
 }
 
