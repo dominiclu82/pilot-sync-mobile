@@ -57,8 +57,8 @@ import { getAirportDbJs } from '../spa/js-airport-db.js';
 
 // ── 版本（比照 CrewSync / Morning：每次推版必更新；SW cache 名稱跟著走） ────
 // 本機 preview build 會暫時加 -tNN 後綴方便對版；推正式版前拿掉只留乾淨版號。
-export const PILOT_LOG_VERSION = 'V2.4.05';
-const PILOT_LOG_CACHE = 'pilotlog-v2-4-05';
+export const PILOT_LOG_VERSION = 'V2.4.06';
+const PILOT_LOG_CACHE = 'pilotlog-v2-4-06';
 
 export const pilotLogRouter = express.Router();
 
@@ -365,6 +365,11 @@ function _renderPilotLogChangelog(): string {
   return `
     ${renderCommunityLink()}
     <div class="pl-cl-v">${PILOT_LOG_VERSION}</div>
+    <div class="pl-cl-txt">
+      <b>✨ 組員拖拉介面微調，更直覺。</b><br>
+      <b>✨ Crew drag-reorder UI refinement.</b>
+    </div>
+    <div class="pl-cl-v old">V2.4.05</div>
     <div class="pl-cl-txt">
       <b>✨ 組員操作優化：可拖拉換位、搜尋更聰明、一鍵從航班重建通訊錄。</b><br>
       <b>✨ Crew workflow improvements: drag to reorder, smarter search, one-tap address-book rebuild.</b>

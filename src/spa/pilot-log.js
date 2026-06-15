@@ -1826,9 +1826,10 @@ function _plCrewField(key, e) {
   var handle = drag ? '<span onpointerdown="_plCkDragStart(event,\'' + key + '\')" title="拖曳換位 Drag to reorder" style="flex:0 0 auto;touch-action:none;cursor:grab;color:var(--muted);font-size:1em;padding:0 2px;user-select:none">⠿</span>' : '';
   // V2.1.09：iPad（寬螢幕）維持原本 label-above 緊湊版（搭配 2-per-row，不動）。
   if (_plWide()) {
-    return '<div' + dragAttr + ' style="margin-bottom:8px">' +
+    // V2.4.06：data-ckslot（拖曳高亮/框線對象）放「內容那塊」而非整筆 → 上面的角色標籤不會被框起來（誤會整排可拖）。
+    return '<div style="margin-bottom:8px">' +
       '<div style="font-size:.62em;color:var(--muted);margin-bottom:2px">' + _plEsc(label) + '</div>' +
-      '<div style="display:flex;gap:4px;align-items:center">' + handle +
+      '<div' + dragAttr + ' style="display:flex;gap:4px;align-items:center">' + handle +
         '<div style="flex:1;min-width:0;position:relative">' +
           '<input id="ple-crew-' + key + '" autocomplete="off" placeholder="name" oninput="_plCrewSlotInput(\'' + key + '\');_plCrewDD(\'' + key + '\')" onfocus="_plCrewDD(\'' + key + '\')" onblur="_plCrewDDClose(\'' + key + '\')" style="width:100%;box-sizing:border-box;' + inputCss + '" value="' + _plEsc(dispName) + '">' +
           '<div id="ple-crewdd-' + key + '" style="display:none;position:absolute;left:0;right:0;top:calc(100% + 2px);z-index:60;max-height:190px;overflow-y:auto;background:var(--card,#0f172a);border:1px solid var(--border,#334155);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.45)"></div>' +
@@ -1839,14 +1840,17 @@ function _plCrewField(key, e) {
   }
   // 手機：LogTen 式 —— 標籤靠左、名字吃滿整列（一列一個），長名不再被截斷。職級與 ✏️ 收右邊。
   // V2.2.02：label 欄 64→46px（左邊不再留空、把空間還給名字），rank 50→52px（"RANK"/職級顯示得完整）。
-  return '<div' + dragAttr + ' style="display:flex;align-items:center;gap:5px;margin-bottom:6px">' + handle +
+  // V2.4.06：角色標籤放 data-ckslot「外面」（不被拖曳框線/高亮框住，免誤會整排可拖）；把手+名字+rank+✏️ 才是可拖的內容塊。
+  return '<div style="display:flex;align-items:center;gap:5px;margin-bottom:6px">' +
     '<div style="flex:0 0 46px;font-size:.62em;color:var(--muted);text-align:right;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + _plEsc(label) + '">' + _plEsc(label) + '</div>' +
-    '<div style="flex:1;min-width:0;position:relative">' +
-      '<input id="ple-crew-' + key + '" autocomplete="off" placeholder="name" oninput="_plCrewSlotInput(\'' + key + '\');_plCrewDD(\'' + key + '\')" onfocus="_plCrewDD(\'' + key + '\')" onblur="_plCrewDDClose(\'' + key + '\')" style="width:100%;box-sizing:border-box;' + inputCss + '" value="' + _plEsc(dispName) + '">' +
-      '<div id="ple-crewdd-' + key + '" style="display:none;position:absolute;left:0;right:0;top:calc(100% + 2px);z-index:60;max-height:190px;overflow-y:auto;background:var(--card,#0f172a);border:1px solid var(--border,#334155);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.45)"></div>' +
-    '</div>' +
-    '<input id="ple-crewrank-' + key + '" placeholder="rank" style="flex:0 0 auto;width:52px;text-transform:uppercase;' + inputCss + '" value="' + _plEsc(val.rank) + '">' +
-    editBtn + hidden + '</div>';
+    '<div' + dragAttr + ' style="display:flex;align-items:center;gap:5px;flex:1;min-width:0">' + handle +
+      '<div style="flex:1;min-width:0;position:relative">' +
+        '<input id="ple-crew-' + key + '" autocomplete="off" placeholder="name" oninput="_plCrewSlotInput(\'' + key + '\');_plCrewDD(\'' + key + '\')" onfocus="_plCrewDD(\'' + key + '\')" onblur="_plCrewDDClose(\'' + key + '\')" style="width:100%;box-sizing:border-box;' + inputCss + '" value="' + _plEsc(dispName) + '">' +
+        '<div id="ple-crewdd-' + key + '" style="display:none;position:absolute;left:0;right:0;top:calc(100% + 2px);z-index:60;max-height:190px;overflow-y:auto;background:var(--card,#0f172a);border:1px solid var(--border,#334155);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.45)"></div>' +
+      '</div>' +
+      '<input id="ple-crewrank-' + key + '" placeholder="rank" style="flex:0 0 auto;width:52px;text-transform:uppercase;' + inputCss + '" value="' + _plEsc(val.rank) + '">' +
+      editBtn +
+    '</div>' + hidden + '</div>';
 }
 
 // V2.3：航班編輯器的整組 crew 欄位 —— 核心飛航組常駐，Relief/Observer2 與「客艙組員（cabin1..20）」各自收合，
@@ -1855,13 +1859,15 @@ function _plCrewFields(e) {
   var crew = (e && e.crew) || {};
   function has(k) { return !!_plCrewVal(crew[k]).name; }
   // 核心飛航組（沿用既有 6 格版面：iPad 2-per-row、手機一列一個）—— 不動原設計。
-  var core = _plWide()
+  // V2.4.06：小提示，讓非工程背景的人知道 ⠿ 可拖（避免看不懂 grip 圖示）。
+  var dragHint = '<div style="font-size:.58em;color:var(--muted);margin:0 0 6px 2px">⠿ 拖曳可換 PIC／SIC／Relief 位 · drag ⠿ to reorder</div>';
+  var core = dragHint + (_plWide()
     ? _plFieldRow(2, _plCrewField('pic', e) + _plCrewField('crew2', e)) +
       _plFieldRow(2, _plCrewField('crew3', e) + _plCrewField('crew4', e)) +
       _plFieldRow(2, _plCrewField('cic', e) + _plCrewField('obs', e))
     : _plCrewField('pic', e) + _plCrewField('crew2', e) +
       _plCrewField('crew3', e) + _plCrewField('crew4', e) +
-      _plCrewField('cic', e) + _plCrewField('obs', e);
+      _plCrewField('cic', e) + _plCrewField('obs', e));
   var sumCss = 'font-size:.66em;font-weight:700;color:var(--muted);cursor:pointer;padding:5px 2px';
   // V2.3.04：收合區排版比照核心組（iPad 一行兩格、手機一列一個）—— 原本不分裝置一人一行，
   // 20 格客艙在 iPad 拉超長（user 實測抱怨）。
