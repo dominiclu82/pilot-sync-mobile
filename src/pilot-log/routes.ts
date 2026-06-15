@@ -46,7 +46,7 @@ import { importLogatp } from './import-logatp.js';
 import { importLogtenAddressBook } from './import-addressbook.js';
 import { importLogtenAircraftTypes } from './import-aircraft-types.js';
 import { renderCommunityLink } from '../app-changelog.js';
-import { importRoster } from './import-roster.js';
+import { importRoster, upsertCrewContact } from './import-roster.js';
 import { getTotals, getRollingTotals, getByAircraftType, getOpeningBalance, getSimTotals } from './stats.js';
 import { tailLookup } from './tw-fleet.js';            // V2.3.07：duty-backfill 公司判斷（機尾範圍推）
 import { normAirportKey } from './airport-codes.js';   // V2.3.07：duty 規則機場比對（IATA/ICAO 正規化）
@@ -57,8 +57,8 @@ import { getAirportDbJs } from '../spa/js-airport-db.js';
 
 // ── 版本（比照 CrewSync / Morning：每次推版必更新；SW cache 名稱跟著走） ────
 // 本機 preview build 會暫時加 -tNN 後綴方便對版；推正式版前拿掉只留乾淨版號。
-export const PILOT_LOG_VERSION = 'V2.4.04';
-const PILOT_LOG_CACHE = 'pilotlog-v2-4-04';
+export const PILOT_LOG_VERSION = 'V2.4.05';
+const PILOT_LOG_CACHE = 'pilotlog-v2-4-05';
 
 export const pilotLogRouter = express.Router();
 
@@ -365,6 +365,11 @@ function _renderPilotLogChangelog(): string {
   return `
     ${renderCommunityLink()}
     <div class="pl-cl-v">${PILOT_LOG_VERSION}</div>
+    <div class="pl-cl-txt">
+      <b>✨ 組員操作優化：可拖拉換位、搜尋更聰明、一鍵從航班重建通訊錄。</b><br>
+      <b>✨ Crew workflow improvements: drag to reorder, smarter search, one-tap address-book rebuild.</b>
+    </div>
+    <div class="pl-cl-v old">V2.4.04</div>
     <div class="pl-cl-txt">
       <b>✨ 操作優化：組員輸入更順手、可一鍵建回程與對調 PIC/SIC。</b><br>
       <b>✨ Workflow improvements: smoother crew entry, one-tap return flight & PIC/SIC swap.</b>
@@ -1896,9 +1901,9 @@ pilotLogRouter.get('/api/pilot-log/aircraft-types', requireAuth, async (req: Aut
 // is_self 排在最前面、其他依 display_name 排序
 pilotLogRouter.get('/api/pilot-log/crew', requireAuth, async (req: AuthedRequest, res) => {
   const pool = getPool();
-  if (!pool) return res.status(503).json({ error: 'database_unavailable' });
+  if (!pool || !(await ensureTables())) return res.status(503).json({ error: 'database_unavailable' });   // V2.4.05：先跑 migration 確保 c.aliases 欄存在（升級後第一次開 Crew 頁不會 500，codex P1）
   const r = await pool.query(
-    `SELECT c.id, c.display_name, c.organization, c.comment, c.is_self,
+    `SELECT c.id, c.display_name, c.organization, c.comment, c.is_self, c.aliases,
             c.created_at, c.updated_at,
             COALESCE(
               array_agg(e.employee_id ORDER BY e.created_at) FILTER (WHERE e.employee_id IS NOT NULL),
@@ -1912,6 +1917,43 @@ pilotLogRouter.get('/api/pilot-log/crew', requireAuth, async (req: AuthedRequest
     [req.pilotUserId]
   );
   res.json({ crew: r.rows });
+});
+
+// V2.4.05：從所有航班的組員槽「重建通訊錄」—— 掃每筆 entry 的 crew，把有員編的組員（含客艙）依員編 upsert 進通訊錄。
+//   給「舊航班的組員（尤其空服）當初沒進通訊錄」一鍵補滿，不用一個月一個月重匯班表。只收有員編的（用員編比對、不會同名誤併）。
+pilotLogRouter.post('/api/pilot-log/crew/rebuild', requireAuth, async (req: AuthedRequest, res) => {
+  const pool = getPool();
+  if (!pool || !(await ensureTables())) return res.status(503).json({ error: 'database_unavailable' });
+  const userId = req.pilotUserId!;
+  try {
+    // 只掃「實際飛過的操作航班」：有實際落地(in_utc)、非搭便機、非已移除 → 不從未來草稿/移除/DHD 帶人進來（codex P1）
+    const rows = await pool.query(
+      `SELECT crew FROM pilot_log_entries
+       WHERE user_id = $1 AND crew IS NOT NULL AND in_utc IS NOT NULL
+         AND COALESCE(is_deadhead, false) = false AND COALESCE(status, '') <> 'roster_removed'`,
+      [userId]
+    );
+    let scanned = 0, added = 0;
+    const seen = new Set<string>();   // 同一員編一輪只 upsert 一次（一個人會出現在很多班）
+    for (const row of rows.rows) {
+      scanned++;
+      const crew = row.crew;
+      if (!crew || typeof crew !== 'object') continue;
+      for (const k of Object.keys(crew)) {
+        const slot: any = crew[k];
+        if (!slot) continue;
+        const name = (typeof slot === 'string') ? slot : String(slot.name || '');
+        const eid = (typeof slot === 'object') ? String(slot.eid || '').trim() : '';
+        if (!name.trim() || !eid) continue;          // 只收有員編的（安全，跟匯入一致）
+        if (seen.has(eid)) continue;
+        seen.add(eid);
+        try { if (await upsertCrewContact(pool, userId, eid, name.trim())) added++; } catch { /* 單筆失敗略過 */ }
+      }
+    }
+    res.json({ ok: true, scanned, added });
+  } catch (e: any) {
+    res.status(500).json({ error: 'internal', detail: e.message });
+  }
 });
 
 // V1.3.14：直接編輯 crew —— 之前只能匯入 / 從航班間接帶員編，沒有「點名單就改」。
@@ -1941,8 +1983,15 @@ pilotLogRouter.put('/api/pilot-log/crew/:id', requireAuth, async (req: AuthedReq
     const own = await client.query(`SELECT id FROM crew WHERE id = $1 AND user_id = $2`, [crewId, userId]);
     if (own.rows.length === 0) { await client.query('ROLLBACK'); return res.status(404).json({ error: 'not_found' }); }
 
+    // V2.4.05：改名時把舊名收進 aliases（去重）→ 改成中文後仍能用拼音搜尋。display_name 沒變就不動 aliases。
     await client.query(
-      `UPDATE crew SET display_name = $1, organization = $2, comment = $3, updated_at = NOW()
+      `UPDATE crew SET
+         aliases = CASE
+           WHEN display_name IS DISTINCT FROM $1 AND COALESCE(display_name,'') <> ''
+                AND POSITION((';'||display_name||';') IN (';'||COALESCE(aliases,'')||';')) = 0
+           THEN TRIM(BOTH ';' FROM COALESCE(aliases,'') || ';' || display_name)
+           ELSE aliases END,
+         display_name = $1, organization = $2, comment = $3, updated_at = NOW()
        WHERE id = $4 AND user_id = $5`,
       [displayName, organization, comment, crewId, userId]
     );

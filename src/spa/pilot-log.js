@@ -1820,11 +1820,15 @@ function _plCrewField(key, e) {
   var editBtn = '<button type="button" id="ple-crewedit-' + key + '" onclick="_plQuickEditCrewSlot(\'' + key + '\')" title="編輯 / 新增此聯絡人 Edit / add contact" style="flex:0 0 auto;background:transparent;border:1px solid var(--border,#334155);border-radius:6px;color:var(--text);font-size:.85em;padding:0 7px;cursor:pointer;visibility:' + (dispName ? 'visible' : 'hidden') + '">✏️</button>';
   var hidden = '<input type="hidden" id="ple-crewid-' + key + '" value="' + _plEsc(val.eid) + '">' +
     '<input type="hidden" id="ple-crewname0-' + key + '" value="' + _plEsc(dispName) + '">';   // 原始名字：判斷名字有沒有被改過，改過就不沿用舊員編
+  // V2.4.05：只有 4 個操作位（PIC/SIC/Relief1/Relief2）可拖拉換位；拖把手 ⠿ + data-ckslot 標記。
+  var drag = (key === 'pic' || key === 'crew2' || key === 'crew3' || key === 'crew4');
+  var dragAttr = drag ? ' data-ckslot="' + key + '"' : '';
+  var handle = drag ? '<span onpointerdown="_plCkDragStart(event,\'' + key + '\')" title="拖曳換位 Drag to reorder" style="flex:0 0 auto;touch-action:none;cursor:grab;color:var(--muted);font-size:1em;padding:0 2px;user-select:none">⠿</span>' : '';
   // V2.1.09：iPad（寬螢幕）維持原本 label-above 緊湊版（搭配 2-per-row，不動）。
   if (_plWide()) {
-    return '<div style="margin-bottom:8px">' +
+    return '<div' + dragAttr + ' style="margin-bottom:8px">' +
       '<div style="font-size:.62em;color:var(--muted);margin-bottom:2px">' + _plEsc(label) + '</div>' +
-      '<div style="display:flex;gap:4px">' +
+      '<div style="display:flex;gap:4px;align-items:center">' + handle +
         '<div style="flex:1;min-width:0;position:relative">' +
           '<input id="ple-crew-' + key + '" autocomplete="off" placeholder="name" oninput="_plCrewSlotInput(\'' + key + '\');_plCrewDD(\'' + key + '\')" onfocus="_plCrewDD(\'' + key + '\')" onblur="_plCrewDDClose(\'' + key + '\')" style="width:100%;box-sizing:border-box;' + inputCss + '" value="' + _plEsc(dispName) + '">' +
           '<div id="ple-crewdd-' + key + '" style="display:none;position:absolute;left:0;right:0;top:calc(100% + 2px);z-index:60;max-height:190px;overflow-y:auto;background:var(--card,#0f172a);border:1px solid var(--border,#334155);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.45)"></div>' +
@@ -1835,7 +1839,7 @@ function _plCrewField(key, e) {
   }
   // 手機：LogTen 式 —— 標籤靠左、名字吃滿整列（一列一個），長名不再被截斷。職級與 ✏️ 收右邊。
   // V2.2.02：label 欄 64→46px（左邊不再留空、把空間還給名字），rank 50→52px（"RANK"/職級顯示得完整）。
-  return '<div style="display:flex;align-items:center;gap:5px;margin-bottom:6px">' +
+  return '<div' + dragAttr + ' style="display:flex;align-items:center;gap:5px;margin-bottom:6px">' + handle +
     '<div style="flex:0 0 46px;font-size:.62em;color:var(--muted);text-align:right;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + _plEsc(label) + '">' + _plEsc(label) + '</div>' +
     '<div style="flex:1;min-width:0;position:relative">' +
       '<input id="ple-crew-' + key + '" autocomplete="off" placeholder="name" oninput="_plCrewSlotInput(\'' + key + '\');_plCrewDD(\'' + key + '\')" onfocus="_plCrewDD(\'' + key + '\')" onblur="_plCrewDDClose(\'' + key + '\')" style="width:100%;box-sizing:border-box;' + inputCss + '" value="' + _plEsc(dispName) + '">' +
@@ -1900,7 +1904,8 @@ function _plCrewDD(key) {
   for (var i = 0; i < cands.length && list.length < 50; i++) {
     var nm = (cands[i].display_name || '').trim();
     if (!nm) continue;
-    if (!q || nm.toLowerCase().indexOf(q) >= 0) list.push(cands[i]);
+    var al = (cands[i].aliases || '').toLowerCase();   // V2.4.05：別名(拼音)也比對 → 改成中文也找得到
+    if (!q || nm.toLowerCase().indexOf(q) >= 0 || al.indexOf(q) >= 0) list.push(cands[i]);
   }
   if (!list.length) { dd.style.display = 'none'; return; }
   dd.innerHTML = list.map(function(c) {
@@ -2032,6 +2037,90 @@ function _plMakeReturn() {
   if (_plWide() && document.getElementById('pl-detail-pane')) { _plRenderEditor('pl-detail-pane'); _plRenderList(); }
   else { _plRenderEditor(); if (typeof _plRenderYearIndex === 'function') _plRenderYearIndex(); }
   if (typeof _plToast === 'function') _plToast('↩ 已建回程草稿，填航班號與時間即可');
+}
+
+// ── V2.4.05：4 個操作位拖拉換位（PIC/SIC/Relief1/Relief2）。Pointer events → iPhone 也能拖。 ──
+var _plCkDrag = null;
+function _plCkDragTargetAt(x, y) {
+  var el = document.elementFromPoint(x, y);
+  return (el && el.closest) ? el.closest('[data-ckslot]') : null;
+}
+function _plCkDragStart(ev, key) {
+  if (ev.cancelable) ev.preventDefault();
+  _plCkDrag = { key: key };
+  var row = document.querySelector('[data-ckslot="' + key + '"]');
+  if (row) row.style.opacity = '0.45';
+  document.addEventListener('pointermove', _plCkDragMove, { passive: false });
+  document.addEventListener('pointerup', _plCkDragEnd);
+  document.addEventListener('pointercancel', _plCkDragEnd);
+}
+function _plCkDragMove(ev) {
+  if (!_plCkDrag) return;
+  if (ev.cancelable) ev.preventDefault();
+  var rows = document.querySelectorAll('[data-ckslot]');
+  for (var i = 0; i < rows.length; i++) rows[i].style.outline = '';
+  var row = _plCkDragTargetAt(ev.clientX, ev.clientY);
+  if (row && row.getAttribute('data-ckslot') !== _plCkDrag.key) row.style.outline = '2px solid var(--accent,#0ea5e9)';
+}
+function _plCkDragEnd(ev) {
+  document.removeEventListener('pointermove', _plCkDragMove);
+  document.removeEventListener('pointerup', _plCkDragEnd);
+  document.removeEventListener('pointercancel', _plCkDragEnd);
+  var src = _plCkDrag; _plCkDrag = null;
+  var rows = document.querySelectorAll('[data-ckslot]');
+  for (var i = 0; i < rows.length; i++) { rows[i].style.opacity = ''; rows[i].style.outline = ''; }
+  if (!src) return;
+  var row = (ev.type === 'pointercancel') ? null : _plCkDragTargetAt(ev.clientX, ev.clientY);
+  var tgt = row ? row.getAttribute('data-ckslot') : null;
+  if (tgt && tgt !== src.key) _plCkReorder(src.key, tgt);
+}
+function _plReadSlotContent(k) {
+  return {
+    name: (document.getElementById('ple-crew-' + k) || {}).value || '',
+    eid: (document.getElementById('ple-crewid-' + k) || {}).value || '',
+    rank: (document.getElementById('ple-crewrank-' + k) || {}).value || '',
+    name0: (document.getElementById('ple-crewname0-' + k) || {}).value || '',
+  };
+}
+function _plWriteSlotContent(k, c) {
+  var n = document.getElementById('ple-crew-' + k); if (n) n.value = c.name;
+  var id = document.getElementById('ple-crewid-' + k); if (id) id.value = c.eid;
+  var rk = document.getElementById('ple-crewrank-' + k); if (rk) rk.value = c.rank;
+  var n0 = document.getElementById('ple-crewname0-' + k); if (n0) n0.value = c.name0;
+  _plCrewSlotInput(k);
+}
+// 拖 srcKey 插到 tgtKey 的位置（其餘往前/後移）；整個人(name/員編/rank)跟著搬。
+function _plCkReorder(srcKey, tgtKey) {
+  var keys = ['pic', 'crew2', 'crew3', 'crew4'];
+  var content = {}; keys.forEach(function(k) { content[k] = _plReadSlotContent(k); });
+  var order = keys.slice();
+  var si = order.indexOf(srcKey), ti = order.indexOf(tgtKey);
+  if (si < 0 || ti < 0) return;
+  order.splice(si, 1); order.splice(ti, 0, srcKey);
+  keys.forEach(function(k, i) { _plWriteSlotContent(k, content[order[i]]); });
+  _plUpdateOwnerRole();
+}
+// 你本人(員編)現在在哪一格 → 設你的 position（PIC 格=PIC、其餘=SIC）+ 觸發時數重算。
+function _plUpdateOwnerRole() {
+  var selfEids = [];
+  (_pl.crew || []).forEach(function(c) {
+    if (c.is_self && Array.isArray(c.employee_ids)) c.employee_ids.forEach(function(x) { if (x) selfEids.push(String(x).trim()); });
+  });
+  if (!selfEids.length) return;   // 不知道本人 → 不動 position
+  var keys = ['pic', 'crew2', 'crew3', 'crew4'], ownerKey = null;
+  keys.forEach(function(k) {
+    var id = ((document.getElementById('ple-crewid-' + k) || {}).value || '').trim();
+    if (id && selfEids.indexOf(id) >= 0) ownerKey = k;
+  });
+  if (!ownerKey) return;   // 本人不在這 4 格 → 不動
+  var posEl = document.getElementById('ple-position');
+  if (posEl) {
+    // 只在「跨越 PIC 邊界」才改 position：進 PIC 格→PIC；從 PIC 移出→SIC；本來就 SIC/SFO/FO 在非 PIC 格間移動 → 不動（保留 SFO/FO，codex P2）
+    var cur = posEl.value, np = cur;
+    if (ownerKey === 'pic') np = 'PIC';
+    else if (cur === 'PIC') np = 'SIC';
+    if (np !== cur) { posEl.value = np; posEl.dispatchEvent(new Event('change', { bubbles: true })); }   // change → role 自動帶把 block 算到 PIC/SIC
+  }
 }
 
 // ── V1.3.05：機場座標 + 太陽角度，給手動新增航班自動算 night time / 日夜起降 ─────────
@@ -5354,6 +5443,19 @@ async function _plOpenCrew() {
   await _plFetchAll(); _pl.aircraftEntries = _pl.entries;   // V2.2.07：_plFetchAll 已用 limit=all 載全本 → 共用，免再抓一次（codex P2 修重複下載）
   _plRenderCrewList();
 }
+// V2.4.05：從航班重建通訊錄 —— 掃所有航班組員槽、依員編補進通訊錄（含客艙），補完重載名單。
+async function _plRebuildCrew() {
+  if (!confirm('掃你所有航班的組員，依員編補進通訊錄（含客艙、已在的不重複、不動航班）。要執行嗎？')) return;
+  if (typeof _plToast === 'function') _plToast('🔄 重建中…');
+  try {
+    var res = await _plApi('/api/pilot-log/crew/rebuild', { method: 'POST', timeoutMs: 60000 });
+    var j = res.ok ? await res.json() : null;
+    if (j && j.ok) {
+      if (typeof _plToast === 'function') _plToast('🔄 已從 ' + (j.scanned || 0) + ' 個航班補進 ' + (j.added || 0) + ' 位組員');
+      await _plOpenCrew();   // 重載名單
+    } else if (typeof _plToast === 'function') _plToast('重建失敗，請稍後再試');
+  } catch (e) { if (typeof _plToast === 'function') _plToast('重建失敗（離線？）'); }
+}
 
 // V2.3：列表組員顯示模式（含 localStorage 離線退路）。cic_only=只機長 / flight=飛航組（排除客艙）/ all=全部。
 function _plGetCrewDisplayMode() {
@@ -5474,6 +5576,8 @@ function _plRenderCrewList() {
         '<button onclick="_plRenderMain()" style="background:transparent;border:0;color:var(--text);font-size:1.2em;cursor:pointer">←</button>' +
         '<div style="font-size:1em;font-weight:700">👥 Crew</div>' +
         '<div style="flex:1"></div>' +
+        // V2.4.05：從航班重建通訊錄（把舊航班的組員，尤其空服，依員編補進來）
+        '<button onclick="_plRebuildCrew()" title="掃所有航班的組員，依員編補進通訊錄（含客艙）" style="background:transparent;color:var(--muted);border:1px solid var(--border,#334155);border-radius:6px;padding:5px 9px;font-size:.72em;cursor:pointer">🔄 重建 Rebuild</button>' +
         // V1.3.32：匯出通訊錄 CSV
         '<button onclick="_plExportCrewCsv()" style="background:transparent;color:var(--muted);border:1px solid var(--border,#334155);border-radius:6px;padding:5px 9px;font-size:.72em;cursor:pointer">⬇️ Export</button>' +
         '<div style="font-size:.7em;color:var(--muted)">共 ' + _pl.crew.length + ' 人</div>' +
@@ -5503,6 +5607,7 @@ function _plRenderCrewRows() {
   var filtered = _pl.crew.filter(function(p) {
     if (!term) return true;
     if ((p.display_name || '').toLowerCase().indexOf(term) >= 0) return true;
+    if ((p.aliases || '').toLowerCase().indexOf(term) >= 0) return true;   // V2.4.05：別名(拼音)也比對 → 改中文後打拼音也找得到（codex P2）
     if (Array.isArray(p.employee_ids)) {
       for (var k = 0; k < p.employee_ids.length; k++) {
         if (String(p.employee_ids[k]).toLowerCase().indexOf(term) >= 0) return true;

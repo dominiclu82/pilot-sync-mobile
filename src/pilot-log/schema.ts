@@ -211,6 +211,8 @@ export async function ensureTables(): Promise<boolean> {
       CREATE INDEX IF NOT EXISTS idx_crew_user ON crew(user_id);
       CREATE INDEX IF NOT EXISTS idx_crew_user_name ON crew(user_id, display_name);
     `);
+    // V2.4.05：別名（分號分隔）—— 改成中文名後仍能用拼音搜尋；匯入/改名時把舊名收進這裡。
+    await pool.query(`ALTER TABLE crew ADD COLUMN IF NOT EXISTS aliases TEXT`).catch(() => {});
 
     // crew_employee_ids: 一個 crew 可掛多個 employee_id（換公司情境）
     // user_id 故意 denormalize → 跨 row UNIQUE 限制：同一個 user 的 address book 內，

@@ -202,13 +202,16 @@ function extractCrew(
   if (picIdx < 0) picIdx = cockpit.findIndex((m) => /CAP|CMD|PIC/.test((m.position || '').toUpperCase()));
   if (picIdx < 0 && cockpit.length) picIdx = 0;
   if (picIdx >= 0) out.pic = crewVal(cockpit[picIdx]);
-  // 其餘駕駛艙 → crew2..crew6（V2.3.04 跟上槽位擴充：原本只到 crew4，Relief 3/4 會被丟掉）
+  // V2.4.05：SIC（crew2）= PIC 以外、rank 是 CAP 的、工號最小（最資深）那位（公司慣例：資深 CAP 飛去程 PIC、次資深飛回程）。
+  //   沒有第二位 CAP（另一位是真的 FO/SFO）→ 用第一位副駕駛。其餘照原順序填 crew3..crew6。使用者可在 app 拖拉手動調。
+  const rest = cockpit.filter((_, i) => i !== picIdx);
+  const isCap = (m: RosterCrewMember) => /CAP|CMD/.test((m.position || '').toUpperCase()) || /CAP|CMD|TCAP/.test((m.rank || '').toUpperCase());
+  const eidNum = (m: RosterCrewMember) => { const n = parseInt(String(m.staffId || '').replace(/\D/g, ''), 10); return isNaN(n) ? Infinity : n; };   // 工號轉數字比（避免長度不同字串排錯，如 "100"<"99"，codex P2）
+  const caps = rest.filter(isCap).slice().sort((a, b) => eidNum(a) - eidNum(b));   // 工號小=資深在前；沒工號排最後
+  const sicMember = caps.length ? caps[0] : (rest[0] || null);
+  const ordered = sicMember ? [sicMember].concat(rest.filter((m) => m !== sicMember)) : rest;
   const otherSlots = ['crew2', 'crew3', 'crew4', 'crew5', 'crew6'];
-  let oi = 0;
-  cockpit.forEach((m, i) => {
-    if (i === picIdx) return;
-    if (oi < otherSlots.length) out[otherSlots[oi++]] = crewVal(m);
-  });
+  ordered.forEach((m, i) => { if (i < otherSlots.length) out[otherSlots[i]] = crewVal(m); });
   // V2.3.04：客艙組員依出現順序填 cabin1..cabin20（超過 20 人才溢位丟棄）
   cabin.forEach((m, i) => { if (i < CREW_CABIN_SLOTS.length) out[CREW_CABIN_SLOTS[i]] = crewVal(m); });
   return Object.keys(out).length ? out : null;
@@ -243,7 +246,7 @@ function isLoggedCrew(m: RosterCrewMember): boolean {
 // V1.3.12：把單一 roster 組員（以員編為主識別）upsert 進通訊錄。
 // 純「加人不改人」：員編命中既有 → 不動使用者的聯絡人；員編沒命中但同名無員編剛好 1 筆
 // → 補掛員編（避免重複）；都沒有 → 新建。回傳是否真的新增了一筆。
-async function upsertCrewContact(
+export async function upsertCrewContact(
   pool: NonNullable<ReturnType<typeof getPool>>,
   userId: string,
   staffId: string | undefined,
@@ -255,7 +258,19 @@ async function upsertCrewContact(
       `SELECT DISTINCT crew_id FROM crew_employee_ids WHERE user_id = $1 AND employee_id = $2`,
       [userId, sid]
     );
-    if (idMatch.rows.length >= 1) return false;            // 員編已掛在某聯絡人 → 不動
+    if (idMatch.rows.length >= 1) {
+      // V2.4.05：員編已掛 → 不改名，但把這次班表的名字（拼音）收進 aliases（去重；改成中文後仍能用拼音搜尋）。
+      await pool.query(
+        `UPDATE crew SET aliases = CASE
+            WHEN display_name <> $2
+                 AND POSITION((';'||$2||';') IN (';'||COALESCE(aliases,'')||';')) = 0
+            THEN TRIM(BOTH ';' FROM COALESCE(aliases,'') || ';' || $2)
+            ELSE aliases END
+         WHERE id = $1 AND user_id = $3`,
+        [idMatch.rows[0].crew_id, name, userId]
+      ).catch(() => {});
+      return false;            // 員編已掛在某聯絡人 → 不改名
+    }
     // 員編沒命中 → 試同名、且「沒掛任何員編」的聯絡人
     const nameMatch = await pool.query(
       `SELECT c.id FROM crew c
