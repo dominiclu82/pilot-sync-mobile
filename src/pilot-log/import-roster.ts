@@ -370,6 +370,25 @@ export async function importRoster(
     " AND COALESCE(day_takeoffs,0)=0 AND COALESCE(night_takeoffs,0)=0" +
     " AND COALESCE(day_landings,0)=0 AND COALESCE(night_landings,0)=0 AND COALESCE(autolands,0)=0";
 
+  // V2.4.07：sweep（班表拿掉的舊 draft）專用判定 —— 只認「真的飛了/真的在記飛行紀錄」才保護。
+  //   使用者點明：機號/機型/組員/備註這些是「飛前先填的」，班表變更把該班拿掉就該一起清掉；
+  //   只有實際 OOOI 時間、block/air/night/PIC/SIC 時數、起降/進場次數（真正的飛行紀錄）才留。
+  //   ⚠ 故意比 UNTOUCHED 寬鬆，且「只用在 sweep」—— 主迴圈同班合併去重仍用 UNTOUCHED（保守、不誤刪使用者編輯）。
+  //   sweep 只動「不在新班表裡（已被拿掉）」的列，跟仍在班表的 draft（會走合併、保留 tail/crew）互斥，不會打架。
+  const HAS_FLIGHT_RECORD =
+    "(out_utc IS NOT NULL OR off_utc IS NOT NULL OR on_utc IS NOT NULL OR in_utc IS NOT NULL" +
+    " OR COALESCE(block_minutes,0)>0 OR COALESCE(air_minutes,0)>0 OR COALESCE(night_minutes,0)>0" +
+    " OR COALESCE(pic_minutes,0)>0 OR COALESCE(sic_minutes,0)>0" +
+    " OR COALESCE(day_takeoffs,0)>0 OR COALESCE(night_takeoffs,0)>0" +
+    " OR COALESCE(day_landings,0)>0 OR COALESCE(night_landings,0)>0 OR COALESCE(autolands,0)>0" +
+    // 其他「手動可填的飛行紀錄」—— 只在「有實際值」時才保護（>0），避免被開編輯器存檔時零初始化的 0 騙到
+    //   （使用者那些 total_duty=0 的草稿仍可被掃）。⚠ 不納 pilot_flying：編輯器存檔會把它預設成 false，
+    //   IS NOT NULL 會連「只開過沒飛」的草稿都擋下來（實測重現使用者回報的 bug）；PF/PM 本是飛前規劃、非飛行證據。
+    " OR COALESCE(total_duty_minutes,0)>0 OR COALESCE(pax_count,0)>0 OR COALESCE(distance_nm,0)>0" +
+    // approaches 是 JSONB（進場明細陣列）—— ⚠ SQL 的 AND 不保證短路，jsonb_array_length 對非陣列值會丟
+    //   'cannot get array length of a non-array'。用 CASE 保證先判型別、只有 array 才取長度（物件/字串/null 一律 0）。
+    " OR (CASE WHEN jsonb_typeof(approaches)='array' THEN jsonb_array_length(approaches) ELSE 0 END) > 0)";
+
   // codex P2（V2.3.04）：同日同班號同航線可能有兩腿（罕見但合法）。正規化比對會把兩腿看成同一班
   // → 第二腿誤併掉第一腿、永遠少一筆。解法：「已認領」集合 —— 這輪匯入中，每筆既有列只能被一腿
   // 認走（合併/補組員/刪除都算），第二腿配不到未認領的列就走正常新增，兩腿各自保留。
@@ -652,16 +671,17 @@ export async function importRoster(
   // roster_month，所以「6 月班表的 SEA→TPE 回程（flight_date 落在 7/1）」會被 6 月 sweep 正確掃到，
   // 又不會誤動到真正屬於 7 月班表的 draft（它 roster_month='2026-07'）。舊資料 roster_month 為 NULL
   // → 退回原本的 flight_date 區間掃（非邊界腿都涵蓋；下次重匯就會補上 roster_month、自動升級成精準掃）。
-  // UNTOUCHED 定義已搬到主迴圈前（V2.3.04）—— sweep 與同班合併共用。
+  // V2.4.07：sweep 改用 HAS_FLIGHT_RECORD（比 UNTOUCHED 寬鬆）—— 沒實際飛行紀錄的草稿，
+  //   就算先填了機號/機型/組員，班表把它拿掉就一起清；真有飛行紀錄（時間/時數/起降）才留。
   for (const sw of sweeps) {
-    // 班表變更：這次匯入的月份內，舊「純草稿」不在新班表 → 直接刪掉（不留「已移除」狀態；動過的保留）。
+    // 班表變更：這次匯入的月份內，舊草稿不在新班表 + 沒飛行紀錄 → 直接刪掉（有飛行紀錄的保留）。
     const r = sw.month
       ? await pool.query(
           `DELETE FROM pilot_log_entries
            WHERE user_id = $1
              AND source = 'roster'
              AND status = 'draft'
-             AND ${UNTOUCHED}
+             AND NOT ${HAS_FLIGHT_RECORD}
              AND NOT (source_ref = ANY($5::text[]))
              AND (
                roster_month = $2
@@ -674,7 +694,7 @@ export async function importRoster(
            WHERE user_id = $1
              AND source = 'roster'
              AND status = 'draft'
-             AND ${UNTOUCHED}
+             AND NOT ${HAS_FLIGHT_RECORD}
              AND flight_date >= $2 AND flight_date <= $3
              AND NOT (source_ref = ANY($4::text[]))`,
           [userId, sw.start, sw.end, seenRefs]

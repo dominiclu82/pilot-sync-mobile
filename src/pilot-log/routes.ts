@@ -57,8 +57,8 @@ import { getAirportDbJs } from '../spa/js-airport-db.js';
 
 // ── 版本（比照 CrewSync / Morning：每次推版必更新；SW cache 名稱跟著走） ────
 // 本機 preview build 會暫時加 -tNN 後綴方便對版；推正式版前拿掉只留乾淨版號。
-export const PILOT_LOG_VERSION = 'V2.4.06';
-const PILOT_LOG_CACHE = 'pilotlog-v2-4-06';
+export const PILOT_LOG_VERSION = 'V2.4.07';
+const PILOT_LOG_CACHE = 'pilotlog-v2-4-07';
 
 export const pilotLogRouter = express.Router();
 
@@ -365,6 +365,11 @@ function _renderPilotLogChangelog(): string {
   return `
     ${renderCommunityLink()}
     <div class="pl-cl-v">${PILOT_LOG_VERSION}</div>
+    <div class="pl-cl-txt">
+      <b>✨ 重匯班表邏輯改進。</b><br>
+      <b>✨ Roster re-import logic improved.</b>
+    </div>
+    <div class="pl-cl-v old">V2.4.06</div>
     <div class="pl-cl-txt">
       <b>✨ 組員拖拉介面微調，更直覺。</b><br>
       <b>✨ Crew drag-reorder UI refinement.</b>
@@ -2825,6 +2830,14 @@ pilotLogRouter.get('/api/pilot-log/admin/all-users', requireAuth, async (req: Au
       `SELECT db_total_bytes, pilot_log_bytes, restaurant_etc_bytes, captured_at
        FROM pilot_db_size_history ORDER BY captured_at DESC LIMIT 30`
     ).catch(() => ({ rows: [] as any[] }));
+    // V9.5.02：全體聚合 —— 匯入來源分布 + 機型排行（純統計、無 PII；補上 Tower 移除額度卡後的空位）。
+    const srcAgg = await pool.query(
+      `SELECT source, COUNT(*)::int AS n FROM pilot_log_entries GROUP BY source ORDER BY n DESC`
+    ).catch(() => ({ rows: [] as any[] }));
+    const acAgg = await pool.query(
+      `SELECT aircraft_type AS t, COUNT(*)::int AS n FROM pilot_log_entries
+       WHERE COALESCE(aircraft_type,'') <> '' GROUP BY aircraft_type ORDER BY n DESC LIMIT 8`
+    ).catch(() => ({ rows: [] as any[] }));
     res.json({
       pilot: { count: pilot.rows.length, users: pilot.rows },
       crewsync: { count: cs.rows.length, sharing: sharingCount, users: cs.rows },
@@ -2832,6 +2845,8 @@ pilotLogRouter.get('/api/pilot-log/admin/all-users', requireAuth, async (req: Au
       groups: { count: groups.rows.length, list: groups.rows },
       // 整庫 / pilot-log / 餐廳+其他 大小快照（最新 + 最近 30 筆，前端算成長速度、推估到 1GB）
       db: { latest: dbsize.rows[0] || null, history: dbsize.rows },
+      // V9.5.02：全體匯入來源分布 + 機型排行（統計）
+      stats: { sources: srcAgg.rows, aircraft: acAgg.rows },
     });
   } catch (e: any) {
     res.status(500).json({ error: e.message });
@@ -3303,7 +3318,8 @@ async function load(){
     T.data=await r.json();
     try{var rs=await api('/api/pilot-log/oops/stats?limit=30');if(rs.ok)T.db=await rs.json();}catch(e){}
     try{var ru=await api('/api/pilot-log/oops/users');if(ru.ok){var ju=await ru.json();T.dbusers=ju.users||[];}}catch(e){}
-    try{var ra=await api('/api/atis-usage');if(ra.ok)T.atis=await ra.json();}catch(e){}
+    // TODO（V9.5.02 移除）：ATIS airframes「額度」面板已停用 —— V9.4.18 換匿名 /v1 端點後無 key/無額度，getAtisUsage 恆為空。
+    //   原本 try{ /api/atis-usage → T.atis }；連同 dash() 內的「ATIS 額度 · airframes」卡片一併拿掉（後端端點留著、孤兒、無害）。
     el('me').textContent='owner';el('reBtn').style.display='';el('outBtn').style.display='';el('foot').style.display='';el('msg').textContent='';
     render();
   }catch(e){}
@@ -3331,7 +3347,15 @@ function dash(){
     '<div class=card><div class=lbl>今日新增</div><div class="big blue">+'+newToday+'</div></div>'+
     '<div class=card><div class=lbl>跨 App 重疊</div><div class=big>'+overlap+'</div><div class=sub>CrewSync + Pilot Log</div></div>'+
     (diskBytes!=null?'<div class=card><div class=lbl>資料庫</div><div class=big>'+mb(diskBytes)+'<span style="font-size:.5em;color:#64748b"> / 1 GB</span></div><div class=bar><i style="width:'+pct+'%"></i></div><div class=sub>'+pct+'% · Pilot Log '+mb(plBytes)+'</div></div>':'')+
-    (T.atis?'<div class=card><div class=lbl>ATIS 額度 · airframes</div>'+(T.atis.known?'<div class=big>'+T.atis.used+'<span style="font-size:.5em;color:#64748b"> / '+T.atis.limit+'</span></div><div class=seg><span class=gray>剩 <b>'+T.atis.remaining+'</b></span><span class=blue>founder 上限 <b>'+T.atis.founderCap+'</b></span></div>':'<div class=big>—</div><div class=sub>等有人用過才顯示(不主動抓、省額度)</div>')+'<div class=sub style="margin-top:5px">今日 <b style="color:#e2e8f0">'+(T.atis.todayUsers||0)+'</b> 人用 · 詳見 📻 ATIS 分頁</div></div>':'')+
+    /* V9.5.02：原 ATIS 額度卡（匿名化後恆空）已移除，改放下面兩張全體統計卡。原碼見 git 歷史，後端孤兒端點留著。 */
+    (function(){var ss=(d.stats&&d.stats.sources)||[];var sm={};var tot=0;ss.forEach(function(x){sm[x.source]=x.n;tot+=x.n;});
+      if(!tot)return '';
+      var segs=SRC_ORDER.filter(function(k){return sm[k];}).map(function(k){return '<span>'+SRC_LABELS[k]+' <b>'+sm[k]+'</b></span>';}).join('');
+      return '<div class=card><div class=lbl>匯入來源</div><div class=big>'+tot+'</div><div class=seg style="flex-wrap:wrap">'+segs+'</div></div>';})()+
+    (function(){var aa=(d.stats&&d.stats.aircraft)||[];
+      if(!aa.length)return '';
+      var rest=aa.slice(1,6).map(function(x){return '<span>'+esc(x.t)+' <b>'+x.n+'</b></span>';}).join('');
+      return '<div class=card><div class=lbl>機型排行</div><div class=big>'+esc(aa[0].t)+'<span style="font-size:.5em;color:#64748b"> '+aa[0].n+'</span></div><div class=seg style="flex-wrap:wrap">'+rest+'</div></div>';})()+
   '</div>';
 }
 function filt(arr,keys){var q=T.q.toLowerCase();if(!q)return arr;return arr.filter(function(u){return keys.some(function(k){var v=u[k];if(Array.isArray(v))v=v.join(' ');return String(v||'').toLowerCase().indexOf(q)>=0;});});}
@@ -3345,40 +3369,15 @@ function render(){
     '<div class="tab'+(T.tab===2?' on':'')+'" onclick="setTab(2)">🌅 Morning <span class=n>· '+m.count+'</span></div>'+
     '<div class="tab'+(T.tab===3?' on':'')+'" onclick="setTab(3)">👥 Groups <span class=n>· '+gp.count+'</span></div>'+
     '<div class="tab'+(T.tab===4?' on':'')+'" onclick="setTab(4)">💾 DB</div>'+
-    '<div class="tab'+(T.tab===5?' on':'')+'" onclick="setTab(5)">📻 ATIS</div>'+
+    /* TODO（V9.5.02 移除）：📻 ATIS 分頁已停用（匿名化後額度/誰用紀錄皆空）。 */
   '</div>';
   if(T.tab<3){h+='<div class=ctrl><input placeholder="🔍 搜尋…" value="'+esc(T.q)+'" oninput="T.q=this.value;render()"></div>';}
-  if(T.tab===0)h+=secCrew(c);else if(T.tab===1)h+=secPilot(p,c);else if(T.tab===2)h+=secMorning(m);else if(T.tab===3)h+=secGroups(gp);else if(T.tab===4)h+=secDb();else h+=secAtis();
+  if(T.tab===0)h+=secCrew(c);else if(T.tab===1)h+=secPilot(p,c);else if(T.tab===2)h+=secMorning(m);else if(T.tab===3)h+=secGroups(gp);else if(T.tab===4)h+=secDb();
   el('app').style.display='';el('app').innerHTML=h;
 }
-function secAtis(){
-  var a=T.atis;
-  if(!a){return '<div class="sec on"><div class=sechdr><h2>📻 ATIS · airframes</h2></div><div class=row>無資料（owner 才看得到）</div></div>';}
-  var h='<div class="sec on"><div class=sechdr><h2>📻 ATIS · airframes 額度</h2><span class=cnt>每天 UTC 00:00 重置（台灣早上 08:00）</span></div>';
-  h+='<div class=row><div class=stats>';
-  if(a.known){h+='<span>今日已用 <b>'+a.used+'</b> / '+a.limit+'</span><span>剩 <b>'+a.remaining+'</b></span><span>founder 上限 <b>'+a.founderCap+'</b></span><span>你 owner 可用滿 <b>'+a.limit+'</b></span>';}
-  else{h+='<span>今日已用 <b>—</b>（不主動抓、省額度 → 等有人真的用過 ATIS 才顯示）</span>';}
-  h+='</div><div class=t>快取機場 '+(a.cachedAirports||0)+' · 數字來自 airframes，重啟不歸零</div></div>';
-  // helper：把 [{who,icao,n}] 依 who 分組;把機場清單轉字串
-  function grp(rows,k){var m={};(rows||[]).forEach(function(r){(m[r.who]=m[r.who]||[]).push({icao:r.icao,n:r[k]});});return m;}
-  function aptStr(list){return (list||[]).map(function(x){return '<span><b>'+esc(x.icao||'?')+'</b> '+x.n+'</span>';}).join('');}
-  var hist=a.history||{};
-  // 今日誰用(誰查了哪些機場)
-  var todayG=grp(a.who,'count'),todayKeys=Object.keys(todayG);
-  h+='<div class=sechdr style="margin-top:14px"><h2 style="font-size:.95em">今日誰用 · 查了哪些機場</h2><span class=cnt>'+(a.todayUsers||0)+' 人</span></div>';
-  if(todayKeys.length){todayKeys.forEach(function(who){var s=todayG[who].reduce(function(t,x){return t+x.n;},0);h+='<div class=row><div class=r1><span class=id>'+esc(who)+'</span><span class=badge style="background:#0a0e1a;color:#fcd34d;border:1px solid #92590e">共 '+s+'</span></div><div class=src style="flex-wrap:wrap">'+aptStr(todayG[who])+'</div></div>';});}else{h+='<div class=row>今日尚無人觸發 airframes</div>';}
-  // 累計誰用最多(+各自查的機場)
-  var uaG=grp(hist.byUserAirport,'total');
-  h+='<div class=sechdr style="margin-top:14px"><h2 style="font-size:.95em">累計 · 誰用最多（全部歷史）</h2><span class=cnt>'+((hist.byUser&&hist.byUser.length)||0)+' 人</span></div>';
-  if(hist.byUser&&hist.byUser.length){hist.byUser.forEach(function(w){h+='<div class=row><div class=r1><span class=id>'+esc(w.who)+'</span><span class=badge style="background:#0a0e1a;color:#fcd34d;border:1px solid #92590e">'+w.total+' 次</span></div><div class=src style="flex-wrap:wrap">'+aptStr(uaG[w.who])+'</div>'+(w.last?'<div class=t>最後 '+fmtDt(w.last)+'</div>':'')+'</div>';});}else{h+='<div class=row>尚無紀錄</div>';}
-  // 各機場被查熱度
-  h+='<div class=sechdr style="margin-top:14px"><h2 style="font-size:.95em">各機場被查次數（全部歷史）</h2></div>';
-  if(hist.byAirport&&hist.byAirport.length){h+='<div class=row><div class=src style="flex-wrap:wrap">'+hist.byAirport.map(function(x){return '<span><b>'+esc(x.icao||'?')+'</b> '+x.total+'</span>';}).join('')+'</div></div>';}else{h+='<div class=row>尚無紀錄</div>';}
-  // 每日用量
-  h+='<div class=sechdr style="margin-top:14px"><h2 style="font-size:.95em">每日用量</h2></div>';
-  if(hist.byDay&&hist.byDay.length){hist.byDay.forEach(function(dd){h+='<div class=row><div class=r1><span class=id>'+esc(dd.day)+'</span><span class=badge style="background:#0a0e1a;color:#93c5fd;border:1px solid #1e3a5f">'+dd.total+' 次</span><span class=name>'+dd.users+' 人</span></div></div>';});}else{h+='<div class=row>尚無紀錄</div>';}
-  return h+'</div>';
-}
+/* TODO（V9.5.02 移除）：secAtis() ATIS 額度/誰用紀錄分頁已停用 —— V9.4.18 換匿名 /v1 端點後
+   getAtisUsage 恆空、cs_atis_who 自 2026-06-08 起不再寫入。原實作見 git 歷史；要恢復「熱門查詢機場」
+   需先在抓取路徑重新記錄 who/icao。對應導覽鈕與 dispatch 已一併移除，後端孤兒端點留著、無害。 */
 function secCrew(c){
   var fl={},rk={},sh=0;c.users.forEach(function(u){if(u.fleet)fl[u.fleet]=(fl[u.fleet]||0)+1;if(u.rank)rk[u.rank]=(rk[u.rank]||0)+1;if(u.sharing)sh++;});
   var flS=Object.keys(fl).map(function(k){return k+' '+fl[k];}).join(' / ')||'—';
