@@ -405,7 +405,8 @@ function fetchWxDetail(icao, name) {
     // 還不知道創始身份 → 背景只探一次身份(不碰快取資料,免把共享 FAA/airframes 降級成 guru,P1)。學到後用「原快取資料」重繪,只多出切換鈕。已知就不再探。
     if (!_atisLevelKnown) {
       _wxAtisProbeLevel().then(function () {
-        if (wxSelectedIcao !== icao || _tok !== _wxDetailReqToken || !_atisLevelKnown) return;
+        // ⚠ 多加 !wxDetailRawCache[icao]：若下面的 gate 重驗已判定鎖定、刪了快取，這裡就別再用舊 cached.atis 重畫把 ATIS 蓋回來（競態繞過鎖，codex P1）。
+        if (wxSelectedIcao !== icao || _tok !== _wxDetailReqToken || !_atisLevelKnown || !wxDetailRawCache[icao]) return;
         var h2 = _wxBuildDetailHtml(icao, cached.metar, cached.taf, cached.atis, cached.atisSrc);   // 用原快取資料重繪,只是現在會帶切換鈕
         wxDetailCache[icao] = h2;
         var c = document.getElementById('wx-detail-content');
@@ -414,16 +415,20 @@ function fetchWxDetail(icao, name) {
     }
     // 非美 ATIS 受 gate 控管：即使有 24h 快取也要背景跟 server 確認還有沒有權限 → 失去權限(403 locked)就清掉
     //   本地快取(免舊快取在 24h 內繞過 gate，codex P1)+ 改顯示鎖定卡；有權限就維持快取顯示、不多事。
-    if (icao[0] !== 'K' && icao[0] !== 'P' && cached.atis && cached.atis.length) {
-      _wxAtisFetch(icao, undefined, false).then(function (r) {
-        if (!r || !r.locked) return;
-        delete wxDetailRawCache[icao]; _wxSaveDetailCache();
-        delete wxDetailCache[icao];
-        if (wxSelectedIcao !== icao || _tok !== _wxDetailReqToken) return;
-        var hl = _wxBuildDetailHtml(icao, cached.metar, cached.taf, null, '', true);
-        var cl = document.getElementById('wx-detail-content');
-        if (cl && wxSelectedIcao === icao) cl.innerHTML = hl;
-      });
+    //   ⚠ 不可加「cached.atis.length」條件：空 ATIS 快取(顯示「無資料」)的非美場也要重驗，否則未登入看到「無資料」而非「鎖定」(實見 RCTP/RCKH)。
+    if (icao[0] !== 'K' && icao[0] !== 'P') {
+      // 輕量重驗：只看「是不是 403(鎖定)」就好，不走 _wxAtisFetch 的完整抓取+atis.guru fallback
+      //   → 已登入/有權限的場(含真的無 ATIS)不會每次開都多打網路(codex P2 耗能)。
+      fetch('/api/atis?icao=' + icao, { headers: (typeof _plAtHeaders === 'function' ? _plAtHeaders() : {}) })
+        .then(function (r) {
+          if (r.status !== 403) return;   // 有權限 → 不動快取、不多事
+          delete wxDetailRawCache[icao]; _wxSaveDetailCache();
+          delete wxDetailCache[icao];
+          if (wxSelectedIcao !== icao || _tok !== _wxDetailReqToken) return;
+          var hl = _wxBuildDetailHtml(icao, cached.metar, cached.taf, null, '', true);
+          var cl = document.getElementById('wx-detail-content');
+          if (cl && wxSelectedIcao === icao) cl.innerHTML = hl;
+        }).catch(function () { });
     }
     return;
   }

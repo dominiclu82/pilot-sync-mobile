@@ -1536,7 +1536,7 @@ export function getSpaHtmlBody(): string {
       <button class="tab-util-btn tab-install-btn" id="tab-install-btn" onclick="showInstallGuide()" style="display:none">
         <span>📲</span>安裝
       </button>
-      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer;text-decoration:underline" onclick="showAbout()">V9.5.00</span>
+      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer;text-decoration:underline" onclick="showAbout()">V9.5.01</span>
     </div>
   </div>
 </div>
@@ -1570,7 +1570,12 @@ export function getSpaHtmlBody(): string {
     </div>
     <div style="max-height:50vh;overflow-y:auto;-webkit-overflow-scrolling:touch;margin-bottom:10px">
     ${renderCommunityLink()}
-    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V9.5.00</div>
+    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V9.5.01</div>
+    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
+      <div>🔒 <b>修正未同步時部分機場 ATIS 誤顯示「無資料」，現在會正確顯示鎖定提示。</b></div>
+      <div>🔒 <b>Fixed some airports showing "no data" instead of the lock notice when not synced.</b></div>
+    </div>
+    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V9.5.00</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
       <div>🛡️ <b>隱私強化：班表分享／群組／Briefing 的寫入與刪除改為需驗證本人身分（防冒名覆蓋他人班表、亂加群、刪他人 briefing）；班表查詢加流量限制擋枚舉撈照片。Briefing 筆記改為僅本人可讀寫。</b></div>
       <div>🛡️ <b>Privacy hardening: writes/deletes for roster sharing, groups and briefings now require identity verification (no impersonating others); roster lookups are rate-limited against enumeration. Briefing notes are now owner-only.</b></div>
