@@ -945,7 +945,12 @@ function _plRenderEntryRow(e) {
     '<span style="min-width:34px;text-align:right">' + arr + '</span>' +
   '</div>';
 
-  var airports = e.is_sim
+  var airports = e.is_ground
+    ? '<div style="display:flex;align-items:center;gap:8px">' +
+        '<span style="background:#0891b2;color:#fff;font-size:.6em;font-weight:800;padding:2px 8px;border-radius:5px;letter-spacing:.5px">GND</span>' +
+        '<span style="font-size:1.05em;font-weight:700">' + _plEsc(e.flight_no || 'Ground Duty') + '</span>' +
+      '</div>'
+    : e.is_sim
     ? '<div style="display:flex;align-items:center;gap:8px">' +
         '<span style="background:#7c3aed;color:#fff;font-size:.6em;font-weight:800;padding:2px 8px;border-radius:5px;letter-spacing:.5px">SIM</span>' +
         '<span style="font-size:1.05em;font-weight:700">' + _plEsc(e.sim_type || 'Simulator') + '</span>' +
@@ -1808,9 +1813,9 @@ async function _plSaveFieldLabels() {
   }
 }
 // crew.X 是 JSONB 巢狀欄位，用專屬 input id ple-crew-X（名字）/ ple-crewrank-X（rank）/ ple-crewid-X（員編 hidden），跟 _plSaveEntry 讀法對齊
-function _plCrewField(key, e) {
+function _plCrewField(key, e, labelOverride) {
   var val = _plCrewVal(e.crew && e.crew[key]);
-  var label = _plCrewLabel(key);
+  var label = labelOverride || _plCrewLabel(key);   // V2.4.08：SIM 用固定標籤（Crew1/IP·CP），不走全域 PIC/SIC 對照
   // V1.3.14：有員編且通訊錄查得到 → 編輯器也顯示通訊錄名（跟列表一致）。name0 同步設成顯示名，
   // 這樣「沒被改過 → 沿用舊員編」的判斷仍成立（name === name0），不會弄丟 eid 連結。
   var dispName = _plCrewDisplayName(val);
@@ -1855,9 +1860,46 @@ function _plCrewField(key, e) {
 
 // V2.3：航班編輯器的整組 crew 欄位 —— 核心飛航組常駐，Relief/Observer2 與「客艙組員（cabin1..20）」各自收合，
 // 有值才預設展開。所有槽位一律渲染（即使收合）→ 存檔時 _plSaveEntry 讀得到、不會掉資料。
-function _plCrewFields(e) {
+// V2.4.08：把畫面上目前的組員輸入收成 crew 物件（切換類型重建前用，保住未存的編輯）。讀法跟存檔一致。
+function _plSnapshotCrewFromForm() {
+  var out = {};
+  var prev = (_pl.editing && _pl.editing.crew) || {};
+  var readKeys = PL_CREW_KEYS.concat(['crew1', 'ip']);
+  Object.keys(prev).forEach(function(k) { if (readKeys.indexOf(k) < 0 && prev[k] != null && prev[k] !== '') out[k] = prev[k]; });
+  readKeys.forEach(function(k) {
+    var el = document.getElementById('ple-crew-' + k); if (!el) return;
+    var name = (el.value || '').trim(); if (!name) return;
+    var rankEl = document.getElementById('ple-crewrank-' + k);
+    var idEl = document.getElementById('ple-crewid-' + k);
+    var slot = { name: name };
+    if (rankEl && rankEl.value.trim()) slot.rank = rankEl.value.trim().toUpperCase();
+    if (idEl && idEl.value.trim()) slot.eid = idEl.value.trim();
+    out[k] = slot;
+  });
+  return out;
+}
+// V2.4.08：Crew 區內容（header + datalist + 欄位）—— 抽出來讓切換類型時可重建。type 明確傳入（不靠 e，因切換當下 e 還沒更新）。
+function _plCrewSectionInner(e, type) {
+  return '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">' +
+      '<div style="font-size:.7em;font-weight:700;color:var(--muted);text-transform:uppercase">Crew</div>' +
+      (type === 'flight' ? '<button type="button" onclick="_plSwapPicSic()" title="對調 PIC/SIC（一去一回輪替）" style="background:transparent;border:1px solid var(--border,#334155);border-radius:6px;color:var(--text);font-size:.7em;padding:4px 8px;cursor:pointer">⇄ Swap PIC/SIC</button>' : '') +
+    '</div>' +
+    _plCrewDatalist() +
+    _plCrewFields(e, type);
+}
+function _plCrewFields(e, typeOverride) {
   var crew = (e && e.crew) || {};
   function has(k) { return !!_plCrewVal(crew[k]).name; }
+  var etype = typeOverride || _plEntryType(e);
+  // V2.4.08：SIM 用四格固定版面（Crew1/Crew2/Crew3/IP·CP），不用 PIC/SIC/客艙那套。
+  if (etype === 'sim') {
+    if (_plWide()) {
+      return _plFieldRow(2, _plCrewField('crew1', e, 'Crew 1') + _plCrewField('crew2', e, 'Crew 2')) +
+             _plFieldRow(2, _plCrewField('crew3', e, 'Crew 3') + _plCrewField('ip', e, 'IP / CP'));
+    }
+    return _plCrewField('crew1', e, 'Crew 1') + _plCrewField('crew2', e, 'Crew 2') +
+           _plCrewField('crew3', e, 'Crew 3') + _plCrewField('ip', e, 'IP / CP');
+  }
   // 核心飛航組（沿用既有 6 格版面：iPad 2-per-row、手機一列一個）—— 不動原設計。
   // V2.4.06：小提示，讓非工程背景的人知道 ⠿ 可拖（避免看不懂 grip 圖示）。
   var dragHint = '<div style="font-size:.58em;color:var(--muted);margin:0 0 6px 2px">⠿ 拖曳可換 PIC／SIC／Relief 位 · drag ⠿ to reorder</div>';
@@ -3394,13 +3436,14 @@ function _plRenderEditor(target) {
           '<option value="flight"' + (_plEntryType(e) === 'flight' ? ' selected' : '') + '>✈️ Flight 一般航班</option>' +
           '<option value="dhd"' + (_plEntryType(e) === 'dhd' ? ' selected' : '') + '>🧳 DHD 搭便機（乘客 — 不算 PIC/SIC 與起降）</option>' +
           '<option value="sim"' + (_plEntryType(e) === 'sim' ? ' selected' : '') + '>🖥️ SIM 模擬機</option>' +
+          '<option value="ground"' + (_plEntryType(e) === 'ground' ? ' selected' : '') + '>🏫 Ground 地面勤務</option>' +
         '</select>' +
       '</div>' +
       '<div id="ple-sim-fields" style="display:' + (_plEntryType(e) === 'sim' ? 'block' : 'none') + ';margin-bottom:8px">' +
         _plFieldRow(2, _plEditorField('Sim Type（FFS/FTD）', 'sim_type', 'text') + _plEditorField('Sim Time', 'sim_minutes', 'hhmm-dur')) +
       '</div>' +
       _plFieldRow(2, _plEditorField('Date', 'flight_date', 'date') + _plEditorField('Flight #', 'flight_no', 'text')) +
-      '<div id="ple-route-row" style="display:' + (_plEntryType(e) === 'sim' ? 'none' : '') + '">' + _plFieldRow(2, _plEditorField('From (' + (_plAptFmtCur() === 'iata' ? 'IATA' : 'ICAO') + ')', 'origin', 'text', { fmt: _plAptFmt, aptSide: 'origin', labelId: 'ple-origin-label', placeholder: '選星宇航點或輸入 · pick/type' }) + _plEditorField('To (' + (_plAptFmtCur() === 'iata' ? 'IATA' : 'ICAO') + ')', 'dest', 'text', { fmt: _plAptFmt, aptSide: 'dest', labelId: 'ple-dest-label', placeholder: '選星宇航點或輸入 · pick/type' })) +
+      '<div id="ple-route-row" style="display:' + ((_plEntryType(e) === 'sim' || _plEntryType(e) === 'ground') ? 'none' : '') + '">' + _plFieldRow(2, _plEditorField('From (' + (_plAptFmtCur() === 'iata' ? 'IATA' : 'ICAO') + ')', 'origin', 'text', { fmt: _plAptFmt, aptSide: 'origin', labelId: 'ple-origin-label', placeholder: '選星宇航點或輸入 · pick/type' }) + _plEditorField('To (' + (_plAptFmtCur() === 'iata' ? 'IATA' : 'ICAO') + ')', 'dest', 'text', { fmt: _plAptFmt, aptSide: 'dest', labelId: 'ple-dest-label', placeholder: '選星宇航點或輸入 · pick/type' })) +
         '<div id="ple-aptname-row" style="font-size:.6em;color:var(--muted);margin:-4px 0 8px;line-height:1.4"></div>' +
         '<button type="button" id="ple-wx-btn" onclick="_plToggleEditorWx()" style="background:none;border:none;color:#22c55e;font-size:.7em;font-weight:700;cursor:pointer;padding:0 0 6px">⛅ WX · METAR / TAF ▾</button>' +
         '<div id="ple-wx-panel" style="display:none;margin-bottom:8px"></div></div>' +
@@ -3410,7 +3453,7 @@ function _plRenderEditor(target) {
     '</div>' +
 
     // ── Times：Scheduled 一行 / OOOI 一行 / Duty 一行 ──
-    '<div id="ple-times-sec" style="display:' + (_plEntryType(e) === 'sim' ? 'none' : 'block') + ';margin-top:12px;background:var(--card);border-radius:10px;padding:12px">' +
+    '<div id="ple-times-sec" style="display:block;margin-top:12px;background:var(--card);border-radius:10px;padding:12px">' +   /* V2.4.08：SIM/Ground 也要顯示 Times（Duty/Schedule 時間） */
       '<div style="font-size:.7em;font-weight:700;color:var(--muted);text-transform:uppercase;margin-bottom:2px">Times (UTC HHMM)</div>' +
       _plFieldSub('Scheduled') +
       _plFieldRow(2, _plEditorField('Sched Out', 'std_utc', 'time-utc', { localOf: 'origin' }) + _plEditorField('Sched In', 'sta_utc', 'time-utc', { localOf: 'dest' })) +
@@ -3457,13 +3500,9 @@ function _plRenderEditor(target) {
     '</div>' +
 
     // ── Crew：飛航組（PIC/SIC/Relief/Observer）+ 客艙組（cabin1..20，收合）（V2.3；欄位名可在 Crew 頁自訂）──
-    '<div style="margin-top:12px;background:var(--card);border-radius:10px;padding:12px">' +
-      '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">' +
-        '<div style="font-size:.7em;font-weight:700;color:var(--muted);text-transform:uppercase">Crew</div>' +
-        (_plEntryType(e) === 'flight' ? '<button type="button" onclick="_plSwapPicSic()" title="對調 PIC/SIC（一去一回輪替）" style="background:transparent;border:1px solid var(--border,#334155);border-radius:6px;color:var(--text);font-size:.7em;padding:4px 8px;cursor:pointer">⇄ Swap PIC/SIC</button>' : '') +
-      '</div>' +
-      _plCrewDatalist() +
-      _plCrewFields(e) +
+    // V2.4.08：Ground 沒組員欄（整區隱藏）；切換類型時 _plEntryTypeChange 會重建本區（顯示/隱藏 + 換 SIM 四格/飛航版面）。
+    '<div id="ple-crew-sec" style="margin-top:12px;background:var(--card);border-radius:10px;padding:12px' + (_plEntryType(e) === 'ground' ? ';display:none' : '') + '">' +
+      _plCrewSectionInner(e, _plEntryType(e)) +
     '</div>' +
 
     // ── Other：SID+STAR / Remarks ──
@@ -3496,15 +3535,25 @@ function _plReadField(name, type) {
 
 // V1.3.08：LogTen 模型 — Save 就是 Save，沒有 Confirm 步驟。是否「飛了」用 flight_date 隱含判斷。
 // V1.3.19：entry 類型（flight/dhd/sim）。下拉切換時 show/hide sim 欄 + 收/展航線與 Times。
-function _plEntryType(e) { return (e && e.is_sim) ? 'sim' : ((e && e.is_deadhead) ? 'dhd' : 'flight'); }
+function _plEntryType(e) { return (e && e.is_sim) ? 'sim' : ((e && e.is_ground) ? 'ground' : ((e && e.is_deadhead) ? 'dhd' : 'flight')); }
 function _plEntryTypeChange() {
   var v = (document.getElementById('ple-entry-type') || {}).value || 'flight';
   var sf = document.getElementById('ple-sim-fields');
   var route = document.getElementById('ple-route-row');
   var times = document.getElementById('ple-times-sec');
   if (sf) sf.style.display = (v === 'sim') ? 'block' : 'none';
-  if (route) route.style.display = (v === 'sim') ? 'none' : '';
-  if (times) times.style.display = (v === 'sim') ? 'none' : '';
+  // V2.4.08：SIM/Ground 都沒航線；Times 區一律顯示（Duty/Schedule 時間有用）
+  if (route) route.style.display = (v === 'sim' || v === 'ground') ? 'none' : '';
+  if (times) times.style.display = 'block';
+  // V2.4.08：Crew 區隨類型重建 —— Ground 隱藏、SIM 換四格、flight/dhd 換回飛航版面（codex P2）
+  //   重建前先把畫面上「還沒存的組員輸入」收回 _pl.editing.crew，避免切換類型時丟掉使用者剛打的名字（codex P2）。
+  var cs = document.getElementById('ple-crew-sec');
+  if (cs) {
+    if (_pl.editing) _pl.editing.crew = _plSnapshotCrewFromForm();   // 先收回未存的編輯（保住、之後切回來還在）
+    cs.style.display = (v === 'ground') ? 'none' : '';
+    // Ground：清掉組員 inputs（不只隱藏）→ 存檔不會把殘留 crew 序列化進去（codex P2）；切回非 ground 再重建。
+    cs.innerHTML = (v === 'ground') ? '' : _plCrewSectionInner(_pl.editing || {}, v);
+  }
   if (typeof _plAutoCalcDuty === 'function') _plAutoCalcDuty();   // V2.4.03：切 DHD/SIM 即時更新 FDP Limit（DHD/SIM 不顯示）
 }
 
@@ -3512,9 +3561,10 @@ async function _plSaveEntry() {
   var e = _pl.editing;
   if (!e) return;
 
-  // V1.3.19：類型下拉決定 flight / dhd / sim
+  // V1.3.19：類型下拉決定 flight / dhd / sim / ground（V2.4.08）
   var _etype = (document.getElementById('ple-entry-type') || {}).value || 'flight';
   var _isSim = _etype === 'sim';
+  var _isGround = _etype === 'ground';
 
   var body = {
     flight_date: _plReadField('flight_date'),
@@ -3540,6 +3590,7 @@ async function _plSaveEntry() {
     sic_minutes: _plReadField('sic_minutes', 'hhmm-dur'),
     is_deadhead: _etype === 'dhd',
     is_sim: _isSim,
+    is_ground: _isGround,
     sim_type: _isSim ? (_plReadField('sim_type') || null) : null,
     sim_minutes: _isSim ? _plReadField('sim_minutes', 'hhmm-dur') : null,
     total_duty_minutes: _plReadField('total_duty_minutes', 'hhmm-dur'),
@@ -3551,7 +3602,7 @@ async function _plSaveEntry() {
     autolands: _plReadField('autolands', 'number') || 0,
     pax_count: _plReadField('pax_count', 'number'),
     crew_count: _plReadField('crew_count', 'number'),
-    operating_crew: (function() { var v = parseInt(_plGetVal('ple-operating_crew'), 10); return (v >= 2 && v <= 4) ? v : null; })(),
+    operating_crew: (function() { if (_isSim || _isGround) return null; var v = parseInt(_plGetVal('ple-operating_crew'), 10); return (v >= 2 && v <= 4) ? v : null; })(),   // V2.4.08：SIM/Ground 不操作 → 不帶 operating_crew（codex P2）
     dep_rwy: _plReadField('dep_rwy'),
     arr_rwy: _plReadField('arr_rwy'),
     sid: _plReadField('sid'),
@@ -3560,9 +3611,10 @@ async function _plSaveEntry() {
   };
 
   // V1.3.19：SIM 沒有航線 / OOOI → 即使隱藏欄位有殘值也清空
-  if (_isSim) {
+  // V2.4.08：SIM/Ground 沒航線、沒 OOOI（保留 Schedule 與 Duty 時間）。
+  //   SIM：Schedule = 進出箱子；Ground：Schedule＋On Duty 同一時間。兩者都不該有 origin/dest/OOOI。
+  if (_isSim || _isGround) {
     body.origin = null; body.dest = null;
-    body.std_utc = null; body.sta_utc = null;
     body.out_utc = null; body.off_utc = null; body.on_utc = null; body.in_utc = null;
   }
 
@@ -3589,11 +3641,13 @@ async function _plSaveEntry() {
   // 名字若對得到通訊錄唯一同名聯絡人就用那個員編（手動選了已知聯絡人 → 自動連結）。
   // codex P1：先保留「沒被新 UI 渲染的舊 key」（如 observer2），避免編輯舊紀錄存檔時掉資料。
   var crew = {};
+  // V2.4.08：SIM 用 crew1 / ip 兩個額外槽（crew2/crew3 已在 PL_CREW_KEYS）；讀取與保留都要含它們。
+  var readKeys = PL_CREW_KEYS.concat(['crew1', 'ip']);
   var prevCrew = (_pl.editing && _pl.editing.crew) || {};
   Object.keys(prevCrew).forEach(function(k) {
-    if (PL_CREW_KEYS.indexOf(k) < 0 && prevCrew[k] != null && prevCrew[k] !== '') crew[k] = prevCrew[k];
+    if (readKeys.indexOf(k) < 0 && prevCrew[k] != null && prevCrew[k] !== '') crew[k] = prevCrew[k];
   });
-  PL_CREW_KEYS.forEach(function(k) {
+  readKeys.forEach(function(k) {
     var nameEl = document.getElementById('ple-crew-' + k);
     var name = nameEl ? nameEl.value.trim() : '';
     if (!name) return;
@@ -3610,6 +3664,7 @@ async function _plSaveEntry() {
     if (eid) slot.eid = eid;
     crew[k] = slot;
   });
+  if (_isGround) crew = {};   // V2.4.08：Ground 無組員 —— 不論 DOM 殘留，存檔一律清空（codex P2）
   body.crew = crew;
 
   // V1.3.08：新 manual entry 直接 status='confirmed'（LogTen 模型 — 寫好就是寫好）；
@@ -3722,8 +3777,8 @@ function _plEntryIsDone(e) {
   if (!e || e.status === 'roster_removed') return false;
   if (e.needs_completion) return false;   // 待補強＝未完成（缺資料），不管有沒有 in_utc 都不算「已完成」（codex P2）
   if (e.in_utc) return true;
-  if ((e.is_sim || e.is_deadhead) && e.flight_date &&
-      String(e.flight_date).slice(0, 10) <= _plTodayStr()) return true;
+  if ((e.is_sim || e.is_deadhead || e.is_ground) && e.flight_date &&
+      String(e.flight_date).slice(0, 10) <= _plTodayStr()) return true;   // V2.4.08：Ground 也用日期判定（過了＝綠）
   return false;
 }
 function _plEntryMatchesFilter(e, filter) {
@@ -3848,9 +3903,34 @@ function _plImportPaneRoster() {
         'Pulls the roster CrewSync has synced — they arrive as <b>open (blue)</b> and turn <b>done (green)</b> once you log the actual in-time after flying.<br>' +
         '<b>用前提示：</b>先去 CrewSync 用<b>同一個 Google 帳號</b>同步當月（與想要的其他月份），再回來。' +
       '</div>' +
+      _plRosterGroundModeUI() +
       '<button onclick="_plRosterListMonths()" style="background:#10b981;color:#fff;border:0;border-radius:6px;padding:6px 12px;font-size:.78em;font-weight:700;cursor:pointer">📅 列出可匯入月份 / List months</button>' +
       '<div id="pl-roster-months" style="margin-top:10px"></div>' +
     '</div>';
+}
+// V2.4.08：匯入內容三選一（只航班 / +模擬機 / +模擬機+地面勤務）。存 localStorage、記住選擇。
+function _plRosterGroundMode() { try { return localStorage.getItem('pilotlog_roster_ground') || 'none'; } catch (e) { return 'none'; } }
+function _plSetRosterGroundMode(v) {
+  v = (v === 'sim' || v === 'all') ? v : 'none';
+  try { localStorage.setItem('pilotlog_roster_ground', v); } catch (e) {}
+  var box = document.getElementById('pl-roster-gm'); if (box) box.innerHTML = _plRosterGroundModeBtns();
+}
+function _plRosterGroundModeBtns() {
+  var cur = _plRosterGroundMode();
+  var btn = function(v, label) {
+    var on = cur === v;
+    return '<button onclick="_plSetRosterGroundMode(\'' + v + '\')" style="flex:1;background:' + (on ? '#3b82f6' : 'transparent') +
+      ';color:' + (on ? '#fff' : 'var(--text)') + ';border:1px solid ' + (on ? '#3b82f6' : 'var(--border,#334155)') +
+      ';border-radius:6px;padding:6px 8px;font-size:.72em;font-weight:700;cursor:pointer">' + label + '</button>';
+  };
+  return btn('none', '只航班 Flights') + btn('sim', '+ 模擬機 SIM') + btn('all', '+ 模擬機+地面 All');
+}
+function _plRosterGroundModeUI() {
+  return '<div style="margin:4px 0 10px">' +
+    '<div style="font-size:.66em;color:var(--muted);margin-bottom:4px">匯入內容 / Include</div>' +
+    '<div id="pl-roster-gm" style="display:flex;gap:6px">' + _plRosterGroundModeBtns() + '</div>' +
+    '<div style="font-size:.6em;color:var(--muted);margin-top:4px">模擬機/地面勤務依機隊碼判斷（待命永不匯）。SIM 帶報到+進出箱子時間、機型與組員。</div>' +
+  '</div>';
 }
 
 // ② Logbook pane：來源子選 + 內容容器 + 結果框
@@ -4185,13 +4265,14 @@ function _plRosterImportSelected() {
 async function _plImportRoster(selectedMonths) {
   // V1.3.13：selectedMonths 給 → 只匯這幾個月（雲端傳 months 篩、本機過濾 byMonth）；沒給 → 全部。
   var hasSel = Array.isArray(selectedMonths) && selectedMonths.length > 0;
+  var groundMode = _plRosterGroundMode();   // V2.4.08：none / sim / all
   // 1) 先試 server 私有表
   var serverErr = '';
   try {
     var sr = await _plApi('/api/pilot-log/import/roster-from-server', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: hasSel ? { months: selectedMonths } : {},
+      body: Object.assign({ groundMode: groundMode }, hasSel ? { months: selectedMonths } : {}),
     });
     if (sr.ok) {
       var sj = await sr.json().catch(function() { return {}; });
@@ -4201,6 +4282,8 @@ async function _plImportRoster(selectedMonths) {
           ' / 已完成略過 ' + (sj.skipped_confirmed || 0) +
           (sj.skipped_existing ? ' / 已記略過 ' + sj.skipped_existing : '') +
           (sj.crew_filled ? ' / 補組員 ' + sj.crew_filled : '') +
+          (sj.sim_imported ? ' / SIM ' + sj.sim_imported : '') +
+          (sj.ground_imported ? ' / 地面 ' + sj.ground_imported : '') +
           ' / 標 removed ' + (sj.marked_removed || 0) +
           (sj.crew_added ? ' / 通訊錄 +' + sj.crew_added : ''));
         await _plRefreshMain();
@@ -4250,7 +4333,7 @@ async function _plImportRoster(selectedMonths) {
     var r = await _plApi('/api/pilot-log/import/roster', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: { duties: allDuties, months: Array.from(new Set(months)) },
+      body: { duties: allDuties, months: Array.from(new Set(months)), groundMode: groundMode },
     });
     if (!r.ok) {
       var ej = await r.json().catch(function() { return {}; });
@@ -4262,6 +4345,8 @@ async function _plImportRoster(selectedMonths) {
       ' / 已完成略過 ' + (j.skipped_confirmed || 0) +
       (j.skipped_existing ? ' / 已記略過 ' + j.skipped_existing : '') +
       (j.crew_filled ? ' / 補組員 ' + j.crew_filled : '') +
+      (j.sim_imported ? ' / SIM ' + j.sim_imported : '') +
+      (j.ground_imported ? ' / 地面 ' + j.ground_imported : '') +
       ' / 標 removed ' + (j.marked_removed || 0) +
       (j.crew_added ? ' / 通訊錄 +' + j.crew_added : ''));
     await _plRefreshMain();
@@ -6115,7 +6200,7 @@ function _plOpenTypeDetail(type) {
   if (!c) return;
   if (_pl.tab !== 'analyze') return;
   var entries = (_pl.aircraftEntries || []).filter(function(e) {
-    if (e.is_deadhead || e.is_sim || e.status === 'roster_removed') return false;
+    if (e.is_deadhead || e.is_sim || e.is_ground || e.status === 'roster_removed') return false;
     return !!e.in_utc && (e.aircraft_type || '—') === type;
   });
   var sorted = entries.slice().sort(function(a, b) { return String(b.flight_date || '').localeCompare(String(a.flight_date || '')); });
@@ -6293,7 +6378,7 @@ function _plOpenCompanyDetail(company) {
   if (!c) return;
   if (_pl.tab !== 'analyze') return;
   var entries = (_pl.aircraftEntries || []).filter(function(e) {
-    if (e.is_deadhead || e.is_sim || e.status === 'roster_removed') return false;
+    if (e.is_deadhead || e.is_sim || e.is_ground || e.status === 'roster_removed') return false;
     return !!e.in_utc && _plEntryCompany(e) === company;
   });
   var sorted = entries.slice().sort(function(a, b) { return String(b.flight_date || '').localeCompare(String(a.flight_date || '')); });

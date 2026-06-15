@@ -57,8 +57,8 @@ import { getAirportDbJs } from '../spa/js-airport-db.js';
 
 // ── 版本（比照 CrewSync / Morning：每次推版必更新；SW cache 名稱跟著走） ────
 // 本機 preview build 會暫時加 -tNN 後綴方便對版；推正式版前拿掉只留乾淨版號。
-export const PILOT_LOG_VERSION = 'V2.4.07';
-const PILOT_LOG_CACHE = 'pilotlog-v2-4-07';
+export const PILOT_LOG_VERSION = 'V2.4.08';
+const PILOT_LOG_CACHE = 'pilotlog-v2-4-08';
 
 export const pilotLogRouter = express.Router();
 
@@ -365,6 +365,11 @@ function _renderPilotLogChangelog(): string {
   return `
     ${renderCommunityLink()}
     <div class="pl-cl-v">${PILOT_LOG_VERSION}</div>
+    <div class="pl-cl-txt">
+      <b>🖥️ 班表可選擇帶入模擬機／地面勤務（匯入頁三選一）。SIM 自動帶報到+進出箱子時間、機型、1號機與組員（Crew1-3／IP·CP），時數自動算；地面勤務記時間、過了自動變綠。待命永不匯。</b><br>
+      <b>🖥️ Roster import can now include simulator / ground duties (three-way toggle). SIM auto-fills report + box-in/out times, type, lead aircraft and crew (Crew1-3 / IP·CP) with auto-computed hours; ground duties log their time and turn green once past. Standby never imported.</b>
+    </div>
+    <div class="pl-cl-v old">V2.4.07</div>
     <div class="pl-cl-txt">
       <b>✨ 重匯班表邏輯改進。</b><br>
       <b>✨ Roster re-import logic improved.</b>
@@ -1483,6 +1488,7 @@ const EDITABLE_FIELDS = [
   'pic_minutes', 'sic_minutes',                    // V1.2.04：實際 PIC/SIC 時數（可手動編輯）
   'is_deadhead',                                   // V1.2.05：deadhead/positioning（手動標）
   'is_sim', 'sim_type', 'sim_minutes',             // V1.3.19：模擬機（編輯器類型下拉 Flight/SIM/DHD）
+  'is_ground',                                      // V2.4.08：地面勤務
   'is_locked',                                     // V1.3.08：上鎖（LogTen 風格防誤改；鎖了不能編輯/刪除）
   'on_duty_utc', 'off_duty_utc', 'total_duty_minutes',
   'crew', 'approaches',
@@ -1800,8 +1806,10 @@ pilotLogRouter.post('/api/pilot-log/import/roster', requireAuth, async (req: Aut
   const months: string[] | undefined = Array.isArray(monthsRaw)
     ? monthsRaw.filter((x: any) => typeof x === 'string' && /^\d{4}-\d{2}$/.test(x))
     : undefined;
+  const gm = String((body && body.groundMode) || 'none');   // V2.4.08：none / sim / all
+  const gOpts = { includeSim: gm === 'sim' || gm === 'all', includeGround: gm === 'all' };
   try {
-    const r = await importRoster(req.pilotUserId!, duties, dateRange, months);
+    const r = await importRoster(req.pilotUserId!, duties, dateRange, months, gOpts);
     res.json(r);
   } catch (e: any) {
     console.error('[pilot-log] roster import error:', e.message);
@@ -1825,6 +1833,8 @@ pilotLogRouter.post('/api/pilot-log/import/roster-from-server', requireAuth, asy
   const monthFilter: string[] | null = Array.isArray(monthFilterRaw)
     ? monthFilterRaw.filter((x: any) => typeof x === 'string' && /^\d{4}-\d{2}$/.test(x))
     : null;
+  const gmS = String((body && body.groundMode) || 'none');   // V2.4.08：none / sim / all
+  const gOptsS = { includeSim: gmS === 'sim' || gmS === 'all', includeGround: gmS === 'all' };
   try {
     // 1) 拿這個 pilot 的所有 email（可能多筆）
     const emailQ = await pool.query('SELECT email FROM pilot_user_emails WHERE user_id = $1', [userId]);
@@ -1861,7 +1871,7 @@ pilotLogRouter.post('/api/pilot-log/import/roster-from-server', requireAuth, asy
       : availMonths;
     if (!allDuties.length || !selMonths.length) return res.json({ error: 'no_roster', months: availMonths });
     // importRoster 用 selMonths 過濾處理 + per-month sweep（只掃選取月份、不誤標沒選的）
-    const r = await importRoster(userId, allDuties, undefined, selMonths);
+    const r = await importRoster(userId, allDuties, undefined, selMonths, gOptsS);
     res.json({ ...r, months: selMonths });
   } catch (e: any) {
     console.error('[pilot-log] roster-from-server error:', e.message);

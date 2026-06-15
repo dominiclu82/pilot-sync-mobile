@@ -59,6 +59,8 @@ export interface ImportRosterResult {
   crew_added?: number;   // V1.3.12：自動加進通訊錄的組員數
   skipped_existing?: number;   // V2.0.02：同航班已有「已完成」紀錄（LogTen/手動）→ 略過不重複建草稿
   crew_filled?: number;   // V2.2.00：把班表組員/POB/position「只補空缺」補進已完成航班的筆數
+  sim_imported?: number;     // V2.4.08：匯入的模擬機筆數
+  ground_imported?: number;  // V2.4.08：匯入的地面勤務筆數
 }
 
 function normalizePosition(raw?: string): 'PIC' | 'SIC' | 'OBSERVER' | null {
@@ -315,17 +317,70 @@ export async function upsertCrewContact(
   return true;
 }
 
+// ── V2.4.08：SIM / Ground duty 匯入 ──────────────────────────────────────────
+// 班表的非航班項目（無起降地）：待命（S+數字，永遠不匯）、模擬機（機隊碼開頭或含 SIM）、其餘地面勤務。
+// 由匯入選項 includeSim / includeGround 控制要不要帶。
+function classifyGroundDuty(code: string): 'standby' | 'sim' | 'ground' | null {
+  const c = String(code || '').trim().toUpperCase();
+  if (!c) return null;
+  if (/^S\d/.test(c)) return 'standby';                      // S5B / S2B…＝待命
+  if (/SIM/.test(c) || /^(A35|A33|A32|A21|A20|B77|B78)/.test(c)) return 'sim';  // 機隊碼開頭或含 SIM
+  return 'ground';
+}
+// SIM 機隊碼 → 機型 + 1 號機（該型機籍最小號；星宇現役）。查不到回機型空、tail 空。
+function simTypeTail(code: string): { type: string; tail: string } {
+  const c = String(code || '').trim().toUpperCase();
+  if (c.startsWith('A35')) return { type: 'A359', tail: 'B-58501' };
+  if (c.startsWith('A33')) return { type: 'A339', tail: 'B-58301' };
+  if (c.startsWith('A32') || c.startsWith('A21')) return { type: 'A21N', tail: 'B-58201' };
+  return { type: '', tail: '' };
+}
+// 班表 TPE 當地時間字串（"2026.Feb.09 0900L" / "2026.Feb.09 09:00" / "2026.Feb.09 0900"）→ UTC Date。
+// 台灣固定 UTC+8、無日光節約 → 直接 −8h。解不出回 null。
+function parseTpeLocalToUtc(s?: string): Date | null {
+  if (!s) return null;
+  const m = String(s).trim().match(/^(\d{4})\.([A-Za-z]{3,})\.(\d{1,2})\s+(\d{2}):?(\d{2})/);
+  if (!m) return null;
+  const monIdx = MONTHS.indexOf(m[2].slice(0, 3).toLowerCase());
+  if (monIdx < 0) return null;
+  const localMs = Date.UTC(parseInt(m[1], 10), monIdx, parseInt(m[3], 10), parseInt(m[4], 10), parseInt(m[5], 10));
+  return new Date(localMs - 8 * 3600 * 1000);
+}
+// SIM 組員依 position 分四槽：Instructor→ip、MSP（manning support）→crew2、其餘（學生）→crew1/crew3。
+// 純照 position，不特別處理本人（你是學生就落 crew、未來當 IP 自動進 ip）。
+function extractSimCrew(crew: RosterCrewMember[] | undefined): Record<string, CrewSlotVal> | null {
+  if (!crew || !crew.length) return null;
+  let instructor: RosterCrewMember | null = null, msp: RosterCrewMember | null = null;
+  const students: RosterCrewMember[] = [];
+  for (const m of crew) {
+    if (!m.name) continue;
+    const pos = (m.position || '').toUpperCase();
+    if (/INSTRUCTOR|^IP\b|^CP\b|^INS/.test(pos)) { if (!instructor) instructor = m; else students.push(m); }
+    else if (/MSP|MANNING/.test(pos)) { if (!msp) msp = m; else students.push(m); }
+    else students.push(m);
+  }
+  const out: Record<string, CrewSlotVal> = {};
+  if (instructor) out.ip = crewVal(instructor);
+  if (msp) out.crew2 = crewVal(msp);
+  const studentSlots = msp ? ['crew1', 'crew3'] : ['crew1', 'crew2', 'crew3'];
+  let si = 0;
+  for (const s of students) { if (si < studentSlots.length) out[studentSlots[si++]] = crewVal(s); }
+  return Object.keys(out).length ? out : null;
+}
+
 /**
  * Import roster duties for a user.
  * @param userId pilot_users.id
  * @param duties roster duties from sync
  * @param dateRange { start, end } UTC dates — within range, draft entries not seen become roster_removed
+ * @param opts.includeSim / includeGround — V2.4.08：是否帶入模擬機 / 地面勤務（預設都不帶＝只航班）
  */
 export async function importRoster(
   userId: string,
   duties: RosterDuty[],
   dateRange?: { start: string; end: string },
   months?: string[],          // V1.3.07 codex P2：實際同步的月份清單；給 → 只在這些月份做 roster_removed sweep，避免把沒同步的空檔月份（5/7 同步、6 沒同步）的舊 draft 誤殺
+  opts?: { includeSim?: boolean; includeGround?: boolean },
 ): Promise<ImportRosterResult> {
   const pool = getPool();
   if (!pool || !(await ensureTables())) {
@@ -334,7 +389,10 @@ export async function importRoster(
 
   const result: ImportRosterResult = {
     inserted: 0, updated: 0, skipped_confirmed: 0, marked_removed: 0, crew_added: 0, skipped_existing: 0, crew_filled: 0,
+    sim_imported: 0, ground_imported: 0,
   };
+  const includeSim = !!(opts && opts.includeSim);
+  const includeGround = !!(opts && opts.includeGround);
 
   const seenRefs: string[] = [];
   // V1.3.12：跨整份班表蒐集「要進通訊錄」的組員，去重後再 upsert（一個人會出現在很多班）。
@@ -439,8 +497,121 @@ export async function importRoster(
     const flights = duty.flights || [];
 
     for (const f of flights) {
-      // V1.3.14：地面班/訓練（FSM/S5C 等，無起訖地）不進飛行 logbook，只匯真實航班。
-      if (!f.origin && !f.dest) continue;
+      // V2.4.08：非航班項目（無起訖地）→ 待命永遠不匯；模擬機/地面勤務依匯入選項帶入。
+      if (!f.origin && !f.dest) {
+        const code = String(f.workCode || f.flightNo || '').trim();
+        const cls = classifyGroundDuty(code);
+        if (!cls || cls === 'standby') continue;                 // 待命/認不出 → 不匯
+        if (cls === 'sim' && !includeSim) continue;
+        if (cls === 'ground' && !includeGround) continue;
+        const gDate = flightDate(f, ctx);
+        if (!gDate) continue;
+        const gMonth = (duty as any)._rmonth || gDate.slice(0, 7);
+        if (months && months.length && months.indexOf(gMonth) < 0) continue;
+        // 時間（TPE 當地 −8 → UTC）—— 先算，dedup key 要帶開始時間才能分辨同日同碼的兩場（codex P2）
+        const gReport = parseTpeLocalToUtc(duty.reportTime);
+        const gStart = parseTpeLocalToUtc(f.depTime) || gReport;
+        const gEnd = parseTpeLocalToUtc(f.arrTime) || parseTpeLocalToUtc(duty.endTime);
+        let stdU: Date | null, staU: Date | null, onD: Date | null, offD: Date | null, simMin: number | null = null;
+        let acType = '', tail = '';
+        if (cls === 'sim') {
+          onD = gReport;                                          // 報到 → On Duty
+          stdU = gStart; staU = gEnd;                             // 進出箱子 → Schedule
+          offD = parseTpeLocalToUtc(duty.endTime) || gEnd;       // duty 結束 → Off Duty
+          if (stdU && staU && staU.getTime() > stdU.getTime()) simMin = Math.round((staU.getTime() - stdU.getTime()) / 60000);
+          const tt = simTypeTail(code); acType = tt.type; tail = tt.tail;
+        } else {                                                  // ground：單一時間同時填 Schedule + On Duty
+          onD = gStart; stdU = gStart; staU = gEnd; offD = gEnd;
+        }
+        // 開始時間當 dedup 鑑別子（同日同碼但不同場＝不同時間，不可併）
+        const startKey = stdU ? stdU.toISOString() : (onD ? onD.toISOString() : 'NA');
+        const gSig = `GD|${gDate}|${cls}|${code.toUpperCase()}|${startKey}`;   // 同一場同批列兩次只處理一份
+        if (batchProcessed.has(gSig)) continue;
+        batchProcessed.add(gSig);
+        const gRef = `roster:GD:${cls}:${code}:${gDate}:${startKey}`;          // ref 含開始時間 → 兩場各自有 ref、re-import exact 命中
+        seenRefs.push(gRef);
+        const gCrew = (cls === 'sim') ? extractSimCrew(f.crew) : null;
+        if (cls === 'sim') {                                      // sim 組員也進通訊錄（跟航班一致）
+          for (const m of (f.crew || [])) {
+            if (!m.name) continue;
+            const sid = (m.staffId || '').trim();
+            const key = sid ? 'id:' + sid : 'name:' + m.name;
+            if (!contacts.has(key)) contacts.set(key, { staffId: sid || undefined, name: m.name });
+          }
+        }
+        // codex P1：跨來源查重 —— 同一場 SIM/Ground 若已手動/他源記過（source<>roster），不再建 roster 重複。
+        //   順手清掉對應的 roster 純草稿（自癒）。比對：同日 + 同類型 + 同 workCode + 同開始時間。
+        const exNon = await pool.query(
+          `SELECT 1 FROM pilot_log_entries WHERE user_id = $1 AND source <> 'roster' AND flight_date = $2
+             AND ((is_sim IS TRUE AND $3 = 'sim') OR (is_ground IS TRUE AND $3 = 'ground'))
+             AND COALESCE(flight_no,'') = $4 AND std_utc IS NOT DISTINCT FROM $5 LIMIT 1`,
+          [userId, gDate, cls, code, stdU]
+        );
+        if (exNon.rows.length) {
+          const dupRoster = await pool.query(
+            `SELECT id, (${UNTOUCHED}) AS untouched FROM pilot_log_entries
+             WHERE user_id = $1 AND source = 'roster' AND status = 'draft' AND flight_date = $2
+               AND ((is_sim IS TRUE AND $3 = 'sim') OR (is_ground IS TRUE AND $3 = 'ground'))
+               AND COALESCE(flight_no,'') = $4 AND std_utc IS NOT DISTINCT FROM $5`,
+            [userId, gDate, cls, code, stdU]
+          );
+          for (const r of dupRoster.rows) {
+            if (!consumedIds.has(r.id) && r.untouched) { await pool.query('DELETE FROM pilot_log_entries WHERE id = $1', [r.id]); consumedIds.add(r.id); }
+          }
+          result.skipped_existing = (result.skipped_existing || 0) + 1;
+          continue;
+        }
+        // 去重：exact source_ref **或**（同日+類型+workCode+開始時間）。
+        //   - 含開始時間 → 同日兩場不會被併（codex P2）。
+        //   - 含 source_ref → 使用者改過 std 後重匯仍認得既有列、走 UPDATE，不會撞 unique 鍵爆掉整批匯入（codex P1）。
+        const exG = await pool.query(
+          `SELECT id, status, source_ref, (${UNTOUCHED}) AS untouched FROM pilot_log_entries
+           WHERE user_id = $1 AND source = 'roster' AND flight_date = $2
+             AND ((is_sim IS TRUE AND $3 = 'sim') OR (is_ground IS TRUE AND $3 = 'ground'))
+             AND COALESCE(flight_no,'') = $4
+             AND (source_ref = $6 OR std_utc IS NOT DISTINCT FROM $5)`,
+          [userId, gDate, cls, code, stdU, gRef]
+        );
+        const gMatches = exG.rows.filter((r: any) => !consumedIds.has(r.id));
+        const gConfirmed = gMatches.find((r: any) => r.status === 'confirmed');
+        if (gConfirmed) { consumedIds.add(gConfirmed.id); result.skipped_confirmed++; continue; }
+        if (!gMatches.length) {
+          await pool.query(
+            `INSERT INTO pilot_log_entries
+              (id, user_id, source, source_ref, status, flight_date, flight_no, origin, dest,
+               std_utc, sta_utc, on_duty_utc, off_duty_utc, crew, roster_month,
+               is_sim, sim_type, sim_minutes, is_ground, aircraft_type, tail_no)
+             VALUES ($1,$2,'roster',$3,'draft',$4,$5,NULL,NULL,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)`,
+            [randomUUID(), userId, gRef, gDate, code, stdU, staU, onD, offD,
+             gCrew ? JSON.stringify(gCrew) : null, gMonth,
+             // sim_type 是模擬機裝置型別（FFS/FTD），班表沒給 → 留 null（duty 代碼存在 flight_no，機型存 aircraft_type）（codex P2）
+             cls === 'sim', null, simMin, cls === 'ground', acType || null, tail || null]
+          );
+          if (cls === 'sim') result.sim_imported = (result.sim_imported || 0) + 1;
+          else result.ground_imported = (result.ground_imported || 0) + 1;
+          result.inserted++;
+        } else {
+          const primary = gMatches.find((r: any) => r.source_ref === gRef) || gMatches[0];
+          consumedIds.add(primary.id);
+          for (const r of gMatches) {
+            if (r.id !== primary.id && r.untouched) { await pool.query('DELETE FROM pilot_log_entries WHERE id = $1', [r.id]); consumedIds.add(r.id); }
+          }
+          // 只補空白（COALESCE）—— 不洗掉使用者手改的時間/組員
+          await pool.query(
+            `UPDATE pilot_log_entries SET status='draft', source_ref=$2, roster_month=$3,
+               std_utc=COALESCE(std_utc,$4), sta_utc=COALESCE(sta_utc,$5),
+               on_duty_utc=COALESCE(on_duty_utc,$6), off_duty_utc=COALESCE(off_duty_utc,$7),
+               crew = CASE WHEN $8::jsonb IS NULL THEN crew ELSE $8::jsonb || COALESCE(crew,'{}'::jsonb) END,
+               sim_minutes=COALESCE(sim_minutes,$9),
+               aircraft_type=COALESCE(NULLIF(aircraft_type,''),$10), tail_no=COALESCE(NULLIF(tail_no,''),$11),
+               updated_at=NOW()
+             WHERE id=$1`,
+            [primary.id, gRef, gMonth, stdU, staU, onD, offD, gCrew ? JSON.stringify(gCrew) : null, simMin, acType || null, tail || null]
+          );
+          result.updated++;
+        }
+        continue;
+      }
 
       const sourceRef = buildSourceRef(f, dutyIdx, ctx);
       if (!sourceRef) continue;
@@ -681,6 +852,7 @@ export async function importRoster(
            WHERE user_id = $1
              AND source = 'roster'
              AND status = 'draft'
+             AND is_sim IS NOT TRUE AND is_ground IS NOT TRUE
              AND NOT ${HAS_FLIGHT_RECORD}
              AND NOT (source_ref = ANY($5::text[]))
              AND (
@@ -694,12 +866,35 @@ export async function importRoster(
            WHERE user_id = $1
              AND source = 'roster'
              AND status = 'draft'
+             AND is_sim IS NOT TRUE AND is_ground IS NOT TRUE
              AND NOT ${HAS_FLIGHT_RECORD}
              AND flight_date >= $2 AND flight_date <= $3
              AND NOT (source_ref = ANY($4::text[]))`,
           [userId, sw.start, sw.end, seenRefs]
         );
     result.marked_removed += r.rowCount || 0;
+
+    // V2.4.08（codex P2）：SIM/Ground 的清掃「只在這次有帶該類型時才做」—— 帶 sim 才掃 sim、帶 ground 才掃 ground。
+    //   這樣①取消/移動的 SIM/Ground 重匯會被清掉；②關掉匯入選項（mode=none/只 sim）時不會誤刪另一類既有紀錄。
+    //   只刪 draft + 沒鎖 + 沒實際飛行紀錄（HAS_FLIGHT_RECORD 對 sim/ground 幾乎永遠 false，等同保護使用者大改過的）。
+    const monthWhere = sw.month
+      ? `(roster_month = $2 OR (roster_month IS NULL AND flight_date >= $3 AND flight_date <= $4))`
+      : `flight_date >= $2 AND flight_date <= $3`;
+    const refIdx = sw.month ? 5 : 4;
+    const sweepParams = sw.month ? [userId, sw.month, sw.start, sw.end, seenRefs] : [userId, sw.start, sw.end, seenRefs];
+    for (const flag of [includeSim ? 'is_sim' : null, includeGround ? 'is_ground' : null]) {
+      if (!flag) continue;
+      const rg = await pool.query(
+        `DELETE FROM pilot_log_entries
+         WHERE user_id = $1 AND source = 'roster' AND status = 'draft'
+           AND ${flag} IS TRUE AND is_locked IS NOT TRUE
+           AND NOT ${HAS_FLIGHT_RECORD}
+           AND NOT (source_ref = ANY($${refIdx}::text[]))
+           AND ${monthWhere}`,
+        sweepParams
+      );
+      result.marked_removed += rg.rowCount || 0;
+    }
   }
 
   // V1.3.14（self-heal）：清掉舊版 parse bug 留下的爛 draft —— 真實航班的 depTimeUtc（"1610Z/17Jun"）
