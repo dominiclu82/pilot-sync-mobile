@@ -1825,7 +1825,10 @@ function _plCrewField(key, e) {
     return '<div style="margin-bottom:8px">' +
       '<div style="font-size:.62em;color:var(--muted);margin-bottom:2px">' + _plEsc(label) + '</div>' +
       '<div style="display:flex;gap:4px">' +
-        '<input id="ple-crew-' + key + '" list="ple-crew-dl" placeholder="name" oninput="_plCrewSlotInput(\'' + key + '\')" style="flex:1;min-width:0;' + inputCss + '" value="' + _plEsc(dispName) + '">' +
+        '<div style="flex:1;min-width:0;position:relative">' +
+          '<input id="ple-crew-' + key + '" autocomplete="off" placeholder="name" oninput="_plCrewSlotInput(\'' + key + '\');_plCrewDD(\'' + key + '\')" onfocus="_plCrewDD(\'' + key + '\')" onblur="_plCrewDDClose(\'' + key + '\')" style="width:100%;box-sizing:border-box;' + inputCss + '" value="' + _plEsc(dispName) + '">' +
+          '<div id="ple-crewdd-' + key + '" style="display:none;position:absolute;left:0;right:0;top:calc(100% + 2px);z-index:60;max-height:190px;overflow-y:auto;background:var(--card,#0f172a);border:1px solid var(--border,#334155);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.45)"></div>' +
+        '</div>' +
         '<input id="ple-crewrank-' + key + '" placeholder="rank" style="flex:0 0 auto;width:54px;text-transform:uppercase;' + inputCss + '" value="' + _plEsc(val.rank) + '">' +
         editBtn +
       '</div>' + hidden + '</div>';
@@ -1834,7 +1837,10 @@ function _plCrewField(key, e) {
   // V2.2.02：label 欄 64→46px（左邊不再留空、把空間還給名字），rank 50→52px（"RANK"/職級顯示得完整）。
   return '<div style="display:flex;align-items:center;gap:5px;margin-bottom:6px">' +
     '<div style="flex:0 0 46px;font-size:.62em;color:var(--muted);text-align:right;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + _plEsc(label) + '">' + _plEsc(label) + '</div>' +
-    '<input id="ple-crew-' + key + '" list="ple-crew-dl" placeholder="name" oninput="_plCrewSlotInput(\'' + key + '\')" style="flex:1;min-width:0;' + inputCss + '" value="' + _plEsc(dispName) + '">' +
+    '<div style="flex:1;min-width:0;position:relative">' +
+      '<input id="ple-crew-' + key + '" autocomplete="off" placeholder="name" oninput="_plCrewSlotInput(\'' + key + '\');_plCrewDD(\'' + key + '\')" onfocus="_plCrewDD(\'' + key + '\')" onblur="_plCrewDDClose(\'' + key + '\')" style="width:100%;box-sizing:border-box;' + inputCss + '" value="' + _plEsc(dispName) + '">' +
+      '<div id="ple-crewdd-' + key + '" style="display:none;position:absolute;left:0;right:0;top:calc(100% + 2px);z-index:60;max-height:190px;overflow-y:auto;background:var(--card,#0f172a);border:1px solid var(--border,#334155);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.45)"></div>' +
+    '</div>' +
     '<input id="ple-crewrank-' + key + '" placeholder="rank" style="flex:0 0 auto;width:52px;text-transform:uppercase;' + inputCss + '" value="' + _plEsc(val.rank) + '">' +
     editBtn + hidden + '</div>';
 }
@@ -1881,6 +1887,151 @@ function _plCrewSlotInput(key) {
   var nameEl = document.getElementById('ple-crew-' + key);
   var btn = document.getElementById('ple-crewedit-' + key);
   if (btn) btn.style.visibility = (nameEl && (nameEl.value || '').trim()) ? 'visible' : 'hidden';   // V2.2.02：佔位不變，只切可見
+}
+// V2.4.04：組員名字自訂下拉（取代 iPhone 難用的原生 datalist）—— 打字即時篩通訊錄、點一下就帶名字+員編。
+//   候選 = _pl.crew（通訊錄聯絡人），名字「包含」即篩；上限 50 筆避免一次塞滿（通訊錄可達數千）。
+function _plCrewDD(key) {
+  var inp = document.getElementById('ple-crew-' + key);
+  var dd = document.getElementById('ple-crewdd-' + key);
+  if (!inp || !dd) return;
+  var q = (inp.value || '').trim().toLowerCase();
+  var cands = _pl.crew || [];
+  var list = [];
+  for (var i = 0; i < cands.length && list.length < 50; i++) {
+    var nm = (cands[i].display_name || '').trim();
+    if (!nm) continue;
+    if (!q || nm.toLowerCase().indexOf(q) >= 0) list.push(cands[i]);
+  }
+  if (!list.length) { dd.style.display = 'none'; return; }
+  dd.innerHTML = list.map(function(c) {
+    var nm = c.display_name || '';
+    var org = c.organization ? ' <span style="color:var(--muted)">· ' + _plEsc(c.organization) + '</span>' : '';
+    var eidn = (c.employee_ids && c.employee_ids.length) ? ' <span style="color:var(--muted);font-size:.85em">#' + _plEsc(c.employee_ids[0]) + '</span>' : '';
+    return '<div onmousedown="event.preventDefault();_plCrewPick(\'' + key + '\',\'' + _plEsc(String(c.id)) + '\')" ' +
+      'style="padding:7px 10px;cursor:pointer;font-size:.8em;border-bottom:1px solid var(--border,#1e293b);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' +
+      _plEsc(nm) + eidn + org + '</div>';
+  }).join('');
+  dd.style.display = 'block';
+}
+function _plCrewPick(key, cid) {
+  var c = null, cands = _pl.crew || [];
+  for (var i = 0; i < cands.length; i++) { if (String(cands[i].id) === String(cid)) { c = cands[i]; break; } }
+  if (!c) return;
+  var inp = document.getElementById('ple-crew-' + key);
+  var idEl = document.getElementById('ple-crewid-' + key);
+  var n0El = document.getElementById('ple-crewname0-' + key);
+  var nm = c.display_name || '';
+  var eid = (c.employee_ids && c.employee_ids.length) ? c.employee_ids[0] : '';
+  if (inp) inp.value = nm;
+  if (idEl) idEl.value = eid || '';     // 帶員編 → 顯示/比對都連得上（中文名）
+  if (n0El) n0El.value = nm;            // 標記名字沒被改過 → 保留這個員編（_plSaveEntry 邏輯）
+  var dd = document.getElementById('ple-crewdd-' + key);
+  if (dd) dd.style.display = 'none';
+  _plCrewSlotInput(key);
+}
+function _plCrewDDClose(key) {
+  setTimeout(function() { var dd = document.getElementById('ple-crewdd-' + key); if (dd) dd.style.display = 'none'; }, 150);
+}
+// V2.4.04：從目前表單讀出 crew 物件（跟 _plSaveEntry 同邏輯）—— 給 ↩ Return 帶最新組員用。
+function _plReadFormCrew() {
+  var crew = {};
+  var prevCrew = (_pl.editing && _pl.editing.crew) || {};
+  Object.keys(prevCrew).forEach(function(k) {   // 保留未被新 UI 渲染的舊 key（不掉資料）
+    if (PL_CREW_KEYS.indexOf(k) < 0 && prevCrew[k] != null && prevCrew[k] !== '') crew[k] = prevCrew[k];
+  });
+  PL_CREW_KEYS.forEach(function(k) {
+    var nameEl = document.getElementById('ple-crew-' + k);
+    var name = nameEl ? nameEl.value.trim() : '';
+    if (!name) return;
+    var rankEl = document.getElementById('ple-crewrank-' + k);
+    var idEl = document.getElementById('ple-crewid-' + k);
+    var name0El = document.getElementById('ple-crewname0-' + k);
+    var rank = rankEl ? rankEl.value.trim().toUpperCase() : '';
+    var eid = _plResolveEid(name);
+    if (!eid && name0El && name === name0El.value.trim() && idEl) eid = idEl.value.trim();
+    var slot = { name: name };
+    if (rank) slot.rank = rank;
+    if (eid) slot.eid = eid;
+    crew[k] = slot;
+  });
+  return crew;
+}
+// V2.4.04：對調兩個 input 的值
+function _plSwapVals(idA, idB) {
+  var a = document.getElementById(idA), b = document.getElementById(idB);
+  if (a && b) { var t = a.value; a.value = b.value; b.value = t; }
+}
+// V2.4.04：把 UTC ISO 換算成某時區的「當地日期」YYYY-MM-DD（回程日用 —— 跨午夜要看當地，不是 UTC，codex P1）
+function _plLocalDate(utcIso, tz) {
+  try {
+    var d = new Date(utcIso);
+    if (isNaN(d.getTime()) || !tz) return '';
+    var p = new Intl.DateTimeFormat('en-CA', { timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit' }).format(d);
+    return /^\d{4}-\d{2}-\d{2}$/.test(p) ? p : '';
+  } catch (e) { return ''; }
+}
+// V2.4.04：找 SIC（副駕駛）槽 —— 駕駛艙非 PIC 的槽裡，rank 像副駕駛(SFO/FO/SIC)的那格；找不到(如兩位都機長)→ 第二位 crew2（codex P2：別假設 crew2 一定是 SIC）
+function _plSicSlotKey() {
+  var keys = ['crew2', 'crew3', 'crew4', 'crew5', 'crew6'];
+  for (var i = 0; i < keys.length; i++) {
+    var r = ((document.getElementById('ple-crewrank-' + keys[i]) || {}).value || '').toUpperCase();
+    if (/SFO|FO|FIRST OFFICER|SIC/.test(r)) return keys[i];
+  }
+  return 'crew2';
+}
+// V2.4.04：⇄ Swap PIC/SIC —— 兩位機長一去一回輪替 PIC 用。對調本人 position + pic↔SIC(crew2) 名字/員編/rank + PIC↔SIC 時數；PF 不動。
+function _plSwapPicSic() {
+  // 只適用 PIC↔SIC 輪替（兩位機長一去一回）。FO/SFO/OBSERVER 不是這情境 → 不動，避免把 FO/SFO 誤改成 PIC（codex P2）。
+  var posEl = document.getElementById('ple-position');
+  var p = posEl ? posEl.value : '';
+  if (p !== 'PIC' && p !== 'SIC') { if (typeof _plToast === 'function') _plToast('⇄ 只適用 PIC/SIC 輪替'); return; }
+  // pic 槽 ↔ SIC 槽（用 rank 找真正的副駕駛，不假設 crew2）：名字/員編/rank/原始名
+  var sk = _plSicSlotKey();
+  _plSwapVals('ple-crew-pic', 'ple-crew-' + sk);
+  _plSwapVals('ple-crewid-pic', 'ple-crewid-' + sk);
+  _plSwapVals('ple-crewrank-pic', 'ple-crewrank-' + sk);
+  _plSwapVals('ple-crewname0-pic', 'ple-crewname0-' + sk);
+  // 本人 position：PIC↔SIC —— 直接設值「不」dispatch change（否則 logten/wader 的 change handler 會清 manual 並重算 role，把下面對調的時數蓋掉，codex P2）
+  if (posEl) posEl.value = (p === 'PIC') ? 'SIC' : 'PIC';
+  // PIC↔SIC 時數對調 + 標 manual（之後 block 變動也不被自動重算蓋掉）
+  var picM = document.getElementById('ple-pic_minutes'), sicM = document.getElementById('ple-sic_minutes');
+  if (picM && sicM) { var t = picM.value; picM.value = sicM.value; sicM.value = t; picM.dataset.manual = '1'; sicM.dataset.manual = '1'; }
+  _plCrewSlotInput('pic'); _plCrewSlotInput(sk);
+  if (typeof _plToast === 'function') _plToast('⇄ 已對調 PIC/SIC');
+}
+// V2.4.04：↩ Return —— 從已存的去程一鍵建回程草稿：出發↔目的對調、組員/機型/機尾/operating_crew 複製、
+//   日期=去程落地日（跨午夜自動隔天）；航班號+所有時間留空你填。PIC/SIC 不自動換（要輪替按 ⇄ Swap）。
+function _plMakeReturn() {
+  var e = _pl.editing;
+  if (!e || !e.id) return;
+  var r = _plBlankEntry();
+  // 一律用「目前表單」的最新值（不是上次存的）→ 去程未存的修改(航線/組員/機尾/時間)也帶得到（codex P2）
+  var fOrigin = (_plGetVal('ple-origin') || '').toUpperCase();
+  var fDest = (_plGetVal('ple-dest') || '').toUpperCase();
+  var fOut = _plReadField('out_utc', 'time-utc') || _plReadField('std_utc', 'time-utc');
+  var arrIso = _plReadField('in_utc', 'time-utc') || _plReadField('sta_utc', 'time-utc');
+  if (arrIso && fOut && Date.parse(arrIso) < Date.parse(fOut)) arrIso = new Date(Date.parse(arrIso) + 86400000).toISOString();   // 落地早於起飛 → 跨午夜 +1 天
+  var ad = '';
+  if (arrIso) {
+    var info = (typeof _plAptInfo === 'function') ? _plAptInfo(fDest || '') : null;
+    if (info && info.tz) ad = _plLocalDate(arrIso, info.tz);   // 取「目的地當地日期」（跨午夜看當地、不是 UTC，codex P1）
+    if (!ad) ad = String(arrIso).slice(0, 10);                 // 查無時區 → 退 UTC 日
+  }
+  r.flight_date = /^\d{4}-\d{2}-\d{2}$/.test(ad) ? ad : ((_plGetVal('ple-flight_date') || '').slice(0, 10) || r.flight_date);
+  r.origin = fDest || '';                            // 對調
+  r.dest = fOrigin || '';
+  r.aircraft_type = _plGetVal('ple-aircraft_type') || '';
+  r.tail_no = _plGetVal('ple-tail_no') || '';
+  r.position = _plGetVal('ple-position') || 'PIC';
+  var ocv = parseInt(_plGetVal('ple-operating_crew'), 10);
+  r.operating_crew = (ocv >= 2 && ocv <= 4) ? ocv : null;
+  r.crew = _plReadFormCrew();                        // 從表單讀組員（turnaround 大多同一批）
+  // 其餘（flight_no / 所有時間 / 時數 / 起降…）留空白由 _plBlankEntry 提供
+  _pl.editing = r;
+  _pl.selectedId = null;
+  if (_plWide() && document.getElementById('pl-detail-pane')) { _plRenderEditor('pl-detail-pane'); _plRenderList(); }
+  else { _plRenderEditor(); if (typeof _plRenderYearIndex === 'function') _plRenderYearIndex(); }
+  if (typeof _plToast === 'function') _plToast('↩ 已建回程草稿，填航班號與時間即可');
 }
 
 // ── V1.3.05：機場座標 + 太陽角度，給手動新增航班自動算 night time / 日夜起降 ─────────
@@ -2722,13 +2873,21 @@ function _plUpdateOpCrewLimit() {
       else if (ocEl.dataset.auto === '1') ocEl.value = '';
     }
   }
+  var fromEl = document.getElementById('ple-onduty-from');
   if (limEl) limEl.innerHTML = '';
+  if (fromEl) fromEl.innerHTML = '';
   if (isDhd || isSim) return;
   // 2. 找這筆所屬 duty 段
   var snap = _plEditingSnapshotForDuty();
   var grp = null;
   try { grp = _plDutyGroupForEntry(snap, _pl.entries || []); } catch (e) {}
   if (!grp) return;
+  // 2.5 turnaround 第二段以後：On Duty 旁標「起算自第一段航班」（duty 從哪班起算）。單段就是自己→不標。
+  if (fromEl && grp.legs.length > 1) {
+    var firstLeg = grp.legs[0];
+    var isFirst = (snap.id && firstLeg.id === snap.id) || firstLeg === snap;
+    if (!isFirst && firstLeg.flight_no) fromEl.innerHTML = 'from ' + _plEsc(firstLeg.flight_no);
+  }
   // 3. FDP Limit 標籤（無操作人數→不顯示；實際落地超過→紅字）。turnaround 一律用第一段報到+第一段人數。
   if (limEl && grp.opCrew && !isNaN(grp.limitMs) && !isNaN(grp.onMs)) {
     var hrs = DT_MAX_FDP_MIN[grp.opCrew] / 60;
@@ -3118,6 +3277,7 @@ function _plRenderEditor(target) {
       // V2.3：⚙ Configure Fields（LogTen 式）—— 平常欄位名稱鎖住，點了才進可編輯狀態改名。UI 文案用英文。
       '<button onclick="_plToggleConfigFields()" title="Configure field labels" style="background:' + (_pl.configFields ? '#f59e0b' : 'transparent') + ';color:' + (_pl.configFields ? '#fff' : 'var(--muted)') + ';border:1px solid ' + (_pl.configFields ? '#f59e0b' : 'var(--border,#334155)') + ';border-radius:6px;padding:6px 10px;font-size:.74em;cursor:pointer">' + (_pl.configFields ? '✓ Done' : '⚙ Fields') + '</button>' +
       // V1.3.08：拿掉 Confirm — Save 就是 Save。Lock 鈕（LogTen 風格）：鎖了不能改/不能刪；點一下解鎖
+      (e.id && _plEntryType(e) === 'flight' ? '<button onclick="_plMakeReturn()" title="建立回程（出發地↔目的地對調、組員/機型複製，時間留空）" style="background:transparent;color:var(--muted);border:1px solid var(--border,#334155);border-radius:6px;padding:6px 10px;font-size:.74em;cursor:pointer">↩ Return</button>' : '') +
       (e.id ? '<button onclick="_plToggleLock()" style="background:transparent;color:' + (e.is_locked ? '#10b981' : 'var(--muted)') + ';border:1px solid ' + (e.is_locked ? '#10b981' : 'var(--border,#334155)') + ';border-radius:6px;padding:6px 10px;font-size:.74em;cursor:pointer">' + (e.is_locked ? '🔒 Locked' : '🔓 Lock') + '</button>' : '') +
       (!e.is_locked ? '<button onclick="_plSaveEntry()" style="background:#3b82f6;color:#fff;border:0;border-radius:6px;padding:6px 12px;font-size:.78em;font-weight:700;cursor:pointer">Save</button>' : '') +
       (e.id && !e.is_locked ? '<button onclick="_plDeleteEntry()" style="background:transparent;color:#ef4444;border:1px solid #ef4444;border-radius:6px;padding:6px 10px;font-size:.74em;cursor:pointer">Delete</button>' : '') +
@@ -3167,7 +3327,7 @@ function _plRenderEditor(target) {
         : _plFieldRow(2, _plEditorField('Out', 'out_utc', 'time-utc') + _plEditorField('Off', 'off_utc', 'time-utc')) +
           _plFieldRow(2, _plEditorField('On', 'on_utc', 'time-utc') + _plEditorField('In', 'in_utc', 'time-utc'))) +
       _plFieldSub('Duty') +
-      _plFieldRow(2, _plEditorField('On Duty', 'on_duty_utc', 'time-utc') +
+      _plFieldRow(2, _plEditorField('On Duty', 'on_duty_utc', 'time-utc', { labelSuffix: '<span id="ple-onduty-from" style="font-size:.6em;color:var(--muted);white-space:nowrap"></span>' }) +
         _plEditorField('Off Duty', 'off_duty_utc', 'time-utc', { labelSuffix: '<span id="ple-fdp-limit" style="font-size:.62em;font-weight:700;white-space:nowrap"></span>' })) +
       _plFieldRow(2, _plEditorField('Operating Crew', 'operating_crew', 'select', { options: ['', '2', '3', '4'], optLabels: { '': '自動 Auto', '2': '2 人', '3': '3 人', '4': '4 人' } }) +
         '<div style="font-size:.58em;color:var(--muted);align-self:center;line-height:1.3">操作飛行員數（FDP 上限用）<br>PIC+SIC+Relief · auto-detected</div>') +
@@ -3203,7 +3363,10 @@ function _plRenderEditor(target) {
 
     // ── Crew：飛航組（PIC/SIC/Relief/Observer）+ 客艙組（cabin1..20，收合）（V2.3；欄位名可在 Crew 頁自訂）──
     '<div style="margin-top:12px;background:var(--card);border-radius:10px;padding:12px">' +
-      '<div style="font-size:.7em;font-weight:700;color:var(--muted);text-transform:uppercase;margin-bottom:8px">Crew</div>' +
+      '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">' +
+        '<div style="font-size:.7em;font-weight:700;color:var(--muted);text-transform:uppercase">Crew</div>' +
+        (_plEntryType(e) === 'flight' ? '<button type="button" onclick="_plSwapPicSic()" title="對調 PIC/SIC（一去一回輪替）" style="background:transparent;border:1px solid var(--border,#334155);border-radius:6px;color:var(--text);font-size:.7em;padding:4px 8px;cursor:pointer">⇄ Swap PIC/SIC</button>' : '') +
+      '</div>' +
       _plCrewDatalist() +
       _plCrewFields(e) +
     '</div>' +

@@ -224,13 +224,16 @@ function countOperatingCrew(crewObj: Record<string, CrewSlotVal> | null): number
   return n ? Math.max(2, Math.min(4, n)) : null;
 }
 
-// V1.3.12：哪些 roster 組員要自動進通訊錄 —— 跟 extractCrew 會進槽的角色一致：
-// 駕駛艙（PIC/P1~P4/IS）+ OBS + CIC，不灌整批客艙（SC/CC/PC）。
+// V2.4.04：擴大自動進通訊錄到「含客艙」，但客艙這條只收「有員編」的 —— 用員編比對才安全；
+//   沒員編的只靠名字比對，同名（或拼音不一致）會被 upsertCrewContact 誤併成同一人（codex P2 資料完整性）。
+//   駕駛艙/CIC/OBS 維持原本行為（即使偶爾沒帶員編也收，不回退既有功能）。班表本來就帶員編 → 客艙也全收得到。
 function isLoggedCrew(m: RosterCrewMember): boolean {
+  if (!m.name || !m.name.trim()) return false;
   const pos = (m.position || '').toUpperCase();
+  if (/DHD|DEADHEAD/.test(pos)) return false;            // 搭便機不進通訊錄
+  if (m.staffId && m.staffId.trim()) return true;        // 有員編 → 收（用員編比對，安全，含客艙）
+  // 沒員編 → 只收原本就收的駕駛艙/CIC/OBS（不把同名誤併風險擴大到客艙）
   const rank = (m.rank || '').toUpperCase();
-  if (!pos) return false;
-  if (/DHD|DEADHEAD/.test(pos)) return false;   // V1.3.12：搭便機的人不進通訊錄
   if (/CIC|OBS|CAP|CMD|PIC/.test(pos)) return true;
   if (/^P\d|^IS|SFO|FIRST OFFICER|^FO|SIC/.test(pos)) return true;
   if (/CAP|SFO|FO|TFO|TCAP/.test(rank)) return true;
@@ -532,7 +535,7 @@ export async function importRoster(
 
       const confirmedMatch = rosterMatches.find((r: any) => r.status === 'confirmed');
       if (confirmedMatch) {
-        // 同班已被使用者 confirm → 不動它也不再建草稿；多餘「沒動過」的重複草稿順手清掉（自癒）
+        // 同班已被使用者 confirm → 不動它的時間/起降/時數/position 等；多餘「沒動過」的重複草稿順手清掉（自癒）
         consumedIds.add(confirmedMatch.id);
         for (const r of rosterMatches) {
           if (r.id !== confirmedMatch.id && r.status !== 'confirmed' && r.untouched) {
@@ -540,6 +543,9 @@ export async function importRoster(
             consumedIds.add(r.id);
           }
         }
+        // V2.4.04：confirmed 航班「完全不動」（時間/組員/全部）。空服顯示不出中文名是因為「沒進通訊錄」，
+        //   不是 entry 缺資料 —— 匯入時 entry 的客艙槽早就帶了 name+員編(crewVal)。改 isLoggedCrew 讓空服進通訊錄後，
+        //   這些舊航班的空服員編自然對得上、顯示中文名。所以這裡不需要也不該去改 confirmed 的 crew（避免覆蓋使用者編輯/淺合併丟欄位）。
         result.skipped_confirmed++;
       } else if (!rosterMatches.length) {
         // 新 draft
