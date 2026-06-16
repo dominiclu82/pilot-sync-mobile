@@ -26,6 +26,7 @@ var _pl = {
   // Aircraft / Crew 頁共用的完整 entries 快照：不過 _pl.filter、不分頁，撈到所有 user 的 flights
   // 用 null 區別「還沒拉過」和「拉過但是空陣列」，進 Aircraft 或 Crew 頁第一次才 fetch
   aircraftEntries: null,
+  anReturn: null,                // V2.4.16：在 Analyze 某分類鑽取時的返回標記 {kind,key}；null=在主畫面
   suggest: { tail_nos: [], aircraft_types: [], airports: [] },
   editing: null,                 // entry being edited
   initialized: false,
@@ -167,6 +168,7 @@ function switchPlTab(tab, btn) {
   _pl.tab = tab;
   _pl.editing = null;
   _pl.selectedId = null;            // 切走 logbook，detail pane 的選取就重置
+  _pl.anReturn = null;              // V2.4.16：點 tab（含重點 Analyze）一律回頂層，清掉分類鑽取返回標記
   _plHighlightTab(tab);
   if (tab === 'analyze') _plRenderAnalyze();
   else if (tab === 'report') _plRenderReport();
@@ -1342,6 +1344,7 @@ function _plRenderMain() {
   var c = document.getElementById('pilotlog-content');
   if (!c) return;
   _pl.aptReturn = false;   // V1.3.39：回到 Logbook 主列表 → 清掉 Airports 返回標記
+  _pl.anReturn = null;     // V2.4.16：離開 Analyze → 清掉分類返回標記
   // V1.3 離線優先：只有「有網路且手機裡沒有可用身分」才跳登入（Google 登入本來就要網路）。
   // 離線時即使 _pl.user 物件還沒建好，也照樣顯示快取的 logbook，不卡登入。
   if (!_pl.user && _plOnline() && !_plHasSession()) { _plRenderLogin(); return; }
@@ -1486,6 +1489,8 @@ function _plCloseEditor() {
     else _plOpenPlaces();
     return;
   }
+  // V2.4.16：從 Analyze 某分類點航班進來的 → 關閉回那個分類（不是回 logbook）。_plRenderAnalyze 依 anReturn 重開分類。
+  if (_pl.anReturn) { _plRenderAnalyze(); return; }
   // iPad split：清右側回 placeholder + 重畫列表去掉 highlight；列表保持原位不重 fetch
   if (_plWide() && document.getElementById('pl-detail-pane')) {
     document.getElementById('pl-detail-pane').innerHTML = _plDetailPlaceholder();
@@ -4099,6 +4104,7 @@ async function _plDeleteSelected() {
 // 不再一次疊六張卡。Logbook 進去再子選 LogTen（4 格）/ Wader（1 格）；Wipe 用勾選類別。
 function _plOpenImport() {
   _pl.aptReturn = false;   // V2.0.01（codex P2）：離開 Airports → 清返回標記，免得從這裡開編輯器關閉時誤跳 Airports
+  _pl.anReturn = null;   // V2.4.16：離開 Analyze → 清分類返回標記
   var c = document.getElementById('pilotlog-content');
   if (!c) return;
   c.innerHTML =
@@ -4862,6 +4868,7 @@ function _plToggleAircraftSubtype(key) {
 
 async function _plOpenAircraft() {
   _pl.aptReturn = false;   // V2.0.01（codex P2）：離開 Airports → 清返回標記
+  _pl.anReturn = null;   // V2.4.16：離開 Analyze → 清分類返回標記
   var c = document.getElementById('pilotlog-content');
   if (!c) return;
   // Loading state（避免空白）
@@ -5777,6 +5784,7 @@ var _plCrewSearchTerm = '';
 
 async function _plOpenCrew() {
   _pl.aptReturn = false;   // V2.0.01（codex P2）：離開 Airports → 清返回標記
+  _pl.anReturn = null;   // V2.4.16：離開 Analyze → 清分類返回標記
   var c = document.getElementById('pilotlog-content');
   if (!c) return;
   c.innerHTML = '<div style="text-align:center;color:var(--muted);padding:40px;font-size:.85em">載入 crew… · Loading crew…</div>';
@@ -6283,8 +6291,32 @@ async function _plRenderAnalyze() {
   if (!_pl.user) { _plRenderLogin(); return; }
   _plShowTabBar(true);
   _plHighlightTab('analyze');
+  // V2.4.16：若正停在某分類鑽取（從清單點航班→開編輯器→返回，或背景重繪），回到「剛剛那個分類」而非主畫面。
+  //   分類內 ← 用 _plAnBack() 清掉 anReturn 才回主畫面。
+  if (_pl.anReturn) {
+    var _ar = _pl.anReturn;
+    if (_ar.kind === 'type') return _plOpenTypeDetail(_ar.key);
+    if (_ar.kind === 'company') return _plOpenCompanyDetail(_ar.key);
+    if (_ar.kind === 'currency') return _plOpenCurrencyDetail(_ar.key);
+  }
+  // V2.4.16：已有「完整快照」aircraftEntries → 立刻用本機畫（不再每次卡「Loading stats」等 server），背景再刷新。
+  //   ⚠ 只認 aircraftEntries（_plFetchAll limit=all 的全本），不可退回 _pl.entries —— 後者受 filter/200 limit 影響、
+  //   冷啟動時可能只是某子集（codex P1：拿子集當全集會顯示錯誤總時數）。沒有全本就走下面 Loading + 等抓。
+  if (_pl.aircraftEntries && _pl.aircraftEntries.length) {
+    _plRenderAnalyzeContent();
+    _plFetchAll().then(function (ok) {
+      if (!ok) return;
+      if (!_pl.user) { _plRenderLogin(); return; }   // fetch 中 session 失效 → 回登入
+      _pl.aircraftEntries = _pl.entries;
+      // 背景刷新後重畫（跟 Map/Report 一致，任何欄位改動都反映，不只筆數變）；但只在「還停在 Analyze 主畫面、
+      //   沒鑽進航班明細(.pl-an-wrap 在)、沒在編輯」時才畫，避免打斷鑽取/編輯（codex P2）。
+      if (_pl.tab === 'analyze' && !_pl.editing && document.querySelector('.pl-an-wrap')) _plRenderAnalyzeContent();
+    });
+    return;
+  }
+  // 首次（本機還沒全本快照）→ 顯示 Loading 並等抓
   c.innerHTML = '<div style="text-align:center;color:var(--muted);padding:40px;font-size:.85em">Loading stats…</div>';
-  await _plFetchAll(); _pl.aircraftEntries = _pl.entries;   // V2.2.07：_plFetchAll 已用 limit=all 載全本 → 共用，免再抓一次（codex P2 修重複下載）
+  await _plFetchAll(); _pl.aircraftEntries = _pl.entries;
   if (!_pl.user) { _plRenderLogin(); return; }   // fetch 中 session 失效 → 回登入（codex fast P1）
   _plRenderAnalyzeContent();
 }
@@ -6447,10 +6479,16 @@ function _plRenderTypeBreakdown(entries) {
   });
 }
 // V1.3.21：點機型 → 鑽進去看「該機型各公司」的 PIC/SIC 時數
+// V2.4.16：分類鑽取畫面左上角 ← 的目標 —— 清掉返回標記後回 Analyze 主畫面（不是回上一個分類）。
+function _plAnBack() {
+  _pl.anReturn = null;
+  _plRenderAnalyze();
+}
 function _plOpenTypeDetail(type) {
   var c = document.getElementById('pilotlog-content');
   if (!c) return;
   if (_pl.tab !== 'analyze') return;
+  _pl.anReturn = { kind: 'type', key: type };   // V2.4.16：標記在此分類 → 點航班進編輯器，返回回到這裡
   var entries = (_pl.aircraftEntries || []).filter(function(e) {
     if (e.is_deadhead || e.is_sim || e.is_ground || e.status === 'roster_removed') return false;
     return !!e.in_utc && (e.aircraft_type || '—') === type;
@@ -6459,7 +6497,7 @@ function _plOpenTypeDetail(type) {
   c.innerHTML =
     '<div style="padding:10px 14px">' +
       '<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">' +
-        '<button onclick="_plRenderAnalyze()" style="background:transparent;border:0;color:var(--text);font-size:1.2em;cursor:pointer">←</button>' +
+        '<button onclick="_plAnBack()" style="background:transparent;border:0;color:var(--text);font-size:1.2em;cursor:pointer">←</button>' +
         '<div style="font-size:1em;font-weight:700">' + _plEsc(type) + '</div>' +
         '<div style="flex:1"></div>' +
         '<div style="font-size:.72em;color:var(--muted)">' + entries.length + ' flights</div>' +
@@ -6629,6 +6667,7 @@ function _plOpenCompanyDetail(company) {
   var c = document.getElementById('pilotlog-content');
   if (!c) return;
   if (_pl.tab !== 'analyze') return;
+  _pl.anReturn = { kind: 'company', key: company };   // V2.4.16：返回回到此分類
   var entries = (_pl.aircraftEntries || []).filter(function(e) {
     if (e.is_deadhead || e.is_sim || e.is_ground || e.status === 'roster_removed') return false;
     return !!e.in_utc && _plEntryCompany(e) === company;
@@ -6637,7 +6676,7 @@ function _plOpenCompanyDetail(company) {
   c.innerHTML =
     '<div style="padding:10px 14px">' +
       '<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">' +
-        '<button onclick="_plRenderAnalyze()" style="background:transparent;border:0;color:var(--text);font-size:1.2em;cursor:pointer">←</button>' +
+        '<button onclick="_plAnBack()" style="background:transparent;border:0;color:var(--text);font-size:1.2em;cursor:pointer">←</button>' +
         '<div style="font-size:1em;font-weight:700">' + _plEsc(company) + '</div>' +
         '<div style="flex:1"></div>' +
         '<div style="font-size:.72em;color:var(--muted)">' + entries.length + ' flights</div>' +
@@ -6854,15 +6893,20 @@ function _plCurrencyCell(catKey, calc) {
     '<div style="font-size:.6em;color:var(--muted);margin-top:3px">last 3: ' + dates + '</div>' +
   '</div>';
 }
-function _plRenderCurrency(entries) {
+// V2.4.16：Currency 已升為左欄獨立項目（在「時間 Time」之上）。hideHeader=true 時（當作右欄主面板顯示）
+//   省略卡內「⏱️ Currency」大標（左欄/ghead 已標），只留 90 天免責說明。
+function _plRenderCurrency(entries, hideHeader) {
   var src = entries.filter(function (e) { return !e.is_sim && !e.is_ground; });   // 真實飛行才算 currency（entries 已是 in_utc + 非 deadhead/removed）
   var cell = function (k) { return _plCurrencyCell(k, _plCurrencyCalc(src, PL_CURR_CATS[k].fn)); };
   var open = _pl._currDnOpen ? ' open' : '';
+  var header = hideHeader
+    ? '<div style="font-size:.6em;color:var(--muted);margin-bottom:8px">90-day recency · 僅供參考，非官方判定</div>'
+    : '<div style="display:flex;align-items:baseline;gap:8px;margin-bottom:8px">' +
+        '<div style="font-size:.92em;font-weight:800">⏱️ Currency</div>' +
+        '<div style="font-size:.6em;color:var(--muted)">90-day recency · 僅供參考，非官方判定</div>' +
+      '</div>';
   return '<div style="background:var(--card);border-radius:12px;padding:13px;margin-bottom:12px">' +
-    '<div style="display:flex;align-items:baseline;gap:8px;margin-bottom:8px">' +
-      '<div style="font-size:.92em;font-weight:800">⏱️ Currency</div>' +
-      '<div style="font-size:.6em;color:var(--muted)">90-day recency · 僅供參考，非官方判定</div>' +
-    '</div>' +
+    header +
     '<div style="display:flex;gap:8px;flex-wrap:wrap">' + cell('to') + cell('ldg') + '</div>' +
     '<details style="margin-top:8px"' + open + ' ontoggle="_pl._currDnOpen=this.open">' +
       '<summary style="font-size:.66em;font-weight:700;color:var(--muted);cursor:pointer;padding:4px 2px">🌗 Day / Night 依日夜（其他地區用）</summary>' +
@@ -6871,11 +6915,19 @@ function _plRenderCurrency(entries) {
     '</details>' +
   '</div>';
 }
+// V2.4.16：左欄 Currency 項的「一眼狀態燈」—— 起飛+落地兩者都在 90 天有效 → 綠✓；否則琥珀⚠（過期或不足 3 次）。
+function _plCurrencyStatus(entries) {
+  var src = entries.filter(function (e) { return !e.is_sim && !e.is_ground; });
+  var today = _plTodayStr();
+  function ok(k) { var c = _plCurrencyCalc(src, PL_CURR_CATS[k].fn); return !!c.thirdDate && _plAddDaysStr(c.thirdDate, 90) >= today; }
+  return (ok('to') && ok('ldg')) ? { icon: '✓', color: '#10b981' } : { icon: '⚠', color: '#f59e0b' };
+}
 // 點 currency 格 → 列出貢獻「最近 3 次」的航班（點進去可看/編輯）
 function _plOpenCurrencyDetail(catKey) {
   var c = document.getElementById('pilotlog-content');
   if (!c || _pl.tab !== 'analyze') return;
   var cat = PL_CURR_CATS[catKey]; if (!cat) return;
+  _pl.anReturn = { kind: 'currency', key: catKey };   // V2.4.16：返回回到此分類
   var src = (_pl.aircraftEntries || []).filter(function (e) {
     if (e.is_deadhead || e.is_sim || e.is_ground || e.status === 'roster_removed') return false;
     return !!e.in_utc;
@@ -6885,7 +6937,7 @@ function _plOpenCurrencyDetail(catKey) {
   c.innerHTML =
     '<div style="padding:10px 14px">' +
       '<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">' +
-        '<button onclick="_plRenderAnalyze()" style="background:transparent;border:0;color:var(--text);font-size:1.2em;cursor:pointer">←</button>' +
+        '<button onclick="_plAnBack()" style="background:transparent;border:0;color:var(--text);font-size:1.2em;cursor:pointer">←</button>' +
         '<div style="font-size:1em;font-weight:700">' + cat.label + ' <span style="font-size:.8em;color:var(--muted)">' + cat.zh + '</span> · 最近 3 次</div>' +
       '</div>' +
       (calc.picks.length
@@ -6915,18 +6967,26 @@ function _plRenderAnalyzeContent() {
     return;
   }
   var groups = _plAnBuildGroups(entries);
+  var isCurrency = (_pl.anGroup === 'currency');   // V2.4.16：Currency 是左欄獨立項（不在 groups 內）
   var sel = null;
   for (var i = 0; i < groups.length; i++) { if (groups[i].id === (_pl.anGroup || 'all')) { sel = groups[i]; break; } }
   if (!sel) sel = groups[0];
   // 左欄：分區 + 各組（label + block 時數），選中高亮
   var sectionTitle = { time: '時間 Time', company: '依公司 Company', type: '依機型 Type' };
   var leftHtml = '', curSection = '';
+  // V2.4.16：Currency 獨立項 —— 放在所有時間/公司/機型分組之上，右側狀態燈一眼看起降是否有效。
+  var _cs = _plCurrencyStatus(entries);
+  leftHtml += '<div onclick="_plAnSelect(\'currency\')" style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:9px 11px;border-radius:8px;margin-bottom:4px;cursor:pointer;' +
+    (isCurrency ? 'background:var(--accent);color:#fff' : 'background:var(--bar-bg-soft)') + '">' +
+    '<div style="font-size:.78em;font-weight:700;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">⏱️ Currency <span style="font-size:.85em;' + (isCurrency ? '' : 'color:var(--muted)') + '">起降</span></div>' +
+    '<div style="font-size:1em;font-weight:800;' + (isCurrency ? 'color:#fff' : 'color:' + _cs.color) + '">' + _cs.icon + '</div>' +
+  '</div>';
   groups.forEach(function(g) {
     if (g.section !== curSection) {
       curSection = g.section;
       leftHtml += '<div style="font-size:.6em;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin:12px 4px 5px">' + sectionTitle[g.section] + '</div>';
     }
-    var active = (g.id === sel.id);
+    var active = (!isCurrency && g.id === sel.id);
     var s = _plAnGroupSum(g);
     leftHtml += '<div onclick="_plAnSelect(\'' + _plJs(g.id) + '\')" style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:9px 11px;border-radius:8px;margin-bottom:4px;cursor:pointer;' +
       (active ? 'background:var(--accent);color:#fff' : 'background:var(--bar-bg-soft)') + '">' +
@@ -6937,7 +6997,14 @@ function _plRenderAnalyzeContent() {
   // 右欄：選中組的總計橫條 + 依機型(或依公司)卡片；'all' 再加月圖 + 起始累計/SIM
   var selSum = _plAnGroupSum(sel);
   var dim = (sel.section === 'type') ? 'company' : 'type';
-  var rightHtml =
+  // V2.4.16：左欄選 Currency → 右欄整面顯示 currency recency（不再掛在 All Flight Time 底下）。
+  var rightHtml = isCurrency ?
+    ('<div class="pl-an-ghead">' +
+      '<div style="font-size:1.05em;font-weight:800">⏱️ Currency</div>' +
+      '<div style="font-size:.7em;color:var(--muted)">90-day recency</div>' +
+    '</div>' +
+    _plRenderCurrency(entries, true))
+  :
     // #2-analyze：群組標題（All Flight Time 等）。手機(<768)靠 .pl-an-ghead 的 base sticky 固定；
     //   iPad(≥768) 由 media query 改成 static（右欄自己是捲動盒，標題不再 sticky，否則行內 sticky 會蓋住內容）。
     //   ⚠ 一定要用 class，不可寫行內 style position:sticky —— 行內優先權會壓過 media query 的 static 改寫（2026-06-06 踩過：iPad 標題一直蓋住內容修不好就是這個）。
@@ -6945,8 +7012,6 @@ function _plRenderAnalyzeContent() {
       '<div style="font-size:1.05em;font-weight:800">' + _plEsc(sel.label) + '</div>' +
       '<div style="font-size:.7em;color:var(--muted)">' + selSum.flights + ' flights</div>' +
     '</div>' +
-    // V2.4.15：Currency 卡只在「All Flight Time」總覽顯示（是全域 recency，跟 company/type 分組無關）
-    (sel.id === 'all' ? _plRenderCurrency(entries) : '') +
     _plAnBarsCard('總計 Totals', _plMinToHHMM(selSum.block) + ' block', selSum, '') +
     _plAnDetailCard(selSum) +
     '<div style="font-size:.62em;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin:14px 4px 7px">' + (dim === 'company' ? '依公司 By Company' : '依機型 By Type') + '（點看明細）</div>' +
@@ -7110,6 +7175,7 @@ async function _plRenderMapTab() {
   var c = document.getElementById('pilotlog-content');
   if (!c) return;
   _pl.aptReturn = false;
+  _pl.anReturn = null;   // V2.4.16：離開 Analyze → 清分類返回標記
   if (!_pl.user) { _plRenderLogin(); return; }
   _plShowTabBar(true);
   _plHighlightTab('map');
@@ -7546,6 +7612,7 @@ async function _plRenderReport() {
   var c = document.getElementById('pilotlog-content');
   if (!c) return;
   _pl.aptReturn = false;   // V1.3.39：切到 Report → 清 Airports 返回標記
+  _pl.anReturn = null;     // V2.4.16：離開 Analyze → 清分類返回標記
   if (!_pl.user) { _plRenderLogin(); return; }
   _plShowTabBar(true);
   _plHighlightTab('report');
