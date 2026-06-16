@@ -39,6 +39,8 @@ var _pl = {
   _fetching: 0,                  // V2.4.12：背景刷新進行中計數（>0＝同步中）
   _fetchGen: 0,                  // V2.4.12：fetch 世代號 —— 逾時/被新請求取代的舊 fetch 回來時不可寫入（防 race 覆蓋）
   _timedOutGen: 0,               // V2.4.12：被 wrapper 逾時放生的世代；該請求若晚點成功，core 要自己重繪（caller 已放棄）
+  _autoSaveTimer: null,          // V2.4.14：LogTen 式自動存的防抖 timer
+  _editorDirty: false,           // V2.4.14：編輯器有未存改動（含程式改值）→ 關閉時 flush
 };
 
 var _PL_LS_AT = 'pilotlog_at';
@@ -157,6 +159,10 @@ function _plHighlightTab(tab) {
 // 切 tab 一律先丟掉編輯中的草稿狀態回到該 tab 的頂層。
 function switchPlTab(tab, btn) {
   if (!_pl.user) return;            // 未登入時 tab bar 是藏的，保險再擋一次
+  // V2.4.14：自動存模型 —— 切走前先把未存編輯 flush 落地（此時編輯器 DOM 還在，讀得到表單），不丟資料。
+  if (_pl._autoSaveTimer) { clearTimeout(_pl._autoSaveTimer); _pl._autoSaveTimer = null; }
+  if (_pl._editorDirty && _pl.editing && !_pl.editing.is_locked) { try { _plSaveEntry({ keepOpen: true }); } catch (e) {} }
+  _pl._editorDirty = false;
   if (typeof _plDisposeGlobe === 'function') _plDisposeGlobe();   // V2.2.00：離開 Map 先釋放 3D WebGL
   _pl.tab = tab;
   _pl.editing = null;
@@ -307,7 +313,14 @@ function _plEnqueue(type, id, body) {
 function _plReconcileId(localId, realId) {
   for (var i = 0; i < _pl.entries.length; i++) if (_pl.entries[i].id === localId) _pl.entries[i].id = realId;
   for (var k = 0; k < _pl.outbox.length; k++) if (_pl.outbox[k].id === localId) _pl.outbox[k].id = realId;
+  if (_pl.aircraftEntries) for (var a = 0; a < _pl.aircraftEntries.length; a++) if (_pl.aircraftEntries[a].id === localId) _pl.aircraftEntries[a].id = realId;
   if (_pl.selectedId === localId) _pl.selectedId = realId;
+  // V2.4.14：自動存的新航班開著編輯器時 temp→正式 id，editing 也要換，否則 Lock/Delete 仍對舊 local id 動作（codex P2）
+  if (_pl.editing && _pl.editing.id === localId) {
+    _pl.editing.id = realId;
+    var hd = document.getElementById('ple-editor-head');
+    if (hd) hd.innerHTML = _plEditorHeadInner(_pl.editing, !!(document.getElementById('pl-detail-pane') && document.getElementById('pl-detail-pane').contains(hd)));
+  }
   _plCacheSaveEntries(); _plOutboxPersist();
 }
 
@@ -1420,6 +1433,10 @@ function _plBlankEntry() {
 }
 
 function _plOpenEditor(id) {
+  // V2.4.14：直接切到另一筆（不經 _plCloseEditor）時，先把前一筆的未存改動 flush 落地，再重置自動存狀態（codex P1）。
+  if (_pl._autoSaveTimer) { clearTimeout(_pl._autoSaveTimer); _pl._autoSaveTimer = null; }
+  if (_pl._editorDirty && _pl.editing && !_pl.editing.is_locked) { try { _plSaveEntry({ keepOpen: true }); } catch (e) {} }
+  _pl._editorDirty = false;
   if (id) {
     // 先從主頁 list 找；找不到再退回 Aircraft 頁的完整快照
     // （Aircraft detail 顯示的 row 可能不在 _pl.entries 主頁清單裡 — 主頁 filter 篩掉、
@@ -1454,6 +1471,10 @@ function _plOpenEditor(id) {
 }
 
 function _plCloseEditor() {
+  // V2.4.14：關閉前 flush —— 有任何未存的改動（dirty，含程式改值與防抖未到的輸入）就先落地，確保不丟資料。
+  if (_pl._autoSaveTimer) { clearTimeout(_pl._autoSaveTimer); _pl._autoSaveTimer = null; }
+  if (_pl._editorDirty && _pl.editing && !_pl.editing.is_locked) { try { _plSaveEntry({ keepOpen: true }); } catch (e) {} }
+  _pl._editorDirty = false;
   _pl.editing = null;
   _pl.selectedId = null;
   // V2.0.01（codex P2）：從 Airports 點航班進來的 → 關閉回對的那一層（三層導航才順）：
@@ -2139,6 +2160,7 @@ function _plCrewPick(key, cid) {
   var dd = document.getElementById('ple-crewdd-' + key);
   if (dd) dd.style.display = 'none';
   _plCrewSlotInput(key);
+  if (typeof _plScheduleAutoSave === 'function') _plScheduleAutoSave();   // V2.4.14：下拉選組員是程式改值 → 觸發自動存
 }
 function _plCrewDDClose(key) {
   setTimeout(function() { var dd = document.getElementById('ple-crewdd-' + key); if (dd) dd.style.display = 'none'; }, 150);
@@ -2208,6 +2230,7 @@ function _plSwapPicSic() {
   var picM = document.getElementById('ple-pic_minutes'), sicM = document.getElementById('ple-sic_minutes');
   if (picM && sicM) { var t = picM.value; picM.value = sicM.value; sicM.value = t; picM.dataset.manual = '1'; sicM.dataset.manual = '1'; }
   _plCrewSlotInput('pic'); _plCrewSlotInput(sk);
+  if (typeof _plScheduleAutoSave === 'function') _plScheduleAutoSave();   // V2.4.14：程式改值 → 觸發自動存（input 事件不會自動發）
   if (typeof _plToast === 'function') _plToast('⇄ 已對調 PIC/SIC');
 }
 // V2.4.04：↩ Return —— 從已存的去程一鍵建回程草稿：出發↔目的對調、組員/機型/機尾/operating_crew 複製、
@@ -2242,6 +2265,7 @@ function _plMakeReturn() {
   _pl.selectedId = null;
   if (_plWide() && document.getElementById('pl-detail-pane')) { _plRenderEditor('pl-detail-pane'); _plRenderList(); }
   else { _plRenderEditor(); if (typeof _plRenderYearIndex === 'function') _plRenderYearIndex(); }
+  if (typeof _plScheduleAutoSave === 'function') _plScheduleAutoSave();   // V2.4.14：回程草稿已有內容 → 標 dirty，關閉/防抖會落地（不丟）
   if (typeof _plToast === 'function') _plToast('↩ 已建回程草稿，填航班號與時間即可');
 }
 
@@ -2305,6 +2329,7 @@ function _plCkReorder(srcKey, tgtKey) {
   order.splice(si, 1); order.splice(ti, 0, srcKey);
   keys.forEach(function(k, i) { _plWriteSlotContent(k, content[order[i]]); });
   _plUpdateOwnerRole();
+  if (typeof _plScheduleAutoSave === 'function') _plScheduleAutoSave();   // V2.4.14：拖拉換位 → 觸發自動存
 }
 // 你本人(員編)現在在哪一格 → 設你的 position（PIC 格=PIC、其餘=SIC）+ 觸發時數重算。
 function _plUpdateOwnerRole() {
@@ -3429,7 +3454,16 @@ function _plWireEditor() {
     _plUpdateAptNames();
     _plUpdateRwyLists();
     _plUpdateAptLists();
-    if (!_pl.editing.is_locked) { _plAutoCalcTimes(); _plAutoCalcDuty(); }   // V2.3.07：機場庫到位後 IATA→ICAO 才查得到，Duty 規則要補算一次（codex P2）
+    if (!_pl.editing.is_locked) {
+      // V2.4.14（codex P2）：機場庫晚載入會重算衍生值（night/起降/On Duty…）。比對前後，真有變才排自動存 ——
+      //   這樣「庫載入後算出的正確值」不會因使用者只是瀏覽就遺失，又不會純瀏覽（無變化）也白存。
+      var derivedKeys = ['night_minutes', 'block_minutes', 'air_minutes', 'pic_minutes', 'sic_minutes',
+        'on_duty_utc', 'off_duty_utc', 'total_duty_minutes', 'day_takeoffs', 'night_takeoffs', 'day_landings', 'night_landings'];
+      var snap = derivedKeys.map(function(k) { return _plGetVal('ple-' + k); });
+      _plAutoCalcTimes(); _plAutoCalcDuty();   // V2.3.07：機場庫到位後 IATA→ICAO 才查得到，Duty 規則要補算一次
+      var changed = derivedKeys.some(function(k, i) { return _plGetVal('ple-' + k) !== snap[i]; });
+      if (changed) _plScheduleAutoSave();
+    }
   });
   // V1.3.08：上鎖的航班 — 所有編輯欄位 disabled；Lock 按鈕仍可用以解鎖
   if (_pl.editing && _pl.editing.is_locked) {
@@ -3535,6 +3569,28 @@ function _plWireEditor() {
   _plRefreshSchedLocal();   // 初次顯示已存的 Sched 時間之當地時間
 }
 
+// V2.4.14：編輯器標題列內容（關閉鈕 + 標題 + 狀態 + Fields/Return/Lock/自動存提示/Delete）。
+//   抽成函式，讓「新航班首次自動存後（拿到 id）」能單獨重建這列，露出 Delete/Lock/Return，不必整個重繪丟焦點（codex P2）。
+function _plEditorHeadInner(e, inDetail) {
+  var closeLabel = inDetail ? '✕' : '←';
+  var statusBadge = '';
+  if (e.id) {
+    if (e.needs_completion) statusBadge = '<span style="background:#f59e0b;color:#fff;border-radius:10px;padding:2px 8px;font-size:.62em;margin-left:8px">待補強 needs fix</span>';
+    else if (e.status === 'roster_removed') statusBadge = '<span style="background:#94a3b8;color:#fff;border-radius:10px;padding:2px 8px;font-size:.62em;margin-left:8px">removed</span>';
+    else if (_plEntryIsDone(e)) statusBadge = '<span style="background:#10b981;color:#fff;border-radius:10px;padding:2px 8px;font-size:.62em;margin-left:8px">flown 已完成</span>';
+    else statusBadge = '<span style="background:#3b82f6;color:#fff;border-radius:10px;padding:2px 8px;font-size:.62em;margin-left:8px">open 未完成</span>';
+    if (e.is_locked) statusBadge += '<span style="margin-left:6px;font-size:.85em" title="Locked">🔒</span>';
+  }
+  return '<button onclick="_plCloseEditor()" style="background:transparent;border:0;color:var(--text);font-size:1.2em;cursor:pointer">' + closeLabel + '</button>' +
+    '<div style="font-size:1em;font-weight:700">' + (e.id ? 'Edit Entry' : 'New Entry') + '</div>' + statusBadge +
+    '<div style="flex:1"></div>' +
+    '<button onclick="_plToggleConfigFields()" title="Configure field labels" style="background:' + (_pl.configFields ? '#f59e0b' : 'transparent') + ';color:' + (_pl.configFields ? '#fff' : 'var(--muted)') + ';border:1px solid ' + (_pl.configFields ? '#f59e0b' : 'var(--border,#334155)') + ';border-radius:6px;padding:6px 10px;font-size:.74em;cursor:pointer">' + (_pl.configFields ? '✓ Done' : '⚙ Fields') + '</button>' +
+    (e.id && _plEntryType(e) === 'flight' ? '<button onclick="_plMakeReturn()" title="建立回程（出發地↔目的地對調、組員/機型複製，時間留空）" style="background:transparent;color:var(--muted);border:1px solid var(--border,#334155);border-radius:6px;padding:6px 10px;font-size:.74em;cursor:pointer">↩ Return</button>' : '') +
+    (e.id ? '<button onclick="_plToggleLock()" style="background:transparent;color:' + (e.is_locked ? '#10b981' : 'var(--muted)') + ';border:1px solid ' + (e.is_locked ? '#10b981' : 'var(--border,#334155)') + ';border-radius:6px;padding:6px 10px;font-size:.74em;cursor:pointer">' + (e.is_locked ? '🔒 Locked' : '🔓 Lock') + '</button>' : '') +
+    // V2.4.14：LogTen 式自動存 —— 拿掉 Save 鈕，改一行小灰字提示（輸入即存、關閉自動落地）。
+    (!e.is_locked ? '<span style="font-size:.64em;color:var(--muted);white-space:nowrap;align-self:center">✓ 自動儲存<br>Auto-saved</span>' : '') +
+    (e.id && !e.is_locked ? '<button onclick="_plDeleteEntry()" style="background:transparent;color:#ef4444;border:1px solid #ef4444;border-radius:6px;padding:6px 10px;font-size:.74em;cursor:pointer">Delete</button>' : '');
+}
 // target：'pilotlog-content'（預設，全螢幕）或 'pl-detail-pane'（iPad 右側明細面板）。
 // 兩個目標差別只在 header 的關閉鈕標籤（← 回列表 / ✕ 關閉明細）。
 function _plRenderEditor(target) {
@@ -3543,21 +3599,6 @@ function _plRenderEditor(target) {
   if (!c || !_pl.editing) return;
   var e = _pl.editing;
   var inDetail = (target === 'pl-detail-pane');
-  var closeLabel = inDetail ? '✕' : '←';
-  // V1.3.09：badge 改用 in_utc 判斷已完成（roster_removed → 灰；in_utc 有 → 綠 done；其餘 → 藍 open）
-  var statusBadge = '';
-  if (e.id) {
-    if (e.needs_completion) {
-      statusBadge = '<span style="background:#f59e0b;color:#fff;border-radius:10px;padding:2px 8px;font-size:.62em;margin-left:8px">待補強 needs fix</span>';
-    } else if (e.status === 'roster_removed') {
-      statusBadge = '<span style="background:#94a3b8;color:#fff;border-radius:10px;padding:2px 8px;font-size:.62em;margin-left:8px">removed</span>';
-    } else if (_plEntryIsDone(e)) {
-      statusBadge = '<span style="background:#10b981;color:#fff;border-radius:10px;padding:2px 8px;font-size:.62em;margin-left:8px">flown 已完成</span>';
-    } else {
-      statusBadge = '<span style="background:#3b82f6;color:#fff;border-radius:10px;padding:2px 8px;font-size:.62em;margin-left:8px">open 未完成</span>';
-    }
-    if (e.is_locked) statusBadge += '<span style="margin-left:6px;font-size:.85em" title="Locked">🔒</span>';
-  }
 
   var typeOptions = ['', 'A321', 'A359', 'A35K', 'B777-300ER', 'B789', 'B78X'].concat(_pl.suggest.aircraft_types || []);
   typeOptions = Array.from(new Set(typeOptions));
@@ -3569,17 +3610,8 @@ function _plRenderEditor(target) {
     '<div style="padding:10px 14px">' +
     // V2.4.10：iPad split 時標題列在面板內 sticky 釘住 —— 面板捲到哪，Edit Entry/Save/Delete 都在面板頂端、永遠可達
     //   （解「開非第一筆航班標題被捲上去拉不回來」）。iPhone 全螢幕維持原樣。
-    '<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px' + (inDetail ? ';position:sticky;top:0;z-index:6;background:var(--card);padding:6px 0;margin:-2px 0 8px' : '') + '">' +
-      '<button onclick="_plCloseEditor()" style="background:transparent;border:0;color:var(--text);font-size:1.2em;cursor:pointer">' + closeLabel + '</button>' +
-      '<div style="font-size:1em;font-weight:700">' + (e.id ? 'Edit Entry' : 'New Entry') + '</div>' + statusBadge +
-      '<div style="flex:1"></div>' +
-      // V2.3：⚙ Configure Fields（LogTen 式）—— 平常欄位名稱鎖住，點了才進可編輯狀態改名。UI 文案用英文。
-      '<button onclick="_plToggleConfigFields()" title="Configure field labels" style="background:' + (_pl.configFields ? '#f59e0b' : 'transparent') + ';color:' + (_pl.configFields ? '#fff' : 'var(--muted)') + ';border:1px solid ' + (_pl.configFields ? '#f59e0b' : 'var(--border,#334155)') + ';border-radius:6px;padding:6px 10px;font-size:.74em;cursor:pointer">' + (_pl.configFields ? '✓ Done' : '⚙ Fields') + '</button>' +
-      // V1.3.08：拿掉 Confirm — Save 就是 Save。Lock 鈕（LogTen 風格）：鎖了不能改/不能刪；點一下解鎖
-      (e.id && _plEntryType(e) === 'flight' ? '<button onclick="_plMakeReturn()" title="建立回程（出發地↔目的地對調、組員/機型複製，時間留空）" style="background:transparent;color:var(--muted);border:1px solid var(--border,#334155);border-radius:6px;padding:6px 10px;font-size:.74em;cursor:pointer">↩ Return</button>' : '') +
-      (e.id ? '<button onclick="_plToggleLock()" style="background:transparent;color:' + (e.is_locked ? '#10b981' : 'var(--muted)') + ';border:1px solid ' + (e.is_locked ? '#10b981' : 'var(--border,#334155)') + ';border-radius:6px;padding:6px 10px;font-size:.74em;cursor:pointer">' + (e.is_locked ? '🔒 Locked' : '🔓 Lock') + '</button>' : '') +
-      (!e.is_locked ? '<button onclick="_plSaveEntry()" style="background:#3b82f6;color:#fff;border:0;border-radius:6px;padding:6px 12px;font-size:.78em;font-weight:700;cursor:pointer">Save</button>' : '') +
-      (e.id && !e.is_locked ? '<button onclick="_plDeleteEntry()" style="background:transparent;color:#ef4444;border:1px solid #ef4444;border-radius:6px;padding:6px 10px;font-size:.74em;cursor:pointer">Delete</button>' : '') +
+    '<div id="ple-editor-head" style="display:flex;align-items:center;gap:10px;margin-bottom:10px' + (inDetail ? ';position:sticky;top:0;z-index:6;background:var(--card);padding:6px 0;margin:-2px 0 8px' : '') + '">' +
+      _plEditorHeadInner(e, inDetail) +
     '</div>' +
     // V2.3：Configure Fields 模式提示橫幅（英文）
     (_pl.configFields ? '<div style="background:#3b2f0a;border:1px solid #f59e0b;color:#fbbf24;border-radius:8px;padding:8px 10px;font-size:.68em;margin-bottom:10px;line-height:1.5">✏️ <b>Configure fields</b> — tap any field name to rename it, then <b>✓ Done</b> to save. Applies to all flights, synced across your devices.' +
@@ -3687,6 +3719,23 @@ function _plRenderEditor(target) {
     '</div>';
 
   _plWireEditor();   // V1.3.02：掛上 OOOI→block/air、position→PIC/SIC、pilot flying→起降、機型→篩 tail 的自動計算
+
+  // V2.4.14：LogTen 式自動存 —— 編輯器內任何輸入/變更 → 防抖 800ms 後背景存（不關閉、不丟焦點），不用 Save 鈕。
+  //   上鎖的不掛（欄位 disabled）。程式改值的 helper（Swap PIC/SIC、拖拉換位…）改呼叫 _plScheduleAutoSave（input 事件不會自動發）。
+  if (c && !e.is_locked) {
+    c.addEventListener('input', _plScheduleAutoSave);
+    c.addEventListener('change', _plScheduleAutoSave);
+  }
+}
+// V2.4.14：統一的自動存排程入口 —— 標 dirty + 重置 800ms 防抖。input/change 事件與程式改值 helper 都呼叫這個。
+function _plScheduleAutoSave() {
+  if (!_pl.editing || _pl.editing.is_locked) return;
+  _pl._editorDirty = true;
+  if (_pl._autoSaveTimer) clearTimeout(_pl._autoSaveTimer);
+  _pl._autoSaveTimer = setTimeout(function () {
+    _pl._autoSaveTimer = null;
+    if (_pl.editing && !_pl.editing.is_locked) { try { _plSaveEntry({ keepOpen: true }); } catch (e2) {} }
+  }, 800);
 }
 
 function _plReadField(name, type) {
@@ -3728,9 +3777,16 @@ function _plEntryTypeChange() {
   if (typeof _plAutoCalcDuty === 'function') _plAutoCalcDuty();   // V2.4.03：切 DHD/SIM 即時更新 FDP Limit（DHD/SIM 不顯示）
 }
 
-async function _plSaveEntry() {
+// V2.4.14：LogTen 式自動存 —— opts.keepOpen=true 時「背景存、不關閉編輯器」（給輸入防抖 + 關閉前 flush 用）。
+//   沒帶 opts（舊行為）= 存完關閉並重繪（目前已無 UI 呼叫，保留相容）。
+async function _plSaveEntry(opts) {
+  var keepOpen = !!(opts && opts.keepOpen);
   var e = _pl.editing;
   if (!e) return;
+  if (e.is_locked) return;   // 上鎖不存（欄位本來就 disabled，保險）
+  // V2.4.14（codex P1）：防抖 timer 可能在「使用者切到別頁、編輯器 DOM 已被換掉」後才發 → 此時讀表單全是空，
+  //   會把草稿覆蓋成空白。偵測核心欄位不在 DOM → 中止（不讀、不寫），避免清空資料。
+  if (keepOpen && !document.getElementById('ple-flight_date')) return;
 
   // V1.3.19：類型下拉決定 flight / dhd / sim / ground（V2.4.08）
   var _etype = (document.getElementById('ple-entry-type') || {}).value || 'flight';
@@ -3842,6 +3898,9 @@ async function _plSaveEntry() {
   //          編輯既有 entry 不動 status（用 flight_date 隱含「飛了沒」）
   var isNew = !e.id;
   if (isNew) body.status = 'confirmed';
+  // V2.4.14：新航班的建立由 _editorDirty 把關 —— 自動存只在「使用者真的改過」時才會被呼叫（_plScheduleAutoSave
+  //   設 dirty、close/switch 也只在 dirty 時 flush），所以走到這裡＝有實質編輯，直接建即可（不再用脆弱的欄位空白清單，
+  //   那會誤殺只填 position／PF／日期 等的部分新航班，codex P2）。純開了沒動的 New Entry 不會走到這裡。
 
   // V1.3：離線優先 — 先寫本機（_pl.entries 樂觀更新 + IDB）+ 排進 outbox，再背景同步。
   // 線上也走這條：飛機上斷斷續續的網路不會掉資料，回連自動補送。
@@ -3875,6 +3934,22 @@ async function _plSaveEntry() {
   _plCacheSaveEntries();
   _plEnqueue(isNew ? 'create' : 'update', id, body);
 
+  if (keepOpen) {
+    // V2.4.14：自動存 —— 不關閉、不重繪編輯器（保留焦點，使用者繼續打字）。
+    if (isNew) {
+      e.id = id; e.status = statusForCache; e.source = cached.source;   // 新建後拿到 id → 之後存變 update，不重複 create
+      // 只重建「標題列」露出 Delete/Lock/Return（不碰欄位 → 不丟焦點，codex P2）
+      var hd = document.getElementById('ple-editor-head');
+      if (hd) hd.innerHTML = _plEditorHeadInner(e, !!(document.getElementById('pl-detail-pane') && document.getElementById('pl-detail-pane').contains(hd)));
+    }
+    _pl._editorDirty = false;       // 已落地 → 清 dirty（沒再改的話關閉不會重複存）
+    _pl.selectedId = id;
+    // iPad 分割：刷新左列讓那筆即時更新（右側編輯器不動、不丟焦點）。iPhone 全螢幕：列表不在畫面，不重繪。
+    if (_plWide() && document.getElementById('pl-detail-pane') && document.getElementById('pl-list')) _plRenderList();
+    _plSync();
+    return;
+  }
+
   _pl.editing = null;
   _pl.selectedId = null;          // iPad detail pane 的選取也清掉，_plRenderMain 會重建成 placeholder
   _plToast('Saved');
@@ -3886,6 +3961,10 @@ async function _plSaveEntry() {
 async function _plToggleLock() {
   var e = _pl.editing;
   if (!e || !e.id) return;
+  // V2.4.14：上鎖前先 flush 未存編輯 —— 否則防抖窗內按 Lock，後續 autosave 會因已鎖定 early-return 而丟掉這些改動（codex P2）
+  if (_pl._autoSaveTimer) { clearTimeout(_pl._autoSaveTimer); _pl._autoSaveTimer = null; }
+  if (_pl._editorDirty && !e.is_locked) { try { await _plSaveEntry({ keepOpen: true }); } catch (err) {} }
+  _pl._editorDirty = false;
   if (_plIsLocalId(e.id)) { _plToast('先存檔再上鎖', 'error'); return; }
   if (typeof navigator !== 'undefined' && navigator.onLine === false) {
     _plToast('🔒 鎖定切換需要連網路', 'error'); return;
@@ -6157,6 +6236,7 @@ async function _plQuickCreateCrew(slotKey) {
   var sId = document.getElementById('ple-crewid-' + slotKey); if (sId) sId.value = newEid;
   var sName0 = document.getElementById('ple-crewname0-' + slotKey); if (sName0) sName0.value = name;
   _plCrewSlotInput(slotKey);   // 確保 ✏️ 仍顯示
+  if (typeof _plScheduleAutoSave === 'function') _plScheduleAutoSave();   // V2.4.14：回填了組員名/員編 → 觸發自動存
   _plCloseCrewModal();
   if (j.skipped && j.skipped.length) _plToast('已新增；這些員編已掛別人、略過：' + j.skipped.join(', '), 'error');
   else _plToast('已加入通訊錄 · Added');
@@ -6186,6 +6266,7 @@ async function _plQuickSaveCrew(contactId, slotKey) {
   var sName = document.getElementById('ple-crew-' + slotKey); if (sName) sName.value = name;
   var sId = document.getElementById('ple-crewid-' + slotKey); if (sId) sId.value = newEid;
   var sName0 = document.getElementById('ple-crewname0-' + slotKey); if (sName0) sName0.value = name;
+  if (typeof _plScheduleAutoSave === 'function') _plScheduleAutoSave();   // V2.4.14：回填了組員名/員編 → 觸發自動存
   _plCloseCrewModal();
   if (j.skipped && j.skipped.length) _plToast('已存；這些員編已掛在別人身上、略過：' + j.skipped.join(', '), 'error');
   else _plToast('已更新 · Updated');
