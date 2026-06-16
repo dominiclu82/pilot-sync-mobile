@@ -57,8 +57,8 @@ import { getAirportDbJs } from '../spa/js-airport-db.js';
 
 // ── 版本（比照 CrewSync / Morning：每次推版必更新；SW cache 名稱跟著走） ────
 // 本機 preview build 會暫時加 -tNN 後綴方便對版；推正式版前拿掉只留乾淨版號。
-export const PILOT_LOG_VERSION = 'V2.4.11';
-const PILOT_LOG_CACHE = 'pilotlog-v2-4-11';
+export const PILOT_LOG_VERSION = 'V2.4.12';
+const PILOT_LOG_CACHE = 'pilotlog-v2-4-12';
 
 export const pilotLogRouter = express.Router();
 
@@ -204,6 +204,9 @@ body {
 /* Logbook 列被選中時的外框（只 iPad 看得到，因為窄螢幕點下去直接全螢幕，沒有 highlight 需求） */
 .pl-row { transition: outline-color .12s; outline: 2px solid transparent; outline-offset: -2px; }
 .pl-row.pl-row-sel { outline-color: var(--accent); }
+/* V2.4.12：同步中連線圖示的轉圈動畫 */
+@keyframes pl-spin { to { transform: rotate(360deg); } }
+.pl-spin { display: inline-block; animation: pl-spin 1s linear infinite; }
 
 /* About modal — 比照 Morning，加 overflow-x:hidden + overflow-wrap:break-word */
 .pl-modal-wrap {
@@ -367,6 +370,11 @@ function _renderPilotLogChangelog(): string {
   return `
     ${renderCommunityLink()}
     <div class="pl-cl-v">${PILOT_LOG_VERSION}</div>
+    <div class="pl-cl-txt">
+      <b>🔌 新增連線狀態圖示（同步中／已同步／未同步／離線，可點手動同步），背景同步有變更會提示；On Duty／Off Duty 補當地時間。</b><br>
+      <b>🔌 New connection-status icon (syncing / synced / not-synced / offline, tap to sync); background sync notifies on changes; On Duty / Off Duty now show local time.</b>
+    </div>
+    <div class="pl-cl-v old">V2.4.11</div>
     <div class="pl-cl-txt">
       <b>🛠️ iPad 編輯器標題定位真正修好：補上 safe-area，捲動清單後編輯器（Save/Delete）不再卡在工具列後面。</b><br>
       <b>🛠️ iPad editor header positioning properly fixed (safe-area): after scrolling the list, the editor (Save/Delete) no longer hides behind the toolbar.</b>

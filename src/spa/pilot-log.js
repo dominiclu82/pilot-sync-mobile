@@ -35,6 +35,10 @@ var _pl = {
   selectedId: null,              // iPad 分割視窗：目前在 detail pane 開的那筆 entry id
   outbox: [],                    // V1.3：離線改動佇列（create/update/delete），回連自動上傳
   syncing: false,                // V1.3：同步進行中旗標（單例保護）
+  syncState: 'syncing',          // V2.4.12：連線圖示狀態 ok/syncing/warn/offline；開機預設「同步中」（首抓前別謊報已同步，codex P2）
+  _fetching: 0,                  // V2.4.12：背景刷新進行中計數（>0＝同步中）
+  _fetchGen: 0,                  // V2.4.12：fetch 世代號 —— 逾時/被新請求取代的舊 fetch 回來時不可寫入（防 race 覆蓋）
+  _timedOutGen: 0,               // V2.4.12：被 wrapper 逾時放生的世代；該請求若晚點成功，core 要自己重繪（caller 已放棄）
 };
 
 var _PL_LS_AT = 'pilotlog_at';
@@ -383,21 +387,54 @@ async function _plSync() {
   }
   // 排空後跟 server 對帳一次（顯示 server 真實資料）
   if (!_pl.outbox.length && (typeof navigator === 'undefined' || navigator.onLine !== false)) {
-    try { await _plFetchAll(); } catch (e) {}
+    try { await _plFetchAll(); } catch (e) {}   // 內部會設 syncState = ok/warn
     if (_pl.tab === 'logbook' && !_pl.editing) _plRenderList();
+  } else if (_pl.outbox.length) {
+    // V2.4.12：還有沒上傳成功的 → 黃色（有網路沒同步成功）/ 紅色（離線）
+    _pl.syncState = ((typeof navigator !== 'undefined' && navigator.onLine === false) || document.body.classList.contains('pl-offline')) ? 'offline' : 'warn';
   }
   _plRenderSyncStatus();
 }
 
-// 同步狀態小列（待上傳幾筆 / 同步中），填進 logbook header 的 #pl-sync-status
+// V2.4.12：連線狀態圖示（可點＝手動同步），填進 logbook header 的 #pl-sync-status。
+// 四態：🔄同步中 / ✅最新 / ⚠️未同步（有網路但沒成功，點重試） / 🔴離線。離線最優先、同步中次之。
 function _plRenderSyncStatus() {
   var el = document.getElementById('pl-sync-status');
   if (!el) return;
-  if (_pl.syncing) { el.innerHTML = '<span style="color:#3b82f6">🔄 同步中…</span>'; return; }
+  var offline = (typeof navigator !== 'undefined' && navigator.onLine === false) || document.body.classList.contains('pl-offline');
+  var busy = _pl.syncing || (_pl._fetching || 0) > 0;
   var n = _pl.outbox.length;
-  el.innerHTML = n
-    ? '<span style="color:#f59e0b">⏳ ' + n + ' 筆待上傳' + ((typeof navigator!=='undefined'&&navigator.onLine===false)?'（離線）':'') + '</span>'
-    : '';
+  var inner, title;
+  if (offline) {
+    inner = '<span style="color:#ef4444">🔴 離線</span>';
+    title = '離線中 — 連回線會自動同步';
+  } else if (busy) {
+    inner = '<span style="color:#3b82f6"><span class="pl-spin">🔄</span> 同步中…</span>';
+    title = '同步中';
+  } else if (_pl.syncState === 'ok') {
+    inner = '<span style="color:#10b981">✅ 已同步</span>';
+    title = '已是最新 — 點一下手動同步';
+  } else {
+    // warn / 殘留 offline / 尚未確認同步（剛重連還沒跑 fetch）→ 一律黃色，不可顯示綠勾（codex P2）
+    inner = '<span style="color:#f59e0b">⚠️ 未同步' + (n ? '（' + n + '）' : '') + '</span>';
+    title = '尚未同步 — 點一下重試';
+  }
+  el.innerHTML = '<span onclick="_plManualSync()" title="' + title + '" style="cursor:pointer;white-space:nowrap;font-size:.95em">' + inner + '</span>';
+}
+// V2.4.12：手動同步（點連線圖示）。同步中點無效；離線提示；否則排空 outbox + 跟 server 對帳。
+async function _plManualSync() {
+  if (_pl.syncing || (_pl._fetching || 0) > 0) return;
+  if ((typeof navigator !== 'undefined' && navigator.onLine === false) || document.body.classList.contains('pl-offline')) {
+    _plToast('目前離線，連回線會自動同步', 'warn'); return;
+  }
+  try {
+    if (_pl.outbox.length) { await _plSync(); }   // 有待上傳 → 排空（內部排空後會再 _plFetchAll 對帳）
+    else { await _plFetchAll(); }                  // 沒待上傳 → 直接刷新一次
+  } catch (e) { _pl.syncState = 'warn'; }
+  // codex P2：手動同步若 session 過期被清掉 → 導去登入（跟其他刷新路徑一致），不要停在過時畫面
+  if (!_pl.user && _plOnline()) { _plRenderLogin(); return; }
+  if (_pl.tab === 'logbook' && !_pl.editing) _plRenderList();
+  _plRenderSyncStatus();
 }
 
 // 從 IDB 撈回填 _pl；回傳是否有任何快取（用來判斷「曾經登入過」）
@@ -423,6 +460,8 @@ function _plSetOffline(off) {
   var bar = document.getElementById('pl-offline-bar');
   if (bar) bar.classList.toggle('show', !!off);
   document.body.classList.toggle('pl-offline', !!off);
+  if (off) _pl.syncState = 'offline';   // V2.4.12：離線 → 連線圖示紅色（回連後下次 fetch 會改回 ok）
+  _plRenderSyncStatus();
   _plUpdateBannerHeight();     // 量實際橫幅高度（換行會變高）→ 給 sticky 工具列偏移用（codex P2）
   _plApplyOfflineMapShift();   // V2.2.08：離線時把沉浸式地圖下移，避免 OFFLINE 橫幅擋住浮動控制項
   _plManageReconnectProbe(!!off);   // V2.2.08：離線時開始主動探線（iOS 的 online 事件常不觸發 → 橫幅卡住）
@@ -454,6 +493,16 @@ function _plManageReconnectProbe(off) {
     } else if (_pl._reconnTimer) {
       clearInterval(_pl._reconnTimer); _pl._reconnTimer = null; _pl._reconnProbing = false;
     }
+  } catch (e) {}
+}
+// V2.4.12：重繪目前分頁（資料已在 _pl，不再抓）—— 給「逾時後晚成功」的 fetch 收尾用，不打斷編輯。
+function _plRerenderCurrentView() {
+  if (_pl.editing) return;
+  try {
+    if (_pl.tab === 'analyze') _plRenderAnalyze();
+    else if (_pl.tab === 'report') _plRenderReport();
+    else if (_pl.tab === 'map') _plRenderMapTab();
+    else if (_pl.tab === 'logbook') _plRenderList();
   } catch (e) {}
 }
 // 連回線：清離線狀態 + 補送離線期間改動 + 重抓當前頁（不打斷編輯中）。
@@ -759,11 +808,58 @@ async function _plDeleteAccount() {
 // === SECTION: list ══════════════════════════════════════════════════════════
 // V1.2：網路失敗時 catch 起來、保留現有 _pl 資料（可能來自 IDB 快取）、設 OFFLINE 旗標；
 // 不讓網路掛掉的 throw 把 caller 炸掉。成功時順手寫一份進 IDB。
+// V2.4.12：同步狀態包裝層 —— 管「連線圖示狀態（同步中/最新/未同步）」+ 15 秒逾時 + 有異動才 toast。
+// 真正抓資料的核心是 _plFetchAllCore；所有既有呼叫端用這個 wrapper（行為相容：回 true/false）。
 async function _plFetchAll() {
+  var before = (_pl.entries || []).length;
+  _pl._fetching = (_pl._fetching || 0) + 1;
+  if (_pl.syncState !== 'offline') _pl.syncState = 'syncing';
+  _plRenderSyncStatus();
+  var timer = null;
+  var myGen = ++_pl._fetchGen;   // 本次世代（由 wrapper 配，core 沿用）—— 逾時只作廢「自己」、不誤殺更新的並行請求（codex P1）
+  try {
+    var work = _plFetchAllCore(myGen);
+    var timeout = new Promise(function (resolve) { timer = setTimeout(function () { resolve('__TIMEOUT__'); }, 15000); });
+    var r = await Promise.race([work, timeout]);
+    // 「自己仍是最新世代」才可以動 syncState —— 否則表示已有更新的 fetch 接手，舊請求的逾時/失敗不該把它的結果打回警告（codex P1）
+    var mine = (_pl._fetchGen === myGen);
+    if (r === '__STALE__') return false;                 // 被取代（不是失敗）→ 完全不動狀態
+    // 逾時：只翻黃色（不 bump 世代）—— 那個還在飛的請求若稍後完成、且沒有更新請求接手，仍會套用它抓到的最新資料
+    //   （core 的世代檢查已防止它蓋掉「更新的」狀態）。bump 會把這種「慢但會成功」的結果整個丟掉，故不 bump（codex P2）。
+    if (r === '__TIMEOUT__') { if (mine) { _pl.syncState = 'warn'; _pl._timedOutGen = myGen; } return false; }
+    if (r === true) {
+      if (mine) {
+        // 下載成功 → 綠；但有沒上傳的 outbox、或部分端點失敗（_fetchPartial）→ 維持黃色（不謊報已同步，codex P2）
+        _pl.syncState = ((_pl.outbox && _pl.outbox.length) || _pl._fetchPartial) ? 'warn' : 'ok';
+        var after = (_pl.entries || []).length;
+        // 有異動才提示（背景刷新後資料變了 → 讓使用者知道「為什麼東西變了」）。首次載入(before=0)不提示。
+        if (before > 0 && after !== before) {
+          if (after < before) _plToast('已更新：移除 ' + (before - after) + ' 筆', 'warn');
+          else _plToast('已更新：新增 ' + (after - before) + ' 筆');
+        }
+      }
+      return true;
+    }
+    // core 回 false（真失敗）：仍是最新世代才降級 —— 離線 → offline，否則 → warn
+    if (mine) _pl.syncState = ((typeof navigator !== 'undefined' && navigator.onLine === false) || document.body.classList.contains('pl-offline')) ? 'offline' : 'warn';
+    return false;
+  } catch (e) {
+    if (_pl._fetchGen === myGen) _pl.syncState = 'warn';
+    return false;
+  } finally {
+    if (timer) clearTimeout(timer);
+    _pl._fetching = Math.max(0, (_pl._fetching || 1) - 1);
+    _plRenderSyncStatus();
+  }
+}
+async function _plFetchAllCore(myGen) {
   // V1.3.08：filter 改成 client-side（all/past/future/removed 不對應 server status）— 要抓「全部」entries。
   // V2.2.07 修大 bug：原本 q='' 沒帶 limit → server 預設只回最近 200 筆，飛行筆數多的人看不到 2024 以前的
   //   航班（總時數正常是因為 stats 是 server 端全量算）。改帶 limit=all → server 不加 LIMIT，整本全載、無上限。
   var q = '?limit=all';
+  // V2.4.12：世代號由 wrapper 傳入；回來時若已被更新的 fetch 取代（gen 變了）→ 不可寫入（防逾時/舊請求覆蓋新狀態，codex P1）。
+  //   直接呼叫（非經 wrapper，理論上沒有）時 fallback 自己配一個。
+  if (myGen == null) myGen = ++_pl._fetchGen;
   try {
     var [eRes, sRes, aRes, qRes, atRes, cRes, mRes] = await Promise.all([
       _plApi('/api/pilot-log/entries' + q),
@@ -774,28 +870,44 @@ async function _plFetchAll() {
       _plApi('/api/pilot-log/crew'),            // V1.0.11
       _plApi('/api/pilot-log/me'),              // V1.3.12：順便載 crew_labels
     ]);
-    if (eRes.ok) { var ej = await eRes.json(); _pl.entries = ej.entries || []; }
-    if (sRes.ok) { _pl.stats = await sRes.json(); }
-    if (aRes.ok) { var aj = await aRes.json(); _pl.aircraft = aj.aircraft || []; }
-    if (qRes.ok) { _pl.suggest = await qRes.json(); }
-    if (atRes.ok) { var atj = await atRes.json(); _pl.aircraftTypes = atj.aircraft_types || []; }
-    if (cRes.ok) { var cj = await cRes.json(); _pl.crew = cj.crew || []; }
-    if (mRes.ok) {
-      var mj = await mRes.json();
-      _pl.crewLabels = (mj && mj.crew_labels) || null;
+    // codex P1：逾時被 wrapper 放生、或期間有更新的 fetch 啟動 → 這個舊請求不可再寫入；回 '__STALE__'
+    //   讓 wrapper 知道「不是失敗、是被取代」，不要把狀態打成 ⚠️（新請求自己會設正確狀態）。
+    if (myGen !== _pl._fetchGen) return '__STALE__';
+    // 先把所有 json 解析完（這些 await 也會讓出事件迴圈），再做「最終世代檢查」→ 之後同步寫入、
+    //   中間不再有 await，杜絕「解析途中有更新 fetch 啟動、舊請求仍寫入蓋掉新結果」的 race。
+    // codex P2：200 但 JSON 壞掉（代理/伺服器瞬斷）→ 標 parseErr 當失敗，不可謊報已同步。
+    var parseErr = false;
+    var pj = function (res) { return res.ok ? res.json().catch(function () { parseErr = true; return null; }) : Promise.resolve(null); };
+    var ej = await pj(eRes), sj = await pj(sRes), aj = await pj(aRes), qj = await pj(qRes),
+        atj = await pj(atRes), cj = await pj(cRes), mj = await pj(mRes);
+    // codex P2：任一端點非 200，或某筆 200 但 JSON 壞 → 這次只是「部分刷新」（_fetchPartial），不算全同步。
+    //   但已成功解析的 slice 仍照樣套用（下方 if(ej)/if(sj)… 各自 guard，壞的那筆是 null 自動略過）→ 不阻擋主清單更新。
+    var allOk = eRes.ok && sRes.ok && aRes.ok && qRes.ok && atRes.ok && cRes.ok && mRes.ok && !parseErr;
+    if (myGen !== _pl._fetchGen) return '__STALE__';   // 最終檢查；此後到 return 之間不可再 await
+    // codex P1：主資料（航班 entries）抓失敗 → 不算這次刷新成功，也不套用其它 slice（避免 stats 蓋在過時 entries 上不一致）。
+    //   有拿到回應＝在線（清離線橫幅），但回 false 讓 caller 當失敗處理、badge 顯示 ⚠️、不謊報已刷新。
+    if (ej === null) { _plSetOffline(false); return false; }
+    if (ej) _pl.entries = ej.entries || [];
+    if (sj) _pl.stats = sj;
+    if (aj) _pl.aircraft = aj.aircraft || [];
+    if (qj) _pl.suggest = qj;
+    if (atj) _pl.aircraftTypes = atj.aircraft_types || [];
+    if (cj) _pl.crew = cj.crew || [];
+    if (mj) {
+      _pl.crewLabels = mj.crew_labels || null;
       try { localStorage.setItem('pilotlog_crew_labels', JSON.stringify(_pl.crewLabels || {})); } catch (e) {}
       // V2.3：列表組員顯示模式（cic_only/flight/all）
-      if (mj && typeof mj.crew_display_mode === 'string') _pl.crewDisplayMode = mj.crew_display_mode;
+      if (typeof mj.crew_display_mode === 'string') _pl.crewDisplayMode = mj.crew_display_mode;
       try { localStorage.setItem('pilotlog_crew_display_mode', _pl.crewDisplayMode); } catch (e) {}
       // V2.3：編輯器欄位自訂顯示名稱
-      _pl.fieldLabels = (mj && mj.field_labels) || null;
+      _pl.fieldLabels = mj.field_labels || null;
       // V2.3.07：報到時間規則（On Duty = STD − N 分，依公司×機場）
-      _pl.dutyRules = (mj && mj.duty_rules) || null;
+      _pl.dutyRules = mj.duty_rules || null;
       try { localStorage.setItem('pilotlog_duty_rules', JSON.stringify(_pl.dutyRules || null)); } catch (e) {}
       try { localStorage.setItem('pilotlog_field_labels', JSON.stringify(_pl.fieldLabels || {})); } catch (e) {}
       // 會員身分（⭐ 創始會員 / 一般會員）— 帳號選單顯示用，順便存 localStorage 給離線
-      if (_pl.user) _pl.user.isFounder = !!(mj && mj.isFounder);
-      try { localStorage.setItem('pilotlog_is_founder', (mj && mj.isFounder) ? '1' : '0'); } catch (e) {}
+      if (_pl.user) _pl.user.isFounder = !!mj.isFounder;
+      try { localStorage.setItem('pilotlog_is_founder', mj.isFounder ? '1' : '0'); } catch (e) {}
     }
     // codex fast P1：fetch 過程中如果 token 過期 + refresh/cookie 真的失效，_plApi 內部會清
     // session（_pl.user=null）。此時不能假裝成功，否則 caller 會繼續顯示「沒授權但有快取」的 stale UI。
@@ -805,9 +917,20 @@ async function _plFetchAll() {
     }
     _plCacheSaveAll();
     _plSetOffline(false);
+    // codex P2：資料已套用 → 一律回 true 讓 caller 重繪（不可因某個附屬端點失敗就壓掉已更新的航班）；
+    //   「是否全部成功」改用 _fetchPartial 旗標傳給 badge，部分失敗時圖示顯示 ⚠️、但畫面照樣是新資料。
+    _pl._fetchPartial = !allOk;
+    // codex P2：若 wrapper 已逾時翻黃、但這個請求稍後成功落地（仍是最新世代）→ 由 core 自己把 badge 翻回正確狀態，
+    //   不然會卡在 ⚠️ 直到下次刷新。正常（未逾時）流程下 wrapper 也會設一次，重複無害。
+    if (myGen === _pl._fetchGen) {
+      _pl.syncState = ((_pl.outbox && _pl.outbox.length) || _pl._fetchPartial) ? 'warn' : 'ok';
+      _plRenderSyncStatus();
+      // 逾時後才晚成功 → wrapper 的 caller 早已用 false 收掉、不會重繪 → core 自己重繪當前頁（codex P2）
+      if (_pl._timedOutGen === myGen) _plRerenderCurrentView();
+    }
     return true;
   } catch (e) {
-    _plSetOffline(true);
+    if (myGen === _pl._fetchGen) _plSetOffline(true);   // codex P1：舊（被取代/逾時）請求失敗別把已成功的新狀態翻回離線
     return false;
   }
 }
@@ -1523,11 +1646,17 @@ function _plRefreshSchedLocal() {
   // 讀「下拉當下的類型」（不是 _pl.editing 的舊值）→ 切換類型時提示即時跟著對（codex P2）。
   var t = (document.getElementById('ple-entry-type') || {}).value || _plEntryType(_pl.editing || {});
   if (t === 'sim' || t === 'ground') {
+    // SIM/Ground 沒機場 → 一律 TPE
     _plUpdateSchedLocalTz('std_utc', 'Asia/Taipei');
     _plUpdateSchedLocalTz('sta_utc', 'Asia/Taipei');
+    _plUpdateSchedLocalTz('on_duty_utc', 'Asia/Taipei');
+    _plUpdateSchedLocalTz('off_duty_utc', 'Asia/Taipei');
   } else {
+    // 飛班：Sched Out / On Duty 在出發站；Sched In / Off Duty 在目的站
     _plUpdateSchedLocal('std_utc', 'origin');
     _plUpdateSchedLocal('sta_utc', 'dest');
+    _plUpdateSchedLocal('on_duty_utc', 'origin');
+    _plUpdateSchedLocal('off_duty_utc', 'dest');
   }
 }
 // From/To 即時天氣：點開才抓 METAR/TAF（展開式 panel，收合時不佔空間、不動原排版）。
@@ -2979,6 +3108,8 @@ function _plAutoCalcDuty() {
     }
   }
   _plUpdateOpCrewLimit();   // V2.4.03：操作人數自動偵測 + turnaround On/Off + FDP Limit
+  // V2.4.12：On Duty / Off Duty 是程式設值（不觸發 oninput）→ 主動刷新它們的當地時間提示
+  if (typeof _plRefreshSchedLocal === 'function') _plRefreshSchedLocal();
 }
 // V2.4.03：從表單駕駛艙槽即時數操作飛行員（PIC+SIC+Relief 填了幾個），夾 2~4；數不到回 null。
 function _plDetectOpCrewFromForm() {
@@ -3499,8 +3630,13 @@ function _plRenderEditor(target) {
         : _plFieldRow(2, _plEditorField('Out', 'out_utc', 'time-utc') + _plEditorField('Off', 'off_utc', 'time-utc')) +
           _plFieldRow(2, _plEditorField('On', 'on_utc', 'time-utc') + _plEditorField('In', 'in_utc', 'time-utc'))) +
       _plFieldSub('Duty') +
-      _plFieldRow(2, _plEditorField('On Duty', 'on_duty_utc', 'time-utc', { labelSuffix: '<span id="ple-onduty-from" style="font-size:.6em;color:var(--muted);white-space:nowrap"></span>' }) +
-        _plEditorField('Off Duty', 'off_duty_utc', 'time-utc', { labelSuffix: '<span id="ple-fdp-limit" style="font-size:.62em;font-weight:700;white-space:nowrap"></span>' })) +
+      // V2.4.12：On Duty / Off Duty 也顯示當地時間 —— 飛班依站別（報到在出發站、收工在目的站）、SIM/Ground 用 TPE。
+      _plFieldRow(2, _plEditorField('On Duty', 'on_duty_utc', 'time-utc', Object.assign(
+          { labelSuffix: '<span id="ple-onduty-from" style="font-size:.6em;color:var(--muted);white-space:nowrap"></span>' },
+          (_plEntryType(e) === 'sim' || _plEntryType(e) === 'ground') ? { localTz: 'Asia/Taipei' } : { localOf: 'origin' })) +
+        _plEditorField('Off Duty', 'off_duty_utc', 'time-utc', Object.assign(
+          { labelSuffix: '<span id="ple-fdp-limit" style="font-size:.62em;font-weight:700;white-space:nowrap"></span>' },
+          (_plEntryType(e) === 'sim' || _plEntryType(e) === 'ground') ? { localTz: 'Asia/Taipei' } : { localOf: 'dest' })) ) +
       _plFieldRow(2, _plEditorField('Operating Crew', 'operating_crew', 'select', { options: ['', '2', '3', '4'], optLabels: { '': '自動 Auto', '2': '2 人', '3': '3 人', '4': '4 人' } }) +
         '<div style="font-size:.58em;color:var(--muted);align-self:center;line-height:1.3">操作飛行員數（FDP 上限用）<br>PIC+SIC+Relief · auto-detected</div>') +
     '</div>' +
