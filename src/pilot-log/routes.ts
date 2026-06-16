@@ -57,8 +57,8 @@ import { getAirportDbJs } from '../spa/js-airport-db.js';
 
 // ── 版本（比照 CrewSync / Morning：每次推版必更新；SW cache 名稱跟著走） ────
 // 本機 preview build 會暫時加 -tNN 後綴方便對版；推正式版前拿掉只留乾淨版號。
-export const PILOT_LOG_VERSION = 'V2.4.10';
-const PILOT_LOG_CACHE = 'pilotlog-v2-4-10';
+export const PILOT_LOG_VERSION = 'V2.4.11';
+const PILOT_LOG_CACHE = 'pilotlog-v2-4-11';
 
 export const pilotLogRouter = express.Router();
 
@@ -184,9 +184,11 @@ body {
   .pl-detail-pane {
     flex: 1.25 1 0;
     /* #7：列表頂部現在 sticky，編輯器要黏在「標題高度之下」才不會被蓋住、捲不到最上面 */
-    position: sticky; top: calc(var(--pl-head-h, 0px) + 8px);
-    /* 往下移了 --pl-head-h，max-height 也要扣掉同量，否則底部超出視窗被切掉（codex P2） */
-    max-height: calc(100dvh - 84px - var(--pl-head-h, 0px) - env(safe-area-inset-bottom));
+    /* V2.4.11：工具列 .pl-topstack sticky 在 env(safe-area-inset-top)，所以面板 top 必須也含 safe-area —— */
+    /*   否則捲動後面板黏的位置比工具列實際底部高了一個 safe-area，標題鑽到工具列後面拉不回來（iPad 實測）。 */
+    position: sticky; top: calc(env(safe-area-inset-top) + var(--pl-head-h, 0px) + 8px);
+    /* top 往下移了多少，max-height 就扣多少，否則底部超出視窗被切掉（codex P2） */
+    max-height: calc(100dvh - 84px - env(safe-area-inset-top) - var(--pl-head-h, 0px) - env(safe-area-inset-bottom));
     overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: none;
     background: var(--card); border-radius: 12px;
     border: 1px solid var(--border);
@@ -366,8 +368,13 @@ function _renderPilotLogChangelog(): string {
     ${renderCommunityLink()}
     <div class="pl-cl-v">${PILOT_LOG_VERSION}</div>
     <div class="pl-cl-txt">
-      <b>🛠️ iPad 修正：開清單下方的航班時，編輯器標題（Save/Delete）不再被捲到工具列後面、固定可達。</b><br>
-      <b>🛠️ iPad fix: opening an entry from deep in the list no longer hides the editor header (Save/Delete) behind the toolbar — it stays pinned.</b>
+      <b>🛠️ iPad 編輯器標題定位真正修好：補上 safe-area，捲動清單後編輯器（Save/Delete）不再卡在工具列後面。</b><br>
+      <b>🛠️ iPad editor header positioning properly fixed (safe-area): after scrolling the list, the editor (Save/Delete) no longer hides behind the toolbar.</b>
+    </div>
+    <div class="pl-cl-v old">V2.4.10</div>
+    <div class="pl-cl-txt">
+      <b>🛠️ iPad：編輯器標題改面板內 sticky 釘住。</b><br>
+      <b>🛠️ iPad: editor header pinned within the detail pane.</b>
     </div>
     <div class="pl-cl-v old">V2.4.09</div>
     <div class="pl-cl-txt">
