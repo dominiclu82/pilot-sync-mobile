@@ -1320,6 +1320,10 @@ function _plOpenEditor(id) {
   if (_plWide() && document.getElementById('pl-detail-pane')) {
     _plRenderEditor('pl-detail-pane');
     _plRenderList();                    // 重畫列表套用 .pl-row-sel highlight
+    // V2.4.10：iPad split 開編輯器時，若頁面停在清單深處，sticky 右面板的標題（Edit Entry/Save）會卡在
+    //   工具列後面、拉不回來（user 實測）。開啟時把頁面捲到頂 + 面板內部捲到頂 → 標題一定在工具列正下方、可達。
+    _plUpdateHeadHeight();              // 刷新頁首高度 → sticky 右面板 top 算得準
+    var _dp = document.getElementById('pl-detail-pane'); if (_dp) _dp.scrollTop = 0;   // 面板內部捲到頂（不動頁面捲動，保留清單位置）
   } else {
     _plRenderEditor();
     _plRenderYearIndex();   // codex P2：iPhone 全螢幕編輯器替換內容 → 收起年份索引（guard 認 _pl.editing/#pl-list 不在）
@@ -3432,7 +3436,9 @@ function _plRenderEditor(target) {
 
   c.innerHTML =
     '<div style="padding:10px 14px">' +
-    '<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">' +
+    // V2.4.10：iPad split 時標題列在面板內 sticky 釘住 —— 面板捲到哪，Edit Entry/Save/Delete 都在面板頂端、永遠可達
+    //   （解「開非第一筆航班標題被捲上去拉不回來」）。iPhone 全螢幕維持原樣。
+    '<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px' + (inDetail ? ';position:sticky;top:0;z-index:6;background:var(--card);padding:6px 0;margin:-2px 0 8px' : '') + '">' +
       '<button onclick="_plCloseEditor()" style="background:transparent;border:0;color:var(--text);font-size:1.2em;cursor:pointer">' + closeLabel + '</button>' +
       '<div style="font-size:1em;font-weight:700">' + (e.id ? 'Edit Entry' : 'New Entry') + '</div>' + statusBadge +
       '<div style="flex:1"></div>' +
