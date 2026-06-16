@@ -1536,7 +1536,7 @@ export function getSpaHtmlBody(): string {
       <button class="tab-util-btn tab-install-btn" id="tab-install-btn" onclick="showInstallGuide()" style="display:none">
         <span>📲</span>安裝
       </button>
-      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer;text-decoration:underline" onclick="showAbout()">V9.5.01</span>
+      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer;text-decoration:underline" onclick="showAbout()">V9.5.02</span>
     </div>
   </div>
 </div>
@@ -1570,7 +1570,12 @@ export function getSpaHtmlBody(): string {
     </div>
     <div style="max-height:50vh;overflow-y:auto;-webkit-overflow-scrolling:touch;margin-bottom:10px">
     ${renderCommunityLink()}
-    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V9.5.01</div>
+    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V9.5.02</div>
+    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
+      <div>🧹 <b>精簡歷史更新摘要（每版一句），載入更快。</b></div>
+      <div>🧹 <b>Condensed past changelog entries (one line each) for faster loading.</b></div>
+    </div>
+    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V9.5.01</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
       <div>🔒 <b>修正未同步時部分機場 ATIS 誤顯示「無資料」，現在會正確顯示鎖定提示。</b></div>
       <div>🔒 <b>Fixed some airports showing "no data" instead of the lock notice when not synced.</b></div>
@@ -1717,8 +1722,8 @@ export function getSpaHtmlBody(): string {
     </div>
     <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V9.4.20</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
-      <div>🔧 <b>三個工具一起修：CrewSync 同步失敗訊息更清楚＋一鍵回報給管理員；Pilot Log 匯入失敗的航班改收「待補強」可補完；投資組合修正編輯交易無法儲存。</b></div>
-      <div>🔧 <b>Fixes across all three: clearer CrewSync sync errors + one-tap report to admin; Pilot Log keeps failed imports as "needs-fixing" entries to finish; Portfolio transaction edit/save fixed.</b></div>
+      <div>🔧 <b>三個工具一起修：同步失敗訊息更清楚、匯入失敗航班可補完、投資組合編輯交易修好。</b></div>
+      <div>🔧 <b>Fixes across all three apps: clearer sync errors, recoverable failed imports, Portfolio edit fixed.</b></div>
     </div>
     <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V9.4.19</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
@@ -1857,33 +1862,33 @@ export function getSpaHtmlBody(): string {
     </div>
     <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V8.0.56</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
-      <div>📻 <b>ATIS 來源升級,更穩。</b>美國機場改走官方 FAA 源;其他機場改走更可靠的資料源;一鍵更新改成只刷天氣(ATIS 改成「點開機場才抓」,省資源)。</div>
-      <div>📻 <b>ATIS sources upgraded for reliability.</b> US airports now use the official FAA feed; other airports use a more reliable source; Refresh All updates weather only (ATIS loads when you open an airport).</div>
+      <div>📻 <b>ATIS 來源升級更穩：美國走官方 FAA、其他改更可靠來源、ATIS 改點開機場才抓。</b></div>
+      <div>📻 <b>ATIS sources upgraded for reliability (US via FAA, others more reliable, ATIS loads on airport open).</b></div>
     </div>
     <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V8.0.55</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
-      <div>🛰️ <b>衛星圖快取「這次真的」修好。</b>上一版把快取改成「只存成功回應」，但衛星圖磚是跨網域的不透明回應、判斷不出成功 → 反而每次打開機場都重新下載、先空白再載。這版改成跟 Pilot Log 一樣的寫法（不透明圖磚也存、命中就秒出），重複打開同一機場不再重抓。</div>
-      <div>🛰️ <b>Satellite-map cache actually fixed now.</b> The previous version cached only “successful” responses, but cross-origin map tiles are opaque and can’t be judged successful — so every airport reopen re-downloaded the map (blank, then reload). This matches Pilot Log’s caching (opaque tiles are cached too), so reopening the same airport is instant.</div>
+      <div>🛰️ <b>衛星圖快取這次真的修好：不透明圖磚也存，重開同一機場秒出不再重抓。</b></div>
+      <div>🛰️ <b>Satellite-map cache truly fixed — opaque tiles are now cached, so reopening an airport is instant.</b></div>
     </div>
     <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V8.0.54</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
-      <div>📻 <b>ATIS 修復 ＋ 天氣載入加速 ＋ RCTP 衛星圖修。</b>ATIS 改成「你的瀏覽器經 allorigins 代理抓」（atis.guru 擋我們伺服器 IP，server 端抓不到）；天氣詳情改成 METAR/TAF/跑道圖先秒出、ATIS 背景補上，不再整頁卡等；修「衛星圖快取把失敗回應也存住」害 RCTP 圖出不來（改成只存成功的、壞的自動重抓）；Tools 入口文字改清楚（入口本身也能加到主畫面）。</div>
-      <div>📻 <b>ATIS fixed + faster weather load + RCTP map fix.</b> ATIS is now fetched from your browser via the allorigins proxy (atis.guru blocks our server IP); weather details now show METAR/TAF/runway map instantly with ATIS loading in the background; fixed the satellite-map cache storing failed responses (which broke the RCTP map — now only successes are cached and bad ones re-fetched); clarified the Tools hub text.</div>
+      <div>📻 <b>ATIS 修復、天氣詳情先秒出 ATIS 背景補上、RCTP 衛星圖修好。</b></div>
+      <div>📻 <b>ATIS fixed, weather shows instantly with ATIS loading in background, RCTP map fixed.</b></div>
     </div>
     <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V8.0.52</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
-      <div>🌦️ <b>天氣 TAF 修復 ＋ PA 時間欄位加大。</b>Airport WX 的 TAF 之前繞的免費代理掛了、抓不到也很慢 → 改走自己 server 直連，恢復又快又穩；PA「下降」廣播的時間欄（HH:MM）放大好填。</div>
-      <div>🌦️ <b>TAF fixed + bigger PA time fields.</b> Airport WX's TAF no longer routes through a (now-broken) free proxy — fetched directly via our own server, fast and reliable again; the descent PA's HH:MM time fields are wider.</div>
+      <div>🌦️ <b>天氣 TAF 改自家 server 直連恢復快穩；PA 下降廣播時間欄加大好填。</b></div>
+      <div>🌦️ <b>TAF now fetched directly via our server (fast again); descent PA time fields widened.</b></div>
     </div>
     <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V8.0.51</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
-      <div>📻 <b>Pacific HF 移到 Tools、嵌入工具改全螢幕浮層。</b>HF 分頁移除，改成 Tools 裡一顆按鈕直接開瀏覽器；Tools 嵌入工具（颱風/GPSjam）改全螢幕浮層，修掉把分頁推走、卡住的問題。A+/A- 改上下直排、iPad 底部分頁列改等寬鋪滿（平均分散，多一顆鈕也不換行）；從 Tools 入口進來時右下角多一顆回 Tools 鈕（彩色四格）。</div>
-      <div>📻 <b>Pacific HF moved to Tools; embedded tools go full-screen.</b> The HF tab is gone — now a Tools button that opens in your browser; embedded tools (typhoon/GPS-jam) go full-screen, fixing the layout-push/stuck issue. A+/A- now stack vertically and the iPad bottom tab bar evenly fills the width; a Tools button appears bottom-right when launched from the Tools hub.</div>
+      <div>📻 <b>Pacific HF 移到 Tools、嵌入工具改全螢幕浮層；底部分頁列等寬鋪滿。</b></div>
+      <div>📻 <b>Pacific HF moved to Tools, embedded tools now full-screen; bottom tab bar evenly fills width.</b></div>
     </div>
     <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V8.0.48</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
-      <div>💬 <b>加入社群連結。</b>關於頁最上方新增「加入社群 · Money 回報區」按鈕，點一下直接到 LINE 社群（所有軟體的回報都在這）。</div>
-      <div>💬 <b>Community link added.</b> A "Join our community" button now sits at the top of the About page — tap to open the LINE group (feedback for all the apps).</div>
+      <div>💬 <b>關於頁最上方新增「加入社群」按鈕，一鍵到 LINE 社群回報。</b></div>
+      <div>💬 <b>Community link added at the top of the About page — tap to open the LINE group.</b></div>
     </div>
     <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V8.0.47</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
@@ -1902,138 +1907,133 @@ export function getSpaHtmlBody(): string {
     </div>
     <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V8.0.44</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
-      <div>🛠️ <b>修正跑道圖對不準 + Airport WX 跑道圖可收合。</b><b>(1)</b> 修正衛星圖上<b>跑道線歪斜對不準</b>（之前為高緯機場加的經度補償，讓地圖範圍比例跟圖檔不符、Esri 自動微調範圍所致）→ 範圍比例直接對齊圖檔 640:440，跑道線貼齊真實跑道。<b>(2)</b> Airport WX 的跑道圖可<b>點標題收合</b>（記憶偏好，比照 roster）。<b>(3)</b> /apps 入口頁移除頁面大標題。</div>
-      <div>🛠️ <b>Fixed runway misalignment + collapsible runway map in Airport WX.</b> (1) Runway lines were skewed off the real runways (a longitude compensation made the extent ratio mismatch the image, so Esri auto-adjusted the bbox); the ratio now matches the image (640:440) and lines align. (2) The Airport WX runway map is collapsible (tap the title, remembers your choice). (3) Removed the page heading on /apps.</div>
+      <div>🛠️ <b>修正衛星圖跑道線歪斜對不準；Airport WX 跑道圖可點標題收合。</b></div>
+      <div>🛠️ <b>Fixed skewed runway lines; Airport WX runway map is now collapsible.</b></div>
     </div>
     <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V8.0.43</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
-      <div>🗺️ <b>跑道圖擴大到 Airport WX + 所有 Ops Spec 機場底圖永久快取 + App 入口頁。</b><b>(1)</b> 在 Airport WX 點機場看 METAR/TAF 時，上方加一張<b>跑道圖</b>（依即時風向標綠[逆風]/橘[順風]端 + 逆風/側風分量 + 風向箭頭，比照 Pilot Log）。<b>(2)</b> 開 App 背景把<b>所有 Ops Spec 機場</b>的衛星底圖預抓進<b>永久快取</b>（跟 Pilot Log 同網域共用、改版也不清）→ 看過沒看過、離線都秒出。<b>(3)</b> 新增 App 入口頁 <code>/apps</code>：一頁拿到 CrewSync / Pilot Log / 晨報 + 加到主畫面教學（可貼社群置頂）。</div>
-      <div>🗺️ <b>Runway maps in Airport WX + all Ops Spec tiles cached permanently + app hub.</b> (1) Airport WX now shows a runway map above METAR/TAF (green/orange ends by live wind + head/crosswind components + arrow, same as Pilot Log). (2) On launch, all Ops Spec airport satellite tiles are prefetched into a persistent cache (shared with Pilot Log on the same domain, survives updates) — instant on re-open or offline. (3) New app hub at <code>/apps</code>: CrewSync / Pilot Log / Morning on one page with an add-to-home-screen guide (pin it in your community).</div>
+      <div>🗺️ <b>Airport WX 加跑道圖、所有 Ops Spec 機場底圖永久快取、新增 App 入口頁 /apps。</b></div>
+      <div>🗺️ <b>Runway maps in Airport WX, all Ops Spec tiles cached permanently, new app hub at /apps.</b></div>
     </div>
     <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V8.0.42</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
-      <div>🛬 班表的 <b>WX</b> 展開後，起降兩地各多一張<b>跑道圖</b>（比照 Pilot Log）：依真實座標畫出每條跑道、標跑道號與長 × 寬，依<b>即時 METAR 風向</b>把<b>逆風端標綠、順風端標橘</b>，每條跑道旁標逆風／側風分量，左上角加風向箭頭。跑道圖可<b>收合</b>（記住偏好）。</div>
-      <div>🛬 Expanding a flight's <b>WX</b> in the roster now shows a <b>runway map</b> for both departure and arrival (same as Pilot Log): each runway drawn from real coordinates with its number and length × width, ends coloured <b>green (into-wind) / orange (downwind)</b> by live METAR wind, headwind/crosswind components beside each runway, and a wind arrow. Maps are <b>collapsible</b> (remembers your choice).</div>
+      <div>🛬 <b>班表 WX 展開後，起降兩地各多一張依即時風向標色的跑道圖（可收合）。</b></div>
+      <div>🛬 <b>Expanding a flight's WX now shows a wind-coloured runway map for both ends (collapsible).</b></div>
     </div>
     <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V8.0.41</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
-      <div>🗂️ 同步班表時，多存一份<b>完整班表（含組員）</b>到雲端私有表，給 <b>Pilot Log</b> app 直接帶班表用。解決把 CrewSync 與 Pilot Log 各自加到 iPad 主畫面後、變成兩個獨立 App 不共用瀏覽器儲存、Pilot Log 抓不到班表的問題。這份是<b>你自己的、不會分享給朋友/群組</b>（跟「分享班表」功能完全分開、不剃組員）。沿用方式：在 Pilot Log 按 Import Roster 前，先在這裡<b>重新同步一次</b>當月（及想補登的月份），且兩邊用<b>同一個 Google 帳號</b>。</div>
-      <div>🗂️ On each roster sync, a full copy (incl. crew) is now saved to a private cloud table for the <b>Pilot Log</b> app to import directly — fixing the case where CrewSync and Pilot Log are added to the iPad home screen as two separate apps that don't share browser storage, so Pilot Log couldn't find the roster. This copy is <b>yours only, never shared</b> to friends/groups (entirely separate from the Share feature, crew not stripped). To use it: re-sync the month(s) here once before pressing Import Roster in Pilot Log, and use the <b>same Google account</b> on both.</div>
+      <div>🗂️ <b>同步班表時多存一份完整班表（含組員）到雲端私有表，給 Pilot Log 直接匯入用。</b></div>
+      <div>🗂️ <b>Each roster sync now saves a private full copy (incl. crew) for Pilot Log to import directly.</b></div>
     </div>
     <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V8.0.40</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
-      <div>⛅ Airport WX 機場分組更新至 Ops Spec. C-6 Amdt 070（MAY 11 2026 生效）+ Amdt 071（MAY 29 2026 生效）：(1) A321-252NX：移除 RCFN（台東）— Amdt 071。(2) A350-1041：RJFF（福岡）新增 Special 標、VMMC（澳門）拿掉 Special 標 — Amdt 070。順手把 <code>cls</code> 編碼規則寫進 <code>airport-data.js</code> 註解 header（A / S 為主類別，RF / P 等視為附加屬性、不另開新代碼），未來 amend 時不會走偏。</div>
-      <div>⛅ Airport WX fleet groupings updated to Ops Spec. C-6 Amdt 070 (effective MAY 11 2026) + Amdt 071 (effective MAY 29 2026): (1) A321-252NX — removed RCFN (Taitung) per Amdt 071. (2) A350-1041 — RJFF (Fukuoka) added Special tag, VMMC (Macao) removed Special tag per Amdt 070. Also codified the <code>cls</code> encoding rule in <code>airport-data.js</code> header comment (A / S as primary class; RF / P treated as supplementary attributes, no new codes added) to prevent future amendments from drifting.</div>
+      <div>⛅ <b>Airport WX 機場分組更新至 Ops Spec C-6 Amdt 070 + 071。</b></div>
+      <div>⛅ <b>Airport WX fleet groupings updated to Ops Spec C-6 Amdt 070 + 071.</b></div>
     </div>
     <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V8.0.39</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
-      <div>Portfolio V1.0.6: 1) 資產變化圖加 range — 日 30/60/90、月 12/24/36、年 5/10/20。2) 加「📥 補歷史」按鈕從 Yahoo Finance 拉 daily close 回填 portfolio_snapshots，跑 backfill 後就能看到趨勢（V1.0.5 只 snapshot 今天無歷史 user 抱怨「只給我當下我怎麼知道變化」）。3) 主畫面持股 row 加 ＋ 按鈕，點開 pre-fill symbol/market 不用再輸入。4) Detail 頁加「均價（原始）」/「未實現損益（原始）」雙派同時顯示 — 扣息派 vs 原始派並列，差額 × qty = 累計領股利。</div>
-      <div>Portfolio V1.0.6: 1) Asset chart range selector — daily 30/60/90, monthly 12/24/36, yearly 5/10/20. 2) 「📥 Backfill」button pulls daily close from Yahoo Finance and replays transactions to fill portfolio_snapshots (V1.0.5 only had today's snapshot). 3) Quick-add ＋ button on each holding row, pre-fills symbol/market. 4) Detail page shows both cost-basis methods side-by-side: dividend-adjusted avgCost vs raw avgCost (and corresponding unrealized PnL); the diff × qty = total cash dividend received.</div>
+      <div>📊 <b>投資組合 V1.0.6：資產變化圖加時間範圍、補歷史按鈕回填趨勢、持股快速加交易、均價雙派並列。</b></div>
+      <div>📊 <b>Portfolio V1.0.6: chart range selector, backfill button, quick-add per holding, dual cost-basis view.</b></div>
     </div>
     <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V8.0.38</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
-      <div>Portfolio V1.0.5: 1) 交易紀錄每筆加 ✏️ 編輯按鈕（user 反映「萬一打錯只能重來」），複用加交易 modal edit mode 可改日期/股數/價格/手續費/備註，symbol/方向鎖住。2) 主畫面加 📊 <strong>資產變化圖</strong>，按日/月/年切換 — daily cron 23:30 台北 snapshot 全 user 的 portfolio 總值，從 V1.0.5 上線那天開始累積。Chart.js 4.4.7 CDN 載入 (~90KB)。</div>
-      <div>Portfolio V1.0.5: 1) ✏️ Edit button on each transaction (user feedback "what if I mistype"); reuses add-txn modal in edit mode — date/qty/price/fee/note editable, symbol/side locked. 2) 📊 Asset history chart with daily/monthly/yearly toggle. Daily cron at 23:30 Taipei snapshots all users' portfolio total value; chart accumulates from V1.0.5 launch. Chart.js 4.4.7 via CDN (~90KB).</div>
+      <div>📊 <b>投資組合 V1.0.5：交易紀錄可編輯、主畫面加資產變化圖（日/月/年切換）。</b></div>
+      <div>📊 <b>Portfolio V1.0.5: editable transactions + asset history chart (daily/monthly/yearly).</b></div>
     </div>
     <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V8.0.37</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
-      <div>Portfolio V1.0.4: 台股手續費 + 證交稅自動算 — 買賣自動套用 0.1425% 手續費（最低 NT$20），賣方加 0.3% 證交稅。加交易 modal 即時 preview 估算 fee；同時保留**手動覆寫欄位**（user 從券商 app 抄實際 fee 填進去，留空就 auto-calc）。Cost basis 算法：買 fee 加進成本、賣 fee+稅扣 realized PnL；FIFO Lot 視角的賣出 fee 按各 lot 比例分配。Detail 頁交易紀錄每筆 buy/sell 後面顯示 (費 NT$X)。美股暫不算 fee（多數 broker $0 commission）。</div>
-      <div>Portfolio V1.0.4: Auto Taiwan stock fees + capital gains tax — 0.1425% broker fee (min NT$20) on both sides, 0.3% transaction tax on sell. Add-txn modal shows live fee preview; manual override field also available (paste actual fee from broker app, leave blank for auto). Cost basis: buy fee added to cost, sell fee+tax deducted from realized PnL; FIFO lot view splits sell fee proportionally across lots. Detail txn rows show (fee NT$X) suffix. US side keeps fee=0 ($0 commission at most brokers).</div>
+      <div>📊 <b>投資組合 V1.0.4：台股手續費 + 證交稅自動計算（可手動覆寫），併入成本與損益。</b></div>
+      <div>📊 <b>Portfolio V1.0.4: auto Taiwan broker fee + transaction tax (manual override), folded into cost/PnL.</b></div>
     </div>
     <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V8.0.36</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
-      <div>Portfolio V1.0.3 hotfix：A+/A- 字型按了沒變化 — CSS 寫成 <code>html, body { font-size: 15px }</code> 把 body 也寫死 15px，<code>bumpFont</code> 改 html inline style 但子元素 em 相對 body 算（body 還 15px）→ 視覺零變化。拆成 <code>html { font-size: 15px }</code> + <code>body { font-size: 1rem }</code>，body 跟著 root 動。</div>
-      <div>Portfolio V1.0.3 hotfix: A+/A- font-scale buttons had no visible effect — CSS combined <code>html, body { font-size: 15px }</code> hardcoded body too; <code>bumpFont</code> changed html inline style but body kept overriding (children's em relative to body, not html). Split into <code>html { font-size: 15px }</code> + <code>body { font-size: 1rem }</code>.</div>
+      <div>📊 <b>投資組合 V1.0.3 修正：A+/A- 字型按了沒變化的問題。</b></div>
+      <div>📊 <b>Portfolio V1.0.3 hotfix: A+/A- font-scale buttons had no visible effect.</b></div>
     </div>
     <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V8.0.35</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
-      <div>Portfolio V1.0.2: UX 對齊晨報 — 1) 版號 / 字型 ± / 日夜切換按鈕從 footer + settings modal **搬到 header 右上**，跟晨報同位置（user 反映「都說了要對齊晨報」）。2) 漲跌顏色從歐美 convention（綠漲紅跌）改成**台灣股市慣例**（漲紅 / 跌綠），buy 紅 sell 綠也配合改。3) Theme button 改 icon only（☀️ / 🌙）。</div>
-      <div>Portfolio V1.0.2: UX alignment with morning report — 1) Version tag / font ± / theme toggle moved from footer + settings modal **into the header top-right**, matching morning report position. 2) Up/down colors changed from Western (green up / red down) to Taiwan stock convention (red up / green down); buy/sell colors also flipped to match. 3) Theme button reduced to icon only.</div>
+      <div>📊 <b>投資組合 V1.0.2：UX 對齊晨報，漲跌顏色改台股慣例（漲紅跌綠）。</b></div>
+      <div>📊 <b>Portfolio V1.0.2: UX aligned with morning report; up/down colors switched to Taiwan convention.</b></div>
     </div>
     <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V8.0.34</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
-      <div>Portfolio module 升 V1.0.1：補上晨報 / Pilot Log 都有的 UX 基本款 — 日夜切換、字型大小 ±、版次顯示、歷史更新（about modal）。沿用晨報的 <code>data-theme</code> + <code>font-scale</code> localStorage pattern，theme + font 偏好跨裝置不同步（純本機 preference）。V1.0.0 launch 時設計遺漏，user 反映「晨報都有的東西怎麼沒看到」後補完。</div>
-      <div>Portfolio module bump to V1.0.1: add the basic UX features that morning report and Pilot Log already had — light/dark toggle, font size ±, version tag, changelog history (about modal). Reuses the morning report's <code>data-theme</code> + <code>font-scale</code> localStorage pattern; theme + font are per-device (not cross-device). Filled the gap left by V1.0.0 launch after user feedback.</div>
+      <div>📊 <b>投資組合 V1.0.1：補上日夜切換、字型 ±、版次與更新歷史等基本 UX。</b></div>
+      <div>📊 <b>Portfolio V1.0.1: added the basic UX (theme toggle, font ±, version tag, changelog).</b></div>
     </div>
     <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V8.0.33</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
-      <div>Portfolio V1 hotfix 2 個 bug：1) CSS <code>.modal {display:flex}</code> 蓋過 HTML <code>hidden</code> 屬性 → 所有 modal 同時顯示，最上面一層「設定 PIN」誤導 user 以為被強迫設 PIN（實際 PIN 是 opt-in 預設 OFF）。修法：CSS 加 <code>[hidden] {display:none !important}</code> 強制 hidden override 任何 author display。2) PIN 不再限制 4-6 碼數字 — 改成任意長度（min 1, max 72 byte = bcrypt 上限）、任意字元（數字 / 字母 / symbol），兩次輸入一致即可。</div>
-      <div>Portfolio V1 hotfix for 2 bugs: 1) CSS <code>.modal {display:flex}</code> overrode HTML <code>hidden</code> attribute → all modals visible at once with「設定 PIN」on top, misleading users into thinking PIN was forced (it's opt-in, default OFF). Fix: <code>[hidden] {display:none !important}</code>. 2) PIN no longer restricted to 4-6 digits — any length 1-72 bytes, any character set, just needs the two entries to match.</div>
+      <div>📊 <b>投資組合 V1 修正：modal 全擠在一起誤導要設 PIN（PIN 其實預設關）；PIN 放寬為任意字元。</b></div>
+      <div>📊 <b>Portfolio V1 hotfix: modals stacked, falsely implying forced PIN (it's opt-in); PIN now any characters.</b></div>
     </div>
     <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V8.0.32</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
-      <div>🎉 Portfolio module V1.0.0 + 新 domain 上線：</div>
-      <div>1) 新增「投資組合」獨立子系統 <code>/portfolio</code> — 多筆 buy / sell 交易帳本、移動均價自動計算、配股配息（V2 加 auto 入帳）、FIFO Lot 詳細追蹤；三種視角同時呈現（整體實際持倉 / 每筆 buy 的 timing 回顧 / Lot 詳細）；opt-in PIN 保護（sessionStorage 解鎖、tab 關了要重輸）；跨裝置同步沿用晨報 user 暱稱機制。</div>
-      <div>2) Domain rename — 新增 <code>oops.h-peak.com</code> alias（自嘲笨小孩感，跟 brand 主域 h-peak 呼應），老 <code>crewsync.h-peak.com</code> 保留 backward compat，現有 PWA 不受影響；新 user 用新 URL。</div>
-      <div>3) 一次性 migration — 把舊 <code>morning_prefs.tw_holdings / us_holdings</code> 簡單持倉資料搬到新 <code>portfolio_transactions</code> 表（標 <code>source='migration'</code>），影響 3 個 user 共 4 筆 transactions：Dominic / 大全 / 湯湯。</div>
-      <div>4) 新依賴：<code>bcryptjs ^3.0.3</code>（pure JS，~30KB，給 PIN feature 用）。</div>
-      <div>Portfolio module 整體 ~1,800 行新 code 分 4 phase commit 累積（phase 1.A schema → 1.B CRUD + 三視角 → 1.C PWA frontend → 1.D PIN）；intentionally 跳過 phase 1.E（晨報 stocks read-only 改造），晨報短期維持現況 — Portfolio 是 source-of-truth，user 一旦進 Portfolio 加交易就不會回頭編晨報 holdings。V2 視 user 回饋再做 morning frontend cleanup + 配股配息 auto cron。</div>
-      <div>🎉 Portfolio module V1.0.0 + new domain launch: 1) New independent Portfolio subsystem at <code>/portfolio</code> with multi-row buy/sell ledger, moving-average cost basis, stock/cash dividend support (auto-credit in V2), FIFO lot tracking — three views simultaneously (overall reality / per-buy timing retrospective / lot detail); opt-in PIN protection (sessionStorage unlock, re-enter on tab close); cross-device sync reuses morning report's nickname-based identity. 2) Domain rename — added <code>oops.h-peak.com</code> alias (self-deprecating brand fit), kept <code>crewsync.h-peak.com</code> backward compat. 3) One-shot migration of <code>morning_prefs.tw_holdings/us_holdings</code> into <code>portfolio_transactions</code> (3 users, 4 txns). 4) New dep: <code>bcryptjs ^3.0.3</code> (~30KB pure JS for PIN). ~1,800 LOC across phases 1.A-1.D; intentionally skipped phase 1.E (morning stocks read-only refactor) — Portfolio is source-of-truth; users won't go back to editing morning holdings once they use Portfolio.</div>
+      <div>🎉 <b>投資組合 V1.0.0 上線：獨立 /portfolio 子系統（交易帳本 + 三視角 + opt-in PIN），並新增 oops.h-peak.com 網域。</b></div>
+      <div>🎉 <b>Portfolio V1.0.0 launch: standalone /portfolio (ledger + three views + opt-in PIN); new oops.h-peak.com domain.</b></div>
     </div>
     <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V8.0.31</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
-      <div>Dual-source 收斂 — 永遠根治 V8.0.30 修的問題：砍掉 9 個 tracked <code>.js</code>（<code>server</code> / <code>morning</code> / <code>morning-builder</code> / <code>generate-ics-headless</code> / <code>spa/html-body</code> / <code>spa/js-core</code> / <code>spa/js-pilot-log</code> / <code>spa/js-weather</code> / <code>spa/styles</code>）+ 13 個 untracked stale 編譯產物，<code>.ts</code> 變唯一 source-of-truth。tsx 對 <code>'./xxx.js'</code> 的 import 會自動 fallback 到同名 <code>.ts</code>，所以 server.ts 不用改 import 路徑。<code>.gitignore</code> 加防護避免本機跑 tsc 再被誤 track。從此推版只改 <code>.ts</code>，不再有「改了 <code>.js</code> 但 prod 跑 <code>.ts</code>」這種白做工的可能。</div>
-      <div>Dual-source consolidation — permanent fix for the issue V8.0.30 patched: removed 9 tracked <code>.js</code> files (<code>server</code> / <code>morning</code> / <code>morning-builder</code> / <code>generate-ics-headless</code> / <code>spa/html-body</code> / <code>spa/js-core</code> / <code>spa/js-pilot-log</code> / <code>spa/js-weather</code> / <code>spa/styles</code>) plus 13 untracked stale build artifacts, making <code>.ts</code> the sole source of truth. tsx automatically falls back from <code>'./xxx.js'</code> imports to the matching <code>.ts</code>, so server.ts import paths don't need to change. <code>.gitignore</code> now explicitly blocks the <code>.js</code> compilation outputs to prevent re-tracking if someone runs tsc locally. Going forward only the <code>.ts</code> needs to be touched, eliminating the「edited .js but prod runs .ts」class of no-op releases.</div>
+      <div>🛠️ <b>清掉重複的 .js 編譯檔，讓 .ts 成為唯一原始碼，根治「改了沒生效」的推版問題。</b></div>
+      <div>🛠️ <b>Removed duplicate compiled .js so .ts is the sole source, fixing no-op releases for good.</b></div>
     </div>
     <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V8.0.30</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
-      <div>修正 V8.0.27 / V8.0.28 / V8.0.29 三版皆未生效於 prod 的根本問題：<code>src/spa/html-body.ts</code> 跟 <code>html-body.js</code> 是同名雙檔（都被 git tracked），server.ts 雖 import <code>'./spa/html-body.js'</code>，但 tsx ESM resolver 優先解析到同名 <code>.ts</code> → prod runtime 永遠 serve V8.0.26 的 source。前三次推版只改 <code>.js</code> 沒改 <code>.ts</code>，等於白做。本版把 <code>.ts</code> 內容同步到 <code>.js</code> 最新版（含 V8.0.27～29 全部 fix），未來推版兩份要一起改直到 dual-source 收斂。</div>
-      <div>Fix the root cause of V8.0.27/28/29 all failing to take effect in prod: <code>src/spa/html-body.ts</code> and <code>html-body.js</code> are dual-source files (both git-tracked); although server.ts imports <code>'./spa/html-body.js'</code>, tsx's ESM resolver prefers the same-named <code>.ts</code> → prod runtime always serves V8.0.26 source. The previous three releases only updated <code>.js</code> without touching <code>.ts</code>, so they were no-ops on prod. This release syncs <code>.ts</code> to match <code>.js</code> (carrying V8.0.27～29 fixes through), and going forward both files must be edited together until the dual-source situation is resolved.</div>
+      <div>🛠️ <b>修正 V8.0.27～29 三版未生效的根本原因（同名雙檔只改到 .js），把修正同步進去。</b></div>
+      <div>🛠️ <b>Fixed why V8.0.27–29 never took effect (dual-source file edited on the wrong copy); carried the fixes through.</b></div>
     </div>
     <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V8.0.29</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
-      <div>修正 PWA cache 永遠看到舊版本問題：Service Worker 的 cache name 寫死成 <code>'crewsync-v8026'</code>，每次推版都用同一個 cache name → SW activate handler 「刪除別的 cache key」永遠刪不到自己 → 舊 shell 永遠 cached，user kill PWA 重開仍看舊版號（V8.0.26 / V8.0.27 / V8.0.28 改完都沒生效）。改成從 SPA HTML 內動態抓當前 V8.0.X 字串組 cache name → 每次推版 cache name 自動跟著變 → 新 SW 自動 invalidate 舊 cache。</div>
-      <div>Fix PWA cache stuck on old version: Service Worker cache name was hardcoded as <code>'crewsync-v8026'</code>, so every deploy reused the same cache key — SW activate handler's <code>delete keys !== CACHE</code> never cleared its own cache → app shell stuck at the cached old version (V8.0.26/27/28 all failed to take effect even after kill+reopen PWA). Now the cache name is derived dynamically from the current V8.0.X string in the SPA HTML, so it changes with every deploy and the new SW automatically invalidates the old cache.</div>
+      <div>🛠️ <b>修正 PWA 永遠卡舊版：cache 名稱改隨版次自動變動，新版自動清掉舊快取。</b></div>
+      <div>🛠️ <b>Fixed PWA stuck on old version: cache name now changes per release so the old cache auto-clears.</b></div>
     </div>
     <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V8.0.28</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
-      <div>修正 Briefing 中 Overtime warning「表定 FT 00:00 → 任何輸入都顯示 OT」bug：root cause 是 DHD（deadhead，配位調機）任務班表系統會把 <code>flightTime</code> 寫成 <code>"00:00"</code>（DHD 計薪方式不算 FT），但 dep/arr time 還在（飛機還是要飛），DHD 也該算 OT。<code>_briefCalcSchedFTmin</code> 原本看到 <code>flightTime</code> 就用，parse 出 0 也回傳 → OT 警告基準變 0 → 永遠觸發。改成 parse 出 0 視為無效繼續走下方 dep/arr fallback 用 schedule dep/arr 算 schedFT（跟 Overtime 子頁 <code>_otCalcMagic</code> 同邏輯）。</div>
-      <div>Fix Briefing Overtime warning「sched FT 00:00 → always triggers」bug: root cause is DHD (deadhead) tasks — roster system writes <code>flightTime="00:00"</code> for DHD (its pay logic excludes FT), but dep/arr times are still present (the plane still flies) and DHD should still trigger OT calc. <code>_briefCalcSchedFTmin</code> previously took <code>flightTime</code> as-is, returning 0 → OT baseline became 0 → warning always triggered. Now treats parsed value of 0 as invalid and falls through to dep/arr-based sched FT calculation (same logic as Overtime subtab <code>_otCalcMagic</code>).</div>
+      <div>🛠️ <b>修正 Briefing OT 警告對 DHD（表定 FT 00:00）誤判成永遠超時，改用起降時間推算。</b></div>
+      <div>🛠️ <b>Fixed Briefing OT warning always triggering on DHD (sched FT 00:00); now uses dep/arr times.</b></div>
     </div>
     <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V8.0.27</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
-      <div>修正 JX 班表登入流程：原本 <code>catch {}</code> 吞掉真實 error 硬塞「密碼錯」當 fallback 訊息，員工被誤導以為自己帳密錯但其實是 navigation timeout / network error。改為 <code>catch (e)</code> 接住 error 並 <code>log</code> cause，錯誤訊息帶實際原因方便排查（navigation timeout / network error / 真錯帳密）。同時把 <code>page.waitForNavigation</code> timeout 從 8 秒拉到 20 秒，避免班表發布日 JX 後端壅塞時 8 秒太短被誤判成密碼錯。</div>
-      <div>Fix JX roster login flow: previously <code>catch {}</code> swallowed the real error and hardcoded "wrong password" as a fallback message, misleading users into thinking their credentials were wrong when it was actually a navigation timeout / network error. Changed to <code>catch (e)</code> that logs the cause; error message now includes the real reason (navigation timeout / network error / actual wrong credentials) for easier diagnosis. Also bumped <code>page.waitForNavigation</code> timeout from 8s to 20s — 8s was too aggressive during JX server congestion right after roster release.</div>
+      <div>🛠️ <b>修正班表登入錯誤訊息誤報「密碼錯」，改帶真實原因；登入等待時間拉長避免誤判。</b></div>
+      <div>🛠️ <b>Fixed roster login falsely reporting "wrong password"; error now shows the real cause, longer timeout.</b></div>
     </div>
     <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V8.0.26</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
-      <div>修正 Briefing 中 Overtime warning：統一航班號比對規則（去前導 0／去空白）、改用 flight-level 日期推算（學 overtime 子頁的方式，更穩）、找不到航班或算不出表定 FT 時改顯示診斷提示，不再靜默失敗。Groups 群組面板：清除 SFO/FO 合併前留下的舊群組（denylist 模式，只刪明確列出的 legacy id，未來新增機隊／preset 不會被誤刪）。Duty Time 持久化補強：每次輸入即存（不再需要按 Calculate 才存）、保存／還原 crew 人數選擇、重開頁面時若 FDP Start 已填妥則自動重算讓結果區塊回來。</div>
-      <div>Briefing Overtime warning fix: unified flight number matching (strip leading zeros/spaces), use flight-level date parsing (matches Overtime subtab logic), replaced silent failures with diagnostic hints when roster flight not found or scheduled FT unavailable. Groups panel: removed legacy SFO/FO orphan groups left from the merge (denylist approach — only deletes explicitly listed legacy IDs, so future fleets/presets won't be accidentally removed). Duty Time persistence: instant save on every input (no longer requires clicking Calculate), save/restore crew size selection, auto-recalculates on page reopen when FDP Start is filled so the result section comes back too.</div>
+      <div>🛠️ <b>Briefing OT 警告比對更穩、Groups 清掉合併前舊群組、Duty Time 改即時儲存與自動重算。</b></div>
+      <div>🛠️ <b>Sturdier Briefing OT matching, Groups legacy cleanup, Duty Time instant-save + auto-recalc.</b></div>
     </div>
     <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V8.0.25</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
-      <div>機場分類資料表更新到 Operations Specifications C-6 Authorized Airport List APR 01 2026 修正版（Amendment 069），共 8 項：(1) A350-1041 新增 RJBB（關西）為定期機場、新增 RJFF（福岡）為備用機場。(2) A330-941：RJCH（函館）、RJOT（高松）、RPVM（宿霧）由定期改備用。(3) A350-941：新增 RJCH（函館）為備用；RJSS（仙台）、RPLC（克拉克）、RPVM（宿霧）由定期改備用。(4) A321-252NX / A330-941 / A350-941：移除 VDPP（金邊）為備用機場。(5) A321-252NX：WADD（峇里島）由定期改備用。(6) A330-941：WIII（雅加達）由定期改備用。(7) A350-941：VVPQ（富國）、WIII（雅加達）由定期改備用。(8) A330-941：移除 WADD（峇里島）為定期機場；A350-941：移除 WADD 為備用機場。</div>
-      <div>Airport classification table updated to Operations Specifications C-6 Authorized Airport List APR 01 2026 amendment (Amendment 069), 8 changes: (1) A350-1041 — added RJBB (Kansai) as regular, RJFF (Fukuoka) as alternate. (2) A330-941 — RJCH / RJOT / RPVM regular → alternate. (3) A350-941 — added RJCH as alternate; RJSS / RPLC / RPVM regular → alternate. (4) A321-252NX / A330-941 / A350-941 — removed VDPP (Phnom Penh) as alternate. (5) A321-252NX — WADD (Bali) regular → alternate. (6) A330-941 — WIII (Jakarta) regular → alternate. (7) A350-941 — VVPQ / WIII regular → alternate. (8) A330-941 — removed WADD as regular; A350-941 — removed WADD as alternate.</div>
+      <div>⛅ <b>機場分類資料表更新至 Ops Spec C-6 Amdt 069（APR 01 2026），共 8 項調整。</b></div>
+      <div>⛅ <b>Airport classification table updated to Ops Spec C-6 Amdt 069 (APR 01 2026), 8 changes.</b></div>
     </div>
     <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V8.0.24</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
-      <div>Roster sync（Playwright）穩定性大改造：(1) 所有 <code>.rbc-event-content</code> 的等待 timeout 從 2s 拉到 10s，慢網下不再因為 calendar 重繪稍慢就噴掉。(2) 外層 while 入口加 <code>try/catch</code>，超時就優雅 break 並保留已抓到的 duties，不再整份 sync 中止。(3) Click 失敗後檢查是否還在 calendar，有部分導航就 <code>goBack</code> 恢復再繼續。(4) 三個失敗點（outer_timeout / click_fail / goback_wait_fail）加詳細 log（<code>url / i / dutyText / .rbc 數量 / readyState</code>）+ 截圖到 <code>/tmp/sync-debug/{jobId}/{i}_{type}_{ts}.png</code>。(5) 最外層 try/catch 接 unhandled Playwright error，若已抓到 ≥1 筆 duty → 回傳 partial + 輸出部分 ICS；完全沒抓到則維持 fail 不包裝。(6) 新增 <code>GET /api/sync-debug/:syncId/:file?eid=xxx</code>（job.employeeId 比對）讓使用者下載除錯截圖；啟動時清除 24h 前的檔案。(7) 前端同步完成頁三態顯示：✅ 完整 / ⚠️ 部分成功（列出原因 + 截圖連結）/ ❌ 失敗。</div>
-      <div>Roster sync (Playwright) reliability overhaul: (1) all <code>.rbc-event-content</code> wait timeouts raised from 2s to 10s — slow networks no longer trip over calendar re-renders. (2) Outer while-loop entry wrapped in <code>try/catch</code> — timeouts break gracefully, preserving already-captured duties. (3) Click failure now checks if still on calendar, recovers via <code>goBack</code> if partial navigation occurred. (4) Three failure points (outer_timeout / click_fail / goback_wait_fail) now log detailed context (<code>url / i / dutyText / .rbc count / readyState</code>) and snapshot to <code>/tmp/sync-debug/{jobId}/{i}_{type}_{ts}.png</code>. (5) Outermost <code>try/catch</code> catches unhandled Playwright errors — returns partial with partial ICS if ≥1 duty captured, otherwise still fails cleanly (no dishonest wrapping). (6) New <code>GET /api/sync-debug/:syncId/:file?eid=xxx</code> (job.employeeId check) for downloading debug screenshots; 24h-old session dirs auto-cleaned on startup. (7) Sync-complete screen now has three states: ✅ full / ⚠️ partial (with reason + clickable screenshot links) / ❌ failed.</div>
+      <div>🛠️ <b>班表同步穩定性大改造：慢網不再整份失敗、保留已抓到的班、完成頁分完整／部分／失敗三態。</b></div>
+      <div>🛠️ <b>Roster sync reliability overhaul: survives slow networks, keeps captured duties, three-state result.</b></div>
     </div>
     <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V8.0.23</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
-      <div>FLIGHT INFO/DATA 標題的 🗺️ Briefing Room 連結旁，新增小輸入格（約 98px 寬，maxlength 4），placeholder <code>eg. ONT</code>、輸入自動轉大寫，讓使用者自己填 briefing room 代碼。欄位 <code>brief-room</code> 納入 <code>_briefFields</code> 一起 debounced auto-save、歷史同步、載入歷史會還原。</div>
-      <div>Added a small input next to the 🗺️ Briefing Room link in the FLIGHT INFO/DATA header (~98px wide, maxlength 4, placeholder <code>eg. ONT</code>, auto-uppercase) so users can note their assigned briefing room code. Field <code>brief-room</code> is part of <code>_briefFields</code> — debounced auto-save, history sync, restored on history load.</div>
+      <div>🗺️ <b>Briefing Room 連結旁加一個小輸入格，可自己填 briefing room 代碼（自動存、隨歷史還原）。</b></div>
+      <div>🗺️ <b>Added a small input beside the Briefing Room link to note your room code (auto-saved with history).</b></div>
     </div>
     <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V8.0.22</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
-      <div>修正 V8.0.21 的 🗺️ Briefing Room 連結在 PWA（iPad/手機安裝版）沒地方關閉的問題。改為 in-app modal viewer：點連結不再開新 tab，而是在 app 內彈全螢幕黑底 modal，右上角 ✕ 按鈕（避開 notch safe-area），點空白處也能關，圖片支援雙指縮放（<code>touch-action: pinch-zoom</code>）。修正初始 <code>src=""</code> 被瀏覽器解讀為當前頁 URL 導致 bug。</div>
-      <div>Fixed V8.0.21 issue where the 🗺️ Briefing Room link had no close button in PWA mode (installed iPad/phone app). Replaced new-tab with in-app modal viewer: tap the link now opens a full-screen black-backdrop modal inside the app, with a ✕ button top-right (respects notch safe-area), tap outside to close, pinch-zoom supported. Fixed a bug where initial <code>src=""</code> was resolved to current page URL by browsers.</div>
+      <div>🗺️ <b>修正 Briefing Room 圖在 PWA 沒地方關，改成 app 內全螢幕浮層（✕ 關閉、可雙指縮放）。</b></div>
+      <div>🗺️ <b>Fixed Briefing Room image with no close button in PWA; now an in-app modal (✕ close, pinch-zoom).</b></div>
     </div>
     <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V8.0.21</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
-      <div>Briefing 新增兩個功能：(1) FLIGHT INFO/DATA 標題旁加「🗺️ Briefing Room」藍色超連結，點擊開新 tab 顯示 briefing room 平面圖，由 server <code>/briefing-room</code> route 提供（7 天 cache）。(2) 輸入 Flight Time 時自動比對 roster 當日表定 FT；邏輯：實際 ≥ 表定 − 10 分鐘就顯示黃色警告框（實際越長 OT 機率越高），含「→ Overtime」按鈕可直接跳去 Overtime subtab。匹配 duty 日期範圍 <code>[reportTime ~ endTime]</code> ± 1 天容錯（處理外站時區差 + 同日來回），冬夏班表不跨月估算。沒同步當天 roster 就靜默不顯示。警告在清除/改航班號/FT 大幅縮短時自動消失。</div>
-      <div>Briefing gains two features: (1) 🗺️ Briefing Room blue underlined link in the FLIGHT INFO/DATA header — opens floor plan in a new tab, served via <code>/briefing-room</code> route (7-day cache). (2) Entering Flight Time auto-compares against that day's scheduled FT from roster; logic: if actual FT ≥ scheduled − 10 min, shows a yellow warning banner (longer actual = higher OT chance) with a "→ Overtime" button. Matches duty's <code>[reportTime ~ endTime]</code> range with ±1 day tolerance (handles outstation timezone + same-day turns), no cross-month estimation. Silently hides if roster not synced for that day. Warning auto-clears on field clear / flight no. change / FT drop below threshold.</div>
+      <div>🗺️ <b>Briefing 加 Briefing Room 平面圖連結；輸入 FT 時自動比對表定、可能超時就跳黃色警告。</b></div>
+      <div>🗺️ <b>Briefing adds a Briefing Room floor-plan link; entering FT auto-compares scheduled and warns on likely OT.</b></div>
     </div>
     <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V8.0.20</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
-      <div>Briefing 資料儲存改為每字 <code>oninput</code> debounced 500ms 自動存（不用等 blur），整份 briefing（Block 1 + Block 2 notes/POB 全部）都即時同步。搜尋列右邊新增儲存狀態小圓點：🟡 存檔中 / 🟢 已儲存。blur 保留當備胎避免關 tab race。</div>
-      <div>Briefing auto-save switched from blur to <code>input</code> event (debounced 500ms) — no more waiting for field blur; full briefing (Block 1 + Block 2 notes/POB) syncs in real time. Tiny status dot next to the search row: 🟡 saving / 🟢 saved. Blur kept as fallback to guard against tab-close races.</div>
+      <div>📝 <b>Briefing 改為每字即時自動存，搜尋列旁加儲存狀態小圓點（🟡 存檔中 / 🟢 已儲存）。</b></div>
+      <div>📝 <b>Briefing now auto-saves as you type, with a status dot beside the search row (🟡 saving / 🟢 saved).</b></div>
     </div>
     <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V8.0.19</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
-      <div>Briefing panel 新增歷史功能：📅 History 按鈕打開月曆式歷史檢視，黃色日期表示有 briefing，格子內顯示航班號 + 非 TPE 那端城市（例如 <code>JX820 KIX</code>），多班時顯示 <code>⋯ +N</code>。點日期格子 → 下方 panel 列出當日全部航班（可點擊載入或 ✕ 刪除）。查詢成功自動存 snapshot、notes blur 自動 save，資料永久保留。有 eid（上傳過班表）→ Postgres 跨裝置同步；無 eid → 本機 localStorage。NOTES 區塊重構：Turbulence / Tail No./MEL / Min Water / Fuel Required 四欄都加永久 label（標題獨立一行在 textarea 上方，不會被輸入遮蔽）；新增 👥 Crew + Pax = POB 自動加總欄位（同一行顯示）。後端新增 <code>crewsync_briefings</code> 表 + <code>POST/GET/LIST/DELETE /api/briefing</code> 端點；每筆以 (eid, flight_no, flight_date) 唯一。</div>
-      <div>Briefing panel gains history feature: 📅 History button opens a calendar-style modal where golden days indicate saved briefings; each cell shows flight_no + non-TPE city (e.g., <code>JX820 KIX</code>) with <code>⋯ +N</code> for additional flights. Tap a golden date → detail panel below lists all flights for that day (click to load, ✕ to delete). Auto-save on successful Query + debounced on notes blur; permanent retention. Cross-device sync via eid (Postgres) when roster uploaded; else local (localStorage). NOTES restructured: Turbulence / Tail No./MEL / Min Water / Fuel Required all now have a permanent label above each textarea (no longer hidden when typing); new 👥 Crew + Pax = POB row with auto-sum on a single line. Backend: new <code>crewsync_briefings</code> Postgres table + <code>POST/GET/LIST/DELETE /api/briefing</code> endpoints; unique per (eid, flight_no, flight_date).</div>
+      <div>📅 <b>Briefing 新增歷史功能：月曆檢視過往 briefing 可點選載入；NOTES 加固定標題與 POB 自動加總。</b></div>
+      <div>📅 <b>Briefing adds history: a calendar view to reload past briefings; NOTES get fixed labels and POB auto-sum.</b></div>
     </div>
     <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V8.0.18</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
@@ -2077,8 +2077,8 @@ export function getSpaHtmlBody(): string {
     </div>
     <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V8.0.10</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
-      <div>Groups 移除分享 toggle，加入群組即啟用分享，退出所有群組自動停止；預設群組改下拉選單 + 已加入標籤；新增 FC/CC/職級篩選器；Friends header 加 ⓘ、名稱/機隊欄位預設顯示、自動載入第一個群組班表；CC Rest Calculator 移除密碼鎖正式開放、新增 Crew Prep 欄位、休時取整至 5 min、新增重設按鈕與 24hr 快取、表單寬度優化；好友圈說明文字更新；PA dep-min 手動修改 flag 修正</div>
-      <div>Groups: remove share toggle, join = auto-share, leave all = auto-stop; presets changed to dropdown + joined tags; added FC/CC/rank filter; Friends: ⓘ in header, name/fleet shown by default, auto-load first group roster; CC Rest Calculator: removed password lock, added Crew Prep field, rest rounded to 5 min, Reset button, 24hr cache, form width optimized; friend group description updated; PA dep-min manual flag fix</div>
+      <div>👥 <b>Groups 加入即自動分享、改下拉選單 + 職級篩選；CC Rest Calculator 取消密碼鎖正式開放。</b></div>
+      <div>👥 <b>Groups: join = auto-share, dropdown + rank filter; CC Rest Calculator unlocked (no password).</b></div>
     </div>
     <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V8.0.08</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
