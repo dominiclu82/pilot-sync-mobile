@@ -6808,6 +6808,94 @@ function _plAnBuildGroups(all) {
 }
 function _plAnSelect(id) { _pl.anGroup = id; _plRenderAnalyzeContent(); }
 
+// ── V2.4.15：Currency（90 天起降 recency）—— 放 Analyze。主顯示「起飛/落地」合計（台灣只看 90 天不分日夜），
+//   依日夜明細預設折疊（給其他地區）。每格：最近 3 次 + 到期日 + 綠/紅；點開看是哪幾班。英文為主、附中文。
+var PL_CURR_CATS = {
+  to:        { label: 'Takeoff',       zh: '起飛',     fn: function (e) { return (e.day_takeoffs || 0) + (e.night_takeoffs || 0); } },
+  ldg:       { label: 'Landing',       zh: '落地',     fn: function (e) { return (e.day_landings || 0) + (e.night_landings || 0); } },
+  to_day:    { label: 'Day Takeoff',   zh: '日間起飛', fn: function (e) { return e.day_takeoffs || 0; } },
+  ldg_day:   { label: 'Day Landing',   zh: '日間落地', fn: function (e) { return e.day_landings || 0; } },
+  to_night:  { label: 'Night Takeoff', zh: '夜間起飛', fn: function (e) { return e.night_takeoffs || 0; } },
+  ldg_night: { label: 'Night Landing', zh: '夜間落地', fn: function (e) { return e.night_landings || 0; } },
+};
+// 算某類別的「最近 3 次」：回 { total（全部累計）, thirdDate（累計到第 3 次那班的日期）, picks（貢獻最近 3 次的航班）}
+function _plCurrencyCalc(src, fn) {
+  var sorted = src.slice().sort(function (a, b) { return String(b.flight_date || '').localeCompare(String(a.flight_date || '')); });
+  var total = 0, cum = 0, thirdDate = null, picks = [];
+  for (var i = 0; i < sorted.length; i++) {
+    var n = fn(sorted[i]); if (n <= 0) continue;
+    total += n;
+    if (!thirdDate) { picks.push(sorted[i]); cum += n; if (cum >= 3) thirdDate = String(sorted[i].flight_date || '').slice(0, 10); }
+  }
+  return { total: total, thirdDate: thirdDate, picks: picks };
+}
+function _plAddDaysStr(dateStr, n) {
+  var d = new Date(String(dateStr).slice(0, 10) + 'T00:00:00Z'); if (isNaN(d.getTime())) return '';
+  d = new Date(d.getTime() + n * 86400000);
+  return d.getUTCFullYear() + '-' + ('0' + (d.getUTCMonth() + 1)).slice(-2) + '-' + ('0' + d.getUTCDate()).slice(-2);
+}
+function _plCurrencyCell(catKey, calc) {
+  var cat = PL_CURR_CATS[catKey];
+  var today = _plTodayStr();
+  var status, color, sub;
+  if (!calc.thirdDate) {                              // 不足 3 次
+    color = '#ef4444'; status = calc.total + ' / 3'; sub = '不足 3 次 · need 3';
+  } else {
+    var expiry = _plAddDaysStr(calc.thirdDate, 90);
+    var current = expiry >= today;                    // 第 3 近的那次 + 90 天 ≥ 今天 → 有效
+    color = current ? '#10b981' : '#ef4444';
+    status = current ? '✓' : '✗';
+    sub = (current ? 'until ' : 'expired ') + expiry;
+  }
+  var dates = calc.picks.map(function (p) { return String(p.flight_date || '').slice(5, 10); }).join(' · ') || '—';
+  return '<div onclick="_plOpenCurrencyDetail(\'' + catKey + '\')" style="flex:1;min-width:140px;background:var(--bar-bg-soft);border-radius:10px;padding:11px;cursor:pointer">' +
+    '<div style="font-size:.72em;font-weight:700">' + cat.label + ' <span style="font-size:.82em;color:var(--muted)">' + cat.zh + '</span></div>' +
+    '<div style="font-size:1.15em;font-weight:800;color:' + color + ';margin-top:3px">' + status + ' <span style="font-size:.6em;font-weight:600">' + sub + '</span></div>' +
+    '<div style="font-size:.6em;color:var(--muted);margin-top:3px">last 3: ' + dates + '</div>' +
+  '</div>';
+}
+function _plRenderCurrency(entries) {
+  var src = entries.filter(function (e) { return !e.is_sim && !e.is_ground; });   // 真實飛行才算 currency（entries 已是 in_utc + 非 deadhead/removed）
+  var cell = function (k) { return _plCurrencyCell(k, _plCurrencyCalc(src, PL_CURR_CATS[k].fn)); };
+  var open = _pl._currDnOpen ? ' open' : '';
+  return '<div style="background:var(--card);border-radius:12px;padding:13px;margin-bottom:12px">' +
+    '<div style="display:flex;align-items:baseline;gap:8px;margin-bottom:8px">' +
+      '<div style="font-size:.92em;font-weight:800">⏱️ Currency</div>' +
+      '<div style="font-size:.6em;color:var(--muted)">90-day recency · 僅供參考，非官方判定</div>' +
+    '</div>' +
+    '<div style="display:flex;gap:8px;flex-wrap:wrap">' + cell('to') + cell('ldg') + '</div>' +
+    '<details style="margin-top:8px"' + open + ' ontoggle="_pl._currDnOpen=this.open">' +
+      '<summary style="font-size:.66em;font-weight:700;color:var(--muted);cursor:pointer;padding:4px 2px">🌗 Day / Night 依日夜（其他地區用）</summary>' +
+      '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px">' + cell('to_day') + cell('ldg_day') + '</div>' +
+      '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">' + cell('to_night') + cell('ldg_night') + '</div>' +
+    '</details>' +
+  '</div>';
+}
+// 點 currency 格 → 列出貢獻「最近 3 次」的航班（點進去可看/編輯）
+function _plOpenCurrencyDetail(catKey) {
+  var c = document.getElementById('pilotlog-content');
+  if (!c || _pl.tab !== 'analyze') return;
+  var cat = PL_CURR_CATS[catKey]; if (!cat) return;
+  var src = (_pl.aircraftEntries || []).filter(function (e) {
+    if (e.is_deadhead || e.is_sim || e.is_ground || e.status === 'roster_removed') return false;
+    return !!e.in_utc;
+  });
+  var calc = _plCurrencyCalc(src, cat.fn);
+  var rows = calc.picks.map(_plRenderEntryRow).join('');
+  c.innerHTML =
+    '<div style="padding:10px 14px">' +
+      '<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">' +
+        '<button onclick="_plRenderAnalyze()" style="background:transparent;border:0;color:var(--text);font-size:1.2em;cursor:pointer">←</button>' +
+        '<div style="font-size:1em;font-weight:700">' + cat.label + ' <span style="font-size:.8em;color:var(--muted)">' + cat.zh + '</span> · 最近 3 次</div>' +
+      '</div>' +
+      (calc.picks.length
+        ? '<div style="font-size:.68em;color:var(--muted);margin-bottom:8px">這幾班貢獻了最近 3 次' + cat.label + '；' +
+            (calc.thirdDate ? '90 天到期日 ' + _plAddDaysStr(calc.thirdDate, 90) : '不足 3 次') + '。點任一班可看/編輯。</div>' +
+          rows
+        : '<div style="text-align:center;color:var(--muted);padding:30px;font-size:.85em">沒有' + cat.label + '紀錄。<br>No ' + cat.label.toLowerCase() + ' records.</div>') +
+    '</div>';
+}
+
 function _plRenderAnalyzeContent() {
   var c = document.getElementById('pilotlog-content');
   if (!c) return;
@@ -6857,6 +6945,8 @@ function _plRenderAnalyzeContent() {
       '<div style="font-size:1.05em;font-weight:800">' + _plEsc(sel.label) + '</div>' +
       '<div style="font-size:.7em;color:var(--muted)">' + selSum.flights + ' flights</div>' +
     '</div>' +
+    // V2.4.15：Currency 卡只在「All Flight Time」總覽顯示（是全域 recency，跟 company/type 分組無關）
+    (sel.id === 'all' ? _plRenderCurrency(entries) : '') +
     _plAnBarsCard('總計 Totals', _plMinToHHMM(selSum.block) + ' block', selSum, '') +
     _plAnDetailCard(selSum) +
     '<div style="font-size:.62em;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin:14px 4px 7px">' + (dim === 'company' ? '依公司 By Company' : '依機型 By Type') + '（點看明細）</div>' +
@@ -7518,40 +7608,7 @@ function _plRenderReportContent() {
     return !!e.in_utc;
   });
 
-  // ── 90 天 recency ──
-  var now = new Date();
-  var d90 = new Date(now.getTime() - 90 * 86400000);
-  var d90str = d90.getFullYear() + '-' + ('0' + (d90.getMonth() + 1)).slice(-2) + '-' + ('0' + d90.getDate()).slice(-2);
-  var rec = _plAggregate(src, d90str, null);
-  // 最後飛行日
-  var lastDate = '';
-  for (var i = 0; i < src.length; i++) {
-    var fd = String(src[i].flight_date || '').slice(0, 10);
-    if (fd && fd > lastDate) lastDate = fd;
-  }
-  var daysAgo = '';
-  if (lastDate) {
-    var diff = Math.floor((now - new Date(lastDate + 'T00:00:00Z')) / 86400000);
-    daysAgo = diff <= 0 ? 'Today' : diff + ' days ago';
-  }
-  function recCard(label, value, sub) {
-    return '<div style="background:var(--card);border-radius:10px;padding:12px;flex:1;min-width:120px">' +
-      '<div style="font-size:.62em;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">' + label + '</div>' +
-      '<div style="font-size:1.4em;font-weight:700">' + value + '</div>' +
-      (sub ? '<div style="font-size:.62em;color:var(--muted);margin-top:2px">' + sub + '</div>' : '') +
-    '</div>';
-  }
-  var recencyHtml =
-    '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap">' +
-      '<div style="font-size:.85em;font-weight:700">⏱️ Last 90 Days Recency</div>' +
-      '<div style="font-size:.6em;color:var(--muted)">僅供參考、非官方 currency 判定 · For reference only — not an official currency determination</div>' +
-    '</div>' +
-    '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px">' +
-      recCard('Takeoffs', rec.takeoffs, 'Day ' + rec.dayTO + ' / Night ' + rec.nightTO) +
-      recCard('Landings', rec.landings, 'Day ' + rec.dayLdg + ' / Night ' + rec.nightLdg) +
-      recCard('Night Landings', rec.nightLdg, 'Last 90 days') +
-      recCard('Last Flight', daysAgo || '—', lastDate || 'No flights') +
-    '</div>';
+  // ── 90 天 recency 已移到 Analyze 的 Currency 卡（V2.4.15）。Report 專心做時數總表 + 匯出。──
 
   // ── 區間時數總表 ──
   var r = _plReportRange();
@@ -7604,8 +7661,6 @@ function _plRenderReportContent() {
         '<div style="font-size:1em;font-weight:700">📄 Report</div>' +
       '</div>' +
       '</div>' +
-      recencyHtml +
-      '<hr style="border:none;border-top:1px solid var(--border);margin:6px 0">' +
       rangeHtml +
     '</div>';
 }
