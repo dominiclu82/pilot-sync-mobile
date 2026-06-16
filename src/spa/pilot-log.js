@@ -42,6 +42,7 @@ var _pl = {
   _timedOutGen: 0,               // V2.4.12：被 wrapper 逾時放生的世代；該請求若晚點成功，core 要自己重繪（caller 已放棄）
   _autoSaveTimer: null,          // V2.4.14：LogTen 式自動存的防抖 timer
   _editorDirty: false,           // V2.4.14：編輯器有未存改動（含程式改值）→ 關閉時 flush
+  _editorTouched: false,         // V2.4.17：本次開編輯器後使用者有沒有真的動過欄位（黏著；存檔不清，開新一筆才重置）→ 給機場庫晚載入重算判斷「該不該存」用
 };
 
 var _PL_LS_AT = 'pilotlog_at';
@@ -164,6 +165,7 @@ function switchPlTab(tab, btn) {
   if (_pl._autoSaveTimer) { clearTimeout(_pl._autoSaveTimer); _pl._autoSaveTimer = null; }
   if (_pl._editorDirty && _pl.editing && !_pl.editing.is_locked) { try { _plSaveEntry({ keepOpen: true }); } catch (e) {} }
   _pl._editorDirty = false;
+  _pl._editorTouched = false;   // V2.4.17：切 tab 結束編輯 session
   if (typeof _plDisposeGlobe === 'function') _plDisposeGlobe();   // V2.2.00：離開 Map 先釋放 3D WebGL
   _pl.tab = tab;
   _pl.editing = null;
@@ -1440,6 +1442,7 @@ function _plOpenEditor(id) {
   if (_pl._autoSaveTimer) { clearTimeout(_pl._autoSaveTimer); _pl._autoSaveTimer = null; }
   if (_pl._editorDirty && _pl.editing && !_pl.editing.is_locked) { try { _plSaveEntry({ keepOpen: true }); } catch (e) {} }
   _pl._editorDirty = false;
+  _pl._editorTouched = false;   // V2.4.17：開新一筆 → 重置「本次有沒有動過」（庫晚載入重算靠它判斷該不該存）
   if (id) {
     // 先從主頁 list 找；找不到再退回 Aircraft 頁的完整快照
     // （Aircraft detail 顯示的 row 可能不在 _pl.entries 主頁清單裡 — 主頁 filter 篩掉、
@@ -1478,6 +1481,7 @@ function _plCloseEditor() {
   if (_pl._autoSaveTimer) { clearTimeout(_pl._autoSaveTimer); _pl._autoSaveTimer = null; }
   if (_pl._editorDirty && _pl.editing && !_pl.editing.is_locked) { try { _plSaveEntry({ keepOpen: true }); } catch (e) {} }
   _pl._editorDirty = false;
+  _pl._editorTouched = false;   // V2.4.17：關閉結束編輯 session
   _pl.editing = null;
   _pl.selectedId = null;
   // V2.0.01（codex P2）：從 Airports 點航班進來的 → 關閉回對的那一層（三層導航才順）：
@@ -3460,14 +3464,19 @@ function _plWireEditor() {
     _plUpdateRwyLists();
     _plUpdateAptLists();
     if (!_pl.editing.is_locked) {
-      // V2.4.14（codex P2）：機場庫晚載入會重算衍生值（night/起降/On Duty…）。比對前後，真有變才排自動存 ——
-      //   這樣「庫載入後算出的正確值」不會因使用者只是瀏覽就遺失，又不會純瀏覽（無變化）也白存。
+      // V2.4.14（codex P2）：機場庫晚載入會重算衍生值（night/起降/On Duty…），更新畫面顯示成正確值。
+      // V2.4.17（修 bug）：⚠ 只有「使用者這次開編輯器後真的動過東西（_editorTouched）」時，重算才排自動存。
+      //   純瀏覽（只是點開看、沒改任何欄位）絕不可因為「重算值 ≠ 存檔值」就自動存 → 同步（user 回報：點開航班就冒 ⏳ 並自己同步）。
+      //   ⚠ 用 _editorTouched 而非 _editorDirty：dirty 會被 800ms 自動存清掉，若庫在自動存之後才載入（慢網），
+      //     dirty 已是 false 會漏存晚算的值（codex P1）。_editorTouched 是「本次編輯有沒有動過」的黏著旗標，存檔不清它，開新一筆才重置。
+      //   為何安全：① 新航班/既有航班只要動過 From/To 等欄位 → touched=true → 晚算值照樣會被存（不丟）。
+      //   ② 既有航班純看 → touched=false → 只更新顯示、不存。
       var derivedKeys = ['night_minutes', 'block_minutes', 'air_minutes', 'pic_minutes', 'sic_minutes',
         'on_duty_utc', 'off_duty_utc', 'total_duty_minutes', 'day_takeoffs', 'night_takeoffs', 'day_landings', 'night_landings'];
       var snap = derivedKeys.map(function(k) { return _plGetVal('ple-' + k); });
-      _plAutoCalcTimes(); _plAutoCalcDuty();   // V2.3.07：機場庫到位後 IATA→ICAO 才查得到，Duty 規則要補算一次
+      _plAutoCalcTimes(); _plAutoCalcDuty();   // V2.3.07：機場庫到位後 IATA→ICAO 才查得到，Duty 規則要補算一次（更新顯示）
       var changed = derivedKeys.some(function(k, i) { return _plGetVal('ple-' + k) !== snap[i]; });
-      if (changed) _plScheduleAutoSave();
+      if (changed && _pl._editorTouched) _plScheduleAutoSave();
     }
   });
   // V1.3.08：上鎖的航班 — 所有編輯欄位 disabled；Lock 按鈕仍可用以解鎖
@@ -3578,23 +3587,17 @@ function _plWireEditor() {
 //   抽成函式，讓「新航班首次自動存後（拿到 id）」能單獨重建這列，露出 Delete/Lock/Return，不必整個重繪丟焦點（codex P2）。
 function _plEditorHeadInner(e, inDetail) {
   var closeLabel = inDetail ? '✕' : '←';
-  var statusBadge = '';
-  if (e.id) {
-    if (e.needs_completion) statusBadge = '<span style="background:#f59e0b;color:#fff;border-radius:10px;padding:2px 8px;font-size:.62em;margin-left:8px">待補強 needs fix</span>';
-    else if (e.status === 'roster_removed') statusBadge = '<span style="background:#94a3b8;color:#fff;border-radius:10px;padding:2px 8px;font-size:.62em;margin-left:8px">removed</span>';
-    else if (_plEntryIsDone(e)) statusBadge = '<span style="background:#10b981;color:#fff;border-radius:10px;padding:2px 8px;font-size:.62em;margin-left:8px">flown 已完成</span>';
-    else statusBadge = '<span style="background:#3b82f6;color:#fff;border-radius:10px;padding:2px 8px;font-size:.62em;margin-left:8px">open 未完成</span>';
-    if (e.is_locked) statusBadge += '<span style="margin-left:6px;font-size:.85em" title="Locked">🔒</span>';
-  }
+  // V2.4.17：拿掉「未完成/已完成」狀態徽章（清單左側色條已表達同件事，編輯器再放等於重複又佔窄螢幕橫向空間）。
+  //   鎖定狀態仍由下方 Lock 鈕呈現。
   return '<button onclick="_plCloseEditor()" style="background:transparent;border:0;color:var(--text);font-size:1.2em;cursor:pointer">' + closeLabel + '</button>' +
-    '<div style="font-size:1em;font-weight:700">' + (e.id ? 'Edit Entry' : 'New Entry') + '</div>' + statusBadge +
+    '<div style="font-size:1em;font-weight:700">' + (e.id ? 'Edit Entry' : 'New Entry') + '</div>' +
     '<div style="flex:1"></div>' +
     '<button onclick="_plToggleConfigFields()" title="Configure field labels" style="background:' + (_pl.configFields ? '#f59e0b' : 'transparent') + ';color:' + (_pl.configFields ? '#fff' : 'var(--muted)') + ';border:1px solid ' + (_pl.configFields ? '#f59e0b' : 'var(--border,#334155)') + ';border-radius:6px;padding:6px 10px;font-size:.74em;cursor:pointer">' + (_pl.configFields ? '✓ Done' : '⚙ Fields') + '</button>' +
     (e.id && _plEntryType(e) === 'flight' ? '<button onclick="_plMakeReturn()" title="建立回程（出發地↔目的地對調、組員/機型複製，時間留空）" style="background:transparent;color:var(--muted);border:1px solid var(--border,#334155);border-radius:6px;padding:6px 10px;font-size:.74em;cursor:pointer">↩ Return</button>' : '') +
     (e.id ? '<button onclick="_plToggleLock()" style="background:transparent;color:' + (e.is_locked ? '#10b981' : 'var(--muted)') + ';border:1px solid ' + (e.is_locked ? '#10b981' : 'var(--border,#334155)') + ';border-radius:6px;padding:6px 10px;font-size:.74em;cursor:pointer">' + (e.is_locked ? '🔒 Locked' : '🔓 Lock') + '</button>' : '') +
-    // V2.4.14：LogTen 式自動存 —— 拿掉 Save 鈕，改一行小灰字提示（輸入即存、關閉自動落地）。
-    (!e.is_locked ? '<span style="font-size:.64em;color:var(--muted);white-space:nowrap;align-self:center">✓ 自動儲存<br>Auto-saved</span>' : '') +
-    (e.id && !e.is_locked ? '<button onclick="_plDeleteEntry()" style="background:transparent;color:#ef4444;border:1px solid #ef4444;border-radius:6px;padding:6px 10px;font-size:.74em;cursor:pointer">Delete</button>' : '');
+    // V2.4.17：拿掉「✓ 自動儲存 / Auto-saved」提示字（LogTen/ATP2 都沒有，輸入即存本來就不必在畫面一直喊；又佔兩行位）。
+    // V2.4.17：Delete 文字鈕 → 紅色垃圾桶圖標 🗑（省橫向空間，icon 一格抵六個字）。
+    (e.id && !e.is_locked ? '<button onclick="_plDeleteEntry()" title="Delete 刪除" aria-label="Delete" style="background:transparent;color:#ef4444;border:1px solid #ef4444;border-radius:6px;padding:6px 9px;font-size:.95em;line-height:1;cursor:pointer">🗑</button>' : '');
 }
 // target：'pilotlog-content'（預設，全螢幕）或 'pl-detail-pane'（iPad 右側明細面板）。
 // 兩個目標差別只在 header 的關閉鈕標籤（← 回列表 / ✕ 關閉明細）。
@@ -3615,7 +3618,7 @@ function _plRenderEditor(target) {
     '<div style="padding:10px 14px">' +
     // V2.4.10：iPad split 時標題列在面板內 sticky 釘住 —— 面板捲到哪，Edit Entry/Save/Delete 都在面板頂端、永遠可達
     //   （解「開非第一筆航班標題被捲上去拉不回來」）。iPhone 全螢幕維持原樣。
-    '<div id="ple-editor-head" style="display:flex;align-items:center;gap:10px;margin-bottom:10px' + (inDetail ? ';position:sticky;top:0;z-index:6;background:var(--card);padding:6px 0;margin:-2px 0 8px' : '') + '">' +
+    '<div id="ple-editor-head" style="display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-bottom:10px' + (inDetail ? ';position:sticky;top:0;z-index:6;background:var(--card);padding:6px 0;margin:-2px 0 8px' : '') + '">' +
       _plEditorHeadInner(e, inDetail) +
     '</div>' +
     // V2.3：Configure Fields 模式提示橫幅（英文）
@@ -3736,6 +3739,7 @@ function _plRenderEditor(target) {
 function _plScheduleAutoSave() {
   if (!_pl.editing || _pl.editing.is_locked) return;
   _pl._editorDirty = true;
+  _pl._editorTouched = true;     // V2.4.17：使用者真的動過 → 黏著旗標（存檔不清），給庫晚載入重算判斷該不該存
   if (_pl._autoSaveTimer) clearTimeout(_pl._autoSaveTimer);
   _pl._autoSaveTimer = setTimeout(function () {
     _pl._autoSaveTimer = null;
