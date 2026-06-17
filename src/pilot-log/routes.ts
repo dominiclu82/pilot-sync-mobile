@@ -57,8 +57,8 @@ import { getAirportDbJs } from '../spa/js-airport-db.js';
 
 // ── 版本（比照 CrewSync / Morning：每次推版必更新；SW cache 名稱跟著走） ────
 // 本機 preview build 會暫時加 -tNN 後綴方便對版；推正式版前拿掉只留乾淨版號。
-export const PILOT_LOG_VERSION = 'V2.4.21';
-const PILOT_LOG_CACHE = 'pilotlog-v2-4-21';
+export const PILOT_LOG_VERSION = 'V2.4.22';
+const PILOT_LOG_CACHE = 'pilotlog-v2-4-22';
 
 export const pilotLogRouter = express.Router();
 
@@ -370,6 +370,11 @@ function _renderPilotLogChangelog(): string {
   return `
     ${renderCommunityLink()}
     <div class="pl-cl-v">${PILOT_LOG_VERSION}</div>
+    <div class="pl-cl-txt">
+      <b>📕 調整 logbook PDF 排版。</b><br>
+      <b>📕 Adjusted logbook PDF layout.</b>
+    </div>
+    <div class="pl-cl-v old">V2.4.21</div>
     <div class="pl-cl-txt">
       <b>📕 調整 logbook PDF 排版。</b><br>
       <b>📕 Adjusted logbook PDF layout.</b>
