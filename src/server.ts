@@ -1914,37 +1914,61 @@ function _ianaOffsetHours(tz: string): number {
   const asUTC = Date.UTC(+parts.year, +parts.month - 1, +parts.day, +(parts.hour === '24' ? 0 : parts.hour), +parts.minute);
   return Math.round((asUTC - now.getTime()) / 3600000);
 }
-// PHX 鳳凰城（GET JSON，key 寫死在官網 script）。一次回多日 dep+arr。JX 只有 Alaska 共掛 → 從 CodeShares 撈 STARLUX 班號浮上來。
-function _phxJxCodeshare(f: any): string {
-  for (const cs of (Array.isArray(f.CodeShares) ? f.CodeShares : [])) {
-    const m = String(cs).match(/STARLUX[^#]*#\s*(\d+)/i);
-    if (m) return 'JX' + m[1];
-  }
-  return '';
+// FR24 機場板（通用）—— 治 PHX(官網擋 Render IP) / SEA(官網沒 gate 欄) / ONT(整站 Cloudflare)：
+//   改打 FR24（我們已有基礎），一次 call 回整板、列裡直接帶 gate + terminal，繞過三站各自的障礙。每站每向快取 60 秒、不狂打。
+//   缺點：班號是 FR24 追蹤到的「操作航司號」（PHX 的 JX 共掛多半顯示為 AS 號），資料為爬蟲級非官方。
+const _fr24AptCache: Record<string, { ts: number; data: any[] }> = {};
+function _tsHHMMoff(unixSec: any, offH: number): string {
+  const n = Number(unixSec); if (!n) return '';
+  const d = new Date(n * 1000 + offH * 3600 * 1000);
+  const p = (x: number) => String(x).padStart(2, '0');
+  return p(d.getUTCHours()) + ':' + p(d.getUTCMinutes());
 }
-function _phxRow(f: any, port: _FidsPort): any | null {
-  const dir: 'D' | 'A' = String(f.AD || '').toUpperCase() === 'D' ? 'D' : 'A';
-  const op = (String(f.LineCode || '') + String(f.Flightnumber || '')).replace(/\s/g, '').toUpperCase();
-  const jx = _phxJxCodeshare(f);
-  const fno = _outFno(jx || op); if (!fno) return null;
-  const altFno = jx ? _outFno(op) : '';
-  const dm = String(f.Destination || '').match(/^(.*?)\s*\(([A-Z0-9]{3})\)\s*$/);   // "PORTLAND (PDX)"
-  const other = dm ? dm[2] : '';
-  const otherName = dm ? dm[1].trim() : String(f.Destination || '').trim();
-  // ScheduledTime 標 Z 但其實是當地掛鐘時間（與 ScheduledDateTime 一致）→ 直接取 HH:MM 當當地時刻
-  return _outRow(port, dir, {
-    fno, altFno, other, otherName, gate: String(f.Gate || '').trim(),
-    schedT: _hhmm(f.ScheduledTime), actT: _hhmm12(f.Estimated) || _hhmm12(f.Actual),
-    terminal: String(f.Terminal || '').trim(), checkin: '', carousel: dir === 'A' ? String(f.BagClaim || '').trim() : ''
+function _fr24SchedRow(item: any, port: _FidsPort, dir: 'D' | 'A'): any | null {
+  const f = (item && item.flight) || {};
+  const num = (f.identification || {}).number || {};
+  const fno = _outFno(num.default || num.alternative || ''); if (!fno) return null;
+  const ap = f.airport || {};
+  const o = ap.origin || {}, ds = ap.destination || {};
+  const oInfo = o.info || {}, dInfo = ds.info || {};
+  const t = f.time || {}, sched = t.scheduled || {}, real = t.real || {}, est = t.estimated || {};
+  const nameOf = (a: any) => a.name || ((a.position && a.position.region && a.position.region.city) || '') || ((a.code && a.code.iata) || '');
+  if (dir === 'D') {
+    return _outRow(port, 'D', {
+      fno, altFno: '', other: (ds.code && ds.code.iata) || '', otherName: nameOf(ds),
+      gate: String(oInfo.gate || '').trim(), schedT: _tsHHMMoff(sched.departure, port.tz), actT: _tsHHMMoff(real.departure || est.departure, port.tz),
+      terminal: String(oInfo.terminal || '').trim(), checkin: '', carousel: ''
+    });
+  }
+  return _outRow(port, 'A', {
+    fno, altFno: '', other: (o.code && o.code.iata) || '', otherName: nameOf(o),
+    gate: String(dInfo.gate || '').trim(), schedT: _tsHHMMoff(sched.arrival, port.tz), actT: _tsHHMMoff(real.arrival || est.arrival, port.tz),
+    terminal: String(dInfo.terminal || '').trim(), checkin: '', carousel: String(dInfo.baggage || '').trim()
   });
 }
-async function _fidsPhx(port: _FidsPort, dash: string, label: string): Promise<{ rows: any[]; date: string }> {
-  const r = await fetch('https://api.phx.aero/flight-information?Key=4f85fe2ef5a240d59809b63de94ef536', { headers: { 'User-Agent': _FIDS_UA, 'Origin': 'https://www.skyharbor.com', 'Referer': 'https://www.skyharbor.com/', 'Accept': 'application/json' } });
+async function _fr24Sched(code: string, mode: 'departures' | 'arrivals'): Promise<any[]> {
+  const ck = code + '|' + mode;
+  const c = _fr24AptCache[ck];
+  if (c && Date.now() - c.ts < 60000) return c.data;
+  // 刻意「單頁 100 筆、不分頁」：FR24 會封狂打的 IP（已踩過）→ 一站一向只打一次。
+  //   100 筆以「現在」為中心，覆蓋近時段（看 gate 的相關班）；丟掉的是很遠的未來班，對 gate 板可接受。分頁=多打=被封風險，不划算。
+  const url = 'https://api.flightradar24.com/common/v1/airport.json?code=' + encodeURIComponent(code) +
+    '&plugin[]=schedule&plugin-setting[schedule][mode]=' + mode + '&page=1&limit=100';
+  const r = await fetch(url, { headers: { 'User-Agent': _FIDS_UA, 'Accept': 'application/json', 'Referer': 'https://www.flightradar24.com/' } });
   if (!r.ok) throw new Error('HTTP ' + r.status);
   const j: any = await r.json();
-  const arr: any[] = Array.isArray(j) ? j : (j.flights || j.data || []);
+  const sch = (((((j.result || {}).response || {}).airport || {}).pluginData || {}).schedule) || {};
+  const data = ((sch[mode] || {}).data) || [];
+  if (Array.isArray(data) && data.length) _fr24AptCache[ck] = { ts: Date.now(), data };
+  return Array.isArray(data) ? data : [];
+}
+async function _fidsFr24Airport(port: _FidsPort, dash: string, label: string): Promise<{ rows: any[]; date: string }> {
+  // FR24 機場板給「現在前後」的滾動班、無歷史日期 → 非當天請求回空（同 LAX/PRG，避免標錯日期）
+  if (dash && dash !== _localDateDash(port.tz, 0)) return { rows: [], date: label };
+  const [dep, arr] = await Promise.all([_fr24Sched(port.code, 'departures'), _fr24Sched(port.code, 'arrivals')]);
   const rows: any[] = [];
-  for (const f of arr) { if (dash && String(f.ScheduledTime || '').slice(0, 10) !== dash) continue; const row = _phxRow(f, port); if (row) rows.push(row); }
+  for (const f of dep) { const row = _fr24SchedRow(f, port, 'D'); if (row) rows.push(row); }
+  for (const f of arr) { const row = _fr24SchedRow(f, port, 'A'); if (row) rows.push(row); }
   return { rows, date: label };
 }
 
@@ -2017,8 +2041,11 @@ const _FIDS_BESPOKE: Record<string, _FidsPort & { iana?: string; adapter: (p: _F
   nrt: { code: 'NRT', name: '成田', tz: 9, adapter: _fidsNrt },
   sin: { code: 'SIN', name: '樟宜', tz: 8, adapter: _fidsSin },
   lax: { code: 'LAX', name: '洛杉磯', tz: -8, iana: 'America/Los_Angeles', adapter: _fidsLax },
-  phx: { code: 'PHX', name: '鳳凰城', tz: -7, iana: 'America/Phoenix', adapter: _fidsPhx },
   prg: { code: 'PRG', name: '布拉格', tz: 1, iana: 'Europe/Prague', adapter: _fidsPrg },
+  // 以下走 FR24 機場板（官網被擋/沒 gate）：PHX 官網擋 Render IP、SEA 官網無 gate、ONT 整站 Cloudflare
+  phx: { code: 'PHX', name: '鳳凰城', tz: -7, iana: 'America/Phoenix', adapter: _fidsFr24Airport },
+  sea: { code: 'SEA', name: '西雅圖', tz: -7, iana: 'America/Los_Angeles', adapter: _fidsFr24Airport },
+  ont: { code: 'ONT', name: '安大略', tz: -7, iana: 'America/Los_Angeles', adapter: _fidsFr24Airport },
   sfo: { code: 'SFO', name: '舊金山', tz: -7, iana: 'America/Los_Angeles', adapter: _fidsSfo }   // 夏 PDT-7 / 冬 PST-8，動態算
 };
 const _fidsOutCache: Record<string, { ts: number; data: any }> = {};
