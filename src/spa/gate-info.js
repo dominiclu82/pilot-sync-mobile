@@ -15,7 +15,7 @@ var _giRegions = {
   TW: { name: 'TW', stations: [ { code: 'TPE', name: '桃園', src: 'tpe', tz: 'Asia/Taipei' } ] },
   JP: { name: 'JP', stations: [ { code: 'NRT', name: '成田', src: 'nrt', tz: 'Asia/Tokyo' }, { code: 'CTS', name: '新千歲', src: 'cts', tz: 'Asia/Tokyo' }, { code: 'HKD', name: '函館', src: 'hkd', tz: 'Asia/Tokyo' } ] },
   SG: { name: 'SG', stations: [ { code: 'SIN', name: '樟宜', src: 'sin', tz: 'Asia/Singapore' } ] },
-  US: { name: 'US', stations: [ { code: 'SFO', name: '舊金山', src: 'sfo', tz: 'America/Los_Angeles' }, { code: 'LAX', name: '洛杉磯', src: 'lax', tz: 'America/Los_Angeles' } ] },
+  US: { name: 'US', stations: [ { code: 'SFO', name: '舊金山', src: 'sfo', tz: 'America/Los_Angeles' }, { code: 'LAX', name: '洛杉磯', src: 'lax', tz: 'America/Los_Angeles' }, { code: 'PHX', name: '鳳凰城', src: 'phx', tz: 'America/Phoenix', dev: true }, { code: 'SEA', name: '西雅圖', src: 'sea', tz: 'America/Los_Angeles', dev: true }, { code: 'ONT', name: '安大略', src: 'ont', tz: 'America/Los_Angeles', dev: true } ] },
   EU: { name: 'EU', stations: [ { code: 'PRG', name: '布拉格', src: 'prg', tz: 'Europe/Prague' }, { code: 'BCN', name: '巴塞隆納', src: 'bcn', tz: 'Europe/Madrid' }, { code: 'ZRH', name: '蘇黎世', src: 'zrh', tz: 'Europe/Zurich' } ] }
 };
 var _giRegion = 'TW';
@@ -557,7 +557,7 @@ function _giFetchStation(src, dateStr) {
   if (!navigator.onLine) return Promise.reject(new Error('offline'));
   return fetch('/api/fids?airport=' + encodeURIComponent(src) + '&date=' + encodeURIComponent(dateStr))
     .then(function(r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
-    .then(function(data) { _giStationCache[key] = { data: data, ts: Date.now() }; return data; })
+    .then(function(data) { if (data && data.rows && data.rows.length) _giStationCache[key] = { data: data, ts: Date.now() }; return data; })
     .catch(function(e) { if (c) return c.data; throw e; });  // 抓失敗時退回上次成功的舊資料(機場wifi不穩)
 }
 
@@ -571,7 +571,8 @@ function _giProcessStationRows() {
     return (f.fno || '').toUpperCase().indexOf(airline) === 0;
   });
   if (rows.length === 0) {
-    statusEl.textContent = '今日無 ' + (isAll ? 'ALL' : airline) + ' 航班資料';
+    // dev 站（PHX/SEA/ONT，尚無穩定 gate 來源）沒資料 → 顯示「開發中」；其他站只是當下沒班 → 「今日無航班」
+    statusEl.textContent = _giCurrentStation().dev ? '頁面開發中 · Page under development' : ('今日無 ' + (isAll ? 'ALL' : airline) + ' 航班資料');
     statusEl.style.display = 'block';
     wrapEl.style.display = 'none';
     gateFlightsList = [];

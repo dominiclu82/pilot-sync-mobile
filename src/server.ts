@@ -1914,39 +1914,6 @@ function _ianaOffsetHours(tz: string): number {
   const asUTC = Date.UTC(+parts.year, +parts.month - 1, +parts.day, +(parts.hour === '24' ? 0 : parts.hour), +parts.minute);
   return Math.round((asUTC - now.getTime()) / 3600000);
 }
-// PHX 鳳凰城（GET JSON，key 寫死在官網 script）。一次回多日 dep+arr。JX 只有 Alaska 共掛 → 從 CodeShares 撈 STARLUX 班號浮上來。
-function _phxJxCodeshare(f: any): string {
-  for (const cs of (Array.isArray(f.CodeShares) ? f.CodeShares : [])) {
-    const m = String(cs).match(/STARLUX[^#]*#\s*(\d+)/i);
-    if (m) return 'JX' + m[1];
-  }
-  return '';
-}
-function _phxRow(f: any, port: _FidsPort): any | null {
-  const dir: 'D' | 'A' = String(f.AD || '').toUpperCase() === 'D' ? 'D' : 'A';
-  const op = (String(f.LineCode || '') + String(f.Flightnumber || '')).replace(/\s/g, '').toUpperCase();
-  const jx = _phxJxCodeshare(f);
-  const fno = _outFno(jx || op); if (!fno) return null;
-  const altFno = jx ? _outFno(op) : '';
-  const dm = String(f.Destination || '').match(/^(.*?)\s*\(([A-Z0-9]{3})\)\s*$/);   // "PORTLAND (PDX)"
-  const other = dm ? dm[2] : '';
-  const otherName = dm ? dm[1].trim() : String(f.Destination || '').trim();
-  // ScheduledTime 標 Z 但其實是當地掛鐘時間（與 ScheduledDateTime 一致）→ 直接取 HH:MM 當當地時刻
-  return _outRow(port, dir, {
-    fno, altFno, other, otherName, gate: String(f.Gate || '').trim(),
-    schedT: _hhmm(f.ScheduledTime), actT: _hhmm12(f.Estimated) || _hhmm12(f.Actual),
-    terminal: String(f.Terminal || '').trim(), checkin: '', carousel: dir === 'A' ? String(f.BagClaim || '').trim() : ''
-  });
-}
-async function _fidsPhx(port: _FidsPort, dash: string, label: string): Promise<{ rows: any[]; date: string }> {
-  const r = await fetch('https://api.phx.aero/flight-information?Key=4f85fe2ef5a240d59809b63de94ef536', { headers: { 'User-Agent': _FIDS_UA, 'Origin': 'https://www.skyharbor.com', 'Referer': 'https://www.skyharbor.com/', 'Accept': 'application/json' } });
-  if (!r.ok) throw new Error('HTTP ' + r.status);
-  const j: any = await r.json();
-  const arr: any[] = Array.isArray(j) ? j : (j.flights || j.data || []);
-  const rows: any[] = [];
-  for (const f of arr) { if (dash && String(f.ScheduledTime || '').slice(0, 10) !== dash) continue; const row = _phxRow(f, port); if (row) rows.push(row); }
-  return { rows, date: label };
-}
 
 // LAX（爬伺服器渲染 HTML 表格；免 key、無 Cloudflare）。欄序：Airline | Flight# | Gate | Dest/Origin | Sched | Status。
 //   JX 走 TBIT/Midfield Satellite，gate 原樣帶出（如 "TB - 206"）。班號欄第一個是操作方、帶 * 是共掛。
@@ -2025,13 +1992,17 @@ function _zrhRow(f: any, port: _FidsPort): any | null {
   }
   return _outRow(port, 'A', { fno, altFno: '', other, otherName, gate, schedT: _hhmmTz(f.STA, 'Europe/Zurich'), actT: _hhmmTz(f.ATA || f.ETA, 'Europe/Zurich'), terminal: term, checkin: '', carousel: '' });
 }
+let _zrhCache: { ts: number; dash: string; rows: any[] } = { ts: 0, dash: '', rows: [] };
 async function _fidsZrh(port: _FidsPort, dash: string, label: string): Promise<{ rows: any[]; date: string }> {
+  // ZRH 一次回 ~2.9MB → 加 60 秒快取（同 dash），減少重抓、避免偶發逾時。
+  if (_zrhCache.ts && _zrhCache.dash === dash && Date.now() - _zrhCache.ts < 60000) return { rows: _zrhCache.rows, date: label };
   const r = await fetch('https://flightdata.flughafen-zuerich.ch/flights', { headers: { 'User-Agent': _FIDS_UA, 'Accept': 'application/json' } });
   if (!r.ok) throw new Error('HTTP ' + r.status);
   const j: any = await r.json();
   const a: any[] = Array.isArray(j) ? j : (j.flights || []);
   const rows: any[] = [];
   for (const f of a) { if (dash && String(f.SDT || '') !== dash) continue; const row = _zrhRow(f, port); if (row) rows.push(row); }
+  _zrhCache = { ts: Date.now(), dash, rows };
   return { rows, date: label };
 }
 
@@ -2063,15 +2034,95 @@ async function _fidsBcn(port: _FidsPort, dash: string, label: string): Promise<{
   return { rows: [...dep, ...arr], date: label };
 }
 
+// ── 免費公開 proxy 池：給「擋資料中心 IP」的站(PHX)繞道。免費 proxy 短命 → 自動抓清單 + 輪替挑活的；記住上次成功的。──
+let _proxyList: string[] = [];
+let _proxyListAt = 0;
+let _proxyGood = '';
+async function _getProxyList(): Promise<string[]> {
+  if (_proxyList.length && Date.now() - _proxyListAt < 20 * 60 * 1000) return _proxyList;
+  try {
+    const r = await fetch('https://api.proxyscrape.com/v2/?request=getproxies&protocol=http&timeout=8000', { signal: AbortSignal.timeout(15000) });
+    const list = (await r.text()).match(/\d{1,3}(?:\.\d{1,3}){3}:\d+/g) || [];
+    if (list.length) { _proxyList = list; _proxyListAt = Date.now(); }
+  } catch { /* 抓不到就沿用舊清單 */ }
+  return _proxyList;
+}
+async function _fetchViaProxy(url: string, headers: Record<string, string>, valid: (t: string) => boolean, maxTry = 10): Promise<string | null> {
+  const { ProxyAgent } = await import('undici');
+  const attempt = async (p: string): Promise<string | null> => {
+    try {
+      const r: any = await fetch(url, { headers, dispatcher: new ProxyAgent('http://' + p), signal: AbortSignal.timeout(12000) } as any);
+      if (!r || !r.ok) return null;
+      const t = await r.text();
+      return valid(t) ? t : null;
+    } catch { return null; }
+  };
+  if (_proxyGood) { const t = await attempt(_proxyGood); if (t) return t; _proxyGood = ''; }   // 先試上次成功的
+  const list = (await _getProxyList()).slice();
+  for (let i = list.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); const tmp = list[i]; list[i] = list[j]; list[j] = tmp; }   // 洗牌
+  for (let i = 0; i < Math.min(maxTry, list.length); i++) { const t = await attempt(list[i]); if (t) { _proxyGood = list[i]; return t; } }
+  return null;
+}
+
+// PHX 鳳凰城：官方 api.phx.aero 有 gate 但擋 Render IP → 透過 proxy 池「背景」抓、存快取；使用者請求只讀快取（不讓人等慢/會死的 proxy）。空快取 → 前端顯示「開發中」。
+function _phxJxCodeshare(f: any): string { for (const cs of (Array.isArray(f.CodeShares) ? f.CodeShares : [])) { const m = String(cs).match(/STARLUX[^#]*#\s*(\d+)/i); if (m) return 'JX' + m[1]; } return ''; }
+function _phxRow(f: any, port: _FidsPort): any | null {
+  const dir: 'D' | 'A' = String(f.AD || '').toUpperCase() === 'D' ? 'D' : 'A';
+  const op = (String(f.LineCode || '') + String(f.Flightnumber || '')).replace(/\s/g, '').toUpperCase();
+  const jx = _phxJxCodeshare(f);
+  const fno = _outFno(jx || op); if (!fno) return null;
+  const dm = String(f.Destination || '').match(/^(.*?)\s*\(([A-Z0-9]{3})\)\s*$/);
+  return _outRow(port, dir, { fno, altFno: jx ? _outFno(op) : '', other: dm ? dm[2] : '', otherName: dm ? dm[1].trim() : String(f.Destination || '').trim(), gate: String(f.Gate || '').trim(), schedT: _hhmm(f.ScheduledTime), actT: _hhmm12(f.Estimated) || _hhmm12(f.Actual), terminal: String(f.Terminal || '').trim(), checkin: '', carousel: dir === 'A' ? String(f.BagClaim || '').trim() : '' });
+}
+let _phxCache: { ts: number; date: string; rows: any[] } = { ts: 0, date: '', rows: [] };   // date=這批 rows 所屬的當地日期（跨午夜後舊快取不會被當今天，codex P1）
+let _phxRefreshing = false;
+let _phxLastTry = 0;
+async function _refreshPhx(port: _FidsPort): Promise<void> {
+  if (_phxRefreshing) return; _phxRefreshing = true;
+  try {
+    const txt = await _fetchViaProxy('https://api.phx.aero/flight-information?Key=4f85fe2ef5a240d59809b63de94ef536', { 'User-Agent': 'Mozilla/5.0', 'Origin': 'https://www.skyharbor.com' }, (t) => t.indexOf('"Flightnumber"') >= 0, 10);
+    if (!txt) return;
+    let arr: any[] = []; try { arr = JSON.parse(txt); } catch { return; }
+    const today = _localDateDash(port.tz, 0);
+    const rows: any[] = [];
+    for (const f of arr) { if (String(f.ScheduledTime || '').slice(0, 10) !== today) continue; const row = _phxRow(f, port); if (row) rows.push(row); }
+    if (rows.length) _phxCache = { ts: Date.now(), date: today, rows };
+  } finally { _phxRefreshing = false; }
+}
+async function _fidsPhx(port: _FidsPort, dash: string, label: string): Promise<{ rows: any[]; date: string }> {
+  const today = _localDateDash(port.tz, 0);
+  if (dash && dash !== today) return { rows: [], date: label };   // 只服務當天（昨天的 gate 無意義；同 LAX/PRG 滾動站）
+  const valid = () => _phxCache.date === today && _phxCache.rows.length > 0 && (Date.now() - _phxCache.ts < 30 * 60 * 1000);
+  if (valid()) {
+    if (Date.now() - _phxCache.ts > 4 * 60 * 1000 && !_phxRefreshing) _refreshPhx(port).catch(() => { });   // 有快取：背景刷新、不阻塞
+    return { rows: _phxCache.rows, date: label };
+  }
+  // 無有效快取：每 60 秒最多「有上限地等一次」背景抓（~14s，proxy 夠快就直接回資料）；其餘請求立即回空 + 背景試，
+  //   避免 proxy 全死時每個請求都卡 14 秒。空結果上層不快取 → 下次重試（codex P1）。
+  if (Date.now() - _phxLastTry > 60000) {
+    _phxLastTry = Date.now();
+    await Promise.race([_refreshPhx(port).catch(() => { }), new Promise(r => setTimeout(r, 14000))]);
+  } else if (!_phxRefreshing) {
+    _refreshPhx(port).catch(() => { });
+  }
+  return { rows: valid() ? _phxCache.rows : [], date: label };
+}
+// SEA/ONT：唯一含 gate 的源是 FR24，而 FR24 連免費 proxy 也擋 → 目前無可靠來源，回空（前端顯示「開發中」），待之後 Pi / 付費代理再補。
+async function _fidsDevStub(_port: _FidsPort, _dash: string, label: string): Promise<{ rows: any[]; date: string }> {
+  return { rows: [], date: label };
+}
+
 // iana 有給就用它動態算偏移（DST 安全）；沒給就用固定 tz（日本+9、星+8 無 DST）
 const _FIDS_BESPOKE: Record<string, _FidsPort & { iana?: string; adapter: (p: _FidsPort, dash: string, label: string) => Promise<{ rows: any[]; date: string }> }> = {
   nrt: { code: 'NRT', name: '成田', tz: 9, adapter: _fidsNrt },
   sin: { code: 'SIN', name: '樟宜', tz: 8, adapter: _fidsSin },
   lax: { code: 'LAX', name: '洛杉磯', tz: -8, iana: 'America/Los_Angeles', adapter: _fidsLax },
-  phx: { code: 'PHX', name: '鳳凰城', tz: -7, iana: 'America/Phoenix', adapter: _fidsPhx },
   prg: { code: 'PRG', name: '布拉格', tz: 1, iana: 'Europe/Prague', adapter: _fidsPrg },
   bcn: { code: 'BCN', name: '巴塞隆納', tz: 2, iana: 'Europe/Madrid', adapter: _fidsBcn },
   zrh: { code: 'ZRH', name: '蘇黎世', tz: 2, iana: 'Europe/Zurich', adapter: _fidsZrh },
+  phx: { code: 'PHX', name: '鳳凰城', tz: -7, iana: 'America/Phoenix', adapter: _fidsPhx },   // 透過 proxy 池抓官方(有 gate)
+  sea: { code: 'SEA', name: '西雅圖', tz: -7, iana: 'America/Los_Angeles', adapter: _fidsDevStub },   // 暫無可靠 gate 源 → 開發中
+  ont: { code: 'ONT', name: '安大略', tz: -7, iana: 'America/Los_Angeles', adapter: _fidsDevStub },   // 暫無可靠 gate 源 → 開發中
   sfo: { code: 'SFO', name: '舊金山', tz: -7, iana: 'America/Los_Angeles', adapter: _fidsSfo }   // 夏 PDT-7 / 冬 PST-8，動態算
 };
 const _fidsOutCache: Record<string, { ts: number; data: any }> = {};
@@ -2093,7 +2144,7 @@ async function _fidsBespoke(src: string, reqDate: string, res: any) {
   try {
     const { rows, date } = await ent.adapter(port, dash, label);
     const data = { rows, date, airport: ent.code };
-    _fidsOutCache[ck] = { ts: Date.now(), data };
+    if (rows && rows.length) _fidsOutCache[ck] = { ts: Date.now(), data };   // 空結果不快取：PHX 等背景抓尚未填好時別把「空」鎖住 60 秒（codex P1）
     res.json(data);
   } catch (e: any) {
     console.error('FIDS bespoke error:', ent.code, e.message);
