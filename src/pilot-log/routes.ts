@@ -57,8 +57,8 @@ import { getAirportDbJs } from '../spa/js-airport-db.js';
 
 // ── 版本（比照 CrewSync / Morning：每次推版必更新；SW cache 名稱跟著走） ────
 // 本機 preview build 會暫時加 -tNN 後綴方便對版；推正式版前拿掉只留乾淨版號。
-export const PILOT_LOG_VERSION = 'V2.4.20';
-const PILOT_LOG_CACHE = 'pilotlog-v2-4-20';
+export const PILOT_LOG_VERSION = 'V2.4.21';
+const PILOT_LOG_CACHE = 'pilotlog-v2-4-21';
 
 export const pilotLogRouter = express.Router();
 
@@ -371,13 +371,18 @@ function _renderPilotLogChangelog(): string {
     ${renderCommunityLink()}
     <div class="pl-cl-v">${PILOT_LOG_VERSION}</div>
     <div class="pl-cl-txt">
-      <b>📕 匯出 PDF 改成四種標準完整版面（EASA-FCL／General／ASA／Jeppesen）的兩頁跨頁，照真實紙本（每頁結轉、簽名在格內、含封面）。</b><br>
-      <b>📕 Export PDF rebuilt as four full standard layouts (EASA-FCL / General / ASA / Jeppesen) in true two-page spreads with running totals, in-grid signature, and a cover page.</b>
+      <b>📕 調整 logbook PDF 排版。</b><br>
+      <b>📕 Adjusted logbook PDF layout.</b>
+    </div>
+    <div class="pl-cl-v old">V2.4.20</div>
+    <div class="pl-cl-txt">
+      <b>📕 調整 logbook PDF 排版。</b><br>
+      <b>📕 Adjusted logbook PDF layout.</b>
     </div>
     <div class="pl-cl-v old">V2.4.19</div>
     <div class="pl-cl-txt">
-      <b>📕 更新匯出 PDF 格式：每頁結轉（本頁合計／承前頁／累計至今），各標準格式各自欄位。</b><br>
-      <b>📕 Updated export PDF format: per-page running totals (this page / brought forward / total to date), proper per-standard columns.</b>
+      <b>📕 調整 logbook PDF 排版。</b><br>
+      <b>📕 Adjusted logbook PDF layout.</b>
     </div>
     <div class="pl-cl-v old">V2.4.18</div>
     <div class="pl-cl-txt">
