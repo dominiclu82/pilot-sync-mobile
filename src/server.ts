@@ -1710,6 +1710,23 @@ function _localDateDash(offsetHours: number, dayShift = 0): string {
 }
 // ISO("2026-06-08T05:54:00-07:00") 或 "2026-06-08 21:35" → "HH:MM"（時區偏移段的 : 不會誤抓，因前面要 T 或空白）
 function _hhmm(s: any): string { const m = String(s == null ? '' : s).match(/(?:T|\s)(\d{2}:\d{2})/); return m ? m[1] : ''; }
+// 12 小時制 "9:25 PM" / "2:52 PM" → 24 小時 "21:25" / "14:52"（PHX Estimated、LAX Sched/Status 用）
+function _hhmm12(s: any): string {
+  const m = String(s == null ? '' : s).match(/(\d{1,2}):(\d{2})\s*([AaPp])[Mm]/);
+  if (!m) return '';
+  let h = parseInt(m[1], 10) % 12; if (/[Pp]/.test(m[3])) h += 12;
+  return String(h).padStart(2, '0') + ':' + m[2];
+}
+// 帶時區/偏移的 ISO 時間 → 指定 IANA 時區的當地 "HH:MM"（PRG 的 time 是 +0000，要轉布拉格當地顯示）
+function _hhmmTz(s: any, iana: string): string {
+  if (!s) return '';
+  const d = new Date(String(s)); if (isNaN(d.getTime())) return _hhmm(s);
+  try {
+    const p: any = {};
+    for (const x of new Intl.DateTimeFormat('en-GB', { timeZone: iana, hour12: false, hour: '2-digit', minute: '2-digit' }).formatToParts(d)) p[x.type] = x.value;
+    return (p.hour === '24' ? '00' : p.hour) + ':' + p.minute;
+  } catch { return _hhmm(s); }
+}
 // 統一航班號：去空白、ICAO 三字碼→IATA 兩字碼、去數字前導零（AY0074→AY74、JX0805→JX805），跟桃園不留 padding 一致
 function _outFno(raw: any): string {
   const f = String(raw == null ? '' : raw).replace(/\s/g, '').toUpperCase();
@@ -1897,10 +1914,111 @@ function _ianaOffsetHours(tz: string): number {
   const asUTC = Date.UTC(+parts.year, +parts.month - 1, +parts.day, +(parts.hour === '24' ? 0 : parts.hour), +parts.minute);
   return Math.round((asUTC - now.getTime()) / 3600000);
 }
+// PHX 鳳凰城（GET JSON，key 寫死在官網 script）。一次回多日 dep+arr。JX 只有 Alaska 共掛 → 從 CodeShares 撈 STARLUX 班號浮上來。
+function _phxJxCodeshare(f: any): string {
+  for (const cs of (Array.isArray(f.CodeShares) ? f.CodeShares : [])) {
+    const m = String(cs).match(/STARLUX[^#]*#\s*(\d+)/i);
+    if (m) return 'JX' + m[1];
+  }
+  return '';
+}
+function _phxRow(f: any, port: _FidsPort): any | null {
+  const dir: 'D' | 'A' = String(f.AD || '').toUpperCase() === 'D' ? 'D' : 'A';
+  const op = (String(f.LineCode || '') + String(f.Flightnumber || '')).replace(/\s/g, '').toUpperCase();
+  const jx = _phxJxCodeshare(f);
+  const fno = _outFno(jx || op); if (!fno) return null;
+  const altFno = jx ? _outFno(op) : '';
+  const dm = String(f.Destination || '').match(/^(.*?)\s*\(([A-Z0-9]{3})\)\s*$/);   // "PORTLAND (PDX)"
+  const other = dm ? dm[2] : '';
+  const otherName = dm ? dm[1].trim() : String(f.Destination || '').trim();
+  // ScheduledTime 標 Z 但其實是當地掛鐘時間（與 ScheduledDateTime 一致）→ 直接取 HH:MM 當當地時刻
+  return _outRow(port, dir, {
+    fno, altFno, other, otherName, gate: String(f.Gate || '').trim(),
+    schedT: _hhmm(f.ScheduledTime), actT: _hhmm12(f.Estimated) || _hhmm12(f.Actual),
+    terminal: String(f.Terminal || '').trim(), checkin: '', carousel: dir === 'A' ? String(f.BagClaim || '').trim() : ''
+  });
+}
+async function _fidsPhx(port: _FidsPort, dash: string, label: string): Promise<{ rows: any[]; date: string }> {
+  const r = await fetch('https://api.phx.aero/flight-information?Key=4f85fe2ef5a240d59809b63de94ef536', { headers: { 'User-Agent': _FIDS_UA, 'Origin': 'https://www.skyharbor.com', 'Referer': 'https://www.skyharbor.com/', 'Accept': 'application/json' } });
+  if (!r.ok) throw new Error('HTTP ' + r.status);
+  const j: any = await r.json();
+  const arr: any[] = Array.isArray(j) ? j : (j.flights || j.data || []);
+  const rows: any[] = [];
+  for (const f of arr) { if (dash && String(f.ScheduledTime || '').slice(0, 10) !== dash) continue; const row = _phxRow(f, port); if (row) rows.push(row); }
+  return { rows, date: label };
+}
+
+// LAX（爬伺服器渲染 HTML 表格；免 key、無 Cloudflare）。欄序：Airline | Flight# | Gate | Dest/Origin | Sched | Status。
+//   JX 走 TBIT/Midfield Satellite，gate 原樣帶出（如 "TB - 206"）。班號欄第一個是操作方、帶 * 是共掛。
+function _laxParse(html: string, dir: 'D' | 'A', port: _FidsPort): any[] {
+  const out: any[] = [];
+  for (const tr of (html.match(/<tr[\s\S]*?<\/tr>/gi) || [])) {
+    const tds = (tr.match(/<td[\s\S]*?<\/td>/gi) || []).map(td => td.replace(/<[^>]*>/g, ' ').replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/\s+/g, ' ').trim());
+    if (tds.length < 6 || !tds[1]) continue;
+    const tokens = tds[1].split(/\s+/).map(x => x.replace(/\*+$/, ''));
+    const jxTok = tokens.find(x => /^JX\d+$/i.test(x));
+    const fno = _outFno(jxTok || tokens[0]); if (!fno) continue;
+    const altFno = jxTok ? _outFno(tokens[0]) : '';
+    const gate = (tds[2] && tds[2] !== '-') ? tds[2] : '';
+    out.push(_outRow(port, dir, { fno, altFno, other: '', otherName: tds[3] || '', gate, schedT: _hhmm12(tds[4]), actT: _hhmm12(tds[5]), terminal: '', checkin: '', carousel: '' }));
+  }
+  return out;
+}
+async function _fidsLax(port: _FidsPort, dash: string, label: string): Promise<{ rows: any[]; date: string }> {
+  // LAX 頁面只給「當前滾動」班，沒有日期參數 → 非當天的請求(如昨天)回空，避免把今天的班標成別天（codex P2）
+  if (dash && dash !== _localDateDash(port.tz, 0)) return { rows: [], date: label };
+  const get = async (type: string): Promise<string> => {
+    const r = await fetch('https://www.flylax.com/flight-search-list?type=' + type, { headers: { 'User-Agent': _FIDS_UA } });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    return r.text();
+  };
+  const [dep, arr] = await Promise.all([get('dep'), get('arr')]);
+  return { rows: [..._laxParse(dep, 'D', port), ..._laxParse(arr, 'A', port)], date: label };
+}
+
+// PRG 布拉格（GET JSON，免 key）。gate 只有出發有。from 要給「機場當地現在」往後，否則只回已飛走的（gate 已清空）。
+function _prgFromNow(): string {
+  const d = new Date(Date.now() + _ianaOffsetHours('Europe/Prague') * 3600 * 1000);
+  const p = (n: number) => String(n).padStart(2, '0');
+  return p(d.getUTCDate()) + '-' + p(d.getUTCMonth() + 1) + '-' + d.getUTCFullYear() + '_' + p(d.getUTCHours()) + '-' + p(d.getUTCMinutes());
+}
+function _prgRow(f: any, dir: 'D' | 'A', port: _FidsPort): any | null {
+  const fno = _outFno(f.flyNumber); if (!fno) return null;
+  const dm = String(f.destination || '').match(/\(([A-Z0-9]{3})\)\s*$/);
+  const other = String(f['destination-id'] || (dm ? dm[1] : '') || '').toUpperCase();
+  const otherName = String(f.destination || '').replace(/\s*\([A-Z0-9]{3}\)\s*$/, '').trim() || other;
+  const sched = _hhmmTz(f.time, 'Europe/Prague');
+  const act = (f['time-new'] && f['time-new'] !== f.time) ? _hhmmTz(f['time-new'], 'Europe/Prague') : '';
+  return _outRow(port, dir, {
+    fno, altFno: '', other, otherName, gate: String(f.gates || '').trim(),
+    schedT: sched, actT: act, terminal: String(f.terminal || f.hall || '').trim(),
+    checkin: dir === 'D' ? String(f.chin || '').trim() : '', carousel: ''
+  });
+}
+async function _fidsPrg(port: _FidsPort, dash: string, label: string): Promise<{ rows: any[]; date: string }> {
+  // PRG shorttime 只給「現在往後」的滾動班，沒有歷史日期 → 非當天的請求回空，避免把今天的班標成別天（codex P2）
+  if (dash && dash !== _localDateDash(port.tz, 0)) return { rows: [], date: label };
+  const from = _prgFromNow();
+  const get = async (path: string): Promise<any[]> => {
+    const r = await fetch('https://api.prg.aero/' + path + '?offset=0&limit=120&from=' + from, { headers: { 'User-Agent': _FIDS_UA, 'Accept': 'application/json' } });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const j: any = await r.json();
+    return Array.isArray(j) ? j : (j.flights || j.items || []);
+  };
+  const [dep, arr] = await Promise.all([get('departures-shorttime'), get('arrivals-shorttime')]);
+  const rows: any[] = [];
+  for (const f of dep) { const row = _prgRow(f, 'D', port); if (row) rows.push(row); }
+  for (const f of arr) { const row = _prgRow(f, 'A', port); if (row) rows.push(row); }
+  return { rows, date: label };
+}
+
 // iana 有給就用它動態算偏移（DST 安全）；沒給就用固定 tz（日本+9、星+8 無 DST）
 const _FIDS_BESPOKE: Record<string, _FidsPort & { iana?: string; adapter: (p: _FidsPort, dash: string, label: string) => Promise<{ rows: any[]; date: string }> }> = {
   nrt: { code: 'NRT', name: '成田', tz: 9, adapter: _fidsNrt },
   sin: { code: 'SIN', name: '樟宜', tz: 8, adapter: _fidsSin },
+  lax: { code: 'LAX', name: '洛杉磯', tz: -8, iana: 'America/Los_Angeles', adapter: _fidsLax },
+  phx: { code: 'PHX', name: '鳳凰城', tz: -7, iana: 'America/Phoenix', adapter: _fidsPhx },
+  prg: { code: 'PRG', name: '布拉格', tz: 1, iana: 'Europe/Prague', adapter: _fidsPrg },
   sfo: { code: 'SFO', name: '舊金山', tz: -7, iana: 'America/Los_Angeles', adapter: _fidsSfo }   // 夏 PDT-7 / 冬 PST-8，動態算
 };
 const _fidsOutCache: Record<string, { ts: number; data: any }> = {};
