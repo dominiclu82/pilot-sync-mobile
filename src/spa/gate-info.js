@@ -16,7 +16,7 @@ var _giRegions = {
   JP: { name: 'JP', stations: [ { code: 'NRT', name: '成田', src: 'nrt', tz: 'Asia/Tokyo' }, { code: 'CTS', name: '新千歲', src: 'cts', tz: 'Asia/Tokyo' }, { code: 'HKD', name: '函館', src: 'hkd', tz: 'Asia/Tokyo' } ] },
   SG: { name: 'SG', stations: [ { code: 'SIN', name: '樟宜', src: 'sin', tz: 'Asia/Singapore' } ] },
   US: { name: 'US', stations: [ { code: 'SFO', name: '舊金山', src: 'sfo', tz: 'America/Los_Angeles' }, { code: 'LAX', name: '洛杉磯', src: 'lax', tz: 'America/Los_Angeles' } ] },
-  EU: { name: 'EU', stations: [ { code: 'PRG', name: '布拉格', src: 'prg', tz: 'Europe/Prague' } ] }
+  EU: { name: 'EU', stations: [ { code: 'PRG', name: '布拉格', src: 'prg', tz: 'Europe/Prague' }, { code: 'BCN', name: '巴塞隆納', src: 'bcn', tz: 'Europe/Madrid' }, { code: 'ZRH', name: '蘇黎世', src: 'zrh', tz: 'Europe/Zurich' } ] }
 };
 var _giRegion = 'TW';
 var _giAirport = 'TPE';      // 目前場站 code
@@ -57,7 +57,7 @@ var _giCityNames = {
   HKG:'香港',MFM:'澳門',
   SIN:'新加坡',BKK:'曼谷',SGN:'胡志明',HAN:'河內',PNH:'金邊',
   MNL:'馬尼拉',CEB:'宿霧',CGK:'雅加達',DPS:'峇里島',KUL:'吉隆坡',PEN:'檳城',
-  PRG:'布拉格',TPE:'桃園'
+  PRG:'布拉格',BCN:'巴塞隆納',ZRH:'蘇黎世',TPE:'桃園'
 };
 
 var _giIcaoToIata = {
@@ -68,7 +68,7 @@ var _giIcaoToIata = {
   VHHH:'HKG',VMMC:'MFM',
   WSSS:'SIN',VTBS:'BKK',VVTS:'SGN',VVNB:'HAN',VDPP:'PNH',
   RPLL:'MNL',RPVM:'CEB',WIII:'CGK',WADD:'DPS',WMKK:'KUL',WMKP:'PEN',
-  LKPR:'PRG',RCTP:'TPE'
+  LKPR:'PRG',LEBL:'BCN',LSZH:'ZRH',RCTP:'TPE'
 };
 
 function giAirportDisplay(name, code) {

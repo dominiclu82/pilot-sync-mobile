@@ -2012,6 +2012,57 @@ async function _fidsPrg(port: _FidsPort, dash: string, label: string): Promise<{
   return { rows, date: label };
 }
 
+// ZRH 蘇黎世（GET JSON，免 key）。一支端點回全部 dep+arr，含 GAT(閘口)/TER(航廈)。SDT=當地排定日期；STD/STA 為 ISO(Z)→ 轉蘇黎世當地時刻。
+function _zrhRow(f: any, port: _FidsPort): any | null {
+  const dir: 'D' | 'A' = String(f.flightType || '').toUpperCase() === 'D' ? 'D' : 'A';
+  const fno = _outFno(String(f.FLC || '') + String(f.FLN || '')); if (!fno) return null;
+  const other = String((dir === 'D' ? f.PDS : f.POR) || '').toUpperCase();
+  const otherName = f.cityEn || f.airportName || other;
+  const gate = String(f.GAT || '').trim();
+  const term = String(f.TER || '').trim();
+  if (dir === 'D') {
+    return _outRow(port, 'D', { fno, altFno: '', other, otherName, gate, schedT: _hhmmTz(f.STD, 'Europe/Zurich'), actT: _hhmmTz(f.ATD || f.ETD, 'Europe/Zurich'), terminal: term, checkin: '', carousel: '' });
+  }
+  return _outRow(port, 'A', { fno, altFno: '', other, otherName, gate, schedT: _hhmmTz(f.STA, 'Europe/Zurich'), actT: _hhmmTz(f.ATA || f.ETA, 'Europe/Zurich'), terminal: term, checkin: '', carousel: '' });
+}
+async function _fidsZrh(port: _FidsPort, dash: string, label: string): Promise<{ rows: any[]; date: string }> {
+  const r = await fetch('https://flightdata.flughafen-zuerich.ch/flights', { headers: { 'User-Agent': _FIDS_UA, 'Accept': 'application/json' } });
+  if (!r.ok) throw new Error('HTTP ' + r.status);
+  const j: any = await r.json();
+  const a: any[] = Array.isArray(j) ? j : (j.flights || []);
+  const rows: any[] = [];
+  for (const f of a) { if (dash && String(f.SDT || '') !== dash) continue; const row = _zrhRow(f, port); if (row) rows.push(row); }
+  return { rows, date: label };
+}
+
+// BCN 巴塞隆納（Aena，GET JSON，免 key）。flightType=S 出發 / L 抵達；含 puertaPrimera(閘口)/terminal/mostrador(check-in 櫃台)。時刻已是當地。
+function _bcnCity(s: any): string { const c = String(s || '').split('/')[0].replace(/\s+AIRPORT$/i, '').trim(); return c ? c.charAt(0) + c.slice(1).toLowerCase() : ''; }
+function _bcnRow(f: any, dir: 'D' | 'A', port: _FidsPort): any | null {
+  const fno = _outFno(String(f.iataCompania || '') + String(f.numVuelo || '')); if (!fno) return null;
+  const clean = (v: any) => (v && v !== 'null') ? String(v).trim() : '';
+  const hm = (s: any) => { const m = String(s || '').match(/^(\d{1,2}):(\d{2})/); return m ? ('0' + m[1]).slice(-2) + ':' + m[2] : ''; };
+  const ci = clean(f.mostradorDesde), cj = clean(f.mostradorHasta);
+  return _outRow(port, dir, {
+    fno, altFno: '', other: String(f.iataOtro || '').toUpperCase(), otherName: _bcnCity(f.ciudadIataOtro) || String(f.iataOtro || '').toUpperCase(),
+    gate: clean(f.puertaPrimera), schedT: hm(f.horaProgramada), actT: hm(f.horaEstimada),
+    terminal: clean(f.terminal), checkin: dir === 'D' ? (ci ? (cj ? ci + '-' + cj : ci) : '') : '', carousel: ''
+  });
+}
+async function _fidsBcn(port: _FidsPort, dash: string, label: string): Promise<{ rows: any[]; date: string }> {
+  const fechaWant = dash ? (dash.slice(8, 10) + '/' + dash.slice(5, 7) + '/' + dash.slice(0, 4)) : '';   // YYYY-MM-DD → DD/MM/YYYY
+  const get = async (ft: string, dir: 'D' | 'A'): Promise<any[]> => {
+    const r = await fetch('https://www.aena.es/sites/Satellite?pagename=AENA_ConsultarVuelos&airport=BCN&flightType=' + ft + '&limit=300&dosDias=si', { headers: { 'User-Agent': _FIDS_UA, 'Accept': 'application/json' } });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const j: any = await r.json();
+    const a: any[] = Array.isArray(j) ? j : Object.keys(j).filter(k => /^\d+$/.test(k)).map(k => j[k]);
+    const rows: any[] = [];
+    for (const f of a) { if (fechaWant && String(f.fecha || '') !== fechaWant) continue; const row = _bcnRow(f, dir, port); if (row) rows.push(row); }
+    return rows;
+  };
+  const [dep, arr] = await Promise.all([get('S', 'D'), get('L', 'A')]);
+  return { rows: [...dep, ...arr], date: label };
+}
+
 // iana 有給就用它動態算偏移（DST 安全）；沒給就用固定 tz（日本+9、星+8 無 DST）
 const _FIDS_BESPOKE: Record<string, _FidsPort & { iana?: string; adapter: (p: _FidsPort, dash: string, label: string) => Promise<{ rows: any[]; date: string }> }> = {
   nrt: { code: 'NRT', name: '成田', tz: 9, adapter: _fidsNrt },
@@ -2019,6 +2070,8 @@ const _FIDS_BESPOKE: Record<string, _FidsPort & { iana?: string; adapter: (p: _F
   lax: { code: 'LAX', name: '洛杉磯', tz: -8, iana: 'America/Los_Angeles', adapter: _fidsLax },
   phx: { code: 'PHX', name: '鳳凰城', tz: -7, iana: 'America/Phoenix', adapter: _fidsPhx },
   prg: { code: 'PRG', name: '布拉格', tz: 1, iana: 'Europe/Prague', adapter: _fidsPrg },
+  bcn: { code: 'BCN', name: '巴塞隆納', tz: 2, iana: 'Europe/Madrid', adapter: _fidsBcn },
+  zrh: { code: 'ZRH', name: '蘇黎世', tz: 2, iana: 'Europe/Zurich', adapter: _fidsZrh },
   sfo: { code: 'SFO', name: '舊金山', tz: -7, iana: 'America/Los_Angeles', adapter: _fidsSfo }   // 夏 PDT-7 / 冬 PST-8，動態算
 };
 const _fidsOutCache: Record<string, { ts: number; data: any }> = {};
