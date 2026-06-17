@@ -1572,8 +1572,8 @@ export function getSpaHtmlBody(): string {
     ${renderCommunityLink()}
     <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V9.5.04</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
-      <div>🛬 <b>Gate Info 新增外站:洛杉磯、鳳凰城、布拉格。</b></div>
-      <div>🛬 <b>Gate Info: added Los Angeles, Phoenix and Prague.</b></div>
+      <div>🛬 <b>Gate Info 新增外站:洛杉磯、布拉格。</b></div>
+      <div>🛬 <b>Gate Info: added Los Angeles and Prague.</b></div>
     </div>
     <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V9.5.03</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">

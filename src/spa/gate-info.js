@@ -15,7 +15,7 @@ var _giRegions = {
   TW: { name: 'TW', stations: [ { code: 'TPE', name: '桃園', src: 'tpe', tz: 'Asia/Taipei' } ] },
   JP: { name: 'JP', stations: [ { code: 'NRT', name: '成田', src: 'nrt', tz: 'Asia/Tokyo' }, { code: 'CTS', name: '新千歲', src: 'cts', tz: 'Asia/Tokyo' }, { code: 'HKD', name: '函館', src: 'hkd', tz: 'Asia/Tokyo' } ] },
   SG: { name: 'SG', stations: [ { code: 'SIN', name: '樟宜', src: 'sin', tz: 'Asia/Singapore' } ] },
-  US: { name: 'US', stations: [ { code: 'SFO', name: '舊金山', src: 'sfo', tz: 'America/Los_Angeles' }, { code: 'LAX', name: '洛杉磯', src: 'lax', tz: 'America/Los_Angeles' }, { code: 'PHX', name: '鳳凰城', src: 'phx', tz: 'America/Phoenix' } ] },
+  US: { name: 'US', stations: [ { code: 'SFO', name: '舊金山', src: 'sfo', tz: 'America/Los_Angeles' }, { code: 'LAX', name: '洛杉磯', src: 'lax', tz: 'America/Los_Angeles' } ] },
   EU: { name: 'EU', stations: [ { code: 'PRG', name: '布拉格', src: 'prg', tz: 'Europe/Prague' } ] }
 };
 var _giRegion = 'TW';
