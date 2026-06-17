@@ -1577,11 +1577,17 @@ self.addEventListener('fetch', e => {
     })));
     return;
   }
+  // 撐住「更新快照」直到寫完，否則使用者一看到新版就點進 app、SW 被收掉 → 快照沒存成、離線還是舊的（如入口頁版號卡舊）。
+  // ⚠ waitUntil 必須在 event 派發「當下（同步）」就 seed，不能等 fetch().then() 才叫（部分瀏覽器丟 InvalidStateError → 等於沒撐住）。
+  //   故先 seed 一個 promise，put 完成（或失敗/離線）再 resolve 它。不加任何篩選：完全保留原本快取範圍（同源 200 / 跨域 opaque / '/' 轉址 shell 都照存）。
+  let _cacheDone = () => {};
+  e.waitUntil(new Promise(res => { _cacheDone = res; }));
   e.respondWith(
     fetch(e.request).then(r => {
-      caches.open(CACHE).then(c => c.put(e.request, r.clone()));
+      if (r) caches.open(CACHE).then(c => c.put(e.request, r.clone())).catch(() => {}).then(() => _cacheDone());
+      else _cacheDone();
       return r;
-    }).catch(() => caches.match(e.request).then(r => r || new Response(_offlinePage, {headers:{'Content-Type':'text/html'}})))
+    }).catch(() => { _cacheDone(); return caches.match(e.request).then(r => r || new Response(_offlinePage, {headers:{'Content-Type':'text/html'}})); })
   );
 });
 `);
