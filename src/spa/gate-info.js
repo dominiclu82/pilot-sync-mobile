@@ -595,6 +595,7 @@ function _giProcessStationRows() {
   renderGateFlights();   // 由它判斷空狀態(今日無 / 本時段無)+ 顯示/隱藏表格
   gateFlightsLoaded = true;
   _giEnrichWithTPE();   // 亞洲外站：往來台北的航班，用桃園板把「台北側」空格(登機門/停機坪/轉盤/時刻)補進去
+  _giEnrichSiblings();  // 跨站互補：往來其他「我們有源的站」的航班(如高雄→大阪)，用對方板補對方側空格
 }
 
 // 統一航班號格式比對用：去空白、大寫、去數字前導零(JX0805→JX805)，跟 server _outFno 一致，桃園/外站兩邊才對得起來
@@ -630,8 +631,8 @@ function _giEnrichWithTPE() {
     // key 用「航班號 + 對方機場」：同號班一天出現兩次(輪替/延誤順延)時，純航班號會對到錯的 → 加路線當判別子
     var keyOf = function(fno, city) { return _giNormFno(fno) + '|' + String(city || '').toUpperCase(); };
     var tpeArr = {}, tpeDep = {};
-    (data.arr || []).forEach(function(f) { if (!f.ACode) return; tpeArr[keyOf(f.ACode + (f.FlightNo || ''), f.CityCode)] = f; });   // 到站記錄 CityCode=出發地(外站)
-    (data.dep || []).forEach(function(f) { if (!f.ACode) return; tpeDep[keyOf(f.ACode + (f.FlightNo || ''), f.CityCode)] = f; });   // 出發記錄 CityCode=目的地(外站)
+    (data.arr || []).forEach(function(f) { if (!f.ACode) return; var k = keyOf(f.ACode + (f.FlightNo || ''), f.CityCode); tpeArr[k] = (k in tpeArr) ? null : f; });   // 到站 CityCode=出發地；同 key 撞到→null(模糊不補)
+    (data.dep || []).forEach(function(f) { if (!f.ACode) return; var k = keyOf(f.ACode + (f.FlightNo || ''), f.CityCode); tpeDep[k] = (k in tpeDep) ? null : f; });   // 出發 CityCode=目的地；撞到→null
     var changed = false;
     // 對需要補的列做 clone 再填，不直接改 _giStationRows(那是 _giFetchStation 快取的共用資料，改了會卡舊值；每次重新從桃園板補才不會 stale)
     gateFlightsList = gateFlightsList.map(function(row) {
@@ -658,6 +659,92 @@ function _giEnrichWithTPE() {
     });
     if (changed) renderGateFlights();
   }).catch(function() { /* 桃園板抓失敗 → 外站照常顯示 */ });
+}
+
+// 機場代碼 → 站台設定(src/tz) 對照表，從 _giRegions 攤平
+var _giSrcMapCache = null;
+function _giAirportSrcMap() {
+  if (_giSrcMapCache) return _giSrcMapCache;
+  var m = {};
+  Object.keys(_giRegions).forEach(function(rk) {
+    (_giRegions[rk].stations || []).forEach(function(s) { m[s.code] = s; });
+  });
+  _giSrcMapCache = m;
+  return m;
+}
+function _giDateInTz(tz) {
+  try {
+    var o = {};
+    new Intl.DateTimeFormat('en-CA', { timeZone: tz || 'Asia/Taipei', year: 'numeric', month: '2-digit', day: '2-digit' })
+      .formatToParts(new Date()).forEach(function(x) { o[x.type] = x.value; });
+    return o.year + '/' + o.month + '/' + o.day;
+  } catch (e) { return _giTodayStr(); }
+}
+
+// 跨站互補：任一站的航班，另一頭若是「我們也有資料的站」，就用對方的板補上這頭空著的「對方側」格子。
+// 例：高雄看 KHH→大阪，補大阪到站停機坪/轉盤；台北看 TPE→香港，補香港到站(等於用自家源復活台北的外站補強，不靠死掉的 FR24)。
+// 守則同 _giEnrichWithTPE：只今天、限亞洲、外站當地日=對方當地日、航班號+路線(對方那端=本站)、clone 不污染快取、async 期間切站/切日期就放棄。
+function _giEnrichSiblings() {
+  if (_giSelectedDate) return;                          // 只對今天
+  var st = _giCurrentStation();
+  if (!st.tz || st.tz.indexOf('Asia/') !== 0) return;  // 本站須亞洲
+  var sCode = st.code, sToday = _giDateInTz(st.tz);
+  var srcMap = _giAirportSrcMap();
+  // 收集畫面上「對方機場」中：我們有源、亞洲、與本站同一天、且不是自己/TPE(TPE 那側由 _giEnrichWithTPE 處理) 的
+  var wanted = {};
+  gateFlightsList.forEach(function(row) {
+    var isDep = (row.originCode === sCode || row.origin === sCode);
+    var other = isDep ? (row.destCode || row.dest) : (row.originCode || row.origin);
+    if (!other || other === sCode || other === 'TPE') return;
+    var s = srcMap[other];
+    if (!s || !s.tz || s.tz.indexOf('Asia/') !== 0) return;
+    if (_giDateInTz(s.tz) !== sToday) return;   // 跨午夜不同日 → 不補(避免對到別天同號班)
+    wanted[other] = s;
+  });
+  var codes = Object.keys(wanted);
+  if (!codes.length) return;
+  Promise.all(codes.map(function(code) {
+    return _giFetchStation(wanted[code].src, _giDateInTz(wanted[code].tz))
+      .then(function(d) { return { code: code, rows: (d && d.rows) || [] }; })
+      .catch(function() { return { code: code, rows: [] }; });
+  })).then(function(boards) {
+    if (_giCurrentStation().code !== sCode || _giSelectedDate) return;   // 期間切站/切日期 → 放棄
+    var look = {};   // code → { arr: {fno|origin: rec}, dep: {fno|dest: rec} }
+    boards.forEach(function(b) {
+      var L = { arr: {}, dep: {} };
+      b.rows.forEach(function(rr) {
+        var fn = _giNormFno(rr.fno);
+        if (rr.sta || rr.ata) { var ka = fn + '|' + (rr.originCode || rr.origin || ''); L.arr[ka] = (ka in L.arr) ? null : rr; }   // 到站，用其出發地當 key；同 key 撞到→標 null(模糊不補)
+        if (rr.std || rr.atd) { var kd = fn + '|' + (rr.destCode || rr.dest || ''); L.dep[kd] = (kd in L.dep) ? null : rr; }        // 出發，用其目的地當 key；撞到→null
+      });
+      look[b.code] = L;
+    });
+    var changed = false;
+    gateFlightsList = gateFlightsList.map(function(row) {
+      var isDep = (row.originCode === sCode || row.origin === sCode);
+      var other = isDep ? (row.destCode || row.dest) : (row.originCode || row.origin);
+      var L = look[other]; if (!L) return row;
+      var key = _giNormFno(row.fno) + '|' + sCode;   // 對方那端必為本站
+      var rec = isDep ? L.arr[key] : L.dep[key];
+      if (!rec) return row;
+      var r = Object.assign({}, row); changed = true;
+      if (isDep) {   // 本站出發 → 補對方「到站側」
+        if (!r.parking && rec.parking) r.parking = rec.parking;
+        if (!r.carousel && rec.carousel) r.carousel = rec.carousel;
+        if (!r.sta && rec.sta) r.sta = rec.sta;
+        if (!r.ata && rec.ata) r.ata = rec.ata;
+        if (!r.arrTerminal && rec.arrTerminal) r.arrTerminal = rec.arrTerminal;
+      } else {       // 本站抵達 → 補對方「出發側」
+        if (!r.gate && rec.gate) r.gate = rec.gate;
+        if (!r.checkin && rec.checkin) r.checkin = rec.checkin;
+        if (!r.std && rec.std) r.std = rec.std;
+        if (!r.atd && rec.atd) r.atd = rec.atd;
+        if (!r.depTerminal && rec.depTerminal) r.depTerminal = rec.depTerminal;
+      }
+      return r;
+    });
+    if (changed) renderGateFlights();
+  }).catch(function() { /* 對方板抓失敗 → 維持原樣 */ });
 }
 
 function _giProcessFlights() {
@@ -721,6 +808,7 @@ function _giProcessFlights() {
   gateFlightsList = flights;
   renderGateFlights();   // 空狀態(今日無 / 本時段無)+ 顯示/隱藏由 renderGateFlights 統一處理
   gateFlightsLoaded = true;
+  _giEnrichSiblings();   // 桃園各班 → 用對方站板補目的地/來源地的登機門等(復活外站補強，改用自家源)
 
   // Background fetch gate data: FR24 first, FA fallback (today only)
   var isToday = !_giSelectedDate;
@@ -755,6 +843,7 @@ function _giProcessFlights() {
         });
         gateFlightsList = Object.values(map);
         renderGateFlights();
+        _giEnrichSiblings();   // FA 補完後再跑跨站補強(最後寫入者；clone+競態防呆，重複跑無害)
       })
       .catch(function() {
         // FR24 failed, fall back to FA only
@@ -771,6 +860,7 @@ function _giProcessFlights() {
           });
           gateFlightsList = Object.values(map);
           renderGateFlights();
+          _giEnrichSiblings();   // 同上(FR24 失敗→FA only 路徑也補)
         });
       });
   }
