@@ -275,6 +275,21 @@ function renderGateFlights() {
   var sorted = _giSortList(gateFlightsList);
   sorted = sorted.filter(_giTimeFilter);
 
+  // 空狀態（時段篩完後統一判斷；搜尋時交給搜尋結果區、不套用）：
+  var _statusEl = document.getElementById('gate-status');
+  var _wrapEl = document.getElementById('gate-table-wrap');
+  if (!searchTerm && sorted.length === 0) {
+    var _lbl = (_giAirline === 'ALL') ? 'ALL' : _giAirline;
+    // gateFlightsList = 航空篩選後(未套時段)的全天清單：它空 = 該航空整天無班 → 今日無；它有但被時段濾光 → 本時段無（時段=All 不會發生）。
+    var _allDay = (gateFlightsList.length === 0) || (_giTimeSlot === 'all');
+    if (_statusEl) { _statusEl.textContent = (_allDay ? '今日無 ' : '本時段無 ') + _lbl + ' 航班'; _statusEl.style.display = 'block'; }
+    if (_wrapEl) _wrapEl.style.display = 'none';
+    var _pw0 = document.getElementById('gi-pinned-wrap'); if (_pw0) _pw0.style.display = 'none';
+    return;
+  }
+  if (_statusEl) _statusEl.style.display = 'none';
+  if (_wrapEl) _wrapEl.style.display = '';
+
   if (searchTerm) {
     var isNumeric = /^\d+$/.test(searchTerm);
     var termUpper = searchTerm.toUpperCase();
@@ -564,24 +579,18 @@ function _giFetchStation(src, dateStr) {
 function _giProcessStationRows() {
   var statusEl = document.getElementById('gate-status');
   var wrapEl = document.getElementById('gate-table-wrap');
-  var airline = _giAirline;
-  var isAll = (airline === 'ALL');
-  var rows = (_giStationRows || []).filter(function(f) {
-    if (isAll) return true;
-    return (f.fno || '').toUpperCase().indexOf(airline) === 0;
-  });
-  if (rows.length === 0) {
-    // dev 站（PHX/SEA/ONT，尚無穩定 gate 來源）沒資料 → 顯示「開發中」；其他站只是當下沒班 → 「今日無航班」
-    statusEl.textContent = _giCurrentStation().dev ? '頁面開發中 · Page under development' : ('今日無 ' + (isAll ? 'ALL' : airline) + ' 航班資料');
+  var raw = _giStationRows || [];
+  // 「開發中」只在「整站完全沒資料」(raw 空)且是 dev 站(PHX/SEA/ONT 尚無穩定來源)時顯示。其餘空狀態(航空篩選/時段)交給 renderGateFlights。
+  if (raw.length === 0 && _giCurrentStation().dev) {
+    statusEl.textContent = '頁面開發中 · Page under development';
     statusEl.style.display = 'block';
     wrapEl.style.display = 'none';
     gateFlightsList = [];
     return;
   }
-  gateFlightsList = rows;
-  statusEl.style.display = 'none';
-  wrapEl.style.display = '';
-  renderGateFlights();
+  var airline = _giAirline, isAll = (airline === 'ALL');
+  gateFlightsList = raw.filter(function(f) { return isAll || (f.fno || '').toUpperCase().indexOf(airline) === 0; });
+  renderGateFlights();   // 由它判斷空狀態(今日無 / 本時段無)+ 顯示/隱藏表格
   gateFlightsLoaded = true;
 }
 
@@ -643,18 +652,8 @@ function _giProcessFlights() {
   });
 
   var flights = Object.values(map);
-  if (flights.length === 0) {
-    var label = isAll ? 'ALL' : airline;
-    statusEl.textContent = '今日無 ' + label + ' 航班資料';
-    statusEl.style.display = 'block';
-    wrapEl.style.display = 'none';
-    return;
-  }
-
   gateFlightsList = flights;
-  statusEl.style.display = 'none';
-  wrapEl.style.display = '';
-  renderGateFlights();
+  renderGateFlights();   // 空狀態(今日無 / 本時段無)+ 顯示/隱藏由 renderGateFlights 統一處理
   gateFlightsLoaded = true;
 
   // Background fetch gate data: FR24 first, FA fallback (today only)
