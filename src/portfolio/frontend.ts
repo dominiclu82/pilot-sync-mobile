@@ -269,7 +269,7 @@ export function getPortfolioHtml(): string {
       </div>
     </nav>
     <!-- ⊞ 回 Tools：只在「從 /apps 入口進來 + 裝成 PWA」時顯示 -->
-    <script>(function(){try{var s=(window.matchMedia&&window.matchMedia('(display-mode: standalone)').matches)||window.navigator.standalone;if(s&&sessionStorage.getItem('cs_via_apps')==='1'){var b=document.getElementById('cs-apps-home');if(b)b.style.display='inline-flex';}}catch(e){}})();</script>
+    <script>(function(){try{var s=(window.matchMedia&&window.matchMedia('(display-mode: standalone)').matches)||window.navigator.standalone;if(s&&localStorage.getItem('cs_via_apps')==='1'){var b=document.getElementById('cs-apps-home');if(b)b.style.display='inline-flex';}}catch(e){}})();</script>
   </div>
 <script>${getClientJs()}</script>
 </body>

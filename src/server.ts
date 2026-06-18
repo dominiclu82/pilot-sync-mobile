@@ -314,7 +314,7 @@ app.get('/apps', (_req, res) => {
 <meta name="apple-mobile-web-app-title" content="Tools">
 <meta name="mobile-web-app-capable" content="yes">
 <!-- 蓋「從 /apps 入口進來」的章：三個 app 靠這個 + standalone 判斷才顯示 ⊞ 回 Tools 鈕 -->
-<script>try{sessionStorage.setItem('cs_via_apps','1')}catch(e){}</script>
+<script>try{localStorage.setItem('cs_via_apps','1')}catch(e){}</script>
 <!-- 只裝入口頁也能全部離線:上線開一次入口 → 一次叫醒三個 app 的 SW，各自預快取自己的 shell（離線看最後一次資料）。各 app 也保留自己頁面的註冊（分開裝照樣有）。
      ⚠ scope 必須與各 app 自己頁面的註冊「完全一致」:CrewSync=預設(/)、pilot-log=/pilot-log(該 sw route 有設 Service-Worker-Allowed)、morning=/morning/(尾斜線)。不一致會註冊失敗或重複。 -->
 <script>if('serviceWorker' in navigator){

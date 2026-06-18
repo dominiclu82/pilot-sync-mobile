@@ -316,7 +316,7 @@ body.pl-offline .pl-topstack, body.pl-offline .pl-stickhead { top: calc(env(safe
   </div>
 </div>
 <!-- ⊞ 回 Apps：只在「從 /apps 入口進來 + 裝成 PWA」時顯示 -->
-<script>(function(){try{var s=(window.matchMedia&&window.matchMedia('(display-mode: standalone)').matches)||window.navigator.standalone;if(s&&sessionStorage.getItem('cs_via_apps')==='1'){var b=document.getElementById('cs-apps-home');if(b)b.style.display='inline-flex';}}catch(e){}})();</script>
+<script>(function(){try{var s=(window.matchMedia&&window.matchMedia('(display-mode: standalone)').matches)||window.navigator.standalone;if(s&&localStorage.getItem('cs_via_apps')==='1'){var b=document.getElementById('cs-apps-home');if(b)b.style.display='inline-flex';}}catch(e){}})();</script>
 
 <!-- About modal — 點底部版號開啟 -->
 <div class="pl-modal-wrap" id="pl-about-wrap" onclick="if(event.target===this)plHideAbout()">

@@ -2007,7 +2007,7 @@ body { padding-bottom: calc(64px + env(safe-area-inset-bottom, 0px)); }
   </div>
 </nav>
 <!-- ⊞ 回 Apps：只在「從 /apps 入口進來 + 裝成 PWA」時顯示 -->
-<script>(function(){try{var s=(window.matchMedia&&window.matchMedia('(display-mode: standalone)').matches)||window.navigator.standalone;if(s&&sessionStorage.getItem('cs_via_apps')==='1'){var b=document.getElementById('cs-apps-home');if(b)b.style.display='inline-flex';}}catch(e){}})();</script>
+<script>(function(){try{var s=(window.matchMedia&&window.matchMedia('(display-mode: standalone)').matches)||window.navigator.standalone;if(s&&localStorage.getItem('cs_via_apps')==='1'){var b=document.getElementById('cs-apps-home');if(b)b.style.display='inline-flex';}}catch(e){}})();</script>
 
 <div class="top-stack">
   <div class="hdr">

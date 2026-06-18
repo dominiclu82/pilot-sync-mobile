@@ -812,12 +812,12 @@ html:has(#tab-atfm.tab-active) body{overflow:hidden;height:100dvh}
 .atfm-table th{text-align:left;color:var(--muted);font-weight:600;padding:4px 8px;border-bottom:1px solid var(--dim);white-space:nowrap}
 .atfm-table td{padding:4px 8px;border-bottom:1px solid var(--dim);white-space:nowrap}
 .atfm-acid{font-weight:700;color:var(--text)}.atfm-ctotv{font-weight:700;color:#fbbf24}.atfm-new{color:#22c55e}.atfm-note{color:var(--muted);font-size:.9em}
-.gi-station-bar{display:flex;align-items:center;gap:6px;margin:2px 0;flex-wrap:wrap}
+.gi-station-bar{display:flex;align-items:center;gap:6px;flex:1;min-width:0;flex-wrap:nowrap}
 .gi-station-sel{background:var(--bg);border:1px solid var(--dim);color:var(--text);border-radius:6px;
   padding:3px 8px;font-size:.75em;cursor:pointer;-webkit-appearance:menulist;line-height:1.4}
 .gi-station-sel:active{opacity:.7}
 #gi-region{flex:0 0 auto;max-width:6em}
-#gi-station{flex:0 0 auto;width:fit-content;min-width:0;max-width:46vw}
+#gi-station{flex:1 1 auto;min-width:0}
 .gi-date-nav{display:flex;align-items:center;gap:6px}
 .gi-nav-btn{background:none;border:1px solid var(--dim);color:var(--muted);border-radius:6px;
   padding:2px 8px;font-size:.72em;cursor:pointer;-webkit-appearance:none;line-height:1.4}
