@@ -1337,27 +1337,30 @@ export function getSpaHtmlBody(): string {
 
   <div id="gate-content" style="display:flex;flex-direction:column">
     <div class="gi-header">
-      <div class="gi-header-left">
+      <div class="gi-hrow">
         <span class="gi-notice-inline" style="color:#eab308">⚠ Non-operational Reference only</span>
+        <span class="gi-fresh" id="gi-fresh" style="display:none"></span>
+      </div>
+      <div class="gi-hrow">
         <div class="gi-station-bar">
           <select id="gi-region" class="gi-station-sel" onchange="giSetRegion(this.value)"></select>
           <select id="gi-station" class="gi-station-sel" onchange="giSetStation(this.value)"></select>
         </div>
+        <button class="gi-refresh-btn" onclick="refreshGateFlights()">🔄 更新</button>
+      </div>
+      <div class="gi-hrow">
         <div class="gi-date-nav">
           <button class="gi-nav-btn" id="gi-prev-day" onclick="giPrevDay()">◀</button>
           <span class="gi-date" id="gate-date"></span>
           <button class="gi-nav-btn gi-today-btn" id="gi-today-btn" onclick="giToday()" style="display:none">今天</button>
           <button class="gi-nav-btn" id="gi-next-day" onclick="giNextDay()">▶</button>
         </div>
-        <div style="font-size:.62em;color:var(--muted);margin-top:1px">跨午夜抵達航班請切換至次日查詢 / For post-midnight arrivals, switch to the next day</div>
-      </div>
-      <div class="gi-header-btns">
-        <div style="display:flex;flex-direction:column;gap:4px">
+        <div class="gi-header-btns">
           <button class="gi-time-btn" id="gi-time-btn" onclick="toggleGiTime()">⏱ STD/STA</button>
           <button class="gi-view-btn" id="gi-view-btn" onclick="toggleGiView()">🛫 Orig</button>
         </div>
-        <button class="gi-refresh-btn" onclick="refreshGateFlights()">🔄 更新</button>
       </div>
+      <div class="gi-postmid">跨午夜抵達航班請切換至次日查詢 / For post-midnight arrivals, switch to the next day</div>
     </div>
     <div class="gi-filter-bar">
       <div class="gi-search-bar">
@@ -1536,7 +1539,7 @@ export function getSpaHtmlBody(): string {
       <button class="tab-util-btn tab-install-btn" id="tab-install-btn" onclick="showInstallGuide()" style="display:none">
         <span>📲</span>安裝
       </button>
-      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer;text-decoration:underline" onclick="showAbout()">V9.5.17</span>
+      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer;text-decoration:underline" onclick="showAbout()">V9.5.18</span>
     </div>
   </div>
 </div>
@@ -1570,7 +1573,12 @@ export function getSpaHtmlBody(): string {
     </div>
     <div style="max-height:50vh;overflow-y:auto;-webkit-overflow-scrolling:touch;margin-bottom:10px">
     ${renderCommunityLink()}
-    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V9.5.17</div>
+    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V9.5.18</div>
+    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
+      <div>🛬 <b>Gate Info 介面優化，並標示資料更新時間。</b></div>
+      <div>🛬 <b>Gate Info UI cleanup + data freshness indicator.</b></div>
+    </div>
+    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V9.5.17</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
       <div>🛬 <b>補強資料顯示。</b></div>
       <div>🛬 <b>Enhanced data display.</b></div>

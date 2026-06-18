@@ -750,8 +750,11 @@ input[type=radio]{width:15px;height:15px;aspect-ratio:1;accent-color:var(--accen
 #tab-gate.tab-active{display:flex;flex-direction:column;
   height:calc(100dvh - calc(56px + env(safe-area-inset-bottom,0px)))}
 #gate-content{display:flex;flex:1;flex-direction:column;min-height:0}
-.gi-header{display:flex;align-items:flex-start;justify-content:space-between;padding:9px 14px;
+.gi-header{display:flex;flex-direction:column;gap:5px;padding:8px 14px;
   border-bottom:1px solid var(--dim);background:var(--bg);flex-shrink:0}
+.gi-hrow{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.gi-fresh{font-size:.6em;color:var(--muted);white-space:nowrap}
+.gi-postmid{font-size:.62em;color:var(--muted);line-height:1.35}
 .gi-header-left{display:flex;flex-direction:column;gap:2px}
 .gi-title{font-weight:700;font-size:.95em;color:var(--text)}
 .gi-date{font-size:.72em;color:var(--muted)}

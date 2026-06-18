@@ -2220,9 +2220,16 @@ function _fr24SchedRow(item: any, port: _FidsPort, dir: 'D' | 'A'): any | null {
 }
 // Pi 中繼餵進來的已解析 rows（PHX/SEA/ONT；Pi 住宅 IP 抓得到、Render 資料中心 IP 被擋）。20 分鐘內當有效。
 const _fidsIngest: Record<string, { ts: number; date: string; rows: any[] }> = {};
+const _INGEST_TTL_MS = 60 * 60 * 1000;   // Pi 改成每 30 分抓一次 → 有效期放寬到 60 分(扛得住漏抓一輪不變空白)
 function _ingestRows(code: string, today: string): any[] | null {
   const c = _fidsIngest[code];
-  if (c && c.date === today && c.rows.length && Date.now() - c.ts < 20 * 60 * 1000) return c.rows;
+  if (c && c.date === today && c.rows.length && Date.now() - c.ts < _INGEST_TTL_MS) return c.rows;
+  return null;
+}
+// 給前端顯示新鮮度：這站若是 Pi 中繼餵的、且當天有效，回它最後一次餵進來的時間(ms)；否則 null
+function _ingestTs(code: string, today: string): number | null {
+  const c = _fidsIngest[code];
+  if (c && c.date === today && c.rows.length && Date.now() - c.ts < _INGEST_TTL_MS) return c.ts;
   return null;
 }
 
@@ -2317,7 +2324,9 @@ async function _fidsBespoke(src: string, reqDate: string, res: any) {
   if (cached && Date.now() - cached.ts < 60000) { res.json(cached.data); return; }
   try {
     const { rows, date } = await ent.adapter(port, dash, label);
-    const data = { rows, date, airport: ent.code };
+    const data: any = { rows, date, airport: ent.code };
+    const its = _ingestTs(ent.code, dash);   // 是 Pi 中繼餵的站 → 帶回中繼來源旗標 + 最後更新時間，給前端顯示新鮮度
+    if (its != null) { data.relay = true; data.ingestedAt = its; }
     if (rows && rows.length) _fidsOutCache[ck] = { ts: Date.now(), data };   // 空結果不快取：PHX 等背景抓尚未填好時別把「空」鎖住 60 秒（codex P1）
     res.json(data);
   } catch (e: any) {

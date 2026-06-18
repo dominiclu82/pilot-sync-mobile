@@ -522,6 +522,20 @@ function _giMergeFA(map, faData, airline) {
   });
 }
 
+// 表頭新鮮度標示：Pi 中繼餵的站(server 回 relay+ingestedAt)→顯示「🛰 每30分更新 · 更新於 N 分前」；直連站不顯示(本來就即時)
+function _giUpdateFresh(data) {
+  var el = document.getElementById('gi-fresh');
+  if (!el) return;
+  if (data && data.relay && data.ingestedAt) {
+    var mins = Math.max(0, Math.round((Date.now() - data.ingestedAt) / 60000));
+    el.textContent = '🛰 每30分更新 · 更新於' + (mins < 1 ? '剛剛' : (mins + ' 分前'));
+    el.style.display = '';
+  } else {
+    el.textContent = '';
+    el.style.display = 'none';
+  }
+}
+
 function loadGateFlights() {
   var statusEl = document.getElementById('gate-status');
   var tableBody = document.getElementById('gate-tbody');
@@ -533,6 +547,7 @@ function loadGateFlights() {
   wrapEl.style.display = 'none';
   tableBody.innerHTML = '';
   gateFlightsList = [];
+  _giUpdateFresh(null);   // 開始載入先清掉新鮮度標示，免得切到別站/載入失敗時殘留上一站的時間
 
   var dateStr = _giSelectedDate || _giTodayStr();   // 場站當地今天（外站跨時區才不會送成別天）
   var st = _giCurrentStation();
@@ -543,6 +558,7 @@ function loadGateFlights() {
       dateEl.textContent = data.date || '';
       _giRawDep = data.dep || [];
       _giRawArr = data.arr || [];
+      _giUpdateFresh(data);
       _giProcessFlights();
     }).catch(function(e) {
       statusEl.textContent = '載入失敗：' + e.message;
@@ -557,6 +573,7 @@ function loadGateFlights() {
   _giFetchStation(st.src, dateStr).then(function(data) {
     dateEl.textContent = data.date || '';
     _giStationRows = data.rows || [];
+    _giUpdateFresh(data);
     _giProcessStationRows();
   }).catch(function(e) {
     statusEl.textContent = '載入失敗：' + e.message;
