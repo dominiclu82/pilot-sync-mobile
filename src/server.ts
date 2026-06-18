@@ -2293,7 +2293,9 @@ const _FIDS_BESPOKE: Record<string, _FidsPort & { iana?: string; adapter: (p: _F
   hkg: { code: 'HKG', name: '香港', tz: 8, adapter: _fidsHkg },   // 官方 flightinfo-rest，有 gate/櫃檯/轉盤
   khh: { code: 'KHH', name: '高雄', tz: 8, adapter: _fidsKhh },   // 官方 kia.gov.tw JSON，有 Bay/櫃檯/轉盤
   tsa: { code: 'TSA', name: '松山', tz: 8, adapter: _fidsTsa },   // 官方 airFlyTab，國際+國內；無 gate、只有櫃台
-  rmq: { code: 'RMQ', name: '台中', tz: 8, adapter: _fidsRmq }    // 官方 tca.gov.tw HTML 內嵌 JSON，有登機門+櫃檯
+  rmq: { code: 'RMQ', name: '台中', tz: 8, adapter: _fidsRmq },   // 官方 tca.gov.tw HTML 內嵌 JSON，有登機門+櫃檯
+  bkk: { code: 'BKK', name: '曼谷', tz: 7, iana: 'Asia/Bangkok', adapter: _fidsIngestOnly },   // 官方鎖 Cloudflare Turnstile→改靠 Pi 中繼 FR24(有 gate)
+  cnx: { code: 'CNX', name: '清邁', tz: 7, iana: 'Asia/Bangkok', adapter: _fidsIngestOnly }    // 同上，Pi 中繼 FR24
 };
 const _fidsOutCache: Record<string, { ts: number; data: any }> = {};
 async function _fidsBespoke(src: string, reqDate: string, res: any) {
@@ -2348,7 +2350,7 @@ app.post('/api/fids-ingest', (req: any, res) => {
     const d = new Date(u * 1000 + offH * 3600 * 1000); const p = (x: number) => String(x).padStart(2, '0');
     return d.getUTCFullYear() + '-' + p(d.getUTCMonth() + 1) + '-' + p(d.getUTCDate());
   };
-  for (const code of ['SEA', 'ONT']) {
+  for (const code of ['SEA', 'ONT', 'BKK', 'CNX']) {
     const a = airports[code]; if (!a) continue;
     const port = portOf(code); const today = _localDateDash(port.tz, 0); const rows: any[] = [];
     for (const f of grab(a.dep, 'departures')) { if (fr24LocalDate(f, 'departure', port.tz) !== today) continue; const r = _fr24SchedRow(f, port, 'D'); if (r) rows.push(r); }

@@ -16,6 +16,7 @@ var _giRegions = {
   HK: { name: 'HK', stations: [ { code: 'HKG', name: '香港', src: 'hkg', tz: 'Asia/Hong_Kong' } ] },
   JP: { name: 'JP', stations: [ { code: 'NRT', name: '成田', src: 'nrt', tz: 'Asia/Tokyo' }, { code: 'CTS', name: '新千歲', src: 'cts', tz: 'Asia/Tokyo' }, { code: 'HKD', name: '函館', src: 'hkd', tz: 'Asia/Tokyo' } ] },
   SG: { name: 'SG', stations: [ { code: 'SIN', name: '樟宜', src: 'sin', tz: 'Asia/Singapore' } ] },
+  TH: { name: 'TH', stations: [ { code: 'BKK', name: '曼谷', src: 'bkk', tz: 'Asia/Bangkok', dev: true, todayOnly: true }, { code: 'CNX', name: '清邁', src: 'cnx', tz: 'Asia/Bangkok', dev: true, todayOnly: true } ] },
   US: { name: 'US', stations: [ { code: 'SFO', name: '舊金山', src: 'sfo', tz: 'America/Los_Angeles' }, { code: 'LAX', name: '洛杉磯', src: 'lax', tz: 'America/Los_Angeles', todayOnly: true }, { code: 'PHX', name: '鳳凰城', src: 'phx', tz: 'America/Phoenix', dev: true, todayOnly: true }, { code: 'SEA', name: '西雅圖', src: 'sea', tz: 'America/Los_Angeles', dev: true, todayOnly: true }, { code: 'ONT', name: '安大略', src: 'ont', tz: 'America/Los_Angeles', dev: true, todayOnly: true } ] },
   EU: { name: 'EU', stations: [ { code: 'PRG', name: '布拉格', src: 'prg', tz: 'Europe/Prague', todayOnly: true }, { code: 'BCN', name: '巴塞隆納', src: 'bcn', tz: 'Europe/Madrid' }, { code: 'ZRH', name: '蘇黎世', src: 'zrh', tz: 'Europe/Zurich' } ] }
 };
