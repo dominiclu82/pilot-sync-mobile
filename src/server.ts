@@ -2162,12 +2162,11 @@ async function _fidsBespoke(src: string, reqDate: string, res: any) {
   const ent = _FIDS_BESPOKE[src];
   const tz = ent.iana ? _ianaOffsetHours(ent.iana) : ent.tz;
   const port: _FidsPort = { code: ent.code, name: ent.name, tz };
-  // 外站只服務 today / yesterday（比照北海道）；其餘日期回空
+  // 外站只服務 today / yesterday；**只比機場當地日期**，不可摻台北日期 —— 否則美國站(今天=台北昨天)送來的「機場今天」會被當成昨天 → 整站空（實際踩過）。
   const apToday = _localDateStr(tz, 0), apYest = _localDateStr(tz, -1);
-  const twToday = _twDateStr(0), twYest = _twDateStr(-1);
   let shift = 0;
-  if (reqDate === apYest || reqDate === twYest) shift = -1;
-  else if (reqDate && reqDate !== apToday && reqDate !== twToday) { res.json({ rows: [], date: reqDate, airport: ent.code }); return; }
+  if (reqDate === apYest) shift = -1;
+  else if (reqDate && reqDate !== apToday) { res.json({ rows: [], date: reqDate, airport: ent.code }); return; }
   const dash = _localDateDash(tz, shift);
   const label = _localDateStr(tz, shift);
   const ck = src + '|' + dash;
