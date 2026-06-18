@@ -2,7 +2,7 @@ import express from 'express';
 import { google } from 'googleapis';
 import fs from 'fs';
 import path from 'path';
-import { randomUUID, randomBytes, createHash } from 'crypto';
+import { randomUUID, randomBytes, createHash, createHmac, timingSafeEqual } from 'crypto';
 import { Agent as UndiciAgent } from 'undici';
 import { io as _ioClient } from 'socket.io-client';   // ATIS 即時 feed（airframes 全量 socket.io firehose）
 import { fetchNopNetworkEvents } from './atfm-nop.js';
@@ -250,7 +250,7 @@ setInterval(() => {
 // ── Server ───────────────────────────────────────────────────────────────────
 
 const app = express();
-app.use(express.json());
+app.use(express.json({ limit: '3mb', verify: (req: any, _res, buf) => { req.rawBody = buf; } }));   // verify 存原始 bytes 給 /api/fids-ingest 做 HMAC；3mb 容得下 Pi 中繼送來的原始航班 JSON
 
 // Morning Report PWA (獨立模組，掛在 /morning 底下)
 app.use(morningRouter);
@@ -2064,7 +2064,35 @@ async function _fetchViaProxy(url: string, headers: Record<string, string>, vali
   return null;
 }
 
-// PHX 鳳凰城：官方 api.phx.aero 有 gate 但擋 Render IP → 透過 proxy 池「背景」抓、存快取；使用者請求只讀快取（不讓人等慢/會死的 proxy）。空快取 → 前端顯示「開發中」。
+// FR24 機場板的一筆 → 正規化 row（SEA/ONT 用；由 Pi 中繼抓回 FR24 原始 JSON，Render 這邊解析）。
+function _tsHHMMoff(unixSec: any, offH: number): string {
+  const n = Number(unixSec); if (!n) return '';
+  const d = new Date(n * 1000 + offH * 3600 * 1000);
+  const p = (x: number) => String(x).padStart(2, '0');
+  return p(d.getUTCHours()) + ':' + p(d.getUTCMinutes());
+}
+function _fr24SchedRow(item: any, port: _FidsPort, dir: 'D' | 'A'): any | null {
+  const f = (item && item.flight) || {};
+  const num = (f.identification || {}).number || {};
+  const fno = _outFno(num.default || num.alternative || ''); if (!fno) return null;
+  const ap = f.airport || {}; const o = ap.origin || {}, ds = ap.destination || {};
+  const oInfo = o.info || {}, dInfo = ds.info || {};
+  const t = f.time || {}, sched = t.scheduled || {}, real = t.real || {}, est = t.estimated || {};
+  const nameOf = (a: any) => a.name || ((a.position && a.position.region && a.position.region.city) || '') || ((a.code && a.code.iata) || '');
+  if (dir === 'D') {
+    return _outRow(port, 'D', { fno, altFno: '', other: (ds.code && ds.code.iata) || '', otherName: nameOf(ds), gate: String(oInfo.gate || '').trim(), schedT: _tsHHMMoff(sched.departure, port.tz), actT: _tsHHMMoff(real.departure || est.departure, port.tz), terminal: String(oInfo.terminal || '').trim(), checkin: '', carousel: '' });
+  }
+  return _outRow(port, 'A', { fno, altFno: '', other: (o.code && o.code.iata) || '', otherName: nameOf(o), gate: String(dInfo.gate || '').trim(), schedT: _tsHHMMoff(sched.arrival, port.tz), actT: _tsHHMMoff(real.arrival || est.arrival, port.tz), terminal: String(dInfo.terminal || '').trim(), checkin: '', carousel: String(dInfo.baggage || '').trim() });
+}
+// Pi 中繼餵進來的已解析 rows（PHX/SEA/ONT；Pi 住宅 IP 抓得到、Render 資料中心 IP 被擋）。20 分鐘內當有效。
+const _fidsIngest: Record<string, { ts: number; date: string; rows: any[] }> = {};
+function _ingestRows(code: string, today: string): any[] | null {
+  const c = _fidsIngest[code];
+  if (c && c.date === today && c.rows.length && Date.now() - c.ts < 20 * 60 * 1000) return c.rows;
+  return null;
+}
+
+// PHX 鳳凰城：官方 api.phx.aero 有 gate 但擋 Render IP → 優先用 Pi 中繼餵進來的資料；沒有才退回免費 proxy 背景抓。空 → 前端「開發中」。
 function _phxJxCodeshare(f: any): string { for (const cs of (Array.isArray(f.CodeShares) ? f.CodeShares : [])) { const m = String(cs).match(/STARLUX[^#]*#\s*(\d+)/i); if (m) return 'JX' + m[1]; } return ''; }
 function _phxRow(f: any, port: _FidsPort): any | null {
   const dir: 'D' | 'A' = String(f.AD || '').toUpperCase() === 'D' ? 'D' : 'A';
@@ -2092,6 +2120,8 @@ async function _refreshPhx(port: _FidsPort): Promise<void> {
 async function _fidsPhx(port: _FidsPort, dash: string, label: string): Promise<{ rows: any[]; date: string }> {
   const today = _localDateDash(port.tz, 0);
   if (dash && dash !== today) return { rows: [], date: label };   // 只服務當天（昨天的 gate 無意義；同 LAX/PRG 滾動站）
+  const ing = _ingestRows('PHX', today);
+  if (ing) return { rows: ing, date: label };   // Pi 中繼有資料 → 優先用（穩定，不靠免費 proxy）
   const valid = () => _phxCache.date === today && _phxCache.rows.length > 0 && (Date.now() - _phxCache.ts < 30 * 60 * 1000);
   if (valid()) {
     if (Date.now() - _phxCache.ts > 4 * 60 * 1000 && !_phxRefreshing) _refreshPhx(port).catch(() => { });   // 有快取：背景刷新、不阻塞
@@ -2107,9 +2137,11 @@ async function _fidsPhx(port: _FidsPort, dash: string, label: string): Promise<{
   }
   return { rows: valid() ? _phxCache.rows : [], date: label };
 }
-// SEA/ONT：唯一含 gate 的源是 FR24，而 FR24 連免費 proxy 也擋 → 目前無可靠來源，回空（前端顯示「開發中」），待之後 Pi / 付費代理再補。
-async function _fidsDevStub(_port: _FidsPort, _dash: string, label: string): Promise<{ rows: any[]; date: string }> {
-  return { rows: [], date: label };
+// SEA/ONT：gate 只有 FR24 有、且擋 Render 與免費 proxy → 只能靠 Pi 中繼餵進來。讀 ingest 快取；沒有就回空（前端「開發中」）。
+async function _fidsIngestOnly(port: _FidsPort, dash: string, label: string): Promise<{ rows: any[]; date: string }> {
+  const today = _localDateDash(port.tz, 0);
+  if (dash && dash !== today) return { rows: [], date: label };
+  return { rows: _ingestRows(port.code, today) || [], date: label };
 }
 
 // iana 有給就用它動態算偏移（DST 安全）；沒給就用固定 tz（日本+9、星+8 無 DST）
@@ -2121,8 +2153,8 @@ const _FIDS_BESPOKE: Record<string, _FidsPort & { iana?: string; adapter: (p: _F
   bcn: { code: 'BCN', name: '巴塞隆納', tz: 2, iana: 'Europe/Madrid', adapter: _fidsBcn },
   zrh: { code: 'ZRH', name: '蘇黎世', tz: 2, iana: 'Europe/Zurich', adapter: _fidsZrh },
   phx: { code: 'PHX', name: '鳳凰城', tz: -7, iana: 'America/Phoenix', adapter: _fidsPhx },   // 透過 proxy 池抓官方(有 gate)
-  sea: { code: 'SEA', name: '西雅圖', tz: -7, iana: 'America/Los_Angeles', adapter: _fidsDevStub },   // 暫無可靠 gate 源 → 開發中
-  ont: { code: 'ONT', name: '安大略', tz: -7, iana: 'America/Los_Angeles', adapter: _fidsDevStub },   // 暫無可靠 gate 源 → 開發中
+  sea: { code: 'SEA', name: '西雅圖', tz: -7, iana: 'America/Los_Angeles', adapter: _fidsIngestOnly },   // 靠 Pi 中繼餵 FR24 資料
+  ont: { code: 'ONT', name: '安大略', tz: -7, iana: 'America/Los_Angeles', adapter: _fidsIngestOnly },   // 靠 Pi 中繼餵 FR24 資料
   sfo: { code: 'SFO', name: '舊金山', tz: -7, iana: 'America/Los_Angeles', adapter: _fidsSfo }   // 夏 PDT-7 / 冬 PST-8，動態算
 };
 const _fidsOutCache: Record<string, { ts: number; data: any }> = {};
@@ -2152,6 +2184,42 @@ async function _fidsBespoke(src: string, reqDate: string, res: any) {
     res.status(502).json({ error: e.message });
   }
 }
+
+// Pi 中繼把 PHX/SEA/ONT 的原始航班 JSON POST 進來（HMAC 驗簽）；Render 解析成 rows 存快取。Pi 住宅 IP 抓得到、Render 資料中心 IP 被擋。
+app.post('/api/fids-ingest', (req: any, res) => {
+  const secret = process.env.FIDS_INGEST_SECRET || '';
+  if (!secret) { res.status(503).json({ error: 'not configured' }); return; }
+  const raw: Buffer = req.rawBody || Buffer.from('');
+  const expect = createHmac('sha256', secret).update(raw).digest('hex');
+  const sig = String(req.header('x-fids-sig') || '');
+  let okSig = false;
+  try { okSig = sig.length === expect.length && timingSafeEqual(Buffer.from(sig), Buffer.from(expect)); } catch { okSig = false; }
+  if (!okSig) { res.status(401).json({ error: 'bad sig' }); return; }
+  const airports = (req.body && req.body.airports) || {};
+  const portOf = (code: string): _FidsPort => { const e = _FIDS_BESPOKE[code.toLowerCase()]; const tz = e && e.iana ? _ianaOffsetHours(e.iana) : (e ? e.tz : 0); return { code, name: e ? e.name : code, tz }; };
+  let stored = 0;
+  // PHX：api.phx.aero 陣列
+  if (Array.isArray(airports.PHX)) {
+    const port = portOf('PHX'); const today = _localDateDash(port.tz, 0); const rows: any[] = [];
+    for (const f of airports.PHX) { if (String(f.ScheduledTime || '').slice(0, 10) !== today) continue; const r = _phxRow(f, port); if (r) rows.push(r); }
+    if (rows.length) { _fidsIngest['PHX'] = { ts: Date.now(), date: today, rows }; stored++; }
+  }
+  // SEA/ONT：FR24 airport.json（dep + arr 各一份完整回應）。FR24 以「現在」為中心、可能含跨日的班 → 依各班排定當地日期過濾，只留今天（codex P2）。
+  const grab = (obj: any, mode: string): any[] => (((((((obj || {}).result || {}).response || {}).airport || {}).pluginData || {}).schedule || {})[mode] || {}).data || [];
+  const fr24LocalDate = (item: any, key: string, offH: number): string => {
+    const u = Number(((((item || {}).flight || {}).time || {}).scheduled || {})[key]); if (!u) return '';
+    const d = new Date(u * 1000 + offH * 3600 * 1000); const p = (x: number) => String(x).padStart(2, '0');
+    return d.getUTCFullYear() + '-' + p(d.getUTCMonth() + 1) + '-' + p(d.getUTCDate());
+  };
+  for (const code of ['SEA', 'ONT']) {
+    const a = airports[code]; if (!a) continue;
+    const port = portOf(code); const today = _localDateDash(port.tz, 0); const rows: any[] = [];
+    for (const f of grab(a.dep, 'departures')) { if (fr24LocalDate(f, 'departure', port.tz) !== today) continue; const r = _fr24SchedRow(f, port, 'D'); if (r) rows.push(r); }
+    for (const f of grab(a.arr, 'arrivals')) { if (fr24LocalDate(f, 'arrival', port.tz) !== today) continue; const r = _fr24SchedRow(f, port, 'A'); if (r) rows.push(r); }
+    if (rows.length) { _fidsIngest[code] = { ts: Date.now(), date: today, rows }; stored++; }
+  }
+  res.json({ ok: true, stored });
+});
 
 app.get('/api/fids', async (req, res) => {
   // 外站分流：?airport=nrt|sin|sfo → 客製 adapter；cts|hkd → 北海道統一來源；無/tpe → 維持桃園原邏輯
