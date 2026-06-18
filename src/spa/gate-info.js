@@ -12,7 +12,8 @@ var _giTimeSlot = '±2hr';
 
 // ── 場站切換（地區 → 場站）。桃園走原邏輯；外站走 /api/fids?airport= 正規化來源 ──
 var _giRegions = {
-  TW: { name: 'TW', stations: [ { code: 'TPE', name: '桃園', src: 'tpe', tz: 'Asia/Taipei' } ] },
+  TW: { name: 'TW', stations: [ { code: 'TPE', name: '桃園', src: 'tpe', tz: 'Asia/Taipei' }, { code: 'KHH', name: '高雄', src: 'khh', tz: 'Asia/Taipei' } ] },
+  HK: { name: 'HK', stations: [ { code: 'HKG', name: '香港', src: 'hkg', tz: 'Asia/Hong_Kong' } ] },
   JP: { name: 'JP', stations: [ { code: 'NRT', name: '成田', src: 'nrt', tz: 'Asia/Tokyo' }, { code: 'CTS', name: '新千歲', src: 'cts', tz: 'Asia/Tokyo' }, { code: 'HKD', name: '函館', src: 'hkd', tz: 'Asia/Tokyo' } ] },
   SG: { name: 'SG', stations: [ { code: 'SIN', name: '樟宜', src: 'sin', tz: 'Asia/Singapore' } ] },
   US: { name: 'US', stations: [ { code: 'SFO', name: '舊金山', src: 'sfo', tz: 'America/Los_Angeles' }, { code: 'LAX', name: '洛杉磯', src: 'lax', tz: 'America/Los_Angeles' }, { code: 'PHX', name: '鳳凰城', src: 'phx', tz: 'America/Phoenix', dev: true }, { code: 'SEA', name: '西雅圖', src: 'sea', tz: 'America/Los_Angeles', dev: true }, { code: 'ONT', name: '安大略', src: 'ont', tz: 'America/Los_Angeles', dev: true } ] },

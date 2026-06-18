@@ -2034,6 +2034,73 @@ async function _fidsBcn(port: _FidsPort, dash: string, label: string): Promise<{
   return { rows: [...dep, ...arr], date: label };
 }
 
+// HKG 香港（官方 flightinfo-rest，GET JSON，免 key；不擋 Render IP）。一次回多個日期區塊 → 依機場當地日期挑。
+//   班號陣列首筆=操作方、其餘共掛(只取操作方)；status 文字含實際/預估 HH:MM。多站班：出發取第一站、抵達取最後一站。
+//   出發：gate=登機門、aisle=報到櫃檯；抵達：stand=停機坪(放 parking 欄)、baggage=行李轉盤。
+function _hkgRow(f: any, dir: 'D' | 'A', port: _FidsPort): any | null {
+  const list = Array.isArray(f.flight) ? f.flight : [];
+  const fno = _outFno((list[0] || {}).no || ''); if (!fno) return null;
+  const stops: any[] = (dir === 'D' ? f.destination : f.origin) || [];
+  const other = String((dir === 'D' ? stops[0] : stops[stops.length - 1]) || '').toUpperCase();
+  const sm = String(f.time || '').match(/(\d{2}:\d{2})/);
+  const am = String(f.status || '').match(/(\d{2}:\d{2})/);
+  return _outRow(port, dir, {
+    fno, altFno: '', other, otherName: other,
+    gate: dir === 'D' ? String(f.gate || '').trim() : String(f.stand || '').trim(),
+    schedT: sm ? sm[1] : '', actT: am ? am[1] : '',
+    terminal: String(f.terminal || '').trim(),
+    checkin: dir === 'D' ? String(f.aisle || '').trim() : '',
+    carousel: dir === 'A' ? String(f.baggage || '').trim() : ''
+  });
+}
+async function _fidsHkg(port: _FidsPort, dash: string, label: string): Promise<{ rows: any[]; date: string }> {
+  const get = async (arrival: boolean): Promise<any[]> => {
+    const r = await fetch('https://www.hongkongairport.com/flightinfo-rest/rest/flights?date=' + dash + '&lang=en&cargo=false&arrival=' + arrival, { headers: { 'User-Agent': _FIDS_UA, 'Accept': 'application/json' } });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const blocks: any[] = await r.json();
+    const out: any[] = [];
+    for (const b of (Array.isArray(blocks) ? blocks : [])) {
+      if (String(b.date || '') !== dash) continue;
+      for (const f of (b.list || [])) { const row = _hkgRow(f, arrival ? 'A' : 'D', port); if (row) out.push(row); }
+    }
+    return out;
+  };
+  const [dep, arr] = await Promise.all([get(false), get(true)]);
+  return { rows: [...dep, ...arr], date: label };
+}
+
+// KHH 高雄（官方 kia.gov.tw 靜態 JSON，免 key）。dep/arr 各一支，每支含多天 → 依 FDATE 篩當天。
+//   含 Bay(停機坪→出發放 gate/抵達放 parking)、報到島+櫃檯、機型、BHSNo(行李轉盤)。時刻為 "YYYY-MM-DD HH:MM:SS"。
+function _khhTime(s: any): string { const m = String(s || '').match(/\s(\d{2}:\d{2})/); return m ? m[1] : ''; }
+function _khhCheckin(f: any): string {
+  const isl = String(f.ckinisland || '').trim();
+  const norm = (v: any) => { const s = String(v == null ? '' : v).trim(); return (!s || s === '0') ? '' : s; };   // 0/空=無；非 0 原樣保留(別 Number()→零開頭/英數櫃號會被改掉)
+  const a = norm(f.ckindeskstart), b = norm(f.ckindeskend);
+  const rng = a ? (b && b !== a ? a + '-' + b : a) : '';
+  return (isl + (rng ? ' ' + rng : '')).trim();
+}
+function _khhRow(f: any, dir: 'D' | 'A', port: _FidsPort): any | null {
+  const fno = _outFno(f.airLineNum); if (!fno) return null;
+  const other = String((dir === 'D' ? f.ArrivalAirportIATA : f.DepartureAirportIATA) || '').toUpperCase();
+  const bay = String(f.Bay || '').trim();
+  if (dir === 'D') {
+    return _outRow(port, 'D', { fno, altFno: '', other, otherName: other, gate: bay, schedT: _khhTime(f.STD), actT: _khhTime(f.ATD), terminal: '', checkin: _khhCheckin(f), carousel: '' });
+  }
+  return _outRow(port, 'A', { fno, altFno: '', other, otherName: other, gate: bay, schedT: _khhTime(f.STA), actT: _khhTime(f.ATA), terminal: '', checkin: '', carousel: String(f.BHSNo || '').trim() });
+}
+async function _fidsKhh(port: _FidsPort, dash: string, label: string): Promise<{ rows: any[]; date: string }> {
+  const get = async (file: string, dir: 'D' | 'A'): Promise<any[]> => {
+    const r = await fetch('https://www.kia.gov.tw/data/' + file, { headers: { 'User-Agent': _FIDS_UA, 'Accept': 'application/json' } });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const a: any = await r.json();
+    const rows: any[] = [];
+    for (const f of (Array.isArray(a) ? a : [])) { if (dash && String(f.FDATE || '') !== dash) continue; const row = _khhRow(f, dir, port); if (row) rows.push(row); }
+    return rows;
+  };
+  const [dep, arr] = await Promise.all([get('dep.json', 'D'), get('arr.json', 'A')]);
+  return { rows: [...dep, ...arr], date: label };
+}
+
 // ── 免費公開 proxy 池：給「擋資料中心 IP」的站(PHX)繞道。免費 proxy 短命 → 自動抓清單 + 輪替挑活的；記住上次成功的。──
 let _proxyList: string[] = [];
 let _proxyListAt = 0;
@@ -2155,7 +2222,9 @@ const _FIDS_BESPOKE: Record<string, _FidsPort & { iana?: string; adapter: (p: _F
   phx: { code: 'PHX', name: '鳳凰城', tz: -7, iana: 'America/Phoenix', adapter: _fidsPhx },   // 透過 proxy 池抓官方(有 gate)
   sea: { code: 'SEA', name: '西雅圖', tz: -7, iana: 'America/Los_Angeles', adapter: _fidsIngestOnly },   // 靠 Pi 中繼餵 FR24 資料
   ont: { code: 'ONT', name: '安大略', tz: -7, iana: 'America/Los_Angeles', adapter: _fidsIngestOnly },   // 靠 Pi 中繼餵 FR24 資料
-  sfo: { code: 'SFO', name: '舊金山', tz: -7, iana: 'America/Los_Angeles', adapter: _fidsSfo }   // 夏 PDT-7 / 冬 PST-8，動態算
+  sfo: { code: 'SFO', name: '舊金山', tz: -7, iana: 'America/Los_Angeles', adapter: _fidsSfo },   // 夏 PDT-7 / 冬 PST-8，動態算
+  hkg: { code: 'HKG', name: '香港', tz: 8, adapter: _fidsHkg },   // 官方 flightinfo-rest，有 gate/櫃檯/轉盤
+  khh: { code: 'KHH', name: '高雄', tz: 8, adapter: _fidsKhh }    // 官方 kia.gov.tw JSON，有 Bay/櫃檯/轉盤
 };
 const _fidsOutCache: Record<string, { ts: number; data: any }> = {};
 async function _fidsBespoke(src: string, reqDate: string, res: any) {
