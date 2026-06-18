@@ -2137,6 +2137,37 @@ async function _fidsTsa(port: _FidsPort, dash: string, label: string): Promise<{
   return { rows: ([] as any[]).concat(...parts), date: label };
 }
 
+// RMQ 台中（官方 tca.gov.tw 班機即時資訊頁，把當日 arr+dep 以 JSON 內嵌在 HTML，免 key；只有今天）。
+//   upAirportCode=RMQ→出發、goalAirportCode=RMQ→抵達。出發有 airBoardingGate(登機門)+CheckInCount(報到櫃檯，逗號列表→縮成範圍)。
+function _rmqCheckin(s: any): string {
+  const parts = String(s || '').split(',').map(x => x.trim()).filter(Boolean);
+  if (parts.length <= 1) return parts[0] || '';
+  const nums = parts.map(Number);
+  const contiguous = nums.every((n, i) => i === 0 || (Number.isInteger(n) && n === nums[i - 1] + 1));   // 只有整段連續才縮成範圍；否則原樣保留逗號清單(避免「1,3,5」被誤縮成「1-5」憑空多櫃檯)
+  return contiguous ? parts[0] + '-' + parts[parts.length - 1] : parts.join(',');
+}
+function _rmqRow(f: any, port: _FidsPort): any | null {
+  const dir: 'D' | 'A' = String(f.upAirportCode || '').toUpperCase() === 'RMQ' ? 'D' : 'A';
+  const fno = _outFno(String(f.airLineIATA || '').trim() + String(f.airLineNum || '').trim()); if (!fno) return null;
+  const gate = String(f.airBoardingGate || '').trim();
+  if (dir === 'D') {
+    return _outRow(port, 'D', { fno, altFno: '', other: String(f.goalAirportCode || '').toUpperCase(), otherName: f.goalAirportName || f.goalAirportCode, gate, schedT: String(f.expectDepartureTime || '').trim(), actT: String(f.realDepartureTime || '').trim(), terminal: '', checkin: _rmqCheckin(f.CheckInCount), carousel: '' });
+  }
+  return _outRow(port, 'A', { fno, altFno: '', other: String(f.upAirportCode || '').toUpperCase(), otherName: f.upAirportName || f.upAirportCode, gate, schedT: String(f.expectArrivalTime || '').trim(), actT: String(f.realArrivalTime || '').trim(), terminal: '', checkin: '', carousel: '' });
+}
+async function _fidsRmq(port: _FidsPort, dash: string, label: string): Promise<{ rows: any[]; date: string }> {
+  if (dash && dash !== _localDateDash(port.tz, 0)) return { rows: [], date: label };   // 只有今天
+  const r = await fetch('https://www.tca.gov.tw/cht/index.php?act=fids&code=now', { headers: { 'User-Agent': _FIDS_UA } });
+  if (!r.ok) throw new Error('HTTP ' + r.status);
+  const html = await r.text();
+  const rows: any[] = [];
+  for (const m of (html.match(/\{[^{}]*airLineNum[^{}]*\}/g) || [])) {   // 班機物件無巢狀大括號 → 直接逐塊 JSON.parse
+    let f: any; try { f = JSON.parse(m); } catch { continue; }
+    const row = _rmqRow(f, port); if (row) rows.push(row);
+  }
+  return { rows, date: label };
+}
+
 // ── 免費公開 proxy 池：給「擋資料中心 IP」的站(PHX)繞道。免費 proxy 短命 → 自動抓清單 + 輪替挑活的；記住上次成功的。──
 let _proxyList: string[] = [];
 let _proxyListAt = 0;
@@ -2261,7 +2292,8 @@ const _FIDS_BESPOKE: Record<string, _FidsPort & { iana?: string; adapter: (p: _F
   sfo: { code: 'SFO', name: '舊金山', tz: -7, iana: 'America/Los_Angeles', adapter: _fidsSfo },   // 夏 PDT-7 / 冬 PST-8，動態算
   hkg: { code: 'HKG', name: '香港', tz: 8, adapter: _fidsHkg },   // 官方 flightinfo-rest，有 gate/櫃檯/轉盤
   khh: { code: 'KHH', name: '高雄', tz: 8, adapter: _fidsKhh },   // 官方 kia.gov.tw JSON，有 Bay/櫃檯/轉盤
-  tsa: { code: 'TSA', name: '松山', tz: 8, adapter: _fidsTsa }    // 官方 airFlyTab，國際+國內；無 gate、只有櫃台
+  tsa: { code: 'TSA', name: '松山', tz: 8, adapter: _fidsTsa },   // 官方 airFlyTab，國際+國內；無 gate、只有櫃台
+  rmq: { code: 'RMQ', name: '台中', tz: 8, adapter: _fidsRmq }    // 官方 tca.gov.tw HTML 內嵌 JSON，有登機門+櫃檯
 };
 const _fidsOutCache: Record<string, { ts: number; data: any }> = {};
 async function _fidsBespoke(src: string, reqDate: string, res: any) {

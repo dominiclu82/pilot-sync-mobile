@@ -12,12 +12,12 @@ var _giTimeSlot = '±2hr';
 
 // ── 場站切換（地區 → 場站）。桃園走原邏輯；外站走 /api/fids?airport= 正規化來源 ──
 var _giRegions = {
-  TW: { name: 'TW', stations: [ { code: 'TPE', name: '桃園', src: 'tpe', tz: 'Asia/Taipei' }, { code: 'KHH', name: '高雄', src: 'khh', tz: 'Asia/Taipei' }, { code: 'TSA', name: '松山', src: 'tsa', tz: 'Asia/Taipei' } ] },
+  TW: { name: 'TW', stations: [ { code: 'TPE', name: '桃園', src: 'tpe', tz: 'Asia/Taipei' }, { code: 'KHH', name: '高雄', src: 'khh', tz: 'Asia/Taipei' }, { code: 'TSA', name: '松山', src: 'tsa', tz: 'Asia/Taipei', todayOnly: true }, { code: 'RMQ', name: '台中', src: 'rmq', tz: 'Asia/Taipei', todayOnly: true } ] },
   HK: { name: 'HK', stations: [ { code: 'HKG', name: '香港', src: 'hkg', tz: 'Asia/Hong_Kong' } ] },
   JP: { name: 'JP', stations: [ { code: 'NRT', name: '成田', src: 'nrt', tz: 'Asia/Tokyo' }, { code: 'CTS', name: '新千歲', src: 'cts', tz: 'Asia/Tokyo' }, { code: 'HKD', name: '函館', src: 'hkd', tz: 'Asia/Tokyo' } ] },
   SG: { name: 'SG', stations: [ { code: 'SIN', name: '樟宜', src: 'sin', tz: 'Asia/Singapore' } ] },
-  US: { name: 'US', stations: [ { code: 'SFO', name: '舊金山', src: 'sfo', tz: 'America/Los_Angeles' }, { code: 'LAX', name: '洛杉磯', src: 'lax', tz: 'America/Los_Angeles' }, { code: 'PHX', name: '鳳凰城', src: 'phx', tz: 'America/Phoenix', dev: true }, { code: 'SEA', name: '西雅圖', src: 'sea', tz: 'America/Los_Angeles', dev: true }, { code: 'ONT', name: '安大略', src: 'ont', tz: 'America/Los_Angeles', dev: true } ] },
-  EU: { name: 'EU', stations: [ { code: 'PRG', name: '布拉格', src: 'prg', tz: 'Europe/Prague' }, { code: 'BCN', name: '巴塞隆納', src: 'bcn', tz: 'Europe/Madrid' }, { code: 'ZRH', name: '蘇黎世', src: 'zrh', tz: 'Europe/Zurich' } ] }
+  US: { name: 'US', stations: [ { code: 'SFO', name: '舊金山', src: 'sfo', tz: 'America/Los_Angeles' }, { code: 'LAX', name: '洛杉磯', src: 'lax', tz: 'America/Los_Angeles', todayOnly: true }, { code: 'PHX', name: '鳳凰城', src: 'phx', tz: 'America/Phoenix', dev: true, todayOnly: true }, { code: 'SEA', name: '西雅圖', src: 'sea', tz: 'America/Los_Angeles', dev: true, todayOnly: true }, { code: 'ONT', name: '安大略', src: 'ont', tz: 'America/Los_Angeles', dev: true, todayOnly: true } ] },
+  EU: { name: 'EU', stations: [ { code: 'PRG', name: '布拉格', src: 'prg', tz: 'Europe/Prague', todayOnly: true }, { code: 'BCN', name: '巴塞隆納', src: 'bcn', tz: 'Europe/Madrid' }, { code: 'ZRH', name: '蘇黎世', src: 'zrh', tz: 'Europe/Zurich' } ] }
 };
 var _giRegion = 'TW';
 var _giAirport = 'TPE';      // 目前場站 code
@@ -748,9 +748,14 @@ function _giUpdateDateNav() {
   var todayBtn = document.getElementById('gi-today-btn');
   var tomorrow = _giShiftDate(today, 1);
   var yesterday = _giShiftDate(today, -1);
+  var st = _giCurrentStation();
   // 桃園可看到次日；外站(北海道)只有 today/yesterday，次日上限設今天
-  var maxNext = (_giCurrentStation().code === 'TPE') ? tomorrow : today;
-  if (prevBtn) prevBtn.disabled = (current <= yesterday);
+  var maxNext = (st.code === 'TPE') ? tomorrow : today;
+  // 部分站只有「今天」(滾動來源無歷史日期)→ 連昨天也停用，免得按了一片空白看起來壞掉
+  // 防禦：todayOnly 站若帶著別站留下的非今天日期，強制歸回今天(切站時 giSetStation 已歸 null，這裡再保險)
+  if (st.todayOnly && current !== today) { _giSelectedDate = null; current = today; }
+  var minPrev = st.todayOnly ? today : yesterday;
+  if (prevBtn) prevBtn.disabled = (current <= minPrev);
   if (nextBtn) nextBtn.disabled = (current >= maxNext);
   if (todayBtn) todayBtn.style.display = (current === today) ? 'none' : '';
 }
@@ -759,8 +764,8 @@ function giPrevDay() {
   var today = _giTodayStr();
   var current = _giSelectedDate || today;
   var prev = _giShiftDate(current, -1);
-  var yesterday = _giShiftDate(today, -1);
-  if (prev < yesterday) return;
+  var minPrev = _giCurrentStation().todayOnly ? today : _giShiftDate(today, -1);
+  if (prev < minPrev) return;
   _giSelectedDate = (prev === today) ? null : prev;
   _giUpdateDateNav();
   loadGateFlights();
