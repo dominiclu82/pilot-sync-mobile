@@ -594,6 +594,70 @@ function _giProcessStationRows() {
   gateFlightsList = raw.filter(function(f) { return isAll || (f.fno || '').toUpperCase().indexOf(airline) === 0; });
   renderGateFlights();   // 由它判斷空狀態(今日無 / 本時段無)+ 顯示/隱藏表格
   gateFlightsLoaded = true;
+  _giEnrichWithTPE();   // 亞洲外站：往來台北的航班，用桃園板把「台北側」空格(登機門/停機坪/轉盤/時刻)補進去
+}
+
+// 統一航班號格式比對用：去空白、大寫、去數字前導零(JX0805→JX805)，跟 server _outFno 一致，桃園/外站兩邊才對得起來
+function _giNormFno(raw) {
+  var f = String(raw == null ? '' : raw).replace(/\s/g, '').toUpperCase();
+  var m = f.match(/^([A-Z]{2,3})0*(\d+[A-Z]?)$/);
+  return m ? (m[1] + m[2]) : f;
+}
+
+// 外站航班若往來台北(TPE)，外站來源只填得出自己這側，台北那側的格子是空的 → 用桃園完整板補上。
+// 只對亞洲近時區站做(美歐跨日，桃園「今天」板找不到那班、會對錯)。失敗就維持原樣、不影響外站本身。
+function _giTpeTodayStr() {
+  // 「台北當地今天」(不是外站當地日期)：日本+9 等跨午夜班，台北那側才對得到正確日的桃園板
+  try {
+    var o = {};
+    new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Taipei', year: 'numeric', month: '2-digit', day: '2-digit' })
+      .formatToParts(new Date()).forEach(function(x) { o[x.type] = x.value; });
+    return o.year + '/' + o.month + '/' + o.day;
+  } catch (e) { return _giTodayStr(); }
+}
+
+function _giEnrichWithTPE() {
+  var st = _giCurrentStation();
+  if (st.code === 'TPE') return;
+  if (!st.tz || st.tz.indexOf('Asia/') !== 0) return;
+  if (_giSelectedDate) return;   // 只對「今天」補：歷史日期跨時區會對到錯誤日的同號班(顯示錯 gate)，本功能本就是給即時用
+  if (_giTpeTodayStr() !== _giTodayStr()) return;   // 外站當地日 ≠ 台北當地日(台北午夜前後那一小段)→ 不補，避免對到台北板上「別天同號同route」的班
+  var stationCode = st.code;
+  _fidsFetchByDate(_giTpeTodayStr()).then(function(data) {
+    if (_giCurrentStation().code !== stationCode) return;          // 期間切了站 → 放棄
+    if (_giSelectedDate) return;                                   // 期間切到歷史日期 → 放棄(別把今天的桃園資料蓋上去)
+    if (!gateFlightsList.length) return;
+    // key 用「航班號 + 對方機場」：同號班一天出現兩次(輪替/延誤順延)時，純航班號會對到錯的 → 加路線當判別子
+    var keyOf = function(fno, city) { return _giNormFno(fno) + '|' + String(city || '').toUpperCase(); };
+    var tpeArr = {}, tpeDep = {};
+    (data.arr || []).forEach(function(f) { if (!f.ACode) return; tpeArr[keyOf(f.ACode + (f.FlightNo || ''), f.CityCode)] = f; });   // 到站記錄 CityCode=出發地(外站)
+    (data.dep || []).forEach(function(f) { if (!f.ACode) return; tpeDep[keyOf(f.ACode + (f.FlightNo || ''), f.CityCode)] = f; });   // 出發記錄 CityCode=目的地(外站)
+    var changed = false;
+    // 對需要補的列做 clone 再填，不直接改 _giStationRows(那是 _giFetchStation 快取的共用資料，改了會卡舊值；每次重新從桃園板補才不會 stale)
+    gateFlightsList = gateFlightsList.map(function(row) {
+      var rk = keyOf(row.fno, stationCode);   // 對方機場 = 這個外站本身
+      var a = (row.destCode === 'TPE' || row.dest === 'TPE') ? tpeArr[rk] : null;       // 飛往台北 → 桃園到站
+      var d = (row.originCode === 'TPE' || row.origin === 'TPE') ? tpeDep[rk] : null;   // 從台北來 → 桃園出發
+      if (!a && !d) return row;
+      var r = Object.assign({}, row); changed = true;
+      if (a) {
+        if (!r.parking && a.Gate) r.parking = a.Gate;
+        if (!r.carousel && a.StopCode) r.carousel = a.StopCode;
+        if (!r.sta && a.OTime) r.sta = giFmtTime(a.OTime);
+        if (!r.ata && a.RTime) r.ata = giFmtTime(a.RTime);
+        if (!r.arrTerminal && a.BNO) r.arrTerminal = 'T' + a.BNO;
+      }
+      if (d) {
+        if (!r.gate && d.Gate) r.gate = d.Gate;
+        if (!r.checkin && d.CheckIn) r.checkin = d.CheckIn;
+        if (!r.std && d.OTime) r.std = giFmtTime(d.OTime);
+        if (!r.atd && d.RTime) r.atd = giFmtTime(d.RTime);
+        if (!r.depTerminal && d.BNO) r.depTerminal = 'T' + d.BNO;
+      }
+      return r;
+    });
+    if (changed) renderGateFlights();
+  }).catch(function() { /* 桃園板抓失敗 → 外站照常顯示 */ });
 }
 
 function _giProcessFlights() {
