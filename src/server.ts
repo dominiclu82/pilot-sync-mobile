@@ -1139,13 +1139,22 @@ function _atisMergeSections(icao: string, sections: any[] | null): boolean {
 const _COFFEE_COOLDOWN = 15 * 60000;       // 成功(有回資料) → 15 分鐘內不重撈
 const _COFFEE_FAIL_COOLDOWN = 60000;       // 失敗(逾時/掛/空) → 只壓 1 分鐘，暫時掛點別鎖死 15 分（codex P2），但也不狂打
 const _coffeeNext = new Map<string, number>();   // 各場「下次可撈 coffee」的時間
+const _coffeeInFlight = new Map<string, Promise<boolean>>();   // 各場「正在撈 coffee」的 promise → 同站同時間只打一次
 function _coffeeFresh(icao: string): boolean { return Date.now() < (_coffeeNext.get(icao) || 0); }   // 還在冷卻內 → 不重撈
 async function _coffeePull(icao: string): Promise<boolean> {   // 撈 coffee→併庫。回「有沒有真的拉到更新的」(給 fresh 判斷要不要退 airframes)。
-  let got = false, improved = false;
-  try { const cs = await _atisFetchCoffee(icao); if (cs) { got = true; improved = _atisMergeSections(icao, cs); } } catch { got = false; }
-  // 撈完才起算冷卻：有回資料(got，不管有沒有更新) → 正常 15 分；失敗/空 → 只 1 分，暫時掛點不鎖死、但也不狂打站長
-  _coffeeNext.set(icao, Date.now() + (got ? _COFFEE_COOLDOWN : _COFFEE_FAIL_COOLDOWN));
-  return improved;
+  // in-flight 去重（codex P1）：coffee 一次最久 25s，冷卻又是「撈完才設」→ 那段時間同站多請求會各打一次。
+  //   同站若已在撈 → 共用同一個 promise，絕不疊打站長。
+  const ongoing = _coffeeInFlight.get(icao);
+  if (ongoing) return ongoing;
+  const p = (async () => {
+    let got = false, improved = false;
+    try { const cs = await _atisFetchCoffee(icao); if (cs) { got = true; improved = _atisMergeSections(icao, cs); } } catch { got = false; }
+    // 撈完才起算冷卻：有回資料(got，不管有沒有更新) → 正常 15 分；失敗/空 → 只 1 分，暫時掛點不鎖死、但也不狂打站長
+    _coffeeNext.set(icao, Date.now() + (got ? _COFFEE_COOLDOWN : _COFFEE_FAIL_COOLDOWN));
+    return improved;
+  })();
+  _coffeeInFlight.set(icao, p);
+  try { return await p; } finally { _coffeeInFlight.delete(icao); }
 }
 
 // 衛星站整串 A9 → 涵蓋整個衛星波束的幾十場，本地分機場挑現行、塞進累積庫。回傳更新筆數。
@@ -1364,15 +1373,17 @@ function _atisStartPoller() {
   setTimeout(() => { runRoutingFeed(); }, 6000);   // 開機 6s 先跑一次（錯開 station-feed）
   const runFast = async () => { for (const ic of fast) { await _atisPollOne(ic, true); await _atisSleep(800); } };   // 快層 deep（雙管，補衛星站沒覆蓋到的場）
   setInterval(() => { runFast().catch(() => { }); }, 90000);   // 快層每 90s
-  // coffee 主源（站長授權）：重點站逐站輪（爬蟲型 5-20s/站，逐站不並發、不壓站長）；最新的 merge 自動勝過 airframes。
-  let _coffeeBusy = false;
-  const runCoffee = async () => {
-    if (_coffeeBusy) return;   // 上一輪還沒跑完 → 跳過，不疊（單站可能拖到 20s）
-    _coffeeBusy = true;
-    try { for (const ic of fast) { try { await _coffeePull(ic); } catch { /* 單站失敗略過 */ } await _atisSleep(600); } } finally { _coffeeBusy = false; }
-  };
-  setInterval(() => { runCoffee(); }, 15 * 60000);   // 主源每 15 分鐘輪一圈重點站（ATIS ~30 分才換、手動刷新可即時拉 → 不用更勤、尊重站長爬蟲）
-  setTimeout(() => { runCoffee(); }, 1500);          // 開機就先跑（主源優先於 airframes）
+  // ⛔ V9.5.20 停用：背景輪詢 coffee（站長來源）已停。站長有用量上限、要求「使用者按了才抓」→ coffee 改成只在
+  //    /api/atis 手動刷新(fresh=1) 時打。下面整段 runCoffee 背景排程停用（依規範保留不刪，日後若站長同意再啟用）。
+  // TODO（停用，勿自動恢復）：
+  // let _coffeeBusy = false;
+  // const runCoffee = async () => {
+  //   if (_coffeeBusy) return;
+  //   _coffeeBusy = true;
+  //   try { for (const ic of fast) { try { await _coffeePull(ic); } catch { } await _atisSleep(600); } } finally { _coffeeBusy = false; }
+  // };
+  // setInterval(() => { runCoffee(); }, 15 * 60000);
+  // setTimeout(() => { runCoffee(); }, 1500);
   if (slow.length) {   // 慢層：連續慢掃，整圈 ~5 分（每站間隔 = 300000/站數，最少 2s），只廣查省額度
     let si = 0;
     const gap = Math.max(2000, Math.floor(300000 / slow.length));
@@ -1427,12 +1438,19 @@ app.get('/api/atis', async (req, res) => {
   if (!/^[A-Z]{4}$/.test(icao)) return res.status(400).json({ error: 'bad icao' });
   const fresh = req.query.fresh === '1';
   const bulk = req.query.bulk === '1';
-  // 1. 美國機場（K/P 開頭）→ 官方 FAA 源 atis.info 為「權威主源」（免費、CORS*、不佔 airframes）。FAA 沒有(關島等)或掛 → 往下退 airframes。
+  // gateonly：只驗「這個帳號有沒有權限看非美 ATIS」，不抓任何資料(不碰 coffee/airframes/FAA)。
+  //   前端開機場(有快取)用它輕量重驗權限：失去權限就回 locked → 前端清快取改顯示鎖定卡(補回 V9.5.20 拿掉重驗造成的漏洞，codex P1)。
+  if (req.query.gateonly === '1') {
+    if (icao[0] === 'K' || icao[0] === 'P') return res.json({ locked: false });   // 美國公開源不鎖
+    const ok = await _atisGateOk(String(req.headers['x-pl-at'] || ''), String(req.headers['x-cs-idt'] || ''));
+    return res.json({ locked: !ok });
+  }
+  // 1. 美國機場（K/P 開頭）→ 官方 FAA 源 atis.info。V9.5.20：FAA 也改「手動才打」(使用者按重新整理 fresh=1)。
+  //    非手動：有 60 分快取回快取，沒有回空（前端顯示「按重新整理載入」）→ 開機場不自動打 FAA。
   if (icao[0] === 'K' || icao[0] === 'P') {
-    if (!fresh) {
-      const c = _atisCache.get(icao);
-      if (c && Date.now() - c.time < ATIS_TTL) return res.json({ sections: c.sections, source: c.source, cached: true });
-    }
+    const c = _atisCache.get(icao);
+    if (c && Date.now() - c.time < ATIS_TTL && !fresh) return res.json({ sections: c.sections, source: c.source, cached: true });
+    if (!fresh) return res.json({ sections: c ? c.sections : [], source: 'faa', cached: !!c });
     let us: { title: string; text: string; src?: string; time?: string }[] | null = null;
     try { us = await _atisFetchUsFaa(icao); } catch (e: any) { /* atis.info 掛 → 退 airframes */ }
     if (us && us.length) {
@@ -1456,19 +1474,16 @@ app.get('/api/atis', async (req, res) => {
     if (icao[0] !== 'K' && icao[0] !== 'P') improved = await _coffeePull(icao);   // 非美 → coffee 主源（美國到這代表 FAA 已失敗 → 走 airframes）
     if (!improved) { try { await _atisPollOne(icao, true); } catch { /* 刷新失敗就用庫裡現有的 */ } }
   }
-  // 2.5 非美、非手動：開場聰明撈 coffee（主源）。庫 15 分內撈過 → 直接給、不重複打他；
-  //     有舊的 → 秒回舊的 + 背景撈最新暖庫（不卡使用者，下次就新）；從沒撈過 → 等一次(5-20s)拿真資料、不給空白。
-  if (!fresh && !bulk && icao[0] !== 'K' && icao[0] !== 'P' && !_coffeeFresh(icao)) {
-    const st0 = _atisStoreSections(icao);
-    // 「完整」＝每段都有 QNH（天氣/氣壓那後半段在），或是「NOT AVAILABLE」這種合法宵禁/夜間短狀態（本來就沒 QNH，別逼它等 coffee，codex P2）。
-    //   香港等場 airframes 常只給到前一個 frame（半截、缺 QNH 又不是 NA）→ 這種別當「有舊的」秒回半截給飛行員，要等一次 coffee 拿完整版。
-    const complete = Array.isArray(st0) && st0.length > 0 && st0.every((s: any) => {
-      const t = String((s && s.text) || '');
-      return _atisHasQNH(t) || /NOT\s+AVAIL|UNAVAILABLE|NO\s+ATIS|NO\s+DATA/i.test(t);
-    });
-    if (complete) { _coffeePull(icao); }                                       // 有完整舊的 → 背景撈，不擋回應
-    else { try { await _coffeePull(icao); } catch { /* 撈不到 → 往下走 airframes 保底 */ } }   // 沒有/半截 → 等一次拿完整
-  }
+  // 2.5 ⛔ V9.5.20 停用：原「開場非手動自動撈 coffee」整段停掉 —— 開機場不再自動打站長來源。
+  //     非手動一律只走下面的累積庫/快取；要最新 ATIS 請按「重新整理」(fresh=1，上面 block 2 才會打 coffee)。
+  //     (依規範保留原邏輯於此，日後若站長同意自動撈再恢復)
+  // if (!fresh && !bulk && icao[0] !== 'K' && icao[0] !== 'P' && !_coffeeFresh(icao)) {
+  //   const st0 = _atisStoreSections(icao);
+  //   const complete = Array.isArray(st0) && st0.length > 0 && st0.every((s: any) => {
+  //     const t = String((s && s.text) || ''); return _atisHasQNH(t) || /NOT\s+AVAIL|UNAVAILABLE|NO\s+ATIS|NO\s+DATA/i.test(t);
+  //   });
+  //   if (complete) { _coffeePull(icao); } else { try { await _coffeePull(icao); } catch { } }
+  // }
   // 3. 非美：先吃背景累積庫（輪詢維護，最新鮮、跟 coffee 同機制）→ 命中直接回，不打 airframes。
   const stored = _atisStoreSections(icao);
   if (stored) return res.json({ sections: stored, source: 'acars' });

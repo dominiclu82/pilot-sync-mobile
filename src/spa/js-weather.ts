@@ -239,7 +239,7 @@ function refreshWxDetail(icao, name) {
   if (content) content.innerHTML = '<div class="atis-loading">重新載入...</div>';
   var btn = document.getElementById('wx-detail-refresh-btn');
   if (btn) { btn.disabled = true; btn.textContent = '\\u21ba ...'; }
-  fetchWxDetail(icao, name);
+  fetchWxDetail(icao, name, true);   // true = 手動刷新 → 同時抓 METAR+TAF+ATIS(fresh)
 }
 
 function buildMetarCard(icao) {
@@ -306,6 +306,9 @@ function _wxBuildDetailHtml(icao, metarLines, tafText, atisSections, atisSource,
       + '<span style="color:var(--muted);font-size:.9em">\\u5373\\u6642 ATIS \\u8cc7\\u6599\\u50c5\\u958b\\u653e\\u7d66\\u5df2\\u9a57\\u8b49\\u7684\\u661f\\u5b87\\u7d44\\u54e1\\uff0c\\u540c\\u6b65\\u5f8c\\u5373\\u89e3\\u9396\\uff08\\u5176\\u9918\\u5929\\u6c23\\u8cc7\\u8a0a\\u4e0d\\u53d7\\u5f71\\u97ff\\uff09\\u3002</span><br>'
       + '<span style="color:var(--muted);font-size:.82em">Real-time ATIS is available to verified STARLUX crew. Unlock by syncing your roster.</span>'
       + '</pre><button onclick="switchTab(\\'sync\\', document.getElementById(\\'tabBtn-sync\\'))" style="margin-top:4px;width:100%;background:var(--accent);color:#fff;border:none;border-radius:8px;padding:9px;font-size:.85em;cursor:pointer">\\ud83d\\udd04 \\u524d\\u5f80\\u540c\\u6b65 Sync now</button></div>';
+  } else if (atisSections === 'idle') {
+    // V9.5.20：開機場不自動抓 ATIS（避免狂打來源）→ 顯示提示，按右上「更新」才抓 METAR+TAF+ATIS。
+    cards += '<div class="atis-card"><div class="atis-card-title">\\ud83d\\udcfb ATIS</div><pre style="white-space:normal;line-height:1.6"><span style="color:var(--muted)">\\u6309\\u53f3\\u4e0a\\u300c\\u21ba \\u66f4\\u65b0\\u300d\\u8f09\\u5165 ATIS\\u3000Press \\u21ba refresh to load ATIS</span></pre></div>';
   } else if (atisSections === null) {
     cards += '<div class="atis-card"><div class="atis-card-title">\\ud83d\\udcfb ATIS</div><pre><span style="color:var(--muted)">\\u8f09\\u5165\\u4e2d\\u2026 Loading\\u2026</span></pre></div>';
   } else {
@@ -391,39 +394,26 @@ function wxAtisSwitch(icao) {
 }
 
 var _wxDetailReqToken = 0;
-function fetchWxDetail(icao, name) {
-  /* 每次 fetch 給一個遞增 token,只讓「最新那次」的結果(含背景 ATIS)生效,避免慢 ATIS 覆蓋新資料 */
+function fetchWxDetail(icao, name, withAtis) {
+  /* withAtis: 只有「手動重新整理」才為 true → 抓 METAR+TAF+ATIS(fresh)。開機場(false)只抓 METAR+TAF，ATIS 顯示「按更新載入」、不打來源(避免狂打站長)。 */
+  /* 每次 fetch 給一個遞增 token,只讓「最新那次」的結果生效,避免慢回應覆蓋新資料 */
   var _tok = ++_wxDetailReqToken;
-  /* check 24hr cache first。⚠ 舊版快取沒有 atisSrc 欄(undefined)→ 不走捷徑、落到下面正常重抓,讓來源徽章/切換鈕補上(升級一次性自癒)。空字串''=有抓過但無 ATIS,仍算有效快取。 */
+  /* check 24hr cache first（僅開機場時走捷徑；手動刷新 withAtis 一律重抓）。空字串''=有抓過但無 ATIS,仍算有效快取。 */
   var cached = wxDetailRawCache[icao];
-  if (cached && (Date.now() - cached.time) < 86400000 && cached.atisSrc !== undefined) {
-    if (cached.atisSrc) _atisSrc[icao] = (cached.atisSrc === 'atis.guru' ? 'guru' : 'primary');   // 重繪自快取(預設源)→ 一律把 toggle 狀態同步成「目前顯示的來源」,免得 reopen 後方向反掉
-    var html = _wxBuildDetailHtml(icao, cached.metar, cached.taf, cached.atis, cached.atisSrc);
+  if (!withAtis && cached && (Date.now() - cached.time) < 86400000 && cached.atisSrc !== undefined) {
+    if (cached.atisSrc) _atisSrc[icao] = (cached.atisSrc === 'atis.guru' ? 'guru' : 'primary');
+    var atisArg = cached.atisIdle ? 'idle' : cached.atis;   // 開場存的快取標 atisIdle → 顯示「按更新載入」，不假裝有 ATIS
+    var html = _wxBuildDetailHtml(icao, cached.metar, cached.taf, atisArg, cached.atisSrc);
     wxDetailCache[icao] = html;
     var content = document.getElementById('wx-detail-content');
     if (content && wxSelectedIcao === icao) content.innerHTML = html;
-    // 還不知道創始身份 → 背景只探一次身份(不碰快取資料,免把共享 FAA/airframes 降級成 guru,P1)。學到後用「原快取資料」重繪,只多出切換鈕。已知就不再探。
-    if (!_atisLevelKnown) {
-      _wxAtisProbeLevel().then(function () {
-        // ⚠ 多加 !wxDetailRawCache[icao]：若下面的 gate 重驗已判定鎖定、刪了快取，這裡就別再用舊 cached.atis 重畫把 ATIS 蓋回來（競態繞過鎖，codex P1）。
-        if (wxSelectedIcao !== icao || _tok !== _wxDetailReqToken || !_atisLevelKnown || !wxDetailRawCache[icao]) return;
-        var h2 = _wxBuildDetailHtml(icao, cached.metar, cached.taf, cached.atis, cached.atisSrc);   // 用原快取資料重繪,只是現在會帶切換鈕
-        wxDetailCache[icao] = h2;
-        var c = document.getElementById('wx-detail-content');
-        if (c && wxSelectedIcao === icao) c.innerHTML = h2;
-      });
-    }
-    // 非美 ATIS 受 gate 控管：即使有 24h 快取也要背景跟 server 確認還有沒有權限 → 失去權限(403 locked)就清掉
-    //   本地快取(免舊快取在 24h 內繞過 gate，codex P1)+ 改顯示鎖定卡；有權限就維持快取顯示、不多事。
-    //   ⚠ 不可加「cached.atis.length」條件：空 ATIS 快取(顯示「無資料」)的非美場也要重驗，否則未登入看到「無資料」而非「鎖定」(實見 RCTP/RCKH)。
+    // 非美：輕量重驗權限(gateonly，不抓任何 ATIS、不碰 coffee) → 失去權限就清快取改顯示鎖定卡(補回 codex P1：快取繞過 gate 的漏洞)。
     if (icao[0] !== 'K' && icao[0] !== 'P') {
-      // 輕量重驗：只看「是不是 403(鎖定)」就好，不走 _wxAtisFetch 的完整抓取+atis.guru fallback
-      //   → 已登入/有權限的場(含真的無 ATIS)不會每次開都多打網路(codex P2 耗能)。
-      fetch('/api/atis?icao=' + icao, { headers: (typeof _plAtHeaders === 'function' ? _plAtHeaders() : {}) })
-        .then(function (r) {
-          if (r.status !== 403) return;   // 有權限 → 不動快取、不多事
-          delete wxDetailRawCache[icao]; _wxSaveDetailCache();
-          delete wxDetailCache[icao];
+      fetch('/api/atis?icao=' + icao + '&gateonly=1', { headers: (typeof _plAtHeaders === 'function' ? _plAtHeaders() : {}) })
+        .then(function (r) { return r.ok ? r.json() : null; })
+        .then(function (d) {
+          if (!d || !d.locked) return;   // 有權限 → 不動快取
+          delete wxDetailRawCache[icao]; _wxSaveDetailCache(); delete wxDetailCache[icao];
           if (wxSelectedIcao !== icao || _tok !== _wxDetailReqToken) return;
           var hl = _wxBuildDetailHtml(icao, cached.metar, cached.taf, null, '', true);
           var cl = document.getElementById('wx-detail-content');
@@ -442,14 +432,19 @@ function fetchWxDetail(icao, name) {
     .then(function(r) { return r.ok ? r.text() : ''; }).then(function(t) { return t.trim(); }).catch(function() { return ''; });
   /* ATIS：主抓取「永遠」抓預設來源(server FAA/airframes)寫進共享快取 wxDetailRawCache → 持久化的一律是預設源、不會被個人切換污染。
      創始會員的換來源是 wxAtisSwitch 的純記憶體覆蓋(不進這條路徑、不持久化)。回 {sections, source} → 顯示來源標籤。 */
-  var atisP = _wxAtisFetch(icao, undefined, false);
-  /* 先等 METAR+TAF(快)就秒出(ATIS 標「載入中」、跑道圖照樣秒出);ATIS 背景補上 → 不卡載入。 */
+  var atisP = withAtis ? _wxAtisFetch(icao, undefined, true) : null;   // 只有手動刷新(withAtis)才抓 ATIS，且強制 fresh；開機場不抓
+  /* 先等 METAR+TAF(快)就秒出；ATIS：手動刷新時標「載入中」背景補上，開機場則標「按更新載入」(idle)。 */
   Promise.all([metarP, tafP]).then(function(res) {
     var metarLines = res[0], tafText = res[1];
     var content = document.getElementById('wx-detail-content');
     if (!content || wxSelectedIcao !== icao || _tok !== _wxDetailReqToken) return;
-    content.innerHTML = _wxBuildDetailHtml(icao, metarLines, tafText, null);
+    content.innerHTML = _wxBuildDetailHtml(icao, metarLines, tafText, withAtis ? null : 'idle');
     _wxDetailRefreshDone();
+    if (!atisP) {   // 開機場：ATIS 留「按更新載入」、不打來源；但把 METAR/TAF 存快取(標 atisIdle)→ 重開直接用、不重抓(codex P2)
+      wxDetailRawCache[icao] = { metar: metarLines, taf: tafText, atis: [], atisSrc: '', atisIdle: true, time: Date.now() };
+      _wxSaveDetailCache();
+      return;
+    }
     atisP.then(function(r) {
       var atisSections = r.sections, atisSource = r.source;
       // 鎖定時不寫快取(免把鎖定狀態持久化 → 同步後仍卡)；同步解鎖後下次開啟即正常抓。
@@ -675,7 +670,9 @@ function wxRefreshRegion() {
   var airports = wxGetAirports(wxCurrentRegion);
   if (airports.length === 0) { _wxRefreshDone(btn, 0, '\\u21ba'); return; }
   var icaos = airports.map(function(a) { return a.icao; });
-  _wxRefreshRegionAtis(icaos);   // V9.4.18：區域一鍵更新「順便」刷該區 ATIS（暖 server 快取，開了秒出）
+  // V9.5.20：地區一鍵刷新不再「順便」整區抓 ATIS（避免一次打一串來源）。ATIS 一律單場、按該場「更新」才抓。
+  //   (依規範保留 _wxRefreshRegionAtis 不刪，僅停止呼叫)
+  // _wxRefreshRegionAtis(icaos);
   _wxBatchRefresh(icaos, wxCurrentRegion, 'wx-region-refresh-btn', '\\u21ba');
 }
 
