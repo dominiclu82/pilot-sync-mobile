@@ -1543,6 +1543,64 @@ app.get('/api/atis-usage', requireAuth, async (req: AuthedRequest, res) => {
   res.json(usage);
 });
 
+// ── Tower 後台：站長 coffee API「我們自己的用量」面板（owner-only）──────────────
+// 站長 2026-06-19 提供 analytics 端點（Bearer COFFEE_ANALYTICS_KEY）。它只讀站長自己的
+// 紀錄庫，不計次、不碰他上游額度（實測連查 analytics total 不變）。server 端在此「只留我們
+// oops.h-peak.com 的足跡」、濾掉 IP/裝置/別站個資，給 Tower 顯示我們對站長打了幾次、查哪些站。
+let _coffeeUsageCache: { at: number; data: any } | null = null;
+app.get('/api/coffee-usage', requireAuth, async (req: AuthedRequest, res) => {
+  if (!(await isOwnerUserId(req.pilotUserId || ''))) return res.status(403).json({ error: 'not_owner' });
+  const key = process.env.COFFEE_ANALYTICS_KEY || '';
+  if (!key) return res.json({ enabled: false });   // 未設鑰匙 → 前端不顯示此面板
+  if (_coffeeUsageCache && Date.now() - _coffeeUsageCache.at < 60000) return res.json(_coffeeUsageCache.data);  // 60s 快取（客氣）
+  try {
+    const ctrl = new AbortController();                       // P1：限時 8s，站長端慢/掛也不拖垮 Tower
+    const tmr = setTimeout(() => ctrl.abort(), 8000);
+    let r: any;
+    try {
+      r = await fetch('https://api.coffeeteaorme.vip/api/analytics', {
+        headers: { 'Authorization': 'Bearer ' + key, 'User-Agent': _FIDS_UA, 'Accept': 'application/json' },
+        signal: ctrl.signal,
+      });
+    } finally { clearTimeout(tmr); }
+    if (!r.ok) return res.json({ enabled: true, ok: false, status: r.status });
+    const j: any = await r.json();
+    const isOurs = (s: any) => String(s || '').includes('oops.h-peak.com');
+    const recent: any[] = Array.isArray(j.recentCalls) ? j.recentCalls : [];
+    const ourCalls = recent.filter((c) => isOurs(c.site));
+    const aptOf = (c: any) => { try { const q = JSON.parse(c.query || '{}'); return String(q.text || q.icao || '').toUpperCase(); } catch { return ''; } };
+    // 依 endpoint / 機場加總（只我們、僅從最近清單，因站長後台只依 endpoint 全站加總、不依機場/不分站）
+    const byEndpoint: Record<string, number> = {};
+    const byAirport: Record<string, number> = {};
+    for (const c of ourCalls) {
+      const ep = String(c.endpoint || ''); if (ep) byEndpoint[ep] = (byEndpoint[ep] || 0) + 1;
+      const a = aptOf(c); if (a) byAirport[a] = (byAirport[a] || 0) + 1;
+    }
+    // 我們近 24h 的總計（siteStats 較準，是該視窗該站累計；recentCalls 只是近 N 筆）
+    const siteStats: any[] = Array.isArray(j.siteStats) ? j.siteStats : [];
+    const ourSite = siteStats.find((s) => isOurs(s.site));
+    const hourAgo = Date.now() - 3600000;
+    const lastHour = ourCalls.filter((c) => { const t = new Date(c.created_at).getTime(); return !isNaN(t) && t >= hourAgo; }).length;
+    const data = {
+      enabled: true, ok: true,
+      range: j.range || null,                                  // 後台回的時間視窗（約近 24h）
+      ourCalls24h: ourSite ? ourSite.calls : null,             // 準：近 24h 我們對站長總呼叫（siteStats 視窗累計）
+      allTotal: (j.totals && j.totals.total) || 0,             // 全部來源(含站長自己)總數，純對照
+      // 以下為「最近清單樣本」推算：站長後台只回最近 N 筆、endpoint 加總又是全站不分來源，無法對「我們」
+      //   做精準時窗 → 忙時可能少算（codex P2）。前端一律標「最近」、不當權威總量。健康燈仍方向可靠
+      //   （真狂打時最近清單會塞滿我們的呼叫 → lastHour 仍會衝高觸發警示）。
+      sample: {
+        count: ourCalls.length, lastHour, byEndpoint, byAirport,
+        recent: ourCalls.slice(0, 20).map((c) => ({ at: c.created_at, endpoint: c.endpoint, airport: aptOf(c) })),  // 已濾 IP/裝置
+      },
+    };
+    _coffeeUsageCache = { at: Date.now(), data };
+    res.json(data);
+  } catch (e: any) {
+    res.json({ enabled: true, ok: false, error: String((e && e.message) || e) });
+  }
+});
+
 // ── Service Worker ────────────────────────────────────────────────────────────
 // V8.0.29 fix: cache name 從 html-body.js 動態抓當前 V8.0.X，每次推版自動 invalidate 舊 cache
 // 原本寫死 'crewsync-v8026' → 每次 deploy 同 cache name → SW activate handler

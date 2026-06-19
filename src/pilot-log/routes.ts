@@ -3382,7 +3382,11 @@ async function load(){
     // TODO（V9.5.02 移除）：ATIS airframes「額度」面板已停用 —— V9.4.18 換匿名 /v1 端點後無 key/無額度，getAtisUsage 恆為空。
     //   原本 try{ /api/atis-usage → T.atis }；連同 dash() 內的「ATIS 額度 · airframes」卡片一併拿掉（後端端點留著、孤兒、無害）。
     el('me').textContent='owner';el('reBtn').style.display='';el('outBtn').style.display='';el('foot').style.display='';el('msg').textContent='';
+    T.coffee=null;   // P3：每次重載先清掉舊的，避免後續請求失敗時卡著上次的數據
     render();
+    // 站長 API 用量：非阻塞載入（不卡主畫面，回來再補渲染那張卡）。owner-only、server 已濾個資+限時。
+    // 非 OK / 例外 → 存失敗狀態（卡片顯示「讀取失敗」），不殘留舊數值。
+    api('/api/coffee-usage').then(function(r){return r&&r.ok?r.json():null;}).then(function(j){T.coffee=j||{enabled:true,ok:false};render();}).catch(function(){T.coffee={enabled:true,ok:false};render();});
   }catch(e){}
 }
 function dash(){
@@ -3417,6 +3421,12 @@ function dash(){
       if(!aa.length)return '';
       var rest=aa.slice(1,6).map(function(x){return '<span>'+esc(x.t)+' <b>'+x.n+'</b></span>';}).join('');
       return '<div class=card><div class=lbl>機型排行</div><div class=big>'+esc(aa[0].t)+'<span style="font-size:.5em;color:#64748b"> '+aa[0].n+'</span></div><div class=seg style="flex-wrap:wrap">'+rest+'</div></div>';})()+
+    // 站長 coffee API：我們自己的足跡（只我們、已濾個資）。健康燈：近 1h 偏多 → 黃
+    (function(){var cf=T.coffee;if(!cf||!cf.enabled)return '';
+      if(!cf.ok)return '<div class=card><div class=lbl>站長 API · 我們</div><div class="big gray">—</div><div class=sub>讀取失敗'+(cf.status?' '+cf.status:'')+'</div></div>';
+      var sm=cf.sample||{};var n=(cf.ourCalls24h!=null?cf.ourCalls24h:(sm.count||0));var lh=sm.lastHour||0;var cls=lh>=20?'y':'g';
+      var ap=sm.byAirport||{};var apS=Object.keys(ap).sort(function(a,b){return ap[b]-ap[a];}).slice(0,6).map(function(k){return '<span>'+esc(k)+' <b>'+ap[k]+'</b></span>';}).join('')||'<span class=gray>近期無</span>';
+      return '<div class=card><div class=lbl>站長 API · 我們</div><div class="big '+cls+'">'+n+'</div><div class=sub>近 24h ｜ 最近 1h(樣本) <b>'+lh+'</b>'+(lh>=20?' ⚠ 偏多':'')+'</div><div class=seg style="flex-wrap:wrap">最近查過 '+apS+'</div></div>';})()+
   '</div>';
 }
 function filt(arr,keys){var q=T.q.toLowerCase();if(!q)return arr;return arr.filter(function(u){return keys.some(function(k){var v=u[k];if(Array.isArray(v))v=v.join(' ');return String(v||'').toLowerCase().indexOf(q)>=0;});});}
