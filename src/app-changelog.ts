@@ -17,6 +17,12 @@ export function renderCommunityLink(): string {
 export interface ChangelogEntry { v: string; zh: string; en: string; }
 
 export const APP_CHANGELOG: ChangelogEntry[] = [
+  { v: 'V2.0.19',
+    zh: '[全域] 日夜切換膠囊放大、跟 A+/A- 拉開一點，工具列高度不變。',
+    en: '[All] Bigger day-night pill with a little more spacing from A+/A-; toolbar height unchanged.' },
+  { v: 'V2.0.18',
+    zh: '[全域] 日夜切換改成直立滑動膠囊（☀️上 / 🌙下，浮標停在目前模式）。',
+    en: '[All] Day-night switch is now a vertical sliding pill (☀️ top / 🌙 bottom; slider rests on the current mode).' },
   { v: 'V2.0.17',
     zh: '[投資] 緊急修復：V2.0.16 錯誤訊息的換行字元害整頁程式載不進來（全用戶空白），已修好。',
     en: '[Portfolio] Hotfix: a stray newline in a V2.0.16 message broke the whole Portfolio page (blank for all users) — fixed.' },

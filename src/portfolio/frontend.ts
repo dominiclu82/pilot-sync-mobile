@@ -396,10 +396,10 @@ body { font-size: 1rem; padding-left: 0; padding-right: 0; }
 }
 .hdr-btn-font button:active { opacity: 0.7; }
 /* V2.4.xx 日夜：直立分段膠囊（☀️上/🌙下），浮標純 CSS 隨 [data-theme] 上下滑＝現況 */
-.theme-seg{position:relative;display:inline-flex;flex-direction:column;width:26px;height:40px;padding:2px;border-radius:13px;background:var(--bg-card);border:1px solid var(--border);cursor:pointer;flex:0 0 auto}
-.theme-seg-knob{position:absolute;left:2px;right:2px;top:2px;height:calc(50% - 2px);border-radius:11px;background:var(--accent);transition:transform .22s ease;pointer-events:none;transform:translateY(100%)}
+.theme-seg{position:relative;display:inline-flex;flex-direction:column;width:30px;height:40px;padding:3px;border-radius:14px;background:var(--bg-card);border:1px solid var(--border);cursor:pointer;flex:0 0 auto;margin-right:4px}
+.theme-seg-knob{position:absolute;left:3px;right:3px;top:3px;height:calc(50% - 3px);border-radius:12px;background:var(--accent);transition:transform .22s ease;pointer-events:none;transform:translateY(100%)}
 [data-theme="light"] .theme-seg-knob{transform:translateY(0)}
-.theme-seg-opt{position:relative;z-index:1;flex:1;display:flex;align-items:center;justify-content:center;background:none;border:0;padding:0;font-size:.8em;line-height:1;cursor:pointer}
+.theme-seg-opt{position:relative;z-index:1;flex:1;display:flex;align-items:center;justify-content:center;background:none;border:0;padding:0;font-size:.92em;line-height:1;cursor:pointer}
 /* V1.0.18 fix: 14px top margin 對齊晨報 .sec 第一個 card 跟 top-stack 的 gap */
 .hdr-actions { display: flex; gap: 8px; margin: 14px 0 16px; }
 .btn { padding: 8px 14px; border-radius: 6px; border: 1px solid var(--border); background: var(--bg-card); color: var(--fg); font-size: .92em; cursor: pointer; }

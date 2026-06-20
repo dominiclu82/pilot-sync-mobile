@@ -1541,7 +1541,7 @@ export function getSpaHtmlBody(): string {
       <button class="tab-util-btn tab-install-btn" id="tab-install-btn" onclick="showInstallGuide()" style="display:none">
         <span>📲</span>安裝
       </button>
-      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer;text-decoration:underline" onclick="showAbout()">V9.5.24</span>
+      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer;text-decoration:underline" onclick="showAbout()">V9.5.25</span>
     </div>
   </div>
 </div>
@@ -1575,7 +1575,12 @@ export function getSpaHtmlBody(): string {
     </div>
     <div style="max-height:50vh;overflow-y:auto;-webkit-overflow-scrolling:touch;margin-bottom:10px">
     ${renderCommunityLink()}
-    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V9.5.24</div>
+    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V9.5.25</div>
+    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
+      <div>🌗 <b>日夜膠囊放大、跟 A+/A- 拉開，不增加工具列高度。</b></div>
+      <div>🌗 <b>Bigger day-night pill with more spacing from A+/A-; tab-bar height unchanged.</b></div>
+    </div>
+    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V9.5.24</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
       <div>🌗 <b>日夜切換改成滑動膠囊。</b></div>
       <div>🌗 <b>Day-night switch is now a sliding pill.</b></div>

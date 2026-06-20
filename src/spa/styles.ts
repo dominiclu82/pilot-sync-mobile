@@ -40,11 +40,12 @@ body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSy
 .font-size-btn{font-weight:700;padding:2px 6px;border:1px solid var(--dim)!important;border-radius:4px}
 .font-size-btn-sm{font-size:.7em!important}
 .font-size-btn-lg{font-size:1em!important}
-/* V9.5.24 日夜：直立分段膠囊（☀️上 / 🌙下），浮標純 CSS 隨 [data-theme] 上下滑＝現況；高度比照 A+/A- 不增高 */
-.theme-seg{position:relative;display:inline-flex;flex-direction:column;width:24px;height:34px;padding:2px;border-radius:12px;background:var(--card);border:1px solid var(--dim);cursor:pointer;flex:0 0 auto}
-.theme-seg-knob{position:absolute;left:2px;right:2px;top:2px;height:calc(50% - 2px);border-radius:10px;background:var(--accent);transition:transform .22s ease;pointer-events:none;transform:translateY(100%)}
+/* V9.5.25 日夜：直立分段膠囊（☀️上 / 🌙下），浮標純 CSS 隨 [data-theme] 上下滑＝現況。
+   放大貼齊 A+/A- 直排高度（≈42px，仍 ≤ A+/A- 故工具列不增高）、加寬、icon 放大、跟右側 A+/A- 拉開一點 */
+.theme-seg{position:relative;display:inline-flex;flex-direction:column;width:30px;height:42px;padding:3px;border-radius:15px;background:var(--card);border:1px solid var(--dim);cursor:pointer;flex:0 0 auto;margin-right:4px}
+.theme-seg-knob{position:absolute;left:3px;right:3px;top:3px;height:calc(50% - 3px);border-radius:12px;background:var(--accent);transition:transform .22s ease;pointer-events:none;transform:translateY(100%)}
 [data-theme="light"] .theme-seg-knob{transform:translateY(0)}
-.theme-seg-opt{position:relative;z-index:1;flex:1;display:flex;align-items:center;justify-content:center;background:none;border:0;padding:0;font-size:.78em;line-height:1;cursor:pointer}
+.theme-seg-opt{position:relative;z-index:1;flex:1;display:flex;align-items:center;justify-content:center;background:none;border:0;padding:0;font-size:.95em;line-height:1;cursor:pointer}
 .install-overlay{position:fixed;inset:0;z-index:999;background:rgba(0,0,0,.6);
   display:flex;align-items:center;justify-content:center;padding:24px}
 .install-card{background:var(--card);border-radius:16px;padding:28px 24px;width:100%;
