@@ -1527,9 +1527,11 @@ export function getSpaHtmlBody(): string {
   <a href="/apps" id="cs-apps-home" class="tab-util-btn" aria-label="Tools" title="回 Tools" style="display:none;flex:0 0 auto;align-self:center;text-decoration:none;padding:0 8px"><svg width="20" height="20" viewBox="0 0 24 24"><rect x="2" y="2" width="9" height="9" rx="2.5" fill="#3b82f6"/><rect x="13" y="2" width="9" height="9" rx="2.5" fill="#10b981"/><rect x="2" y="13" width="9" height="9" rx="2.5" fill="#f59e0b"/><rect x="13" y="13" width="9" height="9" rx="2.5" fill="#a855f7"/></svg></a>
   <div class="tab-btn tab-util" style="flex-direction:row;gap:0">
     <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center">
-      <button class="tab-util-btn" onclick="toggleTheme()" id="tabBtn-theme">
-        <span id="theme-icon">☀️</span>
-      </button>
+      <div class="theme-seg" title="日 / 夜">
+        <span class="theme-seg-knob"></span>
+        <button class="theme-seg-opt" type="button" onclick="setTheme('light')" aria-label="日間 Day">☀️</button>
+        <button class="theme-seg-opt" type="button" onclick="setTheme('dark')" aria-label="夜間 Night">🌙</button>
+      </div>
     </div>
     <div class="font-size-wrap">
       <button class="tab-util-btn font-size-btn font-size-btn-lg" onclick="adjustFontSize(1)">A+</button>
@@ -1539,7 +1541,7 @@ export function getSpaHtmlBody(): string {
       <button class="tab-util-btn tab-install-btn" id="tab-install-btn" onclick="showInstallGuide()" style="display:none">
         <span>📲</span>安裝
       </button>
-      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer;text-decoration:underline" onclick="showAbout()">V9.5.23</span>
+      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer;text-decoration:underline" onclick="showAbout()">V9.5.24</span>
     </div>
   </div>
 </div>
@@ -1573,7 +1575,12 @@ export function getSpaHtmlBody(): string {
     </div>
     <div style="max-height:50vh;overflow-y:auto;-webkit-overflow-scrolling:touch;margin-bottom:10px">
     ${renderCommunityLink()}
-    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V9.5.23</div>
+    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V9.5.24</div>
+    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
+      <div>🌗 <b>日夜切換改成滑動膠囊。</b></div>
+      <div>🌗 <b>Day-night switch is now a sliding pill.</b></div>
+    </div>
+    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V9.5.23</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
       <div>🗼 <b>後台優化。</b></div>
       <div>🗼 <b>Admin backend improvements.</b></div>

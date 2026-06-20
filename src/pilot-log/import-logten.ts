@@ -111,6 +111,7 @@ const INSERT_COLS = [
   'position',                                   // V1.2.03：匯入時推斷的角色（PIC/SIC）
   'pic_minutes', 'sic_minutes',                 // V1.2.04：LogTen 實際 PIC/SIC 時數
   'is_deadhead',                                // V1.2.05：deadhead/positioning 標記
+  'is_sim',                                     // V2.4.xx：模擬機（班號 EM/TM/PT/PC）
   'pilot_flying',                               // V1.3.03：LogTen「Pilot Flying」欄；起降只在 PF 時計
   'needs_completion',                           // 待補強：缺必填欄位（航班號/起降）但完整保留資料、補完轉綠
 ];
@@ -147,6 +148,7 @@ export interface ImportLogtenFlightsResult {
   updated: number;
   duplicate_skipped: number;            // 命中 confirmed → 不動
   crew_overwritten?: number;            // V1.3.24：overwriteCrew 模式下，confirmed 航班被補/換組員的筆數
+  oooi_backfilled?: number;             // V2.4.xx：confirmed 卻缺 OOOI（in_utc 空）→ 用檔案的實際時間回填（只補空缺）
   parse_errors: number;
   needs_completion?: number;            // 待補強：有日期、缺必填（航班號/起降）→ 收為 needs_completion，不丟棄
   bad_rows?: Array<{ row: number; flight_no?: string; date?: string; reason: string }>;
@@ -155,8 +157,8 @@ export interface ImportLogtenFlightsResult {
     aircraft_type: string; tail_no: string;
     out_utc: string | null; off_utc: string | null; on_utc: string | null; in_utc: string | null;
     block: string | null; pic: string | null; sic: string | null;
-    action: 'insert' | 'update' | 'skip_confirmed' | 'overwrite_crew';
-    new_status: 'draft' | 'confirmed' | null;   // skip_confirmed / overwrite_crew 時為 null
+    action: 'insert' | 'update' | 'skip_confirmed' | 'overwrite_crew' | 'backfill_oooi';
+    new_status: 'draft' | 'confirmed' | null;   // skip_confirmed / overwrite_crew / backfill_oooi 時為 null
     position?: string | null;                    // V1.2.03：推斷的角色（PIC/SIC/null）
     deadhead?: boolean;                          // V1.2.03：是否 positioning
     pic_min?: number | null;                     // V1.2.04：讀到的 LogTen PIC 時數（分）
@@ -224,14 +226,15 @@ export async function importLogtenFlights(
 
   // ── V1.0.04 速度優化：一次撈所有現有 source_ref 進 Map ──────────────────────
   // 取代 V1.0.0x 每 row 一次 SELECT，2000 筆從 2000 query 降到 1 query
-  const existingMap = new Map<string, { id: string; status: string }>();
+  // in_utc 一起撈：用來判斷「confirmed 但缺 OOOI」→ 回填（V2.4.xx）
+  const existingMap = new Map<string, { id: string; status: string; inUtc: string | null; isSim: boolean; isDeadhead: boolean }>();
   {
     const r = await pool.query(
-      `SELECT source_ref, id, status FROM pilot_log_entries WHERE user_id = $1 AND source = 'logten'`,
+      `SELECT source_ref, id, status, in_utc, is_sim, is_deadhead FROM pilot_log_entries WHERE user_id = $1 AND source = 'logten'`,
       [userId]
     );
     for (const row of r.rows) {
-      existingMap.set(row.source_ref, { id: row.id, status: row.status });
+      existingMap.set(row.source_ref, { id: row.id, status: row.status, inUtc: row.in_utc ? new Date(row.in_utc).toISOString() : null, isSim: !!row.is_sim, isDeadhead: !!row.is_deadhead });
     }
   }
 
@@ -257,6 +260,8 @@ export async function importLogtenFlights(
   const updateBatch: Array<{ id: string; params: any[] }> = [];
   // V1.3.24：overwriteCrew —— 對 confirmed 航班只補/換組員 + PIC/SIC 時數 + position，其餘欄位不動
   const crewUpdateBatch: Array<{ id: string; crewJson: string | null; picMin: number | null; sicMin: number | null; position: string | null }> = [];
+  // V2.4.xx：OOOI 回填 —— confirmed 卻缺 in_utc 的航班，用檔案實際時間「只補空缺」（COALESCE），不動其他編輯
+  const backfillBatch: Array<{ id: string; params: any[] }> = [];
 
   // V1.2.04 / codex P2：同檔內「日期+航班號+起降」完全相同的不同航班（同日同班號折返、
   // 兩段 leg）原本 source_ref 會碰撞、被 merge 掉一筆。先掃一遍找出哪些 base 重複，
@@ -367,12 +372,18 @@ export async function importLogtenFlights(
       const from = row['From'];
       const to = row['To'];
       if (!date) { result.parse_errors++; continue; }   // 連日期都沒有 → flight_date NOT NULL，無法收（極少；批次日期檢查通常已先擋）
+      // V2.4.xx：用班號自動分類（user 要求）—— 班號開頭 EM/TM/PT/PC = 模擬機；含 PNC = deadhead。
+      //   sim 沒航線是正常、不算待補強；過去 confirmed 的也會在重匯時被回填這兩個旗標。
+      const _fnUp = String(flightNo || '').toUpperCase();
+      const _fnFirst = _fnUp.split(/\s+/)[0] || '';
+      const isSim = /^(EM|TM|PT|PC)\d*$/.test(_fnFirst);
+      const isPnc = /\bPNC\b/.test(_fnUp);
       // V2.3：拆成兩個概念 ——
       //   missingKeyFields = 缺關鍵欄位（含沒班號）→ 沿用既有 incomplete-style source_ref，
       //     讓 V2.2 已匯入過的「沒班號」航段重匯時對得回去（codex：否則 ref 改格式 → 重匯變兩筆）。
       //   needsCompletion = 真正待補強 = 只有「沒航線」(from/to)；沒班號但有航線+時間的是真飛過的航段、要計入統計。
       const missingKeyFields = !flightNo || !from || !to;
-      const needsCompletion = !from || !to;
+      const needsCompletion = !isSim && (!from || !to);   // 模擬機沒航線是正常、不該被當待補強
 
       // 跨日 OOOI：Out → Off → On → In 順序遞增，若回繞則 +1 day（提前解析，待補強的穩定鍵要用 out）
       const outUtc = parseUtcAtDate(date, row['Out']);
@@ -441,7 +452,7 @@ export async function importLogtenFlights(
 
       // V1.2.03：Deadhead = LogTen 標記 positioning 的欄位。deadhead 是已發生事件
       // （你被載過去、沒操作），先判它，因為它會蓋掉 position 推斷。
-      const isDeadhead = _plTruthyFlag(row['Deadhead']) || _plTruthyFlag(row['Positioning']);
+      const isDeadhead = _plTruthyFlag(row['Deadhead']) || _plTruthyFlag(row['Positioning']) || isPnc;
 
       // V1.2.04：讀 LogTen 實際 PIC/SIC 時數（多候選欄名，取第一個能解析成 HH:MM 的）。
       // 這是統計要加總的真值；deadhead/加強組員巡航等既非 P1 也非 P2 的時間就不會被灌進來。
@@ -483,14 +494,22 @@ export async function importLogtenFlights(
       // V1.0.04 補：existingMap 在 loop 中也即時回寫，讓「同一檔內重複 sourceRef」
       // 走跟 cross-run 一樣的語意（confirmed → 後者 skip；draft → 後者覆蓋前者）
       const existing = existingMap.get(sourceRef);
-      let action: 'insert' | 'update' | 'skip_confirmed' | 'overwrite_crew';
+      let action: 'insert' | 'update' | 'skip_confirmed' | 'overwrite_crew' | 'backfill_oooi';
       let existingId: string | null = null;
       if (!existing) {
         action = 'insert';
       } else if (existing.status === 'confirmed') {
         // V1.3.24：confirmed 預設 skip（保護你的編輯）；開 overwriteCrew → 只補/換組員，不動其他欄位
-        action = opts.overwriteCrew ? 'overwrite_crew' : 'skip_confirmed';
-        existingId = existing.id;
+        // V2.4.xx：但「confirmed 卻缺實際 OOOI（in_utc 空）而檔案有」→ backfill 回填實際時間，
+        //   或「過去資料還沒被分類成 sim/deadhead」→ 一併補上分類旗標。
+        //   修正「過去航班一匯入就被標 confirmed，補了 OOOI 重匯卻被 skip、永遠補不進」的 bug。
+        //   只在沒開 overwriteCrew 時走 backfill；回填用 COALESCE 只補空缺，旗標用 CASE 只補不清。
+        //   ⚠ 必須「真的有缺」才 backfill，否則每次重匯都會跑無謂 UPDATE、灌水回填數（codex P1）。
+        const needsOooi = !existing.inUtc && !!inUtc;
+        const needsSimFlag = isSim && !existing.isSim;
+        const needsDhdFlag = isDeadhead && !existing.isDeadhead;
+        if (!opts.overwriteCrew && (needsOooi || needsSimFlag || needsDhdFlag)) { action = 'backfill_oooi'; existingId = existing.id; }
+        else { action = opts.overwriteCrew ? 'overwrite_crew' : 'skip_confirmed'; existingId = existing.id; }
       } else {
         action = 'update';
         existingId = existing.id;
@@ -529,8 +548,17 @@ export async function importLogtenFlights(
 
       // 即時回寫 existingMap：之後同 sourceRef 的 row 會走 update 或 skip
       // 不論 dryRun 或實際 run，都要回寫，否則 dryRun preview 會跟實際行為不一致
-      // overwrite_crew 不改 status（維持 confirmed），其餘用 newStatus
-      existingMap.set(sourceRef, { id: decidedId, status: action === 'overwrite_crew' ? existing!.status : newStatus });
+      // overwrite_crew / backfill_oooi 不改 status（維持 confirmed），其餘用 newStatus；inUtc 一併更新供同檔後續 row 判斷
+      // isSim/isDeadhead 也回寫：insert/update 取本次值；backfill 取「舊 OR 新」（只加不清）；skip/overwrite 維持舊值，
+      //   讓同檔重複 sourceRef 的後續 row 看到分類已補、不會再被當成「待分類」重觸發（codex P1 延伸）
+      const wrote = action === 'insert' || action === 'update';
+      existingMap.set(sourceRef, {
+        id: decidedId,
+        status: (action === 'overwrite_crew' || action === 'backfill_oooi') ? existing!.status : newStatus,
+        inUtc: (action === 'overwrite_crew') ? (existing ? existing.inUtc : null) : (inUtc ? inUtc.toISOString() : (existing ? existing.inUtc : null)),
+        isSim: wrote ? isSim : ((existing?.isSim || false) || (action === 'backfill_oooi' && isSim)),
+        isDeadhead: wrote ? isDeadhead : ((existing?.isDeadhead || false) || (action === 'backfill_oooi' && isDeadhead)),
+      });
 
       if (opts.dryRun) continue;
 
@@ -542,6 +570,11 @@ export async function importLogtenFlights(
       if (action === 'overwrite_crew') {
         // V1.3.24：只補/換組員 + PIC/SIC 時數 + position（SQL 用 COALESCE：檔案沒值就保留原值，不洗白）
         crewUpdateBatch.push({ id: decidedId, crewJson, picMin, sicMin, position });
+      } else if (action === 'backfill_oooi') {
+        // V2.4.xx：confirmed 航班的「補空缺 + 重分類」—— 實際時間欄 COALESCE 只補空缺；
+        //   is_sim/is_deadhead 只在班號判定為 sim/PNC 時才設 TRUE（不會把正常航班洗成 sim/dhd）。
+        //   不動 status / 組員 / 備註 / 起降數 / position 等你的編輯。
+        backfillBatch.push({ id: decidedId, params: [outUtc, offUtc, onUtc, inUtc, blockMin, airMin, nightMin, stdUtc, staUtc, onDutyUtc, offDutyUtc, dutyMin, distanceVal, isSim, isDeadhead, needsCompletion] });
       } else if (action === 'update') {
         updateBatch.push({
           id: decidedId,
@@ -563,6 +596,7 @@ export async function importLogtenFlights(
             isDeadhead,
             isPF,
             needsCompletion,
+            isSim,                               // $39（UPDATE 末位）
           ],
         });
       } else {
@@ -590,6 +624,7 @@ export async function importLogtenFlights(
           position,
           picMin, sicMin,
           isDeadhead,
+          isSim,                               // is_sim（緊接 is_deadhead，對齊 INSERT_COLS 順序）
           isPF,
           needsCompletion,                     // needs_completion（INSERT_COLS 最後一欄；只有沒航線才 true）
         ]);
@@ -605,7 +640,7 @@ export async function importLogtenFlights(
 
   // 沒任何寫入需求（全部 skip_confirmed、且無完整航班要合併舊待補強）→ 直接回，省掉 TX 開銷
   if (insertBatch.length === 0 && updateBatch.length === 0 && crewUpdateBatch.length === 0
-      && completeKeys.size === 0) return result;
+      && backfillBatch.length === 0 && completeKeys.size === 0) return result;
 
   // ── 包進單一 transaction：要嘛全寫成功，要嘛全 ROLLBACK，避免 partial 狀態 ──
   // codex 提醒：原本 bulk INSERT 後接 UPDATE，若中途任一失敗會留下部分寫入。
@@ -614,6 +649,7 @@ export async function importLogtenFlights(
   let insertedCount = 0;
   let updatedCount = 0;
   let crewUpdatedCount = 0;
+  let oooiBackfilledCount = 0;
   try {
     await client.query('BEGIN');
 
@@ -652,6 +688,7 @@ export async function importLogtenFlights(
            is_deadhead = $36,
            pilot_flying = $37,
            needs_completion = $38,
+           is_sim = $39,
            updated_at = NOW()
          WHERE id = $1`,
         [u.id, ...u.params]
@@ -680,6 +717,29 @@ export async function importLogtenFlights(
       crewUpdatedCount++;
     }
 
+    // V2.4.xx：OOOI 回填 —— confirmed 卻缺實際時間的航班，用檔案值「只補空缺」(COALESCE)，
+    //   不碰 status / 組員 / 備註 / 起降數 / position 等你的編輯。修「補了 OOOI 重匯卻被 skip」的 bug。
+    for (const u of backfillBatch) {
+      await client.query(
+        `UPDATE pilot_log_entries SET
+           out_utc = COALESCE(out_utc, $2), off_utc = COALESCE(off_utc, $3),
+           on_utc = COALESCE(on_utc, $4), in_utc = COALESCE(in_utc, $5),
+           block_minutes = COALESCE(block_minutes, $6), air_minutes = COALESCE(air_minutes, $7),
+           night_minutes = COALESCE(night_minutes, $8),
+           std_utc = COALESCE(std_utc, $9), sta_utc = COALESCE(sta_utc, $10),
+           on_duty_utc = COALESCE(on_duty_utc, $11), off_duty_utc = COALESCE(off_duty_utc, $12),
+           total_duty_minutes = COALESCE(total_duty_minutes, $13), distance_nm = COALESCE(distance_nm, $14),
+           is_sim = CASE WHEN $15 THEN TRUE ELSE is_sim END,
+           is_deadhead = CASE WHEN $16 THEN TRUE ELSE is_deadhead END,
+           -- 重分類成 sim / 補齊 from-to 後，把舊的「待補強」狀態清掉（只清不重新標，避免洗掉你手動補完的）
+           needs_completion = CASE WHEN $17 THEN needs_completion ELSE FALSE END,
+           updated_at = NOW()
+         WHERE id = $1`,
+        [u.id, ...u.params]
+      );
+      oooiBackfilledCount++;
+    }
+
     // ── 待補強合併：本次「完整航班」的 日期+出發時間 → 刪掉同一筆的舊待補強（之前缺資料、現在補好重匯）→ 不留兩筆。
     //   用 out_utc 配對（不依賴缺失的起降/航班號欄；codex P1-A）。待補強現在走正常 insert、已保留 out_utc。
     for (const key of completeKeys) {
@@ -698,9 +758,11 @@ export async function importLogtenFlights(
     result.inserted = insertedCount;
     result.updated = updatedCount;
     result.crew_overwritten = crewUpdatedCount;
+    result.oooi_backfilled = oooiBackfilledCount;
 
     // V1.0.05 monitoring：成功匯入後寫 last_import_at（fire-and-forget，跟主 TX 解耦）
-    if (insertedCount > 0 || updatedCount > 0 || crewUpdatedCount > 0) {
+    // V2.4.xx：backfill-only 的重匯也真的改了 pilot_log_entries，要一併更新時間戳（codex P3）
+    if (insertedCount > 0 || updatedCount > 0 || crewUpdatedCount > 0 || oooiBackfilledCount > 0) {
       pool.query(
         `UPDATE pilot_users SET last_import_at = NOW() WHERE id = $1`,
         [userId]

@@ -57,8 +57,8 @@ import { getAirportDbJs } from '../spa/js-airport-db.js';
 
 // ── 版本（比照 CrewSync / Morning：每次推版必更新；SW cache 名稱跟著走） ────
 // 本機 preview build 會暫時加 -tNN 後綴方便對版；推正式版前拿掉只留乾淨版號。
-export const PILOT_LOG_VERSION = 'V2.4.22';
-const PILOT_LOG_CACHE = 'pilotlog-v2-4-22';
+export const PILOT_LOG_VERSION = 'V2.4.23';
+const PILOT_LOG_CACHE = 'pilotlog-v2-4-23';
 
 export const pilotLogRouter = express.Router();
 
@@ -167,6 +167,17 @@ body {
 }
 .pl-font-btn-lg { font-size: .95em; }
 .pl-font-btn-sm { font-size: .68em; }
+/* V2.4.xx 日夜：直立分段膠囊（☀️上/🌙下），浮標純 CSS 隨 [data-theme] 上下滑＝現況；高度比照 A+/A- */
+.theme-seg{position:relative;display:inline-flex;flex-direction:column;width:24px;height:34px;padding:2px;border-radius:12px;background:var(--card);border:1px solid var(--border);cursor:pointer;flex:0 0 auto}
+.theme-seg-knob{position:absolute;left:2px;right:2px;top:2px;height:calc(50% - 2px);border-radius:10px;background:var(--accent);transition:transform .22s ease;pointer-events:none;transform:translateY(100%)}
+[data-theme="light"] .theme-seg-knob{transform:translateY(0)}
+.theme-seg-opt{position:relative;z-index:1;flex:1;display:flex;align-items:center;justify-content:center;background:none;border:0;padding:0;font-size:.78em;line-height:1;cursor:pointer}
+/* V2.4.xx ICAO/IATA：橫式分段，浮標左右滑＝現況（亮的那邊＝目前格式） */
+.code-seg{position:relative;display:inline-flex;padding:2px;border-radius:8px;background:var(--card);border:1px solid var(--border);cursor:pointer;font-size:.72em;font-weight:700;user-select:none;-webkit-user-select:none;vertical-align:middle}
+.code-seg-knob{position:absolute;top:2px;bottom:2px;left:2px;width:calc(50% - 2px);border-radius:6px;background:var(--accent);transition:transform .2s ease;pointer-events:none}
+.code-seg.is-iata .code-seg-knob{transform:translateX(100%)}
+.code-seg-opt{position:relative;z-index:1;padding:5px 11px;color:var(--muted);transition:color .2s;white-space:nowrap}
+.code-seg-opt.on{color:#fff}
 .pl-ver-tag {
   font-size: .82em; color: var(--muted); opacity: .8;
   cursor: pointer; text-decoration: underline; line-height: 1;
@@ -307,7 +318,11 @@ body.pl-offline .pl-topstack, body.pl-offline .pl-stickhead { top: calc(env(safe
   </button>
   <a href="/apps" id="cs-apps-home" class="pl-util-btn" aria-label="Tools" title="回 Tools" style="display:none;flex:0 0 auto;align-self:center;text-decoration:none;padding:0 8px"><svg width="20" height="20" viewBox="0 0 24 24"><rect x="2" y="2" width="9" height="9" rx="2.5" fill="#3b82f6"/><rect x="13" y="2" width="9" height="9" rx="2.5" fill="#10b981"/><rect x="2" y="13" width="9" height="9" rx="2.5" fill="#f59e0b"/><rect x="13" y="13" width="9" height="9" rx="2.5" fill="#a855f7"/></svg></a>
   <div class="pl-tab-btn pl-tab-util">
-    <button class="pl-util-btn" id="pl-theme-btn" onclick="_plToggleTheme()"><span id="pl-theme-icon">☀️</span></button>
+    <div class="theme-seg" title="日 / 夜">
+      <span class="theme-seg-knob"></span>
+      <button class="theme-seg-opt" type="button" onclick="_plSetTheme('light')" aria-label="日間 Day">☀️</button>
+      <button class="theme-seg-opt" type="button" onclick="_plSetTheme('dark')" aria-label="夜間 Night">🌙</button>
+    </div>
     <div class="pl-font-wrap">
       <button class="pl-font-btn pl-font-btn-lg" onclick="_plAdjustFontSize(1)">A+</button>
       <button class="pl-font-btn pl-font-btn-sm" onclick="_plAdjustFontSize(-1)">A-</button>

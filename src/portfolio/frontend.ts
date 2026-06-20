@@ -260,7 +260,11 @@ export function getPortfolioHtml(): string {
       </div>
       <div class="tab-controls">
         <a href="/apps" id="cs-apps-home" aria-label="Tools" title="回 Tools" style="display:none;align-items:center;justify-content:center;text-decoration:none;padding:0 4px"><svg width="20" height="20" viewBox="0 0 24 24"><rect x="2" y="2" width="9" height="9" rx="2.5" fill="#3b82f6"/><rect x="13" y="2" width="9" height="9" rx="2.5" fill="#10b981"/><rect x="2" y="13" width="9" height="9" rx="2.5" fill="#f59e0b"/><rect x="13" y="13" width="9" height="9" rx="2.5" fill="#a855f7"/></svg></a>
-        <button class="hdr-btn" id="btn-theme" onclick="toggleTheme()" title="日/夜">☀️</button>
+        <div class="theme-seg" title="日 / 夜">
+          <span class="theme-seg-knob"></span>
+          <button class="theme-seg-opt" type="button" onclick="setPortfolioTheme('light')" aria-label="日間 Day">☀️</button>
+          <button class="theme-seg-opt" type="button" onclick="setPortfolioTheme('dark')" aria-label="夜間 Night">🌙</button>
+        </div>
         <div class="hdr-btn-font" title="字型大小">
           <button onclick="bumpFont(1)">A+</button>
           <button onclick="bumpFont(-1)">A−</button>
@@ -391,6 +395,11 @@ body { font-size: 1rem; padding-left: 0; padding-right: 0; }
   min-width: 28px; border-radius: 4px; cursor: pointer;
 }
 .hdr-btn-font button:active { opacity: 0.7; }
+/* V2.4.xx 日夜：直立分段膠囊（☀️上/🌙下），浮標純 CSS 隨 [data-theme] 上下滑＝現況 */
+.theme-seg{position:relative;display:inline-flex;flex-direction:column;width:26px;height:40px;padding:2px;border-radius:13px;background:var(--bg-card);border:1px solid var(--border);cursor:pointer;flex:0 0 auto}
+.theme-seg-knob{position:absolute;left:2px;right:2px;top:2px;height:calc(50% - 2px);border-radius:11px;background:var(--accent);transition:transform .22s ease;pointer-events:none;transform:translateY(100%)}
+[data-theme="light"] .theme-seg-knob{transform:translateY(0)}
+.theme-seg-opt{position:relative;z-index:1;flex:1;display:flex;align-items:center;justify-content:center;background:none;border:0;padding:0;font-size:.8em;line-height:1;cursor:pointer}
 /* V1.0.18 fix: 14px top margin 對齊晨報 .sec 第一個 card 跟 top-stack 的 gap */
 .hdr-actions { display: flex; gap: 8px; margin: 14px 0 16px; }
 .btn { padding: 8px 14px; border-radius: 6px; border: 1px solid var(--border); background: var(--bg-card); color: var(--fg); font-size: .92em; cursor: pointer; }
@@ -1669,18 +1678,17 @@ function applyTheme() {
   const t = readTheme();
   if (t === 'light') document.documentElement.dataset.theme = 'light';
   else delete document.documentElement.dataset.theme;
-  const btn = document.getElementById('btn-theme');
-  // icon 顯示「目標 mode」: 現在 dark → 顯 ☀️ (按就切去 light)；現在 light → 顯 🌙
-  if (btn) btn.textContent = t === 'light' ? '🌙' : '☀️';
   // meta theme-color 同步切換（PWA 上下狀態列色）
   const meta = document.querySelector('meta[name="theme-color"]');
   if (meta) meta.setAttribute('content', t === 'light' ? '#f5f7fa' : '#0a0a0f');
 }
-function toggleTheme() {
-  const cur = readTheme();
-  const next = cur === 'light' ? 'dark' : 'light';
-  try { localStorage.setItem(THEME_KEY, next); } catch {}
+// V2.4.xx 直立膠囊：直接設目標模式（浮標純 CSS 顯示現況，不再寫 icon）
+function setPortfolioTheme(mode) {
+  try { localStorage.setItem(THEME_KEY, mode === 'light' ? 'light' : 'dark'); } catch {}
   applyTheme();
+}
+function toggleTheme() {
+  setPortfolioTheme(readTheme() === 'light' ? 'dark' : 'light');
 }
 
 // V1.0.14: 20-step font scale; V1.0.16: shared key crewsync_font_scale 跨 PWA + morning fallback

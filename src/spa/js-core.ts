@@ -573,27 +573,17 @@ function parseAtisHtml(html) {
 }
 
 // ── Theme ─────────────────────────────────────────────────────────────────────
-function toggleTheme() {
+// V9.5.24：日夜改直立分段膠囊（☀️上/🌙下 + 浮標）。浮標位置純 CSS 靠 [data-theme] 驅動，
+// 這裡只負責設定模式。setTheme 設成指定模式；toggleTheme 保留給舊呼叫者相容。
+function setTheme(mode) {
   const html = document.documentElement;
-  const icon = document.getElementById('theme-icon');
-  if (html.dataset.theme === 'light') {
-    // 目前日間 → 切換回夜間
-    delete html.dataset.theme;
-    icon.textContent = '☀️';
-    localStorage.setItem('crewsync_theme', 'dark');
-  } else {
-    // 目前夜間 → 切換到日間
-    html.dataset.theme = 'light';
-    icon.textContent = '🌙';
-    localStorage.setItem('crewsync_theme', 'light');
-  }
+  if (mode === 'light') { html.dataset.theme = 'light'; localStorage.setItem('crewsync_theme', 'light'); }
+  else { delete html.dataset.theme; localStorage.setItem('crewsync_theme', 'dark'); }
   if (typeof fr24SwitchTheme === 'function') fr24SwitchTheme();
 }
+function toggleTheme() { setTheme(document.documentElement.dataset.theme === 'light' ? 'dark' : 'light'); }
 (function() {
-  if (localStorage.getItem('crewsync_theme') === 'light') {
-    document.documentElement.dataset.theme = 'light';
-    document.getElementById('theme-icon').textContent = '🌙';
-  }
+  if (localStorage.getItem('crewsync_theme') === 'light') document.documentElement.dataset.theme = 'light';
 })();
 
 // ── Cold Temperature Altitude Correction ──────────────────────────────────────

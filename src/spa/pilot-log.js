@@ -105,19 +105,14 @@ function _plAdjustFontSize(dir) {
   try { localStorage.setItem('pilotlog_font_scale', String(_plFontScale)); } catch (e) {}
 }
 
-function _plToggleTheme() {
+// V2.4.xx：日夜改直立分段膠囊（☀️上/🌙下 + 浮標）。浮標位置純 CSS 靠 [data-theme] 驅動，
+// 這裡只設模式。_plSetTheme 設成指定模式；_plToggleTheme 保留相容（給舊呼叫者）。
+function _plSetTheme(mode) {
   var html = document.documentElement;
-  var icon = document.getElementById('pl-theme-icon');
-  if (html.dataset.theme === 'light') {
-    delete html.dataset.theme;
-    if (icon) icon.textContent = '☀️';
-    try { localStorage.setItem('pilotlog_theme', 'dark'); } catch (e) {}
-  } else {
-    html.dataset.theme = 'light';
-    if (icon) icon.textContent = '🌙';
-    try { localStorage.setItem('pilotlog_theme', 'light'); } catch (e) {}
-  }
+  if (mode === 'light') { html.dataset.theme = 'light'; try { localStorage.setItem('pilotlog_theme', 'light'); } catch (e) {} }
+  else { delete html.dataset.theme; try { localStorage.setItem('pilotlog_theme', 'dark'); } catch (e) {} }
 }
+function _plToggleTheme() { _plSetTheme(document.documentElement.dataset.theme === 'light' ? 'dark' : 'light'); }
 
 // 載入時把主題圖示對齊目前狀態（FOUC script 只設了 data-theme，沒動圖示）
 (function() {
@@ -1006,7 +1001,12 @@ function _plRenderToolbar() {
       '<button onclick="_plOpenCrew()" style="background:#a855f7;' + actBtn + '">👥 Crew</button>' +
       '<button onclick="_plOpenPlaces()" style="background:#f59e0b;' + actBtn + '">🗺️ Airports</button>' +
       // V1.3.29：機場碼切換比照日夜間 —— 顯示「按了會切到的目標」
-      '<button onclick="_plToggleAptFmt()" style="background:transparent;color:var(--muted);border:1px solid var(--border,#334155);border-radius:6px;padding:6px 10px;font-size:.72em;cursor:pointer" title="機場碼顯示切換：按一下切到另一種">🌐 ' + (_plAptFmtCur() === 'iata' ? 'ICAO' : 'IATA') + '</button>' +
+      // V2.4.xx：ICAO/IATA 橫式分段切換（亮的＝目前格式、浮標左右滑），取代原單鈕顯示目標
+      '<div class="code-seg' + (_plAptFmtCur() === 'iata' ? ' is-iata' : '') + '" title="機場碼顯示格式（亮起＝目前）">' +
+        '<span class="code-seg-knob"></span>' +
+        '<span class="code-seg-opt' + (_plAptFmtCur() === 'iata' ? '' : ' on') + '" onclick="_plSetAptFmt(\'icao\')">🌐 ICAO</span>' +
+        '<span class="code-seg-opt' + (_plAptFmtCur() === 'iata' ? ' on' : '') + '" onclick="_plSetAptFmt(\'iata\')">IATA</span>' +
+      '</div>' +
       // V1.3.33：一鍵上鎖 / 解鎖全部航班
       '<button onclick="_plLockAll(true)" style="background:transparent;color:var(--muted);border:1px solid var(--border,#334155);border-radius:6px;padding:6px 10px;font-size:.72em;cursor:pointer" title="一鍵上鎖全部航班 · Lock every flight">🔒 Lock all</button>' +
       '<button onclick="_plLockAll(false)" style="background:transparent;color:var(--muted);border:1px solid var(--border,#334155);border-radius:6px;padding:6px 10px;font-size:.72em;cursor:pointer" title="一鍵解鎖全部航班 · Unlock every flight">🔓 Unlock all</button>' +
@@ -1062,7 +1062,8 @@ function _plRenderEntryRow(e) {
   }
 
   // line 3 機尾/機型 + Flt#（deadhead 標 DH badge 跟普通 flight 區分）
-  var acIcon = e.is_deadhead ? '🧳' : ((e.out_utc && e.in_utc) ? '✈' : '🛠');
+  // V2.4.xx：地面/模擬機本來就沒有 OOOI，不該掛「缺資料」扳手 🛠（它們已有 GND/SIM 標籤）。
+  var acIcon = e.is_deadhead ? '🧳' : e.is_sim ? '🖥️' : e.is_ground ? '🏢' : ((e.out_utc && e.in_utc) ? '✈' : '🛠');
   var acMeta = acIcon + ' ' + _plEsc(e.tail_no || '') + (e.aircraft_type ? ', ' + _plEsc(e.aircraft_type) : '');
   var dhBadge = e.is_deadhead ? '<span style="background:#a855f7;color:#fff;border-radius:4px;padding:0 5px;font-size:.85em;margin-right:5px;font-weight:700">DH</span>' : '';
   // V1.3：尚未上傳的離線改動標 ⏳，讓使用者看得到哪些還沒同步
@@ -1546,7 +1547,8 @@ function _plEditorField(label, name, type, opts) {
   } else if (type === 'check') {
     input = '<label style="display:flex;align-items:center;gap:6px;font-size:.78em"><input type="checkbox" id="ple-' + name + '"' + (val ? ' checked' : '') + '> ' + _plEsc(opts.checkLabel || label) + '</label>';
   } else if (type === 'textarea') {
-    input = '<textarea ' + attrs + ' rows="2">' + _plEsc(val) + '</textarea>';
+    // V2.4.xx：remarks 隨輸入自動長高（oninput → _plAutoGrow）；rows=2 當最小高
+    input = '<textarea ' + attrs + ' rows="2" oninput="_plAutoGrow(this)">' + _plEsc(val) + '</textarea>';
   } else if (type === 'number') {
     if (opts.readonly) attrs = 'id="ple-' + name + '" readonly tabindex="-1" style="width:100%;box-sizing:border-box;background:var(--card);color:var(--muted);border:1px solid var(--border,#334155);border-radius:6px;padding:6px 8px;font-size:.78em;font-weight:700"';
     input = '<input type="number" ' + attrs + ' value="' + _plEsc(val) + '" step="' + (opts.step || '1') + '">';
@@ -2014,7 +2016,8 @@ function _plCrewField(key, e, labelOverride) {
   var hidden = '<input type="hidden" id="ple-crewid-' + key + '" value="' + _plEsc(val.eid) + '">' +
     '<input type="hidden" id="ple-crewname0-' + key + '" value="' + _plEsc(dispName) + '">';   // 原始名字：判斷名字有沒有被改過，改過就不沿用舊員編
   // V2.4.05：只有 4 個操作位（PIC/SIC/Relief1/Relief2）可拖拉換位；拖把手 ⠿ + data-ckslot 標記。
-  var drag = (key === 'pic' || key === 'crew2' || key === 'crew3' || key === 'crew4');
+  // V2.4.xx：已上鎖航班不可拖拉換位（鎖定＝不可改動）。
+  var drag = (key === 'pic' || key === 'crew2' || key === 'crew3' || key === 'crew4') && !(_pl.editing && _pl.editing.is_locked);
   var dragAttr = drag ? ' data-ckslot="' + key + '"' : '';
   var handle = drag ? '<span onpointerdown="_plCkDragStart(event,\'' + key + '\')" title="拖曳換位 Drag to reorder" style="flex:0 0 auto;touch-action:none;cursor:grab;color:var(--muted);font-size:1em;padding:0 2px;user-select:none">⠿</span>' : '';
   // V2.1.09：iPad（寬螢幕）維持原本 label-above 緊湊版（搭配 2-per-row，不動）。
@@ -2347,6 +2350,7 @@ function _plCkDragTargetAt(x, y) {
   return (el && el.closest) ? el.closest('[data-ckslot]') : null;
 }
 function _plCkDragStart(ev, key) {
+  if (_pl.editing && _pl.editing.is_locked) return;   // V2.4.xx：上鎖不可拖拉換位（保險，把手本來就不顯示）
   if (ev.cancelable) ev.preventDefault();
   _plCkDrag = { key: key };
   var row = document.querySelector('[data-ckslot="' + key + '"]');
@@ -2741,19 +2745,28 @@ function _plAptFmt(code) {
   return c;
 }
 function _plAptFmtCur() { try { return localStorage.getItem('pilotlog_apt_fmt') || 'icao'; } catch (e) { return 'icao'; } }
-function _plToggleAptFmt() {
-  var next = _plAptFmtCur() === 'iata' ? 'icao' : 'iata';
-  try { localStorage.setItem('pilotlog_apt_fmt', next); } catch (e) {}
-  _plToast('機場碼顯示：' + next.toUpperCase());
+// V2.4.xx：改成橫式分段切換（亮的＝目前格式）→ 直接設定指定格式，不再單純 toggle。
+function _plSetAptFmt(fmt) {
+  fmt = (fmt === 'iata') ? 'iata' : 'icao';
+  if (_plAptFmtCur() === fmt) return;   // 已是該格式 → 不動
+  try { localStorage.setItem('pilotlog_apt_fmt', fmt); } catch (e) {}
+  _plToast('機場碼顯示：' + fmt.toUpperCase());
   // codex P2：編輯器開著時（iPad detail pane）只重畫列表，不動編輯器 —— 否則會丟未存的編輯。
   if (_pl.editing) {
     if (document.getElementById('pl-list')) _plRenderList();
     _plSyncRouteFmt();   // 但 From/To 要跟上新格式：轉換顯示值 + 更新 label + 重建下拉（codex P2 V2.1.02）
   } else _plRenderMain();
 }
+function _plToggleAptFmt() { _plSetAptFmt(_plAptFmtCur() === 'iata' ? 'icao' : 'iata'); }   // 相容舊呼叫
 // 編輯器開著時切換 IATA/ICAO → 只同步 From/To（其他欄位不動、不丟編輯）：轉碼 + 改 label + 重建星宇下拉。
+// V2.4.xx：textarea 隨內容自動長高（remarks 用）。設 auto 再吃 scrollHeight，避免只增不減。
+function _plAutoGrow(el) {
+  if (!el) return;
+  el.style.height = 'auto';
+  el.style.height = (el.scrollHeight + 2) + 'px';
+}
 function _plSyncRouteFmt() {
-  var iata = _plAptFmtCur() === 'iata', tag = iata ? 'IATA' : 'ICAO';
+  var iata = _plAptFmtCur() === 'iata';
   [['origin', 'From'], ['dest', 'To']].forEach(function(p) {
     var inp = document.getElementById('ple-' + p[0]);
     if (inp && (inp.value || '').trim()) {
@@ -2761,8 +2774,9 @@ function _plSyncRouteFmt() {
       if (info) { var c = (iata && info.iata) ? info.iata : info.icao; if (c) inp.value = c; }
     }
     var lb = document.getElementById('ple-' + p[0] + '-label');
-    // V2.3（codex P3）：若使用者自訂了 From/To 名稱，尊重它（不被 IATA/ICAO 切換蓋掉）；沒自訂才用「From (ICAO)」。
-    if (lb) { var cl = _plFieldLabel(p[0], ''); lb.textContent = cl ? cl : (p[1] + ' (' + tag + ')'); }
+    // V2.3（codex P3）：若使用者自訂了 From/To 名稱，尊重它；沒自訂才用預設。
+    // V2.4.xx：拿掉「(ICAO/IATA)」字眼 —— 欄位本就同時吃 ICAO/IATA，標格式反而誤導。
+    if (lb) { var cl = _plFieldLabel(p[0], ''); lb.textContent = cl ? cl : p[1]; }
   });
   _plUpdateAptLists();
 }
@@ -3541,6 +3555,8 @@ function _plWireEditor() {
       if (changed && _pl._editorTouched) _plScheduleAutoSave();
     }
   });
+  // V2.4.xx：開啟時依現有 remarks 內容把欄位撐到合適高度（鎖定的也要撐開才看得到全文）
+  try { var _rmkTa = document.getElementById('ple-remarks'); if (_rmkTa) _plAutoGrow(_rmkTa); } catch (e) {}
   // V1.3.08：上鎖的航班 — 所有編輯欄位 disabled；Lock 按鈕仍可用以解鎖
   if (_pl.editing && _pl.editing.is_locked) {
     ['input', 'select', 'textarea'].forEach(function(tag) {
@@ -3742,7 +3758,7 @@ function _plRenderEditor(target) {
         _plFieldRow(2, _plEditorField('Sim Type（FFS/FTD）', 'sim_type', 'text') + _plEditorField('Sim Time', 'sim_minutes', 'hhmm-dur')) +
       '</div>' +
       _plFieldRow(2, _plEditorField('Date', 'flight_date', 'date') + _plEditorField('Flight #', 'flight_no', 'text')) +
-      '<div id="ple-route-row" style="display:' + ((_plEntryType(e) === 'sim' || _plEntryType(e) === 'ground') ? 'none' : '') + '">' + _plFieldRow(2, _plEditorField('From (' + (_plAptFmtCur() === 'iata' ? 'IATA' : 'ICAO') + ')', 'origin', 'text', { fmt: _plAptFmt, aptSide: 'origin', labelId: 'ple-origin-label', placeholder: '選星宇航點或輸入 · pick/type' }) + _plEditorField('To (' + (_plAptFmtCur() === 'iata' ? 'IATA' : 'ICAO') + ')', 'dest', 'text', { fmt: _plAptFmt, aptSide: 'dest', labelId: 'ple-dest-label', placeholder: '選星宇航點或輸入 · pick/type' })) +
+      '<div id="ple-route-row" style="display:' + ((_plEntryType(e) === 'sim' || _plEntryType(e) === 'ground') ? 'none' : '') + '">' + _plFieldRow(2, _plEditorField('From', 'origin', 'text', { fmt: _plAptFmt, aptSide: 'origin', labelId: 'ple-origin-label', placeholder: '選星宇航點或輸入 · pick/type' }) + _plEditorField('To', 'dest', 'text', { fmt: _plAptFmt, aptSide: 'dest', labelId: 'ple-dest-label', placeholder: '選星宇航點或輸入 · pick/type' })) +
         '<div id="ple-aptname-row" style="font-size:.6em;color:var(--muted);margin:-4px 0 8px;line-height:1.4"></div>' +
         '<button type="button" id="ple-wx-btn" onclick="_plToggleEditorWx()" style="background:none;border:none;color:#22c55e;font-size:.7em;font-weight:700;cursor:pointer;padding:0 0 6px">⛅ WX · METAR / TAF ▾</button>' +
         '<div id="ple-wx-panel" style="display:none;margin-bottom:8px"></div></div>' +
@@ -4742,7 +4758,8 @@ async function _plUploadWader(dryRun) {
   var msg = (dryRun ? '🔍 Dry-run（沒寫入 DB）：' : '✅ 匯入完成：') +
     '航班 <b>' + (j.imported_flights || 0) + '</b>、模擬機 <b>' + (j.imported_sims || 0) + '</b>、' +
     '起始累計 <b>' + (j.opening_types || 0) + '</b> 型、重複略過 <b>' + (j.duplicate_skipped || 0) + '</b>、' +
-    '解析失敗 <b>' + (j.parse_errors || 0) + '</b>' + (j.needs_completion ? '、<span style="color:#fbbf24">待補強 <b>' + j.needs_completion + '</b> 筆（已收進來，可點開補完）</span>' : '');
+    '解析失敗 <b>' + (j.parse_errors || 0) + '</b>' + (j.needs_completion ? '、<span style="color:#fbbf24">待補強 <b>' + j.needs_completion + '</b> 筆（已收進來，可點開補完）</span>' : '') +
+    (j.oooi_backfilled ? '、<span style="color:#4ade80">回填 OOOI <b>' + j.oooi_backfilled + '</b> 筆</span>' : '');
   resBox.innerHTML = '<div style="background:' + (dryRun ? '#1e3a5f' : '#064e3b') + ';color:#fff;padding:10px;border-radius:8px;font-size:.78em">' + msg + '</div>';
   if (!dryRun) { await _plRefreshMain(); }
 }
