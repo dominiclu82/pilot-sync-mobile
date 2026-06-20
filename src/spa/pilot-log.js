@@ -4844,12 +4844,10 @@ async function _plUploadFlights(dryRun) {
   var doneLine = overwrite
     ? '補/換已完成航班組員 <b>' + (dryRun ? nCrew : (j.crew_overwritten || 0)) + '</b>、'
     : '保留已完成 <b>' + (j.duplicate_skipped || 0) + '</b>、';
-  // V2.4.xx：待命 / 同站訓練（TPE↔TPE）跳過筆數（不匯入）＋ 既有垃圾清掉筆數（只留最早一筆 local check）
+  // V2.4.xx：待命（SB）這次檔案跳過的筆數 ＋ 既有待命被清掉的筆數
   var _cleanWord = dryRun ? '可清' : '已清';
   var skipLine = (j.skipped_standby ? '、<span style="color:#94a3b8">待命跳過 <b>' + j.skipped_standby + '</b></span>' : '') +
-    (j.skipped_training ? '、<span style="color:#94a3b8">同站訓練跳過 <b>' + j.skipped_training + '</b></span>' : '') +
-    (j.cleaned_standby ? '、<span style="color:#fca5a5">' + _cleanWord + '既有待命 <b>' + j.cleaned_standby + '</b></span>' : '') +
-    (j.cleaned_training ? '、<span style="color:#fca5a5">' + _cleanWord + '既有同站訓練 <b>' + j.cleaned_training + '</b>（留最早一筆 local check）</span>' : '');
+    (j.cleaned_standby ? '、<span style="color:#fca5a5">' + _cleanWord + '既有待命 <b>' + j.cleaned_standby + '</b></span>' : '');
 
   if (dryRun) {
     // V1.2.04：欄位偵測 — 一眼看出匯出檔有沒有帶 PIC/SIC 時數欄 + Deadhead 欄

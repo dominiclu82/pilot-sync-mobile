@@ -10,7 +10,6 @@
 import { randomUUID } from 'crypto';
 import { getPool, ensureTables } from './schema.js';
 import { parseTab } from './tsv-parser.js';
-import { normAirportKey } from './airport-codes.js';   // V2.4.xx：TPE/RCTP 正規化（同站來回判定）
 // V1.0.06：parseTab 抽到 tsv-parser.ts 改成 proper state machine，
 // 處理 quoted 多行欄位（LogTen Remarks 多行用 quote 包）+ escaped quote。
 // 原本 inline split-by-line 版本會把 LogTen 多行 Remarks 拆成假 row，
@@ -279,23 +278,8 @@ export async function importLogtenFlights(
     baseCount.set(b, (baseCount.get(b) || 0) + 1);
   }
 
-  // V2.4.xx（user 規則）：同站來回（TPE↔TPE，含 RCTP）幾乎都是過去待命/訓練，不需要保留；
-  //   只留「日期最早的那一筆」當 local check（第一筆紀錄）。先掃一遍找出要保留那筆的列索引，
-  //   主迴圈裡其餘 TPE→TPE 一律跳過不匯。
-  const _TPE_KEY = normAirportKey('TPE');
-  let _keepLocalCheckIdx = -1;
-  let _keepLocalCheckDate = '';
-  for (let i = 0; i < rows.length; i++) {
-    const o = rows[i]['From'], t = rows[i]['To'], d = rows[i]['Date'];
-    // codex P2：只在「主迴圈真的會收」的列裡挑 local check —— 沒日期 / 待命(SB/SBY) 的列主迴圈會跳過，
-    //   若被選成 keep idx，會害其餘合格 TPE↔TPE 全被跳掉、最後一筆 local check 都沒留。
-    if (!o || !t || !d) continue;
-    const _fnFirst0 = String(rows[i]['Flight #'] || '').toUpperCase().split(/\s+/)[0] || '';
-    if (/^SBY?[0-9]*$/.test(_fnFirst0)) continue;   // 待命不算 local check
-    if (normAirportKey(o) === _TPE_KEY && normAirportKey(t) === _TPE_KEY) {
-      if (_keepLocalCheckIdx < 0 || d < _keepLocalCheckDate) { _keepLocalCheckIdx = i; _keepLocalCheckDate = d; }
-    }
-  }
+  // 註：舊版曾用「同站來回 TPE↔TPE」判斷跳過訓練 —— 已移除，因為模擬機本來就是 RCTP→RCTP，
+  //   用航線跳會誤刪要保留的模擬機。改成純依航班號分類（見主迴圈 isSim/isPnc/isStandby）。
 
   // V1.2.04 / codex P1：判斷航班是否「已過」用來決定 confirmed。不能用單純 UTC 今天 —
   // 否則 UTC 跨日後、當地還沒跨日的西半球 user，今天還沒飛的航班會被誤標 confirmed（之後
@@ -399,22 +383,23 @@ export async function importLogtenFlights(
       //   sim 沒航線是正常、不算待補強；過去 confirmed 的也會在重匯時被回填這兩個旗標。
       const _fnUp = String(flightNo || '').toUpperCase();
       const _fnFirst = _fnUp.split(/\s+/)[0] || '';
+      // 純依「航班號」分類（user 鐵則：以前沒選分類、全是 flight，但航班號看得出類別）：
+      //   EM/TM/PT/PC/FFK/PNR = 模擬機；含 PNC = deadhead；SB/SBP/SBH… = 待命。
+      //   ⚠ 不可用航線(同站 TPE↔TPE)判斷 —— 模擬機本來就是 RCTP→RCTP，用航線跳會把要保留的模擬機誤刪。
       const isSim = /^(EM|TM|PT|PC|FFK|PNR)\d*$/.test(_fnFirst);
       const isPnc = /\bPNC\b/.test(_fnUp);
-      const isStandby = /^SBY?\d*$/.test(_fnFirst);   // SB / SBY / SB1… = 待命
+      const isStandby = /^SB[A-Z]?$/.test(_fnFirst);   // 待命＝SB 或 SB+單字母（SB/SBP/SBH/SBU/SBY…）；排除 SB740 這種帶數字的真航班（codex）
+      const isDeadhead = _plTruthyFlag(row['Deadhead']) || _plTruthyFlag(row['Positioning']) || isPnc;
 
-      // V2.4.xx（user 規則）：① 待命（SB）→ 一律不匯。
-      //   ② 同站來回（TPE↔TPE）幾乎都是過去待命/訓練 → 不匯，只留最早那筆（local check）。
-      //   都在進任何寫入/preview 之前先攔掉，並計數讓 dry-run 看得到。
-      const _isTpeTpe = !!from && !!to && normAirportKey(from) === _TPE_KEY && normAirportKey(to) === _TPE_KEY;
+      // 待命（SB…）→ 不匯入（沒實質紀錄價值）。其餘一律保留、靠上面旗標分類。
       if (isStandby) { result.skipped_standby = (result.skipped_standby || 0) + 1; continue; }
-      if (_isTpeTpe && i !== _keepLocalCheckIdx) { result.skipped_training = (result.skipped_training || 0) + 1; continue; }
       // V2.3：拆成兩個概念 ——
       //   missingKeyFields = 缺關鍵欄位（含沒班號）→ 沿用既有 incomplete-style source_ref，
       //     讓 V2.2 已匯入過的「沒班號」航段重匯時對得回去（codex：否則 ref 改格式 → 重匯變兩筆）。
       //   needsCompletion = 真正待補強 = 只有「沒航線」(from/to)；沒班號但有航線+時間的是真飛過的航段、要計入統計。
       const missingKeyFields = !flightNo || !from || !to;
-      const needsCompletion = !isSim && (!from || !to);   // 模擬機沒航線是正常、不該被當待補強
+      // 模擬機 / DHD（含 PNC）本來就沒航線/沒 In，屬正常、不該被當待補強（否則 _plEntryIsDone 會把它判成未完成）
+      const needsCompletion = !isSim && !isDeadhead && (!from || !to);
 
       // 跨日 OOOI：Out → Off → On → In 順序遞增，若回繞則 +1 day（提前解析，待補強的穩定鍵要用 out）
       const outUtc = parseUtcAtDate(date, row['Out']);
@@ -481,10 +466,7 @@ export async function importLogtenFlights(
         _cci++;
       }
 
-      // V1.2.03：Deadhead = LogTen 標記 positioning 的欄位。deadhead 是已發生事件
-      // （你被載過去、沒操作），先判它，因為它會蓋掉 position 推斷。
-      const isDeadhead = _plTruthyFlag(row['Deadhead']) || _plTruthyFlag(row['Positioning']) || isPnc;
-
+      // V1.2.03：Deadhead 已在上方（分類處）先判，這裡不再重複宣告。
       // V1.2.04：讀 LogTen 實際 PIC/SIC 時數（多候選欄名，取第一個能解析成 HH:MM 的）。
       // 這是統計要加總的真值；deadhead/加強組員巡航等既非 P1 也非 P2 的時間就不會被灌進來。
       // V1.3.24：時數欄名也因人而異 —— 你的匯出是 "PIC/P1" / "SIC/P2"（不是 "PIC"/"SIC"），補進候選。
@@ -666,28 +648,19 @@ export async function importLogtenFlights(
     }
   }
 
-  // ── V2.4.xx cleanup（user：匯入順手把多餘的刪掉，不必清全部、不必重匯組員）──────────────
-  //   只動 source='logten' + 沒鎖的：① 待命（flight_no SB/SBY[數字]）；② 同站來回（TPE↔TPE）訓練，
-  //   但保留「日期最早一筆」當 local check。dry-run 只數不刪；實際匯入才真刪。
-  const _tpeWhere = `user_id = $1 AND source = 'logten' AND origin IN ('TPE','RCTP') AND dest IN ('TPE','RCTP')`;
-  const _keepSub = `(SELECT id FROM pilot_log_entries WHERE ${_tpeWhere} ORDER BY flight_date ASC, created_at ASC LIMIT 1)`;
-  const _sbWhere = `user_id = $1 AND source = 'logten' AND is_locked IS NOT TRUE AND flight_no ~* '^SBY?[0-9]*$'`;
-  const _trWhere = `${_tpeWhere} AND is_locked IS NOT TRUE AND id <> ${_keepSub}`;
+  // dry-run：到此為止，不寫 DB（preview/needs_completion 已組好）。待命 SB 已在迴圈跳過、不入庫。
+  //   但仍「數」一下實際匯入會清掉的既有待命列，讓 preview 跟真匯入一致（codex：否則 dry-run 報 0 會誤導）。
   if (opts.dryRun) {
-    // dry-run：到此為止，不寫 DB；只「數」會被清掉的既有垃圾，讓使用者先看數字
     try {
-      const a = await pool.query(`SELECT COUNT(*)::int AS n FROM pilot_log_entries WHERE ${_sbWhere}`, [userId]);
-      const b = await pool.query(`SELECT COUNT(*)::int AS n FROM pilot_log_entries WHERE ${_trWhere}`, [userId]);
-      result.cleaned_standby = a.rows[0].n;
-      result.cleaned_training = b.rows[0].n;
-    } catch (e: any) { console.warn('[pilot-log] cleanup dry-run count error:', e.message); }
+      const sb = await pool.query(
+        `SELECT COUNT(*)::int AS n FROM pilot_log_entries WHERE user_id = $1 AND source = 'logten'
+           AND is_locked IS NOT TRUE AND upper(split_part(flight_no,' ',1)) ~ '^SB[A-Z]?$'`,
+        [userId]
+      );
+      result.cleaned_standby = sb.rows[0].n;
+    } catch (e: any) { console.warn('[pilot-log] dry-run standby count error:', e.message); }
     return result;
   }
-  // 實際匯入：cleanup 的 DELETE 改到「transaction 內、插入之後」執行（見下方 client TX）：
-  //   codex P1 —— 若放在 BEGIN 之前，後面 insert 失敗 rollback，刪除卻已生效＝資料遺失。
-  //   codex P2 —— 放在 insert 之後，_keepSub 會用「DB 既有＋這次新插入」一起算最早一筆，
-  //     才能保證全域只留一筆 local check（否則檔案較晚的那筆會跟 DB 既有的並存成兩筆）。
-  //   故這裡不再 early-return；一律開 TX（即使只有 cleanup 要做），讓刪除跟寫入同生共死。
 
   // ── 包進單一 transaction：要嘛全寫成功，要嘛全 ROLLBACK，避免 partial 狀態 ──
   // codex 提醒：原本 bulk INSERT 後接 UPDATE，若中途任一失敗會留下部分寫入。
@@ -800,14 +773,15 @@ export async function importLogtenFlights(
       }   // 無 out 的完整航班（極少）不做 date-only 合併，避免誤刪同日其他待補強
     }
 
-    // ── V2.4.xx cleanup（在 TX 內、插入之後）：刪掉待命 + 同站訓練垃圾 ───────────────
-    //   放這裡的兩個理由（codex）：① 跟寫入同生共死 —— import 失敗 rollback，刪除也一起回復，不會資料遺失。
-    //   ② _keepSub 用「DB 既有 + 這次剛插入」一起算最早一筆 → 全域只留一筆 local check（檔案較晚的那筆也會被清掉）。
+    // ── 待命清理（codex P1）：重匯時把既有的待命列（SB+單字母）一併刪掉，讓 DB 收斂到「不留待命」。
+    //   在 TX 內、insert 之後執行 → 失敗 rollback 一起回復，不會誤刪。只動 source='logten' + 沒鎖。
     {
-      const sb = await client.query(`DELETE FROM pilot_log_entries WHERE ${_sbWhere}`, [userId]);
-      const tr = await client.query(`DELETE FROM pilot_log_entries WHERE ${_trWhere}`, [userId]);
-      result.cleaned_standby = sb.rowCount || 0;
-      result.cleaned_training = tr.rowCount || 0;
+      const sbDel = await client.query(
+        `DELETE FROM pilot_log_entries WHERE user_id = $1 AND source = 'logten'
+           AND is_locked IS NOT TRUE AND upper(split_part(flight_no,' ',1)) ~ '^SB[A-Z]?$'`,
+        [userId]
+      );
+      result.cleaned_standby = sbDel.rowCount || 0;
     }
 
     await client.query('COMMIT');
@@ -818,9 +792,9 @@ export async function importLogtenFlights(
     result.oooi_backfilled = oooiBackfilledCount;
 
     // V1.0.05 monitoring：成功匯入後寫 last_import_at（fire-and-forget，跟主 TX 解耦）
-    // V2.4.xx：backfill-only / 只清理 的重匯也真的改了 pilot_log_entries，要一併更新時間戳（codex P3）
+    // V2.4.xx：backfill-only / 只清待命 的重匯也真的改了 pilot_log_entries，要一併更新時間戳（codex P3）
     if (insertedCount > 0 || updatedCount > 0 || crewUpdatedCount > 0 || oooiBackfilledCount > 0
-        || (result.cleaned_standby || 0) > 0 || (result.cleaned_training || 0) > 0) {
+        || (result.cleaned_standby || 0) > 0) {
       pool.query(
         `UPDATE pilot_users SET last_import_at = NOW() WHERE id = $1`,
         [userId]

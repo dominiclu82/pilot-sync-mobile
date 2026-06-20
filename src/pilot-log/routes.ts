@@ -57,8 +57,8 @@ import { getAirportDbJs } from '../spa/js-airport-db.js';
 
 // ── 版本（比照 CrewSync / Morning：每次推版必更新；SW cache 名稱跟著走） ────
 // 本機 preview build 會暫時加 -tNN 後綴方便對版；推正式版前拿掉只留乾淨版號。
-export const PILOT_LOG_VERSION = 'V2.4.24';
-const PILOT_LOG_CACHE = 'pilotlog-v2-4-24';
+export const PILOT_LOG_VERSION = 'V2.4.25';
+const PILOT_LOG_CACHE = 'pilotlog-v2-4-25';
 
 export const pilotLogRouter = express.Router();
 
@@ -386,8 +386,13 @@ function _renderPilotLogChangelog(): string {
     ${renderCommunityLink()}
     <div class="pl-cl-v">${PILOT_LOG_VERSION}</div>
     <div class="pl-cl-txt">
-      <b>🔧 匯入修正：班表只補組員、不覆蓋已完成航班時間；LogTen 自動清掉待命 / 同站訓練。</b><br>
-      <b>🔧 Import fixes: roster only fills crew (never overwrites completed-flight times); LogTen auto-clears standby / same-airport training.</b>
+      <b>🔧 匯入依航班號自動分類：EM/TM/PT/PC/FFK/PNR→模擬機、PNC→DHD；待命(SB)不匯入；模擬機 / DHD 不再被當未完成。</b><br>
+      <b>🔧 Auto-classify imports by flight number: EM/TM/PT/PC/FFK/PNR→Sim, PNC→DHD; standby(SB) skipped; Sim/DHD no longer marked incomplete.</b>
+    </div>
+    <div class="pl-cl-v old">V2.4.24</div>
+    <div class="pl-cl-txt">
+      <b>🔧 匯入修正：班表只補組員、不覆蓋已完成航班時間。</b><br>
+      <b>🔧 Import fix: roster only fills crew, never overwrites completed-flight times.</b>
     </div>
     <div class="pl-cl-v old">V2.4.23</div>
     <div class="pl-cl-txt">
