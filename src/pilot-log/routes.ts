@@ -3348,12 +3348,6 @@ function _renderTowerHtml(): string {
   .src{display:flex;gap:8px;flex-wrap:wrap;margin-top:6px;font-size:.73em}.src span{background:#0a0e1a;border:1px solid #1f2a3d;border-radius:5px;padding:1px 7px;color:#94a3b8}.src b{color:#cbd5e1}
   .t{color:#64748b;font-size:.72em;margin-top:5px}.err{color:#fca5a5}#gsi{margin:14px 0}
   .note{color:#64748b;font-size:.74em;margin-top:22px;line-height:1.6;border-top:1px solid #1f2a3d;padding-top:12px}
-  .modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:50;align-items:center;justify-content:center;padding:16px}
-  .mbox{background:#111827;border:1px solid #1f2a3d;border-radius:14px;max-width:560px;width:100%;max-height:82vh;overflow:auto;padding:16px}
-  .mhead{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px}.mhead h3{margin:0;font-size:1.02em}
-  .msum{color:#cbd5e1;font-size:.82em;margin-bottom:6px;line-height:1.5}
-  .msec{color:#60a5fa;font-size:.76em;font-weight:700;margin:12px 0 4px;border-top:1px solid #1f2a3d;padding-top:8px}
-  .mr{display:flex;justify-content:space-between;gap:10px;font-size:.82em;padding:3px 0;border-bottom:1px solid #0f1726}.mr b{color:#e2e8f0;white-space:nowrap}.mr span{color:#94a3b8}
 </style></head><body><div class="wrap">
   <div class="top"><h1>🗼 Tower</h1><div class="who"><span id="me"></span> <button class="ghost" id="reBtn" style="display:none" onclick="load()">🔄 重新整理</button> <button class="ghost" id="outBtn" style="display:none" onclick="logout()">登出</button></div></div>
   <div id="msg" class="who" style="margin-bottom:10px"></div>
@@ -3432,27 +3426,24 @@ function dash(){
       if(!cf.ok)return '<div class=card><div class=lbl>站長 API · 我們</div><div class="big gray">—</div><div class=sub>讀取失敗'+(cf.status?' '+cf.status:'')+'</div></div>';
       var sm=cf.sample||{};var n=(cf.ourCalls24h!=null?cf.ourCalls24h:(sm.count||0));var lh=sm.lastHour||0;var cls=lh>=20?'y':'g';
       var ap=sm.byAirport||{};var apS=Object.keys(ap).sort(function(a,b){return ap[b]-ap[a];}).slice(0,6).map(function(k){return '<span>'+esc(k)+' <b>'+ap[k]+'</b></span>';}).join('')||'<span class=gray>近期無</span>';
-      return '<div class=card style="cursor:pointer" onclick="coffeeDetail()" title="點看明細"><div class=lbl>站長 API · 我們 <span style="color:#475569">›</span></div><div class="big '+cls+'">'+n+'</div><div class=sub>近 24h ｜ 最近 1h(樣本) <b>'+lh+'</b>'+(lh>=20?' ⚠ 偏多':'')+'</div><div class=seg style="flex-wrap:wrap">最近查過 '+apS+'</div></div>';})()+
+      return '<div class=card style="cursor:pointer" onclick="setTab(5)" title="看明細分頁"><div class=lbl>站長 API · 我們 <span style="color:#475569">›</span></div><div class="big '+cls+'">'+n+'</div><div class=sub>近 24h ｜ 最近 1h(樣本) <b>'+lh+'</b>'+(lh>=20?' ⚠ 偏多':'')+'</div><div class=seg style="flex-wrap:wrap">最近查過 '+apS+'</div></div>';})()+
   '</div>';
 }
-// 站長 API 用量卡片：點開 → 明細視窗（資料皆來自已抓的 T.coffee，不另打、只我們、已濾個資）
-function showModal(html){var m=el('modal');if(!m){m=document.createElement('div');m.id='modal';m.className='modal';m.onclick=function(e){if(e.target===m)closeModal();};document.body.appendChild(m);}m.innerHTML='<div class=mbox>'+html+'</div>';m.style.display='flex';}
-function closeModal(){var m=el('modal');if(m)m.style.display='none';}
-function kvRows(obj){var o=obj||{};var ks=Object.keys(o).sort(function(a,b){return o[b]-o[a];});if(!ks.length)return '<div class=t>—</div>';return ks.map(function(k){return '<div class=mr><span>'+esc(k)+'</span><b>'+o[k]+'</b></div>';}).join('');}
-function coffeeDetail(){
-  var cf=T.coffee;if(!cf||!cf.enabled)return;
-  if(!cf.ok){showModal('<div class=mhead><h3>站長 API · 我們的足跡</h3><button class=ghost onclick="closeModal()">✕</button></div><div class=msum>讀取失敗'+(cf.status?(' (HTTP '+cf.status+')'):'')+'</div>');return;}
+// 站長 API 用量分頁（T.tab===5）：資料皆來自已抓的 T.coffee，不另打、只我們、已濾個資。比照其他分頁，顯示在下方。
+function coffeeRows(obj){var o=obj||{};var ks=Object.keys(o).sort(function(a,b){return o[b]-o[a];});if(!ks.length)return '<div class=row><span class=gray>—</span></div>';return ks.map(function(k){return '<div class=row><div class=r1><span class=id>'+esc(k)+'</span><span class=stats><b>'+o[k]+'</b> 次</span></div></div>';}).join('');}
+function secCoffee(){
+  var cf=T.coffee;
+  if(!cf||!cf.enabled)return '<div class=row><span class=gray>站長 API 監控未啟用（未設鑰匙）</span></div>';
+  if(!cf.ok)return '<div class=row><span class=err>讀取失敗'+(cf.status?(' (HTTP '+cf.status+')'):'')+'</span></div>';
   var sm=cf.sample||{};
   var rng=cf.range?(fmtDt(cf.range.start)+' ~ '+fmtDt(cf.range.end)):'近 24h';
   var n=(cf.ourCalls24h!=null?cf.ourCalls24h:(sm.count||0));
-  var rc=(sm.recent||[]).map(function(c){return '<div class=mr><span>'+fmtDt(c.at)+'</span><span>'+esc(c.endpoint||'')+'</span><b>'+esc(c.airport||'—')+'</b></div>';}).join('')||'<div class=t>近期無</div>';
-  var h='<div class=mhead><h3>站長 API · 我們的足跡</h3><button class=ghost onclick="closeModal()">✕</button></div>'+
-    '<div class=msum>近 24h <b>'+n+'</b> 次 · 全站(含站長) '+(cf.allTotal||0)+' · 區間 '+rng+'</div>'+
-    '<div class=msec>依 API</div>'+kvRows(sm.byEndpoint)+
-    '<div class=msec>依機場（最近樣本）</div>'+kvRows(sm.byAirport)+
-    '<div class=msec>最近呼叫（最多 20 筆）</div>'+rc+
-    '<div class=t style="margin-top:10px">數字為「最近清單樣本」推算，忙時可能少算；只顯示我們自己（oops.h-peak.com）、已濾 IP/裝置。</div>';
-  showModal(h);
+  var rc=(sm.recent||[]).map(function(c){return '<div class=row><div class=r1><span class=id>'+esc(c.airport||'—')+'</span><span class=name>'+esc(c.endpoint||'')+'</span></div><div class=t>'+fmtDt(c.at)+'</div></div>';}).join('')||'<div class=row><span class=gray>近期無</span></div>';
+  return '<div class=dist><span class=chip>近 24h <b>'+n+'</b> 次</span><span class=chip>全站(含站長) <b>'+(cf.allTotal||0)+'</b></span><span class=chip>區間 '+esc(rng)+'</span></div>'+
+    '<div class=sechdr><h2>依 API</h2></div>'+coffeeRows(sm.byEndpoint)+
+    '<div class=sechdr><h2>依機場</h2><span class=cnt>最近樣本</span></div>'+coffeeRows(sm.byAirport)+
+    '<div class=sechdr><h2>最近呼叫</h2><span class=cnt>最多 20 筆</span></div>'+rc+
+    '<div class=note style="margin-top:14px">數字為「最近清單樣本」推算，忙時可能少算；只顯示我們自己（oops.h-peak.com）、已濾掉 IP/裝置。</div>';
 }
 function filt(arr,keys){var q=T.q.toLowerCase();if(!q)return arr;return arr.filter(function(u){return keys.some(function(k){var v=u[k];if(Array.isArray(v))v=v.join(' ');return String(v||'').toLowerCase().indexOf(q)>=0;});});}
 function render(){
@@ -3465,10 +3456,11 @@ function render(){
     '<div class="tab'+(T.tab===2?' on':'')+'" onclick="setTab(2)">🌅 Morning <span class=n>· '+m.count+'</span></div>'+
     '<div class="tab'+(T.tab===3?' on':'')+'" onclick="setTab(3)">👥 Groups <span class=n>· '+gp.count+'</span></div>'+
     '<div class="tab'+(T.tab===4?' on':'')+'" onclick="setTab(4)">💾 DB</div>'+
+    '<div class="tab'+(T.tab===5?' on':'')+'" onclick="setTab(5)">📡 站長 API</div>'+
     /* TODO（V9.5.02 移除）：📻 ATIS 分頁已停用（匿名化後額度/誰用紀錄皆空）。 */
   '</div>';
   if(T.tab<3){h+='<div class=ctrl><input placeholder="🔍 搜尋…" value="'+esc(T.q)+'" oninput="T.q=this.value;render()"></div>';}
-  if(T.tab===0)h+=secCrew(c);else if(T.tab===1)h+=secPilot(p,c);else if(T.tab===2)h+=secMorning(m);else if(T.tab===3)h+=secGroups(gp);else if(T.tab===4)h+=secDb();
+  if(T.tab===0)h+=secCrew(c);else if(T.tab===1)h+=secPilot(p,c);else if(T.tab===2)h+=secMorning(m);else if(T.tab===3)h+=secGroups(gp);else if(T.tab===4)h+=secDb();else if(T.tab===5)h+=secCoffee();
   el('app').style.display='';el('app').innerHTML=h;
 }
 /* TODO（V9.5.02 移除）：secAtis() ATIS 額度/誰用紀錄分頁已停用 —— V9.4.18 換匿名 /v1 端點後
