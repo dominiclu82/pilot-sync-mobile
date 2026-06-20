@@ -10,6 +10,7 @@
 import { randomUUID } from 'crypto';
 import { getPool, ensureTables } from './schema.js';
 import { parseTab } from './tsv-parser.js';
+import { normAirportKey } from './airport-codes.js';   // V2.4.xx：TPE/RCTP 正規化（同站來回判定）
 // V1.0.06：parseTab 抽到 tsv-parser.ts 改成 proper state machine，
 // 處理 quoted 多行欄位（LogTen Remarks 多行用 quote 包）+ escaped quote。
 // 原本 inline split-by-line 版本會把 LogTen 多行 Remarks 拆成假 row，
@@ -151,6 +152,10 @@ export interface ImportLogtenFlightsResult {
   oooi_backfilled?: number;             // V2.4.xx：confirmed 卻缺 OOOI（in_utc 空）→ 用檔案的實際時間回填（只補空缺）
   parse_errors: number;
   needs_completion?: number;            // 待補強：有日期、缺必填（航班號/起降）→ 收為 needs_completion，不丟棄
+  skipped_standby?: number;             // V2.4.xx：SB 待命 → 不匯入（這次檔案裡跳過的列數）
+  skipped_training?: number;            // V2.4.xx：同站來回（TPE↔TPE）訓練/待命 → 不匯入（只留最早一筆 local check）
+  cleaned_standby?: number;             // V2.4.xx：順手刪掉的「既有」待命垃圾筆數
+  cleaned_training?: number;            // V2.4.xx：順手刪掉的「既有」同站訓練垃圾筆數（留最早一筆 local check）
   bad_rows?: Array<{ row: number; flight_no?: string; date?: string; reason: string }>;
   preview?: Array<{
     flight_date: string; flight_no: string; origin: string; dest: string;
@@ -274,6 +279,24 @@ export async function importLogtenFlights(
     baseCount.set(b, (baseCount.get(b) || 0) + 1);
   }
 
+  // V2.4.xx（user 規則）：同站來回（TPE↔TPE，含 RCTP）幾乎都是過去待命/訓練，不需要保留；
+  //   只留「日期最早的那一筆」當 local check（第一筆紀錄）。先掃一遍找出要保留那筆的列索引，
+  //   主迴圈裡其餘 TPE→TPE 一律跳過不匯。
+  const _TPE_KEY = normAirportKey('TPE');
+  let _keepLocalCheckIdx = -1;
+  let _keepLocalCheckDate = '';
+  for (let i = 0; i < rows.length; i++) {
+    const o = rows[i]['From'], t = rows[i]['To'], d = rows[i]['Date'];
+    // codex P2：只在「主迴圈真的會收」的列裡挑 local check —— 沒日期 / 待命(SB/SBY) 的列主迴圈會跳過，
+    //   若被選成 keep idx，會害其餘合格 TPE↔TPE 全被跳掉、最後一筆 local check 都沒留。
+    if (!o || !t || !d) continue;
+    const _fnFirst0 = String(rows[i]['Flight #'] || '').toUpperCase().split(/\s+/)[0] || '';
+    if (/^SBY?[0-9]*$/.test(_fnFirst0)) continue;   // 待命不算 local check
+    if (normAirportKey(o) === _TPE_KEY && normAirportKey(t) === _TPE_KEY) {
+      if (_keepLocalCheckIdx < 0 || d < _keepLocalCheckDate) { _keepLocalCheckIdx = i; _keepLocalCheckDate = d; }
+    }
+  }
+
   // V1.2.04 / codex P1：判斷航班是否「已過」用來決定 confirmed。不能用單純 UTC 今天 —
   // 否則 UTC 跨日後、當地還沒跨日的西半球 user，今天還沒飛的航班會被誤標 confirmed（之後
   // confirmed 重匯會 skip 改不了）。改用「最落後時區(UTC-12)的當地日期」當 cutoff：航班日期
@@ -372,12 +395,20 @@ export async function importLogtenFlights(
       const from = row['From'];
       const to = row['To'];
       if (!date) { result.parse_errors++; continue; }   // 連日期都沒有 → flight_date NOT NULL，無法收（極少；批次日期檢查通常已先擋）
-      // V2.4.xx：用班號自動分類（user 要求）—— 班號開頭 EM/TM/PT/PC = 模擬機；含 PNC = deadhead。
+      // V2.4.xx：用班號自動分類（user 要求）—— 班號開頭 EM/TM/PT/PC/FFK/PNR = 模擬機；含 PNC = deadhead；SB = 待命。
       //   sim 沒航線是正常、不算待補強；過去 confirmed 的也會在重匯時被回填這兩個旗標。
       const _fnUp = String(flightNo || '').toUpperCase();
       const _fnFirst = _fnUp.split(/\s+/)[0] || '';
-      const isSim = /^(EM|TM|PT|PC)\d*$/.test(_fnFirst);
+      const isSim = /^(EM|TM|PT|PC|FFK|PNR)\d*$/.test(_fnFirst);
       const isPnc = /\bPNC\b/.test(_fnUp);
+      const isStandby = /^SBY?\d*$/.test(_fnFirst);   // SB / SBY / SB1… = 待命
+
+      // V2.4.xx（user 規則）：① 待命（SB）→ 一律不匯。
+      //   ② 同站來回（TPE↔TPE）幾乎都是過去待命/訓練 → 不匯，只留最早那筆（local check）。
+      //   都在進任何寫入/preview 之前先攔掉，並計數讓 dry-run 看得到。
+      const _isTpeTpe = !!from && !!to && normAirportKey(from) === _TPE_KEY && normAirportKey(to) === _TPE_KEY;
+      if (isStandby) { result.skipped_standby = (result.skipped_standby || 0) + 1; continue; }
+      if (_isTpeTpe && i !== _keepLocalCheckIdx) { result.skipped_training = (result.skipped_training || 0) + 1; continue; }
       // V2.3：拆成兩個概念 ——
       //   missingKeyFields = 缺關鍵欄位（含沒班號）→ 沿用既有 incomplete-style source_ref，
       //     讓 V2.2 已匯入過的「沒班號」航段重匯時對得回去（codex：否則 ref 改格式 → 重匯變兩筆）。
@@ -635,12 +666,28 @@ export async function importLogtenFlights(
     }
   }
 
-  // dry-run：到此為止，不寫 DB（preview/result 已組好；needs_completion 已在迴圈計數）
-  if (opts.dryRun) return result;
-
-  // 沒任何寫入需求（全部 skip_confirmed、且無完整航班要合併舊待補強）→ 直接回，省掉 TX 開銷
-  if (insertBatch.length === 0 && updateBatch.length === 0 && crewUpdateBatch.length === 0
-      && backfillBatch.length === 0 && completeKeys.size === 0) return result;
+  // ── V2.4.xx cleanup（user：匯入順手把多餘的刪掉，不必清全部、不必重匯組員）──────────────
+  //   只動 source='logten' + 沒鎖的：① 待命（flight_no SB/SBY[數字]）；② 同站來回（TPE↔TPE）訓練，
+  //   但保留「日期最早一筆」當 local check。dry-run 只數不刪；實際匯入才真刪。
+  const _tpeWhere = `user_id = $1 AND source = 'logten' AND origin IN ('TPE','RCTP') AND dest IN ('TPE','RCTP')`;
+  const _keepSub = `(SELECT id FROM pilot_log_entries WHERE ${_tpeWhere} ORDER BY flight_date ASC, created_at ASC LIMIT 1)`;
+  const _sbWhere = `user_id = $1 AND source = 'logten' AND is_locked IS NOT TRUE AND flight_no ~* '^SBY?[0-9]*$'`;
+  const _trWhere = `${_tpeWhere} AND is_locked IS NOT TRUE AND id <> ${_keepSub}`;
+  if (opts.dryRun) {
+    // dry-run：到此為止，不寫 DB；只「數」會被清掉的既有垃圾，讓使用者先看數字
+    try {
+      const a = await pool.query(`SELECT COUNT(*)::int AS n FROM pilot_log_entries WHERE ${_sbWhere}`, [userId]);
+      const b = await pool.query(`SELECT COUNT(*)::int AS n FROM pilot_log_entries WHERE ${_trWhere}`, [userId]);
+      result.cleaned_standby = a.rows[0].n;
+      result.cleaned_training = b.rows[0].n;
+    } catch (e: any) { console.warn('[pilot-log] cleanup dry-run count error:', e.message); }
+    return result;
+  }
+  // 實際匯入：cleanup 的 DELETE 改到「transaction 內、插入之後」執行（見下方 client TX）：
+  //   codex P1 —— 若放在 BEGIN 之前，後面 insert 失敗 rollback，刪除卻已生效＝資料遺失。
+  //   codex P2 —— 放在 insert 之後，_keepSub 會用「DB 既有＋這次新插入」一起算最早一筆，
+  //     才能保證全域只留一筆 local check（否則檔案較晚的那筆會跟 DB 既有的並存成兩筆）。
+  //   故這裡不再 early-return；一律開 TX（即使只有 cleanup 要做），讓刪除跟寫入同生共死。
 
   // ── 包進單一 transaction：要嘛全寫成功，要嘛全 ROLLBACK，避免 partial 狀態 ──
   // codex 提醒：原本 bulk INSERT 後接 UPDATE，若中途任一失敗會留下部分寫入。
@@ -753,6 +800,16 @@ export async function importLogtenFlights(
       }   // 無 out 的完整航班（極少）不做 date-only 合併，避免誤刪同日其他待補強
     }
 
+    // ── V2.4.xx cleanup（在 TX 內、插入之後）：刪掉待命 + 同站訓練垃圾 ───────────────
+    //   放這裡的兩個理由（codex）：① 跟寫入同生共死 —— import 失敗 rollback，刪除也一起回復，不會資料遺失。
+    //   ② _keepSub 用「DB 既有 + 這次剛插入」一起算最早一筆 → 全域只留一筆 local check（檔案較晚的那筆也會被清掉）。
+    {
+      const sb = await client.query(`DELETE FROM pilot_log_entries WHERE ${_sbWhere}`, [userId]);
+      const tr = await client.query(`DELETE FROM pilot_log_entries WHERE ${_trWhere}`, [userId]);
+      result.cleaned_standby = sb.rowCount || 0;
+      result.cleaned_training = tr.rowCount || 0;
+    }
+
     await client.query('COMMIT');
     // 只有 COMMIT 成功才寫進 result；不然 ROLLBACK 後 DB 是空的，計數也該是 0
     result.inserted = insertedCount;
@@ -761,8 +818,9 @@ export async function importLogtenFlights(
     result.oooi_backfilled = oooiBackfilledCount;
 
     // V1.0.05 monitoring：成功匯入後寫 last_import_at（fire-and-forget，跟主 TX 解耦）
-    // V2.4.xx：backfill-only 的重匯也真的改了 pilot_log_entries，要一併更新時間戳（codex P3）
-    if (insertedCount > 0 || updatedCount > 0 || crewUpdatedCount > 0 || oooiBackfilledCount > 0) {
+    // V2.4.xx：backfill-only / 只清理 的重匯也真的改了 pilot_log_entries，要一併更新時間戳（codex P3）
+    if (insertedCount > 0 || updatedCount > 0 || crewUpdatedCount > 0 || oooiBackfilledCount > 0
+        || (result.cleaned_standby || 0) > 0 || (result.cleaned_training || 0) > 0) {
       pool.query(
         `UPDATE pilot_users SET last_import_at = NOW() WHERE id = $1`,
         [userId]

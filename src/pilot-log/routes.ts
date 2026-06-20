@@ -57,8 +57,8 @@ import { getAirportDbJs } from '../spa/js-airport-db.js';
 
 // ── 版本（比照 CrewSync / Morning：每次推版必更新；SW cache 名稱跟著走） ────
 // 本機 preview build 會暫時加 -tNN 後綴方便對版；推正式版前拿掉只留乾淨版號。
-export const PILOT_LOG_VERSION = 'V2.4.23';
-const PILOT_LOG_CACHE = 'pilotlog-v2-4-23';
+export const PILOT_LOG_VERSION = 'V2.4.24';
+const PILOT_LOG_CACHE = 'pilotlog-v2-4-24';
 
 export const pilotLogRouter = express.Router();
 
@@ -385,6 +385,16 @@ function _renderPilotLogChangelog(): string {
   return `
     ${renderCommunityLink()}
     <div class="pl-cl-v">${PILOT_LOG_VERSION}</div>
+    <div class="pl-cl-txt">
+      <b>🔧 匯入修正：班表只補組員、不覆蓋已完成航班時間；LogTen 自動清掉待命 / 同站訓練。</b><br>
+      <b>🔧 Import fixes: roster only fills crew (never overwrites completed-flight times); LogTen auto-clears standby / same-airport training.</b>
+    </div>
+    <div class="pl-cl-v old">V2.4.23</div>
+    <div class="pl-cl-txt">
+      <b>🎚️ ICAO/IATA 與日夜改滑動切換、備註自動延展；已上鎖航班禁拖組員；地面 / 模擬機完成不顯示板手。</b><br>
+      <b>🎚️ Sliding ICAO/IATA & day-night toggles, auto-grow remarks; locked flights block crew drag; ground/sim hide wrench when done.</b>
+    </div>
+    <div class="pl-cl-v old">V2.4.22</div>
     <div class="pl-cl-txt">
       <b>📕 調整 logbook PDF 排版。</b><br>
       <b>📕 Adjusted logbook PDF layout.</b>

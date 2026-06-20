@@ -783,15 +783,25 @@ export async function importRoster(
         // codex P2：原本用 COALESCE 會卡住已 non-null 的欄位（gate 改了/duty 改了/組員換了
         // 都不會反映）。改成直接覆寫 — 班表是新鮮的就該蓋舊的。
         // V2.3.04：source_ref 同步更新成這次的 ref，下次重匯 exact 命中、sweep 也對得上。
+        // V2.4.xx（user 規則）：航班一旦「已完成」（flight_date 在今天以前＝已飛過），公司會在完成後
+        //   把真實 OOOI 的頭尾時間寫進 schedule，那是真值。所以**已完成航班的時間欄不可被班表覆蓋**，
+        //   只補空缺（COALESCE）；未來（還沒飛）的計畫航班維持直接覆寫＝班表新鮮就蓋舊的。
+        //   codex P2：用台北當地日（UTC+8）判「已過」，不可用 UTC 日 —— 否則台北清晨匯入時昨天剛飛完的
+        //   航班會被當成「未來」而失去保護，正好是要保護的那批被蓋掉。
+        //   codex P1：含「今天」(<=) —— 今天稍早飛完的航班、剛落地就重匯班表是常見路徑，
+        //   不含今天的話它們的實際時間仍會被計畫時間蓋掉。代價：今天還沒飛的計畫航班時間不隨班表刷新（可接受）。
+        const _tpeToday = new Date(Date.now() + 8 * 3600 * 1000).toISOString().slice(0, 10);
+        const isPast = !!fDate && fDate <= _tpeToday;
         await pool.query(
           `UPDATE pilot_log_entries SET
              status = 'draft',
              source_ref = $15,
              flight_date = $2, flight_no = $3, origin = $4, dest = $5,
              position = $6,
-             std_utc = $7, sta_utc = $8,
-             on_duty_utc = $9,
-             off_duty_utc = $10,
+             std_utc      = CASE WHEN $17 THEN COALESCE(std_utc, $7)      ELSE $7  END,
+             sta_utc      = CASE WHEN $17 THEN COALESCE(sta_utc, $8)      ELSE $8  END,
+             on_duty_utc  = CASE WHEN $17 THEN COALESCE(on_duty_utc, $9)  ELSE $9  END,
+             off_duty_utc = CASE WHEN $17 THEN COALESCE(off_duty_utc, $10) ELSE $10 END,
              crew = $11::jsonb,
              is_deadhead = $12,
              roster_month = $13,
@@ -806,6 +816,7 @@ export async function importRoster(
             primary.id, fDate, f.flightNo, f.origin, f.dest,
             position, stdUtc, staUtc, onDuty, offDuty,
             crewJson ? JSON.stringify(crewJson) : null, isDeadhead, rosterMonth, crewCount, sourceRef, operatingCrew,
+            isPast,
           ]
         );
         result.updated++;

@@ -4844,6 +4844,12 @@ async function _plUploadFlights(dryRun) {
   var doneLine = overwrite
     ? '補/換已完成航班組員 <b>' + (dryRun ? nCrew : (j.crew_overwritten || 0)) + '</b>、'
     : '保留已完成 <b>' + (j.duplicate_skipped || 0) + '</b>、';
+  // V2.4.xx：待命 / 同站訓練（TPE↔TPE）跳過筆數（不匯入）＋ 既有垃圾清掉筆數（只留最早一筆 local check）
+  var _cleanWord = dryRun ? '可清' : '已清';
+  var skipLine = (j.skipped_standby ? '、<span style="color:#94a3b8">待命跳過 <b>' + j.skipped_standby + '</b></span>' : '') +
+    (j.skipped_training ? '、<span style="color:#94a3b8">同站訓練跳過 <b>' + j.skipped_training + '</b></span>' : '') +
+    (j.cleaned_standby ? '、<span style="color:#fca5a5">' + _cleanWord + '既有待命 <b>' + j.cleaned_standby + '</b></span>' : '') +
+    (j.cleaned_training ? '、<span style="color:#fca5a5">' + _cleanWord + '既有同站訓練 <b>' + j.cleaned_training + '</b>（留最早一筆 local check）</span>' : '');
 
   if (dryRun) {
     // V1.2.04：欄位偵測 — 一眼看出匯出檔有沒有帶 PIC/SIC 時數欄 + Deadhead 欄
@@ -4863,7 +4869,7 @@ async function _plUploadFlights(dryRun) {
     var preview = _plRenderPreviewRows(j.preview);
     resBox.innerHTML = '<div style="background:#1e3a5f;color:#fff;padding:10px;border-radius:8px;font-size:.78em">' +
       '🔍 Dry-run（沒寫入 DB）：新增 <b>' + nNew + '</b>、更新未完成 <b>' + nUpdate + '</b>、' +
-      doneLine + '解析失敗 <b>' + j.parse_errors + '</b>' + (j.needs_completion ? '、<span style="color:#fbbf24">待補強 <b>' + j.needs_completion + '</b> 筆（已收進來，可點開補完）</span>' : '') + '<br>' +
+      doneLine + '解析失敗 <b>' + j.parse_errors + '</b>' + (j.needs_completion ? '、<span style="color:#fbbf24">待補強 <b>' + j.needs_completion + '</b> 筆（已收進來，可點開補完）</span>' : '') + skipLine + '<br>' +
       '<span style="font-size:.85em;color:#bfdbfe">確認 OK 後按 Import 真的寫入。</span>' +
       headersInfo +
       preview +
@@ -4871,7 +4877,7 @@ async function _plUploadFlights(dryRun) {
   } else {
     resBox.innerHTML = '<div style="background:#064e3b;color:#fff;padding:10px;border-radius:8px;font-size:.78em">' +
       '✅ 匯入完成：新增 <b>' + (j.inserted || 0) + '</b>、更新 <b>' + (j.updated || 0) + '</b>、' +
-      doneLine + '解析失敗 <b>' + j.parse_errors + '</b>' + (j.needs_completion ? '、<span style="color:#fbbf24">待補強 <b>' + j.needs_completion + '</b> 筆（已收進來，可點開補完）</span>' : '') +
+      doneLine + '解析失敗 <b>' + j.parse_errors + '</b>' + (j.needs_completion ? '、<span style="color:#fbbf24">待補強 <b>' + j.needs_completion + '</b> 筆（已收進來，可點開補完）</span>' : '') + skipLine +
       '</div>';
     _plToast('✅ 匯入完成 / Import done：新增 ' + (j.inserted || 0) + ' · 更新 ' + (j.updated || 0) + (overwrite && (j.crew_overwritten || 0) > 0 ? ' · 補組員 ' + j.crew_overwritten : ''));
   }
