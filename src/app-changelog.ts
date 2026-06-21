@@ -17,6 +17,9 @@ export function renderCommunityLink(): string {
 export interface ChangelogEntry { v: string; zh: string; en: string; }
 
 export const APP_CHANGELOG: ChangelogEntry[] = [
+  { v: 'V2.0.20',
+    zh: '[全域] 修正按鈕樣式。',
+    en: '[All] Adjusted button styling.' },
   { v: 'V2.0.19',
     zh: '[全域] 日夜切換膠囊放大、跟 A+/A- 拉開一點，工具列高度不變。',
     en: '[All] Bigger day-night pill with a little more spacing from A+/A-; toolbar height unchanged.' },

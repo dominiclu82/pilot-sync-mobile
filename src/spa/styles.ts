@@ -35,17 +35,17 @@ body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSy
 .tab-util-btn{background:none;border:none;color:var(--muted);font-size:1em;font-weight:600;
   cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:1px;padding:0;-webkit-appearance:none}
 .tab-util-btn span{font-size:1.3em;line-height:1}
-.font-size-wrap{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px}
-/* A+/A- 一律上下直排（三個 app 風格一致），不再因寬螢幕轉橫排 */
-.font-size-btn{font-weight:700;padding:2px 6px;border:1px solid var(--dim)!important;border-radius:4px}
-.font-size-btn-sm{font-size:.7em!important}
-.font-size-btn-lg{font-size:1em!important}
-/* V9.5.25 日夜：直立分段膠囊（☀️上 / 🌙下），浮標純 CSS 隨 [data-theme] 上下滑＝現況。
-   放大貼齊 A+/A- 直排高度（≈42px，仍 ≤ A+/A- 故工具列不增高）、加寬、icon 放大、跟右側 A+/A- 拉開一點 */
-.theme-seg{position:relative;display:inline-flex;flex-direction:column;width:30px;height:42px;padding:3px;border-radius:15px;background:var(--card);border:1px solid var(--dim);cursor:pointer;flex:0 0 auto;margin-right:4px}
-.theme-seg-knob{position:absolute;left:3px;right:3px;top:3px;height:calc(50% - 3px);border-radius:12px;background:var(--accent);transition:transform .22s ease;pointer-events:none;transform:translateY(100%)}
+/* V9.5.26 A+/A- 改「單一實心方塊」：合成一個外框、中間分隔線、上下等大，跟日夜方形同尺寸同樣式 */
+.font-size-wrap{box-sizing:border-box;display:flex;flex-direction:column;flex:0 0 auto;width:34px;height:42px;border:1px solid var(--dim);border-radius:5px;overflow:hidden;background:var(--card);gap:0}
+.font-size-btn{flex:1;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:1.02em!important;line-height:1;padding:0!important;border:0!important;border-radius:0!important;background:none;color:var(--muted)}
+.font-size-btn:first-child{border-bottom:1px solid var(--dim)!important}
+.font-size-btn-sm{font-size:1.02em!important}
+.font-size-btn-lg{font-size:1.02em!important}
+/* V9.5.26 日夜：方形（小圓角、跟 A+/A- 同尺寸同形狀），☀️上/🌙下、浮標純 CSS 上下滑＝現況 */
+.theme-seg{position:relative;display:inline-flex;flex-direction:column;box-sizing:border-box;width:34px;height:42px;padding:2px;border-radius:5px;background:var(--card);border:1px solid var(--dim);cursor:pointer;flex:0 0 auto;margin-right:4px}
+.theme-seg-knob{position:absolute;left:2px;right:2px;top:2px;height:calc(50% - 2px);border-radius:3px;background:var(--accent);transition:transform .22s ease;pointer-events:none;transform:translateY(100%)}
 [data-theme="light"] .theme-seg-knob{transform:translateY(0)}
-.theme-seg-opt{position:relative;z-index:1;flex:1;display:flex;align-items:center;justify-content:center;background:none;border:0;padding:0;font-size:.95em;line-height:1;cursor:pointer}
+.theme-seg-opt{position:relative;z-index:1;flex:1;display:flex;align-items:center;justify-content:center;background:none;border:0;padding:0;font-size:.98em;line-height:1;cursor:pointer}
 .install-overlay{position:fixed;inset:0;z-index:999;background:rgba(0,0,0,.6);
   display:flex;align-items:center;justify-content:center;padding:24px}
 .install-card{background:var(--card);border-radius:16px;padding:28px 24px;width:100%;

@@ -1026,30 +1026,24 @@ a:active { opacity: 0.6; }
 .hdr-btn:active { opacity: 0.7; }
 
 /* Compound font-scale button (A+/A- stacked, separated) */
+/* V2.0.20 A+/A- 改「單一實心方塊」：合成一個外框、中間分隔線、上下等大，跟日夜方形同尺寸同樣式 */
 .hdr-btn-font {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  flex-shrink: 0;
+  box-sizing: border-box; display: flex; flex-direction: column; flex-shrink: 0;
+  width: 34px; height: 42px; border: 1px solid var(--border); border-radius: 5px;
+  overflow: hidden; background: var(--card); gap: 0;
 }
 .hdr-btn-font button {
-  background: rgba(255,255,255,0.08);
-  border: 1px solid var(--border);
-  color: var(--text);
-  padding: 3px 8px;
-  font-size: .62em;
-  font-weight: 700;
-  cursor: pointer;
-  line-height: 1.1;
-  min-width: 30px;
-  border-radius: 6px;
+  flex: 1; display: flex; align-items: center; justify-content: center;
+  background: none; border: 0; color: var(--text); padding: 0;
+  font-size: .88em; font-weight: 700; line-height: 1; cursor: pointer; min-width: 0;
 }
+.hdr-btn-font button:first-child { border-bottom: 1px solid var(--border); }
 .hdr-btn-font button:active { opacity: 0.7; }
-/* V2.4.xx 日夜：直立分段膠囊（☀️上/🌙下），浮標純 CSS 隨 [data-theme] 上下滑＝現況 */
-.theme-seg{position:relative;display:inline-flex;flex-direction:column;width:30px;height:40px;padding:3px;border-radius:14px;background:var(--card);border:1px solid var(--border);cursor:pointer;flex:0 0 auto;margin-right:4px}
-.theme-seg-knob{position:absolute;left:3px;right:3px;top:3px;height:calc(50% - 3px);border-radius:12px;background:var(--accent);transition:transform .22s ease;pointer-events:none;transform:translateY(100%)}
+/* V2.0.20 日夜：方形（小圓角、跟 A+/A- 同尺寸同形狀），☀️上/🌙下、浮標純 CSS 上下滑＝現況 */
+.theme-seg{position:relative;display:inline-flex;flex-direction:column;box-sizing:border-box;width:34px;height:42px;padding:2px;border-radius:5px;background:var(--card);border:1px solid var(--border);cursor:pointer;flex:0 0 auto;margin-right:4px}
+.theme-seg-knob{position:absolute;left:2px;right:2px;top:2px;height:calc(50% - 2px);border-radius:3px;background:var(--accent);transition:transform .22s ease;pointer-events:none;transform:translateY(100%)}
 [data-theme="light"] .theme-seg-knob{transform:translateY(0)}
-.theme-seg-opt{position:relative;z-index:1;flex:1;display:flex;align-items:center;justify-content:center;background:none;border:0;padding:0;font-size:.92em;line-height:1;cursor:pointer}
+.theme-seg-opt{position:relative;z-index:1;flex:1;display:flex;align-items:center;justify-content:center;background:none;border:0;padding:0;font-size:.98em;line-height:1;cursor:pointer}
 
 /* Nav bar (fixed under header) */
 .nav {

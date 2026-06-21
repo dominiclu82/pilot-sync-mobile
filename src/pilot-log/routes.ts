@@ -57,8 +57,8 @@ import { getAirportDbJs } from '../spa/js-airport-db.js';
 
 // ── 版本（比照 CrewSync / Morning：每次推版必更新；SW cache 名稱跟著走） ────
 // 本機 preview build 會暫時加 -tNN 後綴方便對版；推正式版前拿掉只留乾淨版號。
-export const PILOT_LOG_VERSION = 'V2.4.26';
-const PILOT_LOG_CACHE = 'pilotlog-v2-4-26';
+export const PILOT_LOG_VERSION = 'V2.4.27';
+const PILOT_LOG_CACHE = 'pilotlog-v2-4-27';
 
 export const pilotLogRouter = express.Router();
 
@@ -157,21 +157,25 @@ body {
   font-size: 1.3em; line-height: 1; cursor: pointer; padding: 2px;
   -webkit-appearance: none;
 }
+/* V2.4.27 A+/A- 改「單一實心方塊」：合成一個外框、中間分隔線、上下等大，跟日夜方形同尺寸同樣式 */
 .pl-font-wrap {
-  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
+  box-sizing: border-box; display: flex; flex-direction: column; flex: 0 0 auto;
+  width: 34px; height: 42px; border: 1px solid var(--border); border-radius: 5px;
+  overflow: hidden; background: var(--card); gap: 0;
 }
 .pl-font-btn {
-  font-weight: 700; border: 1px solid var(--border); border-radius: 4px;
-  background: none; color: var(--muted); cursor: pointer; -webkit-appearance: none;
-  line-height: 1; padding: 2px 6px;
+  flex: 1; display: flex; align-items: center; justify-content: center;
+  font-weight: 700; font-size: 1.02em; line-height: 1; padding: 0;
+  border: 0; border-radius: 0; background: none; color: var(--muted); cursor: pointer; -webkit-appearance: none;
 }
-.pl-font-btn-lg { font-size: .95em; }
-.pl-font-btn-sm { font-size: .68em; }
-/* V2.4.xx 日夜：直立分段膠囊（☀️上/🌙下），浮標純 CSS 隨 [data-theme] 上下滑＝現況；高度比照 A+/A- */
-.theme-seg{position:relative;display:inline-flex;flex-direction:column;width:30px;height:40px;padding:3px;border-radius:14px;background:var(--card);border:1px solid var(--border);cursor:pointer;flex:0 0 auto;margin-right:4px}
-.theme-seg-knob{position:absolute;left:3px;right:3px;top:3px;height:calc(50% - 3px);border-radius:12px;background:var(--accent);transition:transform .22s ease;pointer-events:none;transform:translateY(100%)}
+.pl-font-btn:first-child { border-bottom: 1px solid var(--border); }
+.pl-font-btn-lg { font-size: 1.02em; }
+.pl-font-btn-sm { font-size: 1.02em; }
+/* V2.4.27 日夜：方形（小圓角、跟 A+/A- 同尺寸同形狀），☀️上/🌙下、浮標純 CSS 上下滑＝現況 */
+.theme-seg{position:relative;display:inline-flex;flex-direction:column;box-sizing:border-box;width:34px;height:42px;padding:2px;border-radius:5px;background:var(--card);border:1px solid var(--border);cursor:pointer;flex:0 0 auto;margin-right:4px}
+.theme-seg-knob{position:absolute;left:2px;right:2px;top:2px;height:calc(50% - 2px);border-radius:3px;background:var(--accent);transition:transform .22s ease;pointer-events:none;transform:translateY(100%)}
 [data-theme="light"] .theme-seg-knob{transform:translateY(0)}
-.theme-seg-opt{position:relative;z-index:1;flex:1;display:flex;align-items:center;justify-content:center;background:none;border:0;padding:0;font-size:.92em;line-height:1;cursor:pointer}
+.theme-seg-opt{position:relative;z-index:1;flex:1;display:flex;align-items:center;justify-content:center;background:none;border:0;padding:0;font-size:.98em;line-height:1;cursor:pointer}
 /* V2.4.xx ICAO/IATA：橫式分段，浮標左右滑＝現況（亮的那邊＝目前格式） */
 .code-seg{position:relative;display:inline-flex;padding:2px;border-radius:8px;background:var(--card);border:1px solid var(--border);cursor:pointer;font-size:.72em;font-weight:700;user-select:none;-webkit-user-select:none;vertical-align:middle}
 .code-seg-knob{position:absolute;top:2px;bottom:2px;left:2px;width:calc(50% - 2px);border-radius:6px;background:var(--accent);transition:transform .2s ease;pointer-events:none}
@@ -385,6 +389,11 @@ function _renderPilotLogChangelog(): string {
   return `
     ${renderCommunityLink()}
     <div class="pl-cl-v">${PILOT_LOG_VERSION}</div>
+    <div class="pl-cl-txt">
+      <b>🎛️ 修正按鈕樣式。</b><br>
+      <b>🎛️ Adjusted button styling.</b>
+    </div>
+    <div class="pl-cl-v old">V2.4.26</div>
     <div class="pl-cl-txt">
       <b>🌗 日夜膠囊放大、跟 A+/A- 拉開，工具列高度不變。</b><br>
       <b>🌗 Bigger day-night pill with more spacing from A+/A-; toolbar height unchanged.</b>
