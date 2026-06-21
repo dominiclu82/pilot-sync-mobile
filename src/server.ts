@@ -1440,24 +1440,33 @@ app.get('/api/atis-debug', async (req, res) => {
   if (String(req.query.key || '') !== (process.env.COFFEE_ANALYTICS_KEY || '')) return res.status(403).json({ error: 'forbidden' });
   const icao = String(req.query.icao || '').toUpperCase();
   if (!/^[A-Z]{4}$/.test(icao)) return res.status(400).json({ error: 'bad icao' });
-  const headers = { 'Origin': 'https://oops.h-peak.com', 'Referer': 'https://oops.h-peak.com/', 'User-Agent': _FIDS_UA, 'Accept': 'application/json' };
-  let coffeeStatus = 0, coffeeErr: string | null = null, rawBody: any = null;
-  try {
-    const r = await fetch('https://api.coffeeteaorme.vip/api/atis?text=' + encodeURIComponent(icao), { headers });
-    coffeeStatus = r.status;
-    try { rawBody = await r.json(); } catch { rawBody = String(await r.text().catch(() => '')).slice(0, 200); }
-  } catch (e: any) { coffeeErr = e.message; }
-  let parsed: any = null, parseErr: string | null = null;
-  try { parsed = await _atisFetchCoffee(icao); } catch (e: any) { parseErr = e.message; }
+  // 試多種「來源標頭」找出 coffee 白名單接受哪個（找到回 200 那組，就把 _atisFetchCoffee 改成它）
+  const variants: Array<{ name: string; origin?: string; referer?: string }> = [
+    { name: 'oops', origin: 'https://oops.h-peak.com', referer: 'https://oops.h-peak.com/' },
+    { name: 'crewsync', origin: 'https://crewsync.h-peak.com', referer: 'https://crewsync.h-peak.com/' },
+    { name: 'render', origin: 'https://crew-sync.onrender.com', referer: 'https://crew-sync.onrender.com/' },
+    { name: 'coffee-self', origin: 'https://info.coffeeteaorme.vip', referer: 'https://info.coffeeteaorme.vip/' },
+    { name: 'none', origin: undefined, referer: undefined },
+  ];
+  const tried: any[] = [];
+  for (const v of variants) {
+    const h: any = { 'User-Agent': _FIDS_UA, 'Accept': 'application/json' };
+    if (v.origin) h['Origin'] = v.origin;
+    if (v.referer) h['Referer'] = v.referer;
+    let status = 0, msg: string | null = null, count: number | null = null, err: string | null = null;
+    try {
+      const r = await fetch('https://api.coffeeteaorme.vip/api/atis?text=' + encodeURIComponent(icao), { headers: h });
+      status = r.status;
+      let b: any = null; try { b = await r.json(); } catch { b = null; }
+      msg = (b && b.message) || null;
+      count = (b && Array.isArray(b.data)) ? b.data.length : null;
+    } catch (e: any) { err = e.message; }
+    tried.push({ variant: v.name, status, msg, dataCount: count, err });
+  }
   const store = _atisStoreSections(icao);
   res.json({
-    icao, coffeeStatus, coffeeErr,
-    coffeeMsg: (rawBody && rawBody.message) || null,
-    coffeeDataCount: (rawBody && Array.isArray(rawBody.data)) ? rawBody.data.length : null,
-    coffeeSample: (rawBody && Array.isArray(rawBody.data)) ? rawBody.data.slice(0, 4).map((d: any) => ({ ts: d.timestamp, flight: d.flight, raw: String(d.rawMessage || '').slice(0, 160) })) : null,
-    ourParsed: parsed ? parsed.map((s: any) => ({ title: s.title, issueAt: s.issueAt, time: s.time, text: String(s.text || '').slice(0, 160) })) : null,
-    parseErr,
-    storeNow: store ? store.map((s: any) => ({ title: s.title, text: String(s.text || '').slice(0, 120) })) : null,
+    icao, tried,
+    storeNow: store ? store.map((s: any) => ({ title: s.title, text: String(s.text || '').slice(0, 100) })) : null,
   });
 });
 
