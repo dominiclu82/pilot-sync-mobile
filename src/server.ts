@@ -1433,43 +1433,6 @@ function _atisStartLiveFeed() {
   });
 }
 
-// ⚠⚠ 臨時診斷端點（2026-06-21，用完即刪、勿留）：owner-key 限定。
-//   目的：在「我們伺服器」(coffee 對它白名單)上看 coffee 對某站實際回什麼 + 我們解析/併庫結果，
-//   定位「日本站按更新仍跟不上 coffee」的真因。只會被手動打幾次，不接任何自動排程。
-app.get('/api/atis-debug', async (req, res) => {
-  if (String(req.query.key || '') !== (process.env.COFFEE_ANALYTICS_KEY || '')) return res.status(403).json({ error: 'forbidden' });
-  const icao = String(req.query.icao || '').toUpperCase();
-  if (!/^[A-Z]{4}$/.test(icao)) return res.status(400).json({ error: 'bad icao' });
-  // 試多種「來源標頭」找出 coffee 白名單接受哪個（找到回 200 那組，就把 _atisFetchCoffee 改成它）
-  const variants: Array<{ name: string; origin?: string; referer?: string }> = [
-    { name: 'oops', origin: 'https://oops.h-peak.com', referer: 'https://oops.h-peak.com/' },
-    { name: 'crewsync', origin: 'https://crewsync.h-peak.com', referer: 'https://crewsync.h-peak.com/' },
-    { name: 'render', origin: 'https://crew-sync.onrender.com', referer: 'https://crew-sync.onrender.com/' },
-    { name: 'coffee-self', origin: 'https://info.coffeeteaorme.vip', referer: 'https://info.coffeeteaorme.vip/' },
-    { name: 'none', origin: undefined, referer: undefined },
-  ];
-  const tried: any[] = [];
-  for (const v of variants) {
-    const h: any = { 'User-Agent': _FIDS_UA, 'Accept': 'application/json' };
-    if (v.origin) h['Origin'] = v.origin;
-    if (v.referer) h['Referer'] = v.referer;
-    let status = 0, msg: string | null = null, count: number | null = null, err: string | null = null;
-    try {
-      const r = await fetch('https://api.coffeeteaorme.vip/api/atis?text=' + encodeURIComponent(icao), { headers: h });
-      status = r.status;
-      let b: any = null; try { b = await r.json(); } catch { b = null; }
-      msg = (b && b.message) || null;
-      count = (b && Array.isArray(b.data)) ? b.data.length : null;
-    } catch (e: any) { err = e.message; }
-    tried.push({ variant: v.name, status, msg, dataCount: count, err });
-  }
-  const store = _atisStoreSections(icao);
-  res.json({
-    icao, tried,
-    storeNow: store ? store.map((s: any) => ({ title: s.title, text: String(s.text || '').slice(0, 100) })) : null,
-  });
-});
-
 app.get('/api/atis', async (req, res) => {
   const icao = String(req.query.icao || '').toUpperCase();
   if (!/^[A-Z]{4}$/.test(icao)) return res.status(400).json({ error: 'bad icao' });
