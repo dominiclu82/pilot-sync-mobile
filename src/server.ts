@@ -1433,6 +1433,34 @@ function _atisStartLiveFeed() {
   });
 }
 
+// ⚠⚠ 臨時診斷端點（2026-06-21，用完即刪、勿留）：owner-key 限定。
+//   目的：在「我們伺服器」(coffee 對它白名單)上看 coffee 對某站實際回什麼 + 我們解析/併庫結果，
+//   定位「日本站按更新仍跟不上 coffee」的真因。只會被手動打幾次，不接任何自動排程。
+app.get('/api/atis-debug', async (req, res) => {
+  if (String(req.query.key || '') !== (process.env.COFFEE_ANALYTICS_KEY || '')) return res.status(403).json({ error: 'forbidden' });
+  const icao = String(req.query.icao || '').toUpperCase();
+  if (!/^[A-Z]{4}$/.test(icao)) return res.status(400).json({ error: 'bad icao' });
+  const headers = { 'Origin': 'https://oops.h-peak.com', 'Referer': 'https://oops.h-peak.com/', 'User-Agent': _FIDS_UA, 'Accept': 'application/json' };
+  let coffeeStatus = 0, coffeeErr: string | null = null, rawBody: any = null;
+  try {
+    const r = await fetch('https://api.coffeeteaorme.vip/api/atis?text=' + encodeURIComponent(icao), { headers });
+    coffeeStatus = r.status;
+    try { rawBody = await r.json(); } catch { rawBody = String(await r.text().catch(() => '')).slice(0, 200); }
+  } catch (e: any) { coffeeErr = e.message; }
+  let parsed: any = null, parseErr: string | null = null;
+  try { parsed = await _atisFetchCoffee(icao); } catch (e: any) { parseErr = e.message; }
+  const store = _atisStoreSections(icao);
+  res.json({
+    icao, coffeeStatus, coffeeErr,
+    coffeeMsg: (rawBody && rawBody.message) || null,
+    coffeeDataCount: (rawBody && Array.isArray(rawBody.data)) ? rawBody.data.length : null,
+    coffeeSample: (rawBody && Array.isArray(rawBody.data)) ? rawBody.data.slice(0, 4).map((d: any) => ({ ts: d.timestamp, flight: d.flight, raw: String(d.rawMessage || '').slice(0, 160) })) : null,
+    ourParsed: parsed ? parsed.map((s: any) => ({ title: s.title, issueAt: s.issueAt, time: s.time, text: String(s.text || '').slice(0, 160) })) : null,
+    parseErr,
+    storeNow: store ? store.map((s: any) => ({ title: s.title, text: String(s.text || '').slice(0, 120) })) : null,
+  });
+});
+
 app.get('/api/atis', async (req, res) => {
   const icao = String(req.query.icao || '').toUpperCase();
   if (!/^[A-Z]{4}$/.test(icao)) return res.status(400).json({ error: 'bad icao' });
