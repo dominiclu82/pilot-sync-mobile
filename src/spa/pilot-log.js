@@ -276,7 +276,9 @@ function _plPurgeForeignOutbox() {
   if (_pl.outbox.length !== before) _plOutboxPersist();
 }
 // V1.3：離線優先的判斷 — 「現在有網路嗎」「手機裡有沒有可用身分」
-function _plOnline() { return typeof navigator === 'undefined' || navigator.onLine !== false; }
+// V2.4.29：改「以實際連得到伺服器為準」(body.pl-offline 由真正的 fetch 成敗決定)，
+//   不再信 navigator.onLine —— iOS PWA + VPN 下它會卡在 false(網路其實通)，害離線狀態卡住不恢復。
+function _plOnline() { return typeof document === 'undefined' || !document.body.classList.contains('pl-offline'); }
 function _plHasSession() {
   if (_pl.refreshToken || _pl.accessToken || _pl.user) return true;
   try { return !!(localStorage.getItem(_PL_LS_RT) || localStorage.getItem(_PL_LS_UID)); } catch (e) { return false; }
@@ -330,7 +332,7 @@ async function _plSync() {
   if (_pl.syncing) return;
   _plRenderSyncStatus();
   if (!_pl.outbox.length) return;
-  if (typeof navigator !== 'undefined' && navigator.onLine === false) return;
+  if (!_plOnline()) return;   // 已確認離線(body.pl-offline，探線中) → 不重複嘗試；回連由探線觸發。否則一律試打(不信 navigator.onLine)
   _pl.syncing = true;
   _plRenderSyncStatus();
   try {
@@ -408,7 +410,7 @@ async function _plSync() {
     _pl.syncing = false;
   }
   // 排空後跟 server 對帳一次（顯示 server 真實資料）
-  if (!_pl.outbox.length && (typeof navigator === 'undefined' || navigator.onLine !== false)) {
+  if (!_pl.outbox.length && _plOnline()) {
     try { await _plFetchAll(); } catch (e) {}   // 內部會設 syncState = ok/warn
     // V2.4.28：同步排空後「一律」重畫清單（即使正在編輯）→ 單筆待上傳的 ⏳ 才會即時清掉（之前 !_pl.editing
     //   會在開著編輯面板時不重畫，導致已同步的那筆沙漏一直掛著）。重畫前後保留 #pl-list 捲動位置、不跳動。
@@ -419,8 +421,8 @@ async function _plSync() {
       var _lcAfter = document.getElementById('pl-list'); if (_lcAfter && _st) _lcAfter.scrollTop = _st;
     }
   } else if (_pl.outbox.length) {
-    // V2.4.12：還有沒上傳成功的 → 黃色（有網路沒同步成功）/ 紅色（離線）
-    _pl.syncState = ((typeof navigator !== 'undefined' && navigator.onLine === false) || document.body.classList.contains('pl-offline')) ? 'offline' : 'warn';
+    // V2.4.12：還有沒上傳成功的 → 黃色（有網路沒同步成功）/ 紅色（離線）。V2.4.29：離線以實際連線為準。
+    _pl.syncState = !_plOnline() ? 'offline' : 'warn';
   }
   _plRenderSyncStatus();
 }
@@ -430,7 +432,7 @@ async function _plSync() {
 function _plRenderSyncStatus() {
   var el = document.getElementById('pl-sync-status');
   if (!el) return;
-  var offline = (typeof navigator !== 'undefined' && navigator.onLine === false) || document.body.classList.contains('pl-offline');
+  var offline = !_plOnline();   // V2.4.29：以實際連得到伺服器為準（body.pl-offline），不信 navigator.onLine
   var busy = _pl.syncing || (_pl._fetching || 0) > 0;
   var n = _pl.outbox.length;
   var inner, title;
@@ -453,7 +455,7 @@ function _plRenderSyncStatus() {
 // V2.4.12：手動同步（點連線圖示）。同步中點無效；離線提示；否則排空 outbox + 跟 server 對帳。
 async function _plManualSync() {
   if (_pl.syncing || (_pl._fetching || 0) > 0) return;
-  if ((typeof navigator !== 'undefined' && navigator.onLine === false) || document.body.classList.contains('pl-offline')) {
+  if (!_plOnline()) {
     _plToast('目前離線，連回線會自動同步', 'warn'); return;
   }
   try {
@@ -869,8 +871,8 @@ async function _plFetchAll() {
       }
       return true;
     }
-    // core 回 false（真失敗）：仍是最新世代才降級 —— 離線 → offline，否則 → warn
-    if (mine) _pl.syncState = ((typeof navigator !== 'undefined' && navigator.onLine === false) || document.body.classList.contains('pl-offline')) ? 'offline' : 'warn';
+    // core 回 false（真失敗）：仍是最新世代才降級 —— 離線 → offline，否則 → warn。V2.4.29：離線以實際連線為準。
+    if (mine) _pl.syncState = !_plOnline() ? 'offline' : 'warn';
     return false;
   } catch (e) {
     if (_pl._fetchGen === myGen) _pl.syncState = 'warn';
@@ -1084,7 +1086,7 @@ function _plRenderEntryRow(e) {
   var acMeta = acIcon + ' ' + _plEsc(e.tail_no || '') + (e.aircraft_type ? ', ' + _plEsc(e.aircraft_type) : '');
   var dhBadge = e.is_deadhead ? '<span style="background:#a855f7;color:#fff;border-radius:4px;padding:0 5px;font-size:.85em;margin-right:5px;font-weight:700">DH</span>' : '';
   // V1.3：尚未上傳的離線改動標 ⏳，讓使用者看得到哪些還沒同步
-  var pendBadge = _plHasPending(e.id) ? '<span title="待上傳 pending sync" style="background:#f59e0b;color:#fff;border-radius:4px;padding:0 5px;font-size:.85em;margin-right:5px;font-weight:700">⏳</span>' : '';
+  var pendBadge = '';   // V2.4.29：移除單筆「待上傳 ⏳」圖示（user：LogTen/ATP2 都沒有、太複雜）。同步狀態看上方全域圖示即可；背景同步照常運作。
   var lockBadge = e.is_locked ? '<span title="Locked" style="font-size:.95em;margin-right:4px">🔒</span>' : '';
   var fltNo = pendBadge + lockBadge + dhBadge + (e.flight_no ? 'Flt ' + _plEsc(e.flight_no) : '');
 
@@ -8549,6 +8551,9 @@ async function pilotLogInit() {
     _pl.initialized = true;
     _plRequestPersist();           // V1.2：請瀏覽器把儲存標 persistent
     _plRegisterSyncTriggers();     // V1.3：online / 切回前景時自動補送 outbox
+    // V2.4.29（codex）：冷啟動時 body.pl-offline 還沒設，_plOnline() 會誤判為「線上」→ 離線開啟可能走去登入頁/不啟探線。
+    //   用 navigator.onLine 當「啟動初值」種一下(它可能誤報離線，但探線會在幾秒內打通 → 自動清掉，不會卡住)。
+    if (typeof navigator !== 'undefined' && navigator.onLine === false) _plSetOffline(true);
   }
   if (_pl.editing) { _plRenderEditor(); return; }
 
