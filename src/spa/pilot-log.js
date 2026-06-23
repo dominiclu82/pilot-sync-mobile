@@ -298,7 +298,9 @@ function _plEnqueue(type, id, body) {
   // rev++ 讓同步引擎能偵測「送出後又被改過」→ 不會把較新的編輯誤刪（codex P1）。
   for (var i = 0; i < _pl.outbox.length; i++) {
     if (_pl.outbox[i].id === id && (_pl.outbox[i].type === 'create' || _pl.outbox[i].type === 'update')) {
-      _pl.outbox[i].body = body; _pl.outbox[i].ts = Date.now();
+      // V2.4.28：改「欄位合併」(Object.assign) 而非整包取代 —— 讓「離線上鎖」只送 {is_locked} 也不會
+      //   洗掉同筆已排隊的其他編輯欄位。整筆存檔(_plSaveEntry)送的是完整 body，合併結果仍是完整版、不受影響。
+      _pl.outbox[i].body = Object.assign({}, _pl.outbox[i].body, body); _pl.outbox[i].ts = Date.now();
       _pl.outbox[i].rev = (_pl.outbox[i].rev || 1) + 1;
       _plOutboxPersist();
       return;
@@ -352,6 +354,14 @@ async function _plSync() {
           done = res.ok || res.status === 404;        // 404 = server 端已不在，視同處理完
         } else if (op.type === 'delete') {
           res = await _plApi('/api/pilot-log/entries/' + op.id, { method: 'DELETE' });
+          // V2.4.28（codex）：離線「解鎖→刪除」時，delete 入列會把待上傳的解鎖 op 一併移除，
+          //   導致 server 端那筆還鎖著 → DELETE 回 423。這裡偵測 423 就先補一次解鎖再重刪，避免變成「本機刪了、server 刪不掉」。
+          if (res && res.status === 423) {
+            try {
+              var ur = await _plApi('/api/pilot-log/entries/' + op.id, { method: 'PUT', body: { is_locked: false } });
+              if (ur && ur.ok) res = await _plApi('/api/pilot-log/entries/' + op.id, { method: 'DELETE' });
+            } catch (e2) {}
+          }
           done = res.ok || res.status === 404;
         } else { done = true; }                        // 未知 op 丟掉
       } catch (netErr) {
@@ -400,7 +410,14 @@ async function _plSync() {
   // 排空後跟 server 對帳一次（顯示 server 真實資料）
   if (!_pl.outbox.length && (typeof navigator === 'undefined' || navigator.onLine !== false)) {
     try { await _plFetchAll(); } catch (e) {}   // 內部會設 syncState = ok/warn
-    if (_pl.tab === 'logbook' && !_pl.editing) _plRenderList();
+    // V2.4.28：同步排空後「一律」重畫清單（即使正在編輯）→ 單筆待上傳的 ⏳ 才會即時清掉（之前 !_pl.editing
+    //   會在開著編輯面板時不重畫，導致已同步的那筆沙漏一直掛著）。重畫前後保留 #pl-list 捲動位置、不跳動。
+    if (_pl.tab === 'logbook') {
+      var _lcBefore = document.getElementById('pl-list'); var _st = _lcBefore ? _lcBefore.scrollTop : 0;
+      _plRenderList();
+      // codex：_plRenderList 會重建 #pl-list 節點 → 必須「重新查一次」新節點再還原捲動位置（舊參考已脫離 DOM、設了沒用）
+      var _lcAfter = document.getElementById('pl-list'); if (_lcAfter && _st) _lcAfter.scrollTop = _st;
+    }
   } else if (_pl.outbox.length) {
     // V2.4.12：還有沒上傳成功的 → 黃色（有網路沒同步成功）/ 紅色（離線）
     _pl.syncState = ((typeof navigator !== 'undefined' && navigator.onLine === false) || document.body.classList.contains('pl-offline')) ? 'offline' : 'warn';
@@ -4091,29 +4108,22 @@ async function _plToggleLock() {
   if (_pl._editorDirty && !e.is_locked) { try { await _plSaveEntry({ keepOpen: true }); } catch (err) {} }
   _pl._editorDirty = false;
   if (_plIsLocalId(e.id)) { _plToast('先存檔再上鎖', 'error'); return; }
-  if (typeof navigator !== 'undefined' && navigator.onLine === false) {
-    _plToast('🔒 鎖定切換需要連網路', 'error'); return;
-  }
+  // V2.4.28：離線優先上鎖（LogTen 離線也能鎖）—— 本機先鎖、排進 outbox（{is_locked} 會合併進同筆待上傳 body，
+  //   不洗掉其他離線編輯），回連自動上傳。不再因離線擋掉。
   var newLocked = !e.is_locked;
-  try {
-    var r = await _plApi('/api/pilot-log/entries/' + e.id, { method: 'PUT', body: { is_locked: newLocked } });
-    if (!r.ok) {
-      var ej = await r.json().catch(function() { return {}; });
-      _plToast('鎖定切換失敗 ' + (ej.error || r.status), 'error'); return;
-    }
-    e.is_locked = newLocked;
-    for (var i = 0; i < _pl.entries.length; i++) if (_pl.entries[i].id === e.id) _pl.entries[i].is_locked = newLocked;
-    if (_pl.aircraftEntries) for (var ai = 0; ai < _pl.aircraftEntries.length; ai++)
-      if (_pl.aircraftEntries[ai].id === e.id) _pl.aircraftEntries[ai].is_locked = newLocked;
-    _plCacheSaveEntries();
-    _plToast(newLocked ? '🔒 Locked' : '🔓 Unlocked');
-    // 重畫 editor 反映 lock 狀態（按鈕變、Delete 隱/現）
-    var inDetail = !!(document.getElementById('pl-detail-pane') && document.getElementById('pl-detail-pane').contains(document.getElementById('ple-flight_date')));
-    _plRenderEditor(inDetail ? 'pl-detail-pane' : 'pilotlog-content');
-    _plRenderList();
-  } catch (err) {
-    _plToast('鎖定切換失敗', 'error');
-  }
+  e.is_locked = newLocked;
+  for (var i = 0; i < _pl.entries.length; i++) if (_pl.entries[i].id === e.id) _pl.entries[i].is_locked = newLocked;
+  if (_pl.aircraftEntries) for (var ai = 0; ai < _pl.aircraftEntries.length; ai++)
+    if (_pl.aircraftEntries[ai].id === e.id) _pl.aircraftEntries[ai].is_locked = newLocked;
+  _plCacheSaveEntries();
+  if (_pl.aircraftEntries) _plCacheSaveAircraftEntries();   // codex：aircraftEntries 也要寫回 IDB，否則離線鎖完重啟會看到舊的未鎖版
+  _plEnqueue('update', e.id, { is_locked: newLocked });
+  _plToast(newLocked ? '🔒 Locked' : '🔓 Unlocked');
+  // 重畫 editor 反映 lock 狀態（按鈕變、Delete 隱/現）
+  var inDetail = !!(document.getElementById('pl-detail-pane') && document.getElementById('pl-detail-pane').contains(document.getElementById('ple-flight_date')));
+  _plRenderEditor(inDetail ? 'pl-detail-pane' : 'pilotlog-content');
+  _plRenderList();
+  _plSync();   // 有網路立刻送、離線排隊回連再送
 }
 
 // V1.3.33：一鍵上鎖 / 解鎖全部航班
