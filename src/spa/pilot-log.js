@@ -1075,7 +1075,7 @@ function _plRenderEntryRow(e) {
     mid = e.block_minutes ? _plMinToHHMM(e.block_minutes) + ' hrs' : '';
   } else if (e.std_utc && e.sta_utc) {
     dep = _plFmtUtcHHMM(e.std_utc); arr = _plFmtUtcHHMM(e.sta_utc);
-    var _schedMin = e.block_minutes != null ? e.block_minutes : Math.round((new Date(e.sta_utc) - new Date(e.std_utc)) / 60000);
+    var _schedMin = (e.block_minutes > 0) ? e.block_minutes : Math.round((new Date(e.sta_utc) - new Date(e.std_utc)) / 60000);
     mid = (_schedMin > 0 ? _plMinToHHMM(_schedMin) + ' ' : '') + 'sched';
   } else {
     mid = e.block_minutes ? _plMinToHHMM(e.block_minutes) + ' hrs' : '—';
