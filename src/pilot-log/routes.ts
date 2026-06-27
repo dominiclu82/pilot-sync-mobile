@@ -57,8 +57,8 @@ import { getAirportDbJs } from '../spa/js-airport-db.js';
 
 // ── 版本（比照 CrewSync / Morning：每次推版必更新；SW cache 名稱跟著走） ────
 // 本機 preview build 會暫時加 -tNN 後綴方便對版；推正式版前拿掉只留乾淨版號。
-export const PILOT_LOG_VERSION = 'V2.4.30';
-const PILOT_LOG_CACHE = 'pilotlog-v2-4-30';
+export const PILOT_LOG_VERSION = 'V2.4.31';
+const PILOT_LOG_CACHE = 'pilotlog-v2-4-31';
 
 export const pilotLogRouter = express.Router();
 
@@ -389,6 +389,16 @@ function _renderPilotLogChangelog(): string {
   return `
     ${renderCommunityLink()}
     <div class="pl-cl-v">${PILOT_LOG_VERSION}</div>
+    <div class="pl-cl-txt">
+      <b>🕐 時數顯示邏輯更新：修正部分表定班次無法顯示預計飛行時間的問題。</b><br>
+      <b>🕐 Time display fix: scheduled flight duration now shows correctly for all upcoming flights.</b>
+    </div>
+    <div class="pl-cl-v old">V2.4.30</div>
+    <div class="pl-cl-txt">
+      <b>🕐 時數顯示邏輯更新：表定班次（未執勤）現在會顯示 STD→STA 預計飛行時間。</b><br>
+      <b>🕐 Time display update: scheduled (not-yet-flown) entries now show the estimated flight duration from STD to STA.</b>
+    </div>
+    <div class="pl-cl-v old">V2.4.29</div>
     <div class="pl-cl-txt">
       <b>🔄 移除單筆待同步圖示（同步狀態看上方即可）；離線→回連自動恢復，不再卡在「離線」、免切畫面。</b><br>
       <b>🔄 Removed per-flight pending icon (use the top sync status); offline→online now auto-recovers — no more stuck "offline", no screen switch needed.</b>
