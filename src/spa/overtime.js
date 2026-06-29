@@ -180,8 +180,12 @@ function _otParseTimeStr(str) {
   return str;
 }
 
-/* ── 取得機場 UTC offset ── */
+/* ── 取得機場 UTC offset（DST-aware）── */
 function _otGetTzOffset(iata) {
+  if (typeof _tzDstOffset !== 'undefined') {
+    var off = _tzDstOffset(iata, new Date());
+    if (off !== null) return off;
+  }
   if (typeof _briefTzOffset !== 'undefined' && _briefTzOffset[iata] !== undefined) {
     return _briefTzOffset[iata];
   }

@@ -62,6 +62,50 @@ var _briefTzOffset = {
   PRG:1,BER:1,MUC:1,WAW:1,LNZ:1,VIE:1
 };
 
+/* ── IATA → IANA timezone（DST 自動換算用）── */
+var _briefTzIana = {
+  TPE:'Asia/Taipei',KHH:'Asia/Taipei',TSA:'Asia/Taipei',RMQ:'Asia/Taipei',
+  HKG:'Asia/Hong_Kong',MFM:'Asia/Macau',
+  NRT:'Asia/Tokyo',HND:'Asia/Tokyo',KIX:'Asia/Tokyo',CTS:'Asia/Tokyo',
+  FUK:'Asia/Tokyo',SDJ:'Asia/Tokyo',OKA:'Asia/Tokyo',KMJ:'Asia/Tokyo',
+  NGO:'Asia/Tokyo',KOJ:'Asia/Tokyo',TAK:'Asia/Tokyo',UKB:'Asia/Tokyo',
+  ICN:'Asia/Seoul',PUS:'Asia/Seoul',CJU:'Asia/Seoul',
+  CRK:'Asia/Manila',MNL:'Asia/Manila',CEB:'Asia/Manila',DVO:'Asia/Manila',
+  BKK:'Asia/Bangkok',DMK:'Asia/Bangkok',UTP:'Asia/Bangkok',CNX:'Asia/Bangkok',HKT:'Asia/Bangkok',
+  SGN:'Asia/Ho_Chi_Minh',HAN:'Asia/Bangkok',PQC:'Asia/Bangkok',PNH:'Asia/Phnom_Penh',
+  CXR:'Asia/Ho_Chi_Minh',DAD:'Asia/Bangkok',
+  CGK:'Asia/Jakarta',DPS:'Asia/Makassar',SUB:'Asia/Jakarta',
+  KCH:'Asia/Kuala_Lumpur',KUL:'Asia/Kuala_Lumpur',PEN:'Asia/Kuala_Lumpur',
+  SIN:'Asia/Singapore',
+  LAX:'America/Los_Angeles',SFO:'America/Los_Angeles',SEA:'America/Los_Angeles',
+  ONT:'America/Los_Angeles',OAK:'America/Los_Angeles',PDX:'America/Los_Angeles',
+  SMF:'America/Los_Angeles',LAS:'America/Los_Angeles',YVR:'America/Vancouver',
+  DEN:'America/Denver',TUS:'America/Phoenix',PHX:'America/Phoenix',
+  ANC:'America/Anchorage',HNL:'Pacific/Honolulu',GUM:'Pacific/Guam',SPN:'Pacific/Saipan',
+  PRG:'Europe/Prague',BER:'Europe/Berlin',MUC:'Europe/Berlin',
+  WAW:'Europe/Warsaw',LNZ:'Europe/Vienna',VIE:'Europe/Vienna',
+};
+
+/* ── DST-aware UTC offset（小時）── */
+function _tzDstOffset(iata, date) {
+  var iana = _briefTzIana[iata];
+  if (!iana) return (_briefTzOffset[iata] !== undefined) ? _briefTzOffset[iata] : null;
+  try {
+    var d = date || new Date();
+    var parts = new Intl.DateTimeFormat('en', {
+      timeZone: iana, timeZoneName: 'shortOffset'
+    }).formatToParts(d);
+    var tz = parts.find(function(p) { return p.type === 'timeZoneName'; });
+    if (!tz) return _briefTzOffset[iata];
+    var m = tz.value.match(/GMT([+-])(\d+)(?::(\d+))?/);
+    if (!m) return (_briefTzOffset[iata] !== undefined) ? _briefTzOffset[iata] : null;
+    var sign = m[1] === '+' ? 1 : -1;
+    return sign * (parseInt(m[2]) + (m[3] ? parseInt(m[3]) / 60 : 0));
+  } catch(e) {
+    return (_briefTzOffset[iata] !== undefined) ? _briefTzOffset[iata] : null;
+  }
+}
+
 /* ── IATA → ICAO 對照 ── */
 var _briefIataToIcao = {
   TPE:'RCTP',KHH:'RCKH',TSA:'RCSS',RMQ:'RCMQ',
@@ -337,8 +381,8 @@ function _briefFetchOriginInfo(fno, arrDateStr, dtEl, originIata) {
     var depDateStr = arrDateStr;
     if (depTs) {
       var d = new Date(depTs * 1000);
-      var offset = _briefTzOffset[originIata];
-      if (offset === undefined) offset = 8;
+      var offset = _tzDstOffset(originIata, d);
+      if (offset === null || offset === undefined) offset = 8;
       var local = new Date(d.getTime() + offset * 3600000);
       var hh = String(local.getUTCHours()).padStart(2, '0');
       var mm = String(local.getUTCMinutes()).padStart(2, '0');
@@ -407,8 +451,8 @@ function _briefFetchLiveOrigin(fno, dateStr, dtEl, originIata) {
     var depDateStr = dateStr;
     if (depIso) {
       var d = new Date(depIso);
-      var offset = _briefTzOffset[originIata];
-      if (offset === undefined) offset = 8;
+      var offset = _tzDstOffset(originIata, d);
+      if (offset === null || offset === undefined) offset = 8;
       var local = new Date(d.getTime() + offset * 3600000);
       timeStr = String(local.getUTCHours()).padStart(2, '0') + ':' + String(local.getUTCMinutes()).padStart(2, '0');
       depDateStr = local.getUTCFullYear() + '/' + String(local.getUTCMonth() + 1).padStart(2, '0') + '/' + String(local.getUTCDate()).padStart(2, '0');
@@ -1150,9 +1194,9 @@ function _briefCalcSchedFTmin(fl) {
   var depL = parseTime(fl.depTime);
   var arrL = parseTime(fl.arrTime);
   if (depL && arrL) {
-    var oOff = _briefTzOffset[(fl.origin || '').toUpperCase()];
-    var dOff = _briefTzOffset[(fl.dest || '').toUpperCase()];
-    if (oOff === undefined || dOff === undefined) return null;
+    var oOff = _tzDstOffset((fl.origin || '').toUpperCase(), new Date());
+    var dOff = _tzDstOffset((fl.dest || '').toUpperCase(), new Date());
+    if (oOff === null || oOff === undefined || dOff === null || dOff === undefined) return null;
     var dUtc = ((depL.hh * 60 + depL.mm) - oOff * 60 + 1440) % 1440;
     var aUtc = ((arrL.hh * 60 + arrL.mm) - dOff * 60 + 1440) % 1440;
     return (aUtc - dUtc + 1440) % 1440;
