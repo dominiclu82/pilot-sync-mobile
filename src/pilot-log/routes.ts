@@ -57,8 +57,8 @@ import { getAirportDbJs } from '../spa/js-airport-db.js';
 
 // ── 版本（比照 CrewSync / Morning：每次推版必更新；SW cache 名稱跟著走） ────
 // 本機 preview build 會暫時加 -tNN 後綴方便對版；推正式版前拿掉只留乾淨版號。
-export const PILOT_LOG_VERSION = 'V2.4.31';
-const PILOT_LOG_CACHE = 'pilotlog-v2-4-31';
+export const PILOT_LOG_VERSION = 'V2.4.32';
+const PILOT_LOG_CACHE = 'pilotlog-v2-4-32';
 
 export const pilotLogRouter = express.Router();
 
@@ -389,6 +389,11 @@ function _renderPilotLogChangelog(): string {
   return `
     ${renderCommunityLink()}
     <div class="pl-cl-v">${PILOT_LOG_VERSION}</div>
+    <div class="pl-cl-txt">
+      <b>🌍 時區夏令時間修正：Overtime 計算機與 Briefing 的本地時間換算現在自動考慮 DST，Seattle 夏天正確顯示 PDT（UTC-7）而非 PST（UTC-8）。</b><br>
+      <b>🌍 DST fix: Overtime and Briefing local-time conversion now accounts for daylight saving time — Seattle shows PDT (UTC-7) in summer, not PST (UTC-8).</b>
+    </div>
+    <div class="pl-cl-v old">V2.4.31</div>
     <div class="pl-cl-txt">
       <b>🕐 時數顯示邏輯更新：修正部分表定班次無法顯示預計飛行時間的問題。</b><br>
       <b>🕐 Time display fix: scheduled flight duration now shows correctly for all upcoming flights.</b>
