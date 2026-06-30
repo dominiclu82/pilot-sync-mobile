@@ -57,8 +57,8 @@ import { getAirportDbJs } from '../spa/js-airport-db.js';
 
 // ── 版本（比照 CrewSync / Morning：每次推版必更新；SW cache 名稱跟著走） ────
 // 本機 preview build 會暫時加 -tNN 後綴方便對版；推正式版前拿掉只留乾淨版號。
-export const PILOT_LOG_VERSION = 'V2.4.31';
-const PILOT_LOG_CACHE = 'pilotlog-v2-4-31';
+export const PILOT_LOG_VERSION = 'V2.4.32';
+const PILOT_LOG_CACHE = 'pilotlog-v2-4-32';
 
 export const pilotLogRouter = express.Router();
 
@@ -389,6 +389,11 @@ function _renderPilotLogChangelog(): string {
   return `
     ${renderCommunityLink()}
     <div class="pl-cl-v">${PILOT_LOG_VERSION}</div>
+    <div class="pl-cl-txt">
+      <b>🏷️ 支援所有欄位改名。</b><br>
+      <b>🏷️ All field labels are now renameable.</b>
+    </div>
+    <div class="pl-cl-v old">V2.4.31</div>
     <div class="pl-cl-txt">
       <b>🕐 時數顯示邏輯更新：修正部分表定班次無法顯示預計飛行時間的問題。</b><br>
       <b>🕐 Time display fix: scheduled flight duration now shows correctly for all upcoming flights.</b>

@@ -2044,7 +2044,7 @@ function _plCrewField(key, e, labelOverride) {
   if (_plWide()) {
     // V2.4.06：data-ckslot（拖曳高亮/框線對象）放「內容那塊」而非整筆 → 上面的角色標籤不會被框起來（誤會整排可拖）。
     return '<div style="margin-bottom:8px">' +
-      '<div style="font-size:.62em;color:var(--muted);margin-bottom:2px">' + _plEsc(label) + '</div>' +
+      _plFieldLabelHtml(key, label) +
       '<div' + dragAttr + ' style="display:flex;gap:4px;align-items:center">' + handle +
         '<div style="flex:1;min-width:0;position:relative">' +
           '<input id="ple-crew-' + key + '" autocomplete="off" placeholder="name" oninput="_plCrewSlotInput(\'' + key + '\');_plCrewDD(\'' + key + '\')" onfocus="_plCrewDD(\'' + key + '\')" onblur="_plCrewDDClose(\'' + key + '\')" style="width:100%;box-sizing:border-box;' + inputCss + '" value="' + _plEsc(dispName) + '">' +
@@ -2057,8 +2057,9 @@ function _plCrewField(key, e, labelOverride) {
   // 手機：LogTen 式 —— 標籤靠左、名字吃滿整列（一列一個），長名不再被截斷。職級與 ✏️ 收右邊。
   // V2.2.02：label 欄 64→46px（左邊不再留空、把空間還給名字），rank 50→52px（"RANK"/職級顯示得完整）。
   // V2.4.06：角色標籤放 data-ckslot「外面」（不被拖曳框線/高亮框住，免誤會整排可拖）；把手+名字+rank+✏️ 才是可拖的內容塊。
+  var _crewLabelHtml = _plFieldLabelHtml(key, label, 'flex:0 0 46px;text-align:right;overflow:hidden;text-overflow:ellipsis;white-space:nowrap');
   return '<div style="display:flex;align-items:center;gap:5px;margin-bottom:6px">' +
-    '<div style="flex:0 0 46px;font-size:.62em;color:var(--muted);text-align:right;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + _plEsc(label) + '">' + _plEsc(label) + '</div>' +
+    _crewLabelHtml +
     '<div' + dragAttr + ' style="display:flex;align-items:center;gap:5px;flex:1;min-width:0">' + handle +
       '<div style="flex:1;min-width:0;position:relative">' +
         '<input id="ple-crew-' + key + '" autocomplete="off" placeholder="name" oninput="_plCrewSlotInput(\'' + key + '\');_plCrewDD(\'' + key + '\')" onfocus="_plCrewDD(\'' + key + '\')" onblur="_plCrewDDClose(\'' + key + '\')" style="width:100%;box-sizing:border-box;' + inputCss + '" value="' + _plEsc(dispName) + '">' +
