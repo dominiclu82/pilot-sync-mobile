@@ -17,6 +17,9 @@ export function renderCommunityLink(): string {
 export interface ChangelogEntry { v: string; zh: string; en: string; }
 
 export const APP_CHANGELOG: ChangelogEntry[] = [
+  { v: 'V2.0.21',
+    zh: '[今日] 匯率改用 open.er-api.com（台銀 BOT 已加機器人驗證，server 端無法存取）；修正重新整理失敗時覆蓋舊資料的問題；日夜切換顏色改為藍色。',
+    en: '[Today] FX rates now use open.er-api.com (BOT Taiwan blocked server-side access with bot challenge); fixed data being wiped when refresh returns empty; day-night toggle colour changed to blue.' },
   { v: 'V2.0.20',
     zh: '[全域] 修正按鈕樣式。',
     en: '[All] Adjusted button styling.' },

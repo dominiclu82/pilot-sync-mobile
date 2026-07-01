@@ -856,7 +856,9 @@ morningRouter.post('/api/morning-report/refresh-partial', async (req, res) => {
     }
     const nowIso = new Date().toISOString();
     const merged: any = { ...existing, date: today, generated_at: nowIso };
-    merged[section] = value;
+    // 若 fetch 回空（{}、[]），保留舊資料不覆寫，只更新 fetched_at 讓前端知道嘗試過
+    const isEmpty = Array.isArray(value) ? value.length === 0 : (typeof value === 'object' && value !== null && Object.keys(value).length === 0);
+    if (!isEmpty) merged[section] = value;
     merged[section + '_fetched_at'] = nowIso;
     await saveReport(userId, today, merged);
     res.json({ ok: true, section, date: today });
@@ -1041,7 +1043,7 @@ a:active { opacity: 0.6; }
 .hdr-btn-font button:active { opacity: 0.7; }
 /* V2.0.20 日夜：方形（小圓角、跟 A+/A- 同尺寸同形狀），☀️上/🌙下、浮標純 CSS 上下滑＝現況 */
 .theme-seg{position:relative;display:inline-flex;flex-direction:column;box-sizing:border-box;width:34px;height:42px;padding:2px;border-radius:5px;background:var(--card);border:1px solid var(--border);cursor:pointer;flex:0 0 auto;margin-right:4px}
-.theme-seg-knob{position:absolute;left:2px;right:2px;top:2px;height:calc(50% - 2px);border-radius:3px;background:var(--accent);transition:transform .22s ease;pointer-events:none;transform:translateY(100%)}
+.theme-seg-knob{position:absolute;left:2px;right:2px;top:2px;height:calc(50% - 2px);border-radius:3px;background:#3b82f6;transition:transform .22s ease;pointer-events:none;transform:translateY(100%)}
 [data-theme="light"] .theme-seg-knob{transform:translateY(0)}
 .theme-seg-opt{position:relative;z-index:1;flex:1;display:flex;align-items:center;justify-content:center;background:none;border:0;padding:0;font-size:.98em;line-height:1;cursor:pointer}
 

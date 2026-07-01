@@ -377,160 +377,64 @@ async function fetchUsStocks(codes: string[] = US_STOCK_CODES) {
 }
 
 // ────────────────────────────────────────────────────────────────────
-// 3) 台銀匯率：CSV 主源 + HTML fallback
-//   - 優先打 flcsv/0/day（簡潔最快），加 cache-busting
-//   - 若 302/HTML/空 → fallback 解析 xrt?Lang=zh-TW 牌告
-//   - 兩者都失敗才回 {}（前端顯示 —）
-//   保留現金/即期買賣價，CSV 恢復後不用再改
+// 3) 匯率：open.er-api.com（免費、無需 key、每日更新）
+//   - 台銀 BOT 已加 bot challenge，server 端無法通過，改用公開 API
+//   - 回傳中間價；無現金買賣價（前端 cashSell 為 null → 顯示「即期」）
 // ────────────────────────────────────────────────────────────────────
-type TwdRate = {
-  rate: number | null;
-  cashBuy: number | null;
-  cashSell: number | null;
-  spotBuy: number | null;
-  spotSell: number | null;
-};
+type TwdRate = { rate: number | null };
 
-function _fxNz(n: number): number | null { return isNaN(n) ? null : n; }
-function _fxMid(cb: number | null, cs: number | null, sb: number | null, ss: number | null): number | null {
-  if (sb != null && ss != null) return (sb + ss) / 2;
-  if (cb != null && cs != null) return (cb + cs) / 2;
-  return null;
-}
-
-// CSV：原本格式
-//   0: 幣別 | 1: "本行買入" | 2: 現金買入 | 3: 即期買入 | 4-10: 遠期買入
-//   11: "本行賣出" | 12: 現金賣出 | 13: 即期賣出 | 14-20: 遠期賣出
-function _parseBotCsv(text: string): Record<string, TwdRate> | null {
-  const cleaned = text.replace(/^﻿/, '').trim();
-  if (!cleaned || cleaned.startsWith('<') || !cleaned.includes(',')) return null;
-  const lines = cleaned.split(/\r?\n/);
-  if (lines.length < 2) return null;
-  const out: Record<string, TwdRate> = {};
-  for (let i = 1; i < lines.length; i++) {
-    const cols = lines[i].split(',');
-    if (cols.length < 14) continue;
-    const code = cols[0].trim();
-    if (!/^[A-Z]{3}$/.test(code)) continue;
-    const cashBuy = _fxNz(parseFloat(cols[2]));
-    const spotBuy = _fxNz(parseFloat(cols[3]));
-    const cashSell = _fxNz(parseFloat(cols[12]));
-    const spotSell = _fxNz(parseFloat(cols[13]));
-    out[code] = { rate: _fxMid(cashBuy, cashSell, spotBuy, spotSell), cashBuy, cashSell, spotBuy, spotSell };
-  }
-  return Object.keys(out).length > 0 ? out : null;
-}
-
-// V1.0.12: 給 portfolio module 換匯用 (USD/TWD rate from BOT)
-// V1.0.15: 加 HTML fallback (CSV 偶發 302 / rate-limit on Render outbound)
-export async function fetchUsdTwdRate(): Promise<number | null> {
-  // 1) CSV (fast path)
+async function _fetchErApiRates(): Promise<Record<string, TwdRate> | null> {
   try {
-    const rates = await _fetchBotCsvRates();
-    const r = rates?.USD?.rate;
-    if (typeof r === 'number' && r > 0) return r;
-  } catch {}
-  // 2) HTML fallback (more robust against 302 redirect / rate-limit)
-  try {
-    const rates = await _fetchBotHtmlRates();
-    const r = rates?.USD?.rate;
-    if (typeof r === 'number' && r > 0) return r;
-  } catch {}
-  return null;
-}
-
-async function _fetchBotCsvRates(): Promise<Record<string, TwdRate> | null> {
-  try {
-    const url = 'https://rate.bot.com.tw/xrt/flcsv/0/day?t=' + Date.now();
-    const r = await fetch(url, {
-      headers: { 'User-Agent': 'Mozilla/5.0', 'Cache-Control': 'no-cache' },
-      cache: 'no-store',
-      redirect: 'manual',  // 不跟隨 302（被導到公告頁就算 CSV 失敗）
-    });
-    if (r.status < 200 || r.status >= 300) return null;
-    const text = await r.text();
-    return _parseBotCsv(text);
-  } catch {
-    return null;
-  }
-}
-
-// HTML：每個幣別一段，內含「(CCY)」+ data-table="本行XX買入/賣出" 的 td 數值
-// 同值會出現兩次（desktop / phone responsive）— 取第一個就行
-function _pickHtmlRate(block: string, label: string): number | null {
-  const re = new RegExp('data-table="' + label + '"[^>]*>\\s*([0-9.]+)', 'i');
-  const m = block.match(re);
-  if (!m) return null;
-  const n = parseFloat(m[1]);
-  return isNaN(n) ? null : n;
-}
-
-function _parseBotHtml(html: string): Record<string, TwdRate> | null {
-  const blocks = html.split(/<\/tr>/i);
-  const out: Record<string, TwdRate> = {};
-  for (const block of blocks) {
-    const m = block.match(/\(([A-Z]{3})\)/);
-    if (!m) continue;
-    const code = m[1];
-    if (out[code]) continue;
-    const cashBuy = _pickHtmlRate(block, '本行現金買入');
-    const cashSell = _pickHtmlRate(block, '本行現金賣出');
-    const spotBuy = _pickHtmlRate(block, '本行即期買入');
-    const spotSell = _pickHtmlRate(block, '本行即期賣出');
-    if (cashBuy == null && spotBuy == null) continue;
-    out[code] = { rate: _fxMid(cashBuy, cashSell, spotBuy, spotSell), cashBuy, cashSell, spotBuy, spotSell };
-  }
-  return Object.keys(out).length > 0 ? out : null;
-}
-
-async function _fetchBotHtmlRates(): Promise<Record<string, TwdRate> | null> {
-  try {
-    const r = await fetch('https://rate.bot.com.tw/xrt?Lang=zh-TW', {
-      headers: { 'User-Agent': 'Mozilla/5.0', 'Accept': 'text/html' },
+    const r = await fetch('https://open.er-api.com/v6/latest/TWD', {
+      headers: { 'Cache-Control': 'no-cache' },
       cache: 'no-store',
     });
     if (!r.ok) return null;
-    const html = await r.text();
-    return _parseBotHtml(html);
+    const data = await r.json();
+    if (data.result !== 'success' || !data.rates) return null;
+    const out: Record<string, TwdRate> = {};
+    for (const [code, ratePerTwd] of Object.entries(data.rates as Record<string, number>)) {
+      if (!/^[A-Z]{3}$/.test(code) || !ratePerTwd || !isFinite(ratePerTwd)) continue;
+      out[code] = { rate: 1 / ratePerTwd };  // convert: code per TWD → TWD per code
+    }
+    return Object.keys(out).length > 0 ? out : null;
   } catch {
     return null;
   }
 }
 
+export async function fetchUsdTwdRate(): Promise<number | null> {
+  try {
+    const rates = await _fetchErApiRates();
+    const r = rates?.USD?.rate;
+    if (typeof r === 'number' && r > 0) return r;
+  } catch {}
+  return null;
+}
+
 async function fetchFx(pairs: string[] = []) {
-  // 若沒傳 pairs 則用預設清單（向後相容）
   const usePairs = (pairs && pairs.length > 0) ? pairs : [
     ...FX_PAIRS.vsTwd.map(c => `${c}/TWD`),
     ...FX_PAIRS.cross.map(([a, b]) => `${a}/${b}`),
   ];
 
-  // 1) CSV 主源
-  let twdRates = await _fetchBotCsvRates();
-  let source: 'csv' | 'html' | null = twdRates ? 'csv' : null;
-
-  // 2) Fallback：HTML 牌告
+  const twdRates = await _fetchErApiRates();
   if (!twdRates) {
-    twdRates = await _fetchBotHtmlRates();
-    if (twdRates) source = 'html';
-  }
-
-  if (!twdRates) {
-    console.warn('[morning-builder] BOT FX: CSV + HTML 都失敗，回空');
+    console.warn('[morning-builder] ER-API FX 失敗，回空');
     return {};
   }
-  console.log(`[morning-builder] BOT FX 來源：${source} (${Object.keys(twdRates).length} 幣別)`);
+  console.log(`[morning-builder] ER-API FX 成功 (${Object.keys(twdRates).length} 幣別)`);
 
-  // 組成 pair-keyed 格式：任何 A/B，都用 (A/TWD)/(B/TWD) 去算
   const out: any = {};
   for (const pair of usePairs) {
     const [a, b] = pair.split('/');
     if (!a || !b) continue;
-    if (b === 'TWD' && twdRates[a]) {
-      out[pair] = { rate: twdRates[a].rate, cashSell: twdRates[a].cashSell };
-    } else if (a === 'TWD' && twdRates[b] && twdRates[b].rate) {
-      out[pair] = { rate: 1 / twdRates[b].rate };
-    } else if (twdRates[a] && twdRates[b] && twdRates[a].rate && twdRates[b].rate) {
-      out[pair] = { rate: twdRates[a].rate / twdRates[b].rate };
+    if (b === 'TWD' && twdRates[a]?.rate) {
+      out[pair] = { rate: twdRates[a].rate };
+    } else if (a === 'TWD' && twdRates[b]?.rate) {
+      out[pair] = { rate: 1 / twdRates[b].rate! };
+    } else if (twdRates[a]?.rate && twdRates[b]?.rate) {
+      out[pair] = { rate: twdRates[a].rate! / twdRates[b].rate! };
     }
   }
   return out;

@@ -518,6 +518,12 @@ function _giMergeFA(map, faData, airline) {
         if (!m.parking || m.parking === '—') m.parking = fa.destination.gate || '';
         if (!m.arrTerminal) m.arrTerminal = fa.destination.terminal || '';
       }
+      // 過境班到站半邊（key + ':A'）：只補出發地 gate/terminal（dest=TPE 那側已從 FIDS 取得，不覆寫）
+      var mArr = map[fno + ':A'];
+      if (mArr && fa.origin && fa.origin.iata && fa.origin.iata !== 'TPE') {
+        if (!mArr.gate || mArr.gate === '—') mArr.gate = fa.origin.gate || '';
+        if (!mArr.depTerminal) mArr.depTerminal = fa.origin.terminal || '';
+      }
     }
   });
 }
@@ -783,6 +789,12 @@ function _giProcessFlights() {
 
   var map = {};
 
+  // 先收集所有離站航班號，用來偵測過境班（同號同時有到站和離站）
+  var depKeys = {};
+  dep.forEach(function(f) {
+    depKeys[f.ACode.trim() + f.FlightNo.replace(/\s/g, '')] = true;
+  });
+
   dep.forEach(function(f) {
     var acode = f.ACode.trim();
     var key = acode + f.FlightNo.replace(/\s/g, '');
@@ -805,8 +817,10 @@ function _giProcessFlights() {
   arr.forEach(function(f) {
     var acode = f.ACode.trim();
     var key = acode + f.FlightNo.replace(/\s/g, '');
-    if (!map[key]) map[key] = { fno: key };
-    var m = map[key];
+    // 過境班：同航班號也有離站記錄，改用 :A 為 key 獨立顯示，避免資料混淆
+    var mapKey = depKeys[key] ? key + ':A' : key;
+    if (!map[mapKey]) map[mapKey] = { fno: key };
+    var m = map[mapKey];
     m.originCode = f.CityCode || '';
     m.originName = f.CityName || f.CityCode || '';
     if (!m.origin) m.origin = f.CityCode || '';

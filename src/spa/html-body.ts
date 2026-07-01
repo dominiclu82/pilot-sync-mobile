@@ -1541,7 +1541,7 @@ export function getSpaHtmlBody(): string {
       <button class="tab-util-btn tab-install-btn" id="tab-install-btn" onclick="showInstallGuide()" style="display:none">
         <span>📲</span>安裝
       </button>
-      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer;text-decoration:underline" onclick="showAbout()">V9.5.27</span>
+      <span style="font-size:.55em;color:var(--muted);line-height:1;opacity:.7;cursor:pointer;text-decoration:underline" onclick="showAbout()">V9.5.28</span>
     </div>
   </div>
 </div>
@@ -1575,7 +1575,12 @@ export function getSpaHtmlBody(): string {
     </div>
     <div style="max-height:50vh;overflow-y:auto;-webkit-overflow-scrolling:touch;margin-bottom:10px">
     ${renderCommunityLink()}
-    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V9.5.27</div>
+    <div style="font-size:.78em;font-weight:700;margin-bottom:6px" id="about-version">V9.5.28</div>
+    <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
+      <div>✈️ <b>Gate Info 修正過境班（如 TR866 SIN→TPE→NRT）顯示錯誤，現在正確拆成到站和離站兩筆。</b></div>
+      <div>✈️ <b>Gate Info: transit flights (e.g. TR866 SIN→TPE→NRT) now show as two separate rows instead of one garbled entry.</b></div>
+    </div>
+    <div style="font-size:.78em;font-weight:700;color:var(--muted);margin-bottom:6px">V9.5.27</div>
     <div style="font-size:.72em;color:var(--muted);margin-bottom:10px;line-height:1.5;text-align:left">
       <div>🌍 <b>Overtime / Briefing 時區換算支援夏令時間（DST），Seattle 夏天正確顯示 PDT (UTC-7)。</b></div>
       <div>🌍 <b>Overtime &amp; Briefing timezone conversion now accounts for DST — Seattle shows PDT (UTC-7) in summer.</b></div>
